@@ -1,3 +1,4 @@
+// @formatter:off
 /**
  * Copyright 2016 Bernard Ladenthin bernard.ladenthin@gmail.com
  *
@@ -14,6 +15,7 @@
  * limitations under the License.
  *
  */
+// @formatter:on
 package net.ladenthin.jcputhrottle;
 
 import com.sun.jna.Structure;
@@ -22,9 +24,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- *
- * @see <a href="http://msdn2.microsoft.com/en-us/library/aa373232.aspx">MSDN</a>
  * @author Bernard Ladenthin bernard.ladenthin@gmail.com
+ * @see <a href="http://msdn2.microsoft.com/en-us/library/aa373232.aspx">MSDN</a>
  */
 public class SYSTEM_POWER_STATUS extends Structure {
 

@@ -1,3 +1,4 @@
+// @formatter:off
 /**
  * Copyright 2016 Bernard Ladenthin bernard.ladenthin@gmail.com
  *
@@ -14,6 +15,7 @@
  * limitations under the License.
  *
  */
+// @formatter:on
 package net.ladenthin.jcputhrottle;
 
 import com.sun.jna.Native;
@@ -23,7 +25,6 @@ import com.sun.jna.platform.win32.WinReg;
 import com.sun.jna.win32.StdCallLibrary;
 
 /**
- *
  * @author Bernard Ladenthin bernard.ladenthin@gmail.com
  */
 public interface PowrProf extends StdCallLibrary {

@@ -1,3 +1,4 @@
+// @formatter:off
 /**
  * Copyright 2016 Bernard Ladenthin bernard.ladenthin@gmail.com
  *
@@ -14,6 +15,7 @@
  * limitations under the License.
  *
  */
+// @formatter:on
 package net.ladenthin.jcputhrottle;
 
 import javafx.application.Application;
@@ -28,7 +30,6 @@ import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
 
 /**
- *
  * @author Bernard Ladenthin bernard.ladenthin@gmail.com
  */
 public class Main extends Application {
