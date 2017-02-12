@@ -30,10 +30,10 @@ Scanner runter laden (startet implizit alle Updates aus dem Store)
 Erweiterte Optionen -> Update für andere Microsoft Produkte bereitstellen [ja], Featureupdates Zurückstellen [ja]
 
 ## autotuninglevel deaktivieren
-Windows Hilfreiches \ DisableAutotuninglevel.bat als Admin ausführen
+WindowsHelper\DisableAutotuninglevel.bat als Admin ausführen
 
 ## fast startup deaktivieren
-Windows Hilfreiches \ TurnOffFastStartup.bat als Admin ausführen
+WindowsHelper\TurnOffFastStartup.bat als Admin ausführen
 
 ## Systemwiederherstellung bereinigen
 * Systemsteuerung\System und Sicherheit\System
