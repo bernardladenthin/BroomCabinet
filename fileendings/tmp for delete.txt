@@ -1,0 +1,11 @@
+~WRL*.tmp
+.~lock.*odt#
+~$*.docx
+._.DS_Store
+.DS_Store
+.picasaoriginals
+.picasa.ini
+*.AAE
+AlbumArt*
+desktop.ini
+Thumbs.db

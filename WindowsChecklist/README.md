@@ -16,6 +16,7 @@ Systemsteuerung\Hardware und Sound\Energieoptionen -> Auswählen, was beim Drüc
 -> Beim Zuklappen -> Nichts unternehmen (für Laptops)
 -> Schnellstart deaktivieren (sehr wichtig).
 -> Ruhezustand deaktivieren (sehr wichtig).
+-> cmd als Admin: powercfg.exe /hibernate off
 
 Zeitpunkt für das Ausschalten des Bildschirms auswählen
 -> Bildschirm ausschalten: Niemals
@@ -35,7 +36,7 @@ WindowsHelper\DisableAutotuninglevel.bat als Admin ausführen
 ## fast startup deaktivieren
 WindowsHelper\TurnOffFastStartup.bat als Admin ausführen
 
-## Systemwiederherstellung bereinigen
+## Systemwiederherstellung
 * Systemsteuerung\System und Sicherheit\System
 * Erweiterte Systemeinstellungen, Tab Computerschutz, für C: (System) aktivieren
 * Konfigurieren: 10% und löschen

@@ -1,4 +1,13 @@
 # Developer
+## Auslagerungsdatei
+Je nach Programmen und RAM deaktivieren für höhere Performance und SSD schonen.
+
+## Large-Page Support und Sperren von Seiten im Speicher
+Wird beides über Sperren von Seiten im Speicher aktiviert.
+* gpedit.msc
+* Computerkonfigurationund/Windows-Einstellungen/Sicherheitseinstellungenund/Lokale Richtlinien/Zuweisen von Benutzerrechten
+* Sperren von Seiten im Speicher -> Benutzer hinzufügen
+
 ## powercfg
 WindowsHelper\CPU\powercfgtweakcpuminmax.bat nach C:\Windows\System32 kopieren
 

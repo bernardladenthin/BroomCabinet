@@ -1,0 +1,10 @@
+.bbl
+.blg
+.definition
+.idx
+.info
+.log
+.toc
+.synctex
+.aux
+.backup

@@ -1,0 +1,1 @@
+java -jar c:\dtdnsupdater-1.0.0.jar
