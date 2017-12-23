@@ -4,5 +4,6 @@ public class Configuration {
     public Command command;
     public BlockchainAnalysis blockchainAnalysis;
     public ExtractAddresses extractAddresses;
-    public ProbeAddresses probeAddresses;
+    public ProbeAddressesCPU probeAddressesCPU;
+    public ProbeAddressesOpenCL probeAddressesOpenCL;
 }
