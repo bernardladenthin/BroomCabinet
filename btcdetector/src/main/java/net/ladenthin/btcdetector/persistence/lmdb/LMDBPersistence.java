@@ -14,10 +14,6 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.util.List;
 
 import static org.lmdbjava.DbiFlags.MDB_CREATE;
@@ -126,7 +122,7 @@ public class LMDBPersistence implements Persistence {
     @Override
     public void writeAllAmounts(File file) throws IOException {
         try (Txn<ByteBuffer> txn = env.txnRead()) {
-            try (CursorIterator<ByteBuffer> iterate = lmdb_h160ToAmount.iterate(txn, CursorIterator.IteratorType.FORWARD)) {
+            try (CursorIterator<ByteBuffer> iterate = lmdb_h160ToAmount.iterate(txn, KeyRange.all())) {
                 try (FileWriter writer = new FileWriter(file)) {
                     for (final CursorIterator.KeyVal<ByteBuffer> kv : iterate.iterable()) {
                         ByteBuffer addressAsByteBuffer = kv.key();
