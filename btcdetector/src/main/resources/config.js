@@ -43,7 +43,7 @@
             "lmdbDirectory" : "lmdb"
         }
     },
-    "probeAddresses" : {
+    "probeAddressesCPU" : {
         "addressesFiles" : ["extractAddresses.txt", "staticAddresses.txt"],
         "foundFile" : "found.txt",
         "nThreads" : 6,
