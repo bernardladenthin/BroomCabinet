@@ -85,6 +85,10 @@ public abstract class Prober implements Runnable {
 
     protected void startStatisticsTimer() {
         Timer timer = new Timer();
+        int period = probeAddresses.printStatisticsEveryNSeconds;
+        if (period < 1) {
+            period = 1;
+        }
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
@@ -94,7 +98,7 @@ public abstract class Prober implements Runnable {
                 long uptimeInSeconds = Math.max(uptime/1000, 1);
                 logger.info("Statistics: Generated " + keys + " keys in " + uptimeInSeconds + " seconds. " + keys/uptimeInSeconds + " keys/second. " + hits.get() + " hits.");
             }
-        }, 0, probeAddresses.printStatisticsEveryNSeconds * 1000);
+        }, 0, period * 1000);
     }
 
     protected void addSchutdownHook() {

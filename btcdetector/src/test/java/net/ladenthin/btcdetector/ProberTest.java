@@ -85,7 +85,6 @@ public class ProberTest {
     @Test
     public void startStatisticsTimer_noExceptionThrown() throws IOException {
         ProbeAddresses pa = new ProbeAddresses();
-        pa.printStatisticsEveryNSeconds = 1;
         ProberTestImpl prober = new ProberTestImpl(pa);
         prober.startStatisticsTimer();
     }
