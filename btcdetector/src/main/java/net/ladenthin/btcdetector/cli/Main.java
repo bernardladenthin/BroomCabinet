@@ -45,7 +45,7 @@ public class Main implements Runnable {
                     prober.run();
                     break;
                 case ProbeAddressesOpenCL:
-                    OpenCLProber openCLProber = new OpenCLProber();
+                    OpenCLProber openCLProber = new OpenCLProber(configuration.probeAddressesOpenCL);
                     openCLProber.run();
                     break;
                 case BlockchainAnalysis:
