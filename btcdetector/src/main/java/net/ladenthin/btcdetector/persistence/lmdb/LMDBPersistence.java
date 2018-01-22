@@ -8,7 +8,13 @@ import net.ladenthin.btcdetector.persistence.PersistenceUtils;
 import org.bitcoinj.core.Address;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.Sha256Hash;
-import org.lmdbjava.*;
+import org.lmdbjava.CursorIterator;
+import org.lmdbjava.Dbi;
+import org.lmdbjava.Env;
+import org.lmdbjava.EnvFlags;
+import org.lmdbjava.KeyRange;
+import org.lmdbjava.Stat;
+import org.lmdbjava.Txn;
 
 import java.io.File;
 import java.io.FileWriter;

@@ -1,24 +1,20 @@
 package net.ladenthin.btcdetector;
 
 import net.ladenthin.btcdetector.configuration.ProbeAddressesCPU;
-import net.ladenthin.javacommons.StreamHelper;
-import org.bitcoinj.core.*;
-import org.bitcoinj.params.MainNetParams;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.bitcoinj.core.Address;
+import org.bitcoinj.core.DumpedPrivateKey;
+import org.bitcoinj.core.ECKey;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class CPUProber extends Prober {
 

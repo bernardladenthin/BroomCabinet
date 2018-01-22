@@ -1,10 +1,10 @@
 package net.ladenthin.btcdetector.cli;
 
 import com.google.gson.Gson;
-import net.ladenthin.btcdetector.*;
-import net.ladenthin.btcdetector.configuration.Command;
+import net.ladenthin.btcdetector.AddressesExtractor;
+import net.ladenthin.btcdetector.Analyser;
+import net.ladenthin.btcdetector.CPUProber;
 import net.ladenthin.btcdetector.configuration.Configuration;
-import net.ladenthin.btcdetector.configuration.ProbeAddresses;
 import net.ladenthin.javacommons.StreamHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,10 +43,6 @@ public class Main implements Runnable {
                 case ProbeAddressesCPU:
                     CPUProber prober = new CPUProber(configuration.probeAddressesCPU);
                     prober.run();
-                    break;
-                case ProbeAddressesOpenCL:
-                    OpenCLProber openCLProber = new OpenCLProber(configuration.probeAddressesOpenCL);
-                    openCLProber.run();
                     break;
                 case BlockchainAnalysis:
                     Analyser analyser = new Analyser(configuration.blockchainAnalysis);
