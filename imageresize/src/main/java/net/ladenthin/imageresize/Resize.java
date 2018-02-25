@@ -8,8 +8,8 @@ import java.nio.file.Path;
 public class Resize implements Runnable {
 
     private Common common = new Common();
-    float compressionQuality = 0.95f;
-    Dimension dimension = new Dimension(360, 360);
+    float compressionQuality = 0.80f;
+    Dimension dimension = new Dimension(600, 600);
     File workingDirectory = new File(".");
 
     public static void main(String[] argv) {

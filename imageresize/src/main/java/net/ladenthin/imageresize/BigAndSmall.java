@@ -28,7 +28,7 @@ public class BigAndSmall implements Runnable {
 
     public void resizeFile(Path path) {
         try {
-            ResizeToDirectory small = new ResizeToDirectory(path, new Dimension(280, 280), 0.90f, "small", "", "_s");
+            ResizeToDirectory small = new ResizeToDirectory(path, new Dimension(280, 280), 0.72f, "small", "", "_s");
             ResizeToDirectory big = new ResizeToDirectory(path, new Dimension(1600, 1600), 0.95f, "big", "", "");
             Set<String> directoriesToIgnore = new HashSet<>(Arrays.asList(small.directoryName, big.directoryName));
 
