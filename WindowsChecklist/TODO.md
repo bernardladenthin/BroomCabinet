@@ -2,8 +2,6 @@
 (Bei der Installation customize, beide Context Menüs raus, Check Updates raus)
 -> Einstellung -> Sprache -> Deutsch
 -> Einstellung -> Überwachung -> BEIDE Hacken deaktivieren
-#FileZilla
-#KeePass
 #LaTeX
 miktext -> install missing packages -> YES
 JabRef

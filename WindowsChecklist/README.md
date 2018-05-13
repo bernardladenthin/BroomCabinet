@@ -1,6 +1,4 @@
 # Einstellungen für alle Rechner
-## Laufwerke defragmentieren und optimieren
-Bei Festplatten: Automatische Defragmentierung (Optimierung) ausstellen
 
 ## Lautstärke
 Auf das Lautstärkesymbol rechtsklick, Wiedergabegeräte, Reiter Kommunikation
@@ -16,6 +14,7 @@ Systemsteuerung\Hardware und Sound\Energieoptionen -> Auswählen, was beim Drüc
 -> Beim Zuklappen -> Nichts unternehmen (für Laptops)
 -> Schnellstart deaktivieren (sehr wichtig).
 -> Ruhezustand deaktivieren (sehr wichtig).
+### Schnellstart, Hybrider Ruhezustand und Ruhezustand über die Eingabeaufforderung deaktivieren
 -> cmd als Admin: powercfg.exe /hibernate off
 
 Zeitpunkt für das Ausschalten des Bildschirms auswählen
@@ -28,7 +27,7 @@ Scanner runter laden (startet implizit alle Updates aus dem Store)
 -> Windows-Scanner laden
 
 ## Windows Update Einstellungen
-Erweiterte Optionen -> Update für andere Microsoft Produkte bereitstellen [ja], Featureupdates Zurückstellen [ja]
+Erweiterte Optionen -> Update für andere Microsoft Produkte bereitstellen, wenn ein Windows-Update ausgeführt wird [ja]
 
 ## autotuninglevel deaktivieren
 WindowsHelper\DisableAutotuninglevel.bat als Admin ausführen
@@ -44,18 +43,14 @@ WindowsHelper\TurnOffFastStartup.bat als Admin ausführen
 ## Startmenü Einträge
 [Dieser PC] und [Systemsteuerung] ins Startmenü
 
+## Gastbenutzer hinzufügen
+
 ## SysinternalsSuite
-Windows Programme Microsoft\SysinternalsSuite (Updated November 18, 2016) entpackt nach C:\SysinternalsSuite kopieren (und ggf. Verknüpfung nach Desktop)
-
-## MD5 and CRC
-Windows Programme\MD5 and CRC nach C:\Windows\System32 kopieren
-
-## Sync
-Windows Programme Microsoft\Sync 2.0 nach C:\Windows\System32 kopieren
-Eigenschaften -> Kompatibilität -> Programm als Administrator ausführen
-(ggf. Verknüpfung nach Desktop)
+Windows Programme Microsoft\SysinternalsSuite (Updated February 13, 2018) entpackt nach C:\SysinternalsSuite kopieren (und ggf. Verknüpfung nach Desktop)
 
 ## Windows Programme
+### MD5 and CRC
+Windows Programme\MD5 and CRC nach C:\Windows\System32 kopieren
 ### 7zip
 ### Adobe
 * Sumatra-PDF
@@ -64,6 +59,7 @@ Eigenschaften -> Kompatibilität -> Programm als Administrator ausführen
 * __kein__ Schokwave oder Air
 Zum Schluss Reader starten und nach Updates suchen
 
+### FileZilla
 ### Greenshot
 
 ### Java
@@ -74,8 +70,12 @@ Zum Schluss Reader starten und nach Updates suchen
 * Windows Programme\Maven\apache-maven-3.3.9-bin.zip nach C:\apache-maven-3.3.9 kopieren
 Umgebungsvariablen setzen:
 -> neu:
-JAVA_HOME: C:\Program Files\Java\jdk1.8.0_121
-PATH -> Neu -> C:\apache-maven-3.3.9\bin
+JAVA_HOME: C:\Program Files\Java\jdk-9.0.4
+PATH -> Neu -> C:\apache-maven-3.5.3\bin
+
+### Groovy
+
+### KeePass
 
 ### LibreOffice
 * Word auswählen
@@ -83,12 +83,8 @@ PATH -> Neu -> C:\apache-maven-3.3.9\bin
 
 ### Mozilla
 * Firefox
-** about:config und dann browser.sessionstore.interval auf 90000
-* wmpfirefoxplugin
 * Im Firefox unter Einstellungen -> Erweitert -> Datenübermittlung -> Telemetrie
 * Nach Standardprogramme suchen und Firefox festlegen
-
-### MozBackup
 
 ### Notepad++
 
@@ -98,7 +94,6 @@ PATH -> Neu -> C:\apache-maven-3.3.9\bin
 ### Python
 Achtung, add to path aktivieren
 
-### Skype
-* More options, beide Bing Buttons / MSN entfernen
-
+### VeraCrypt
 ### VLC
+### WinRAR
