@@ -46,7 +46,7 @@ Scanner runter laden (startet implizit alle Updates aus dem Store)
 
 ## Windows Programme
 ### MD5 and CRC
-*Windows Programme\MD5 and CRC nach C:\Windows\System32 kopieren
+* Windows Programme\MD5 and CRC nach C:\Windows\System32 kopieren
 ### 7zip
 ### Adobe
 * Sumatra-PDF
