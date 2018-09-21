@@ -1,0 +1,2 @@
+pnputil.exe /e > c:\drivers.txt
+pnputil.exe /d oemNN.inf
