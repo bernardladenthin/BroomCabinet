@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import net.ladenthin.btcdetector.AddressesExtractor;
 import net.ladenthin.btcdetector.Analyser;
 import net.ladenthin.btcdetector.CPUProber;
+import net.ladenthin.btcdetector.configuration.Command;
 import net.ladenthin.btcdetector.configuration.Configuration;
 import net.ladenthin.javacommons.StreamHelper;
 import org.slf4j.Logger;
@@ -52,6 +53,8 @@ public class Main implements Runnable {
                     AddressesExtractor addressesExtractor = new AddressesExtractor(configuration.extractAddresses);
                     addressesExtractor.run();
                     break;
+                case ProbeAddressesOpenCL:
+                    throw new UnsupportedOperationException(Command.ProbeAddressesOpenCL.toString() + " currently not supported." );
             }
         } catch (IOException e) {
             throw new RuntimeException(e);

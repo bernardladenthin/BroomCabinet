@@ -1,5 +1,5 @@
 package net.ladenthin.btcdetector.configuration;
 
 public enum Command {
-    ProbeAddressesCPU, BlockchainAnalysis, ExtractAddresses
+    ProbeAddressesCPU, BlockchainAnalysis, ExtractAddresses, ProbeAddressesOpenCL
 }

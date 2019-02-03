@@ -1,5 +1,5 @@
 {
-    "command": "ProbeAddressesOpenCL",
+    "command": "ProbeAddressesCPU",
     "blockchainAnalysis" : {
         "blockchainDirectory" : "I:/Bitcoin/blocks",
         "lastAnalyzedBlockHashFile" : "lastAnalyzedBlockHash.txt",
@@ -44,11 +44,11 @@
         }
     },
     "probeAddressesCPU" : {
-        "addressesFiles" : ["extractAddresses.txt", "staticAddresses.txt"],
+        "addressesFiles" : ["extractAddresses.txt", "staticAddresses.txt", "balances_all.txt"],
         "foundFile" : "found.txt",
         "nThreads" : 6,
         "printStatisticsEveryNSeconds" : 20,
-        "selftestFirst" : false
+        "selftestFirst" : true
     },
     "probeAddressesOpenCL" : {
     "addressesFiles" : ["extractAddresses.txt", "staticAddresses.txt"],

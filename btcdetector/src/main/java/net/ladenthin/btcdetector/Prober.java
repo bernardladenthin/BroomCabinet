@@ -12,7 +12,11 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.Deque;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -34,8 +38,9 @@ public abstract class Prober implements Runnable {
 
     protected final Object synchroizedWrite = new Object();
 
-    protected final static String selftestPrivateKeyAsWiF = "L3ij9REA2R8UQcVb7Vb8muLGN9J2N6TnDcCFgMRLT1ePCcDqqXnz";
-    protected final static String selftestPublicBase58 = "1CG6T3YWT2QmWY5DUcK8Stv2xbWu9Umiep";
+    protected final static String selftestPrivateKeyAsWiF          = "L3ij9REA2R8UQcVb7Vb8muLGN9J2N6TnDcCFgMRLT1ePCcDqqXnz";
+    protected final static String selftestPublicBase58Compressed   = "1CG6T3YWT2QmWY5DUcK8Stv2xbWu9Umiep";
+    protected final static String selftestPublicBase58Uncompressed = "124nnm6YTUT19rLXz6xS9iPcQAPGtNUenk";
 
     protected final ProbeAddresses probeAddresses;
 
@@ -46,15 +51,26 @@ public abstract class Prober implements Runnable {
     protected void readAdresses() {
         for (String addressFilePath : probeAddresses.addressesFiles ) {
             File addressFile = new File(addressFilePath);
-            logger.info("Read address file: " + addressFile);
+            logger.info("Read address file: " + addressFile + " into memory.");
             try {
                 String addressesToParse = new StreamHelper().readFullyAsUTF8String(addressFile);
+                logger.info("Split address file: " + addressFile + " in memory.");
                 String[] lines = addressesToParse.split("\\R");
-                for (String line : lines) {
+                Deque<String> linesAsDeque = new LinkedList<>(Arrays.asList(lines));
+                logger.info("Read address file: " + addressFile + " from memory. Parse now.");
+                // do not booth, its not memory efficient
+                addressesToParse = null;
+                lines = null;
+                while(!linesAsDeque.isEmpty()) {
+                    String line = linesAsDeque.pop();
                     String[] lineSplitted = line.split(CSV_SEPARATOR);
                     String address = lineSplitted[0];
                     address = address.trim();
                     if (address.isEmpty() || address.startsWith("#")) {
+                        continue;
+                    }
+                    if (address.startsWith("bc1")) {
+                        logger.trace("Ignore " + address + " for now. No support.");
                         continue;
                     }
                     try {
@@ -64,7 +80,8 @@ public abstract class Prober implements Runnable {
                     }
                 }
                 if(probeAddresses.selftestFirst) {
-                    addresses.add(getHash160ByteBufferFromBase58String(selftestPublicBase58));
+                    addresses.add(getHash160ByteBufferFromBase58String(selftestPublicBase58Compressed));
+                    addresses.add(getHash160ByteBufferFromBase58String(selftestPublicBase58Uncompressed));
                 }
                 logger.info("Currently " + addresses.size() + " unique addresses.");
             } catch (IOException e) {
@@ -74,7 +91,9 @@ public abstract class Prober implements Runnable {
     }
 
     protected ByteBuffer getHash160ByteBufferFromBase58String(String base58) {
-        return hash160ToByteBuffer(Address.fromBase58(networkParameters, base58).getHash160());
+        Address address = Address.fromBase58(networkParameters, base58);
+        byte[] hash160 = address.getHash160();
+        return hash160ToByteBuffer(hash160);
     }
 
     protected ByteBuffer hash160ToByteBuffer(byte[] hash160) {

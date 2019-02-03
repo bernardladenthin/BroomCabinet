@@ -1,10 +1,8 @@
 rem start /low java ^
 java ^
 -server ^
--XX:GCTimeRatio=19 ^
--XX:MinHeapFreeRatio=20 ^
--XX:MaxHeapFreeRatio=30 ^
--XX:MaxDirectMemorySize=32M ^
+-Xms8g ^
+-Xmx8g ^
 -Xdebug ^
 -Xrunjdwp:transport=dt_socket,address=1000,server=y,suspend=n ^
 -Dcom.sun.management.jmxremote.port=3333 ^

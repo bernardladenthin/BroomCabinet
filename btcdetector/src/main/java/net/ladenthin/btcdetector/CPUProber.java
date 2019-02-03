@@ -4,6 +4,7 @@ import net.ladenthin.btcdetector.configuration.ProbeAddressesCPU;
 import org.bitcoinj.core.Address;
 import org.bitcoinj.core.DumpedPrivateKey;
 import org.bitcoinj.core.ECKey;
+import org.spongycastle.util.encoders.Hex;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -38,7 +39,11 @@ public class CPUProber extends Prober {
 
     private void selftestFirst() {
         if (probeAddressesCPU.selftestFirst) {
-            checkPrivateKey(DumpedPrivateKey.fromBase58(networkParameters, selftestPrivateKeyAsWiF).getKey());
+            DumpedPrivateKey privateKey = DumpedPrivateKey.fromBase58(networkParameters, selftestPrivateKeyAsWiF);
+            ECKey ecKey = privateKey.getKey();
+            checkPrivateKey(ecKey);
+            ECKey decKey = ecKey.decompress();
+            checkPrivateKey(decKey);
         }
     }
 
@@ -58,7 +63,10 @@ public class CPUProber extends Prober {
      */
     private void tryToFindPrivateKey() {
         while(shouldRun.get()) {
-            checkPrivateKey(new ECKey());
+            ECKey ecKey = new ECKey();
+            checkPrivateKey(ecKey);
+            ECKey decKey = ecKey.decompress();
+            checkPrivateKey(decKey);
         }
     }
 
@@ -70,9 +78,11 @@ public class CPUProber extends Prober {
         ByteBuffer hash160AsByteBuffer = hash160ToByteBuffer(hash160);
         generatedPrivateKeys.incrementAndGet();
         if (addresses.contains(hash160AsByteBuffer)) {
+            byte[] publicKeyHash160Bytes = hash160AsByteBuffer.array();
+            String publicKeyHash160 = Hex.toHexString(publicKeyHash160Bytes);
             hits.incrementAndGet();
             String privateKeyAsWiF = key.getPrivateKeyAsWiF(networkParameters);
-            logger.info("HIT: Found a private key: " + privateKeyAsWiF);
+            logger.info("HIT: Found a private key: " + privateKeyAsWiF + " for " + key.getPublicKeyAsHex() +" publicKeyHex " +  publicKeyHash160);
             synchronized (synchroizedWrite) {
                 try {
                     Files.write(Paths.get(probeAddressesCPU.foundFile), (privateKeyAsWiF + "\n").getBytes(), StandardOpenOption.APPEND, StandardOpenOption.CREATE);
@@ -85,10 +95,8 @@ public class CPUProber extends Prober {
                 Address address = new Address(networkParameters, hash160);
                 String base58 = address.toBase58();
                 String privateKeyAsWiF = key.getPrivateKeyAsWiF(networkParameters);
-                logger.trace("MISS: not found the public address "+base58+" for the private key: " + privateKeyAsWiF);
+                logger.trace("MISS: not found the public address "+base58+" for the private key: " + privateKeyAsWiF + " compressed: " + key.isCompressed());
             }
         }
     }
-
-
 }
