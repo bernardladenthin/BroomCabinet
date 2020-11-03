@@ -2,7 +2,7 @@ package net.ladenthin.btcdetector;
 
 import net.ladenthin.btcdetector.configuration.ProbeAddresses;
 import net.ladenthin.javacommons.StreamHelper;
-import org.bitcoinj.core.Address;
+import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.AddressFormatException;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.params.MainNetParams;
@@ -91,7 +91,7 @@ public abstract class Prober implements Runnable {
     }
 
     protected ByteBuffer getHash160ByteBufferFromBase58String(String base58) {
-        Address address = Address.fromBase58(networkParameters, base58);
+        LegacyAddress address = LegacyAddress.fromBase58(networkParameters, base58);
         byte[] hash160 = address.getHash160();
         return hash160ToByteBuffer(hash160);
     }

@@ -1,6 +1,6 @@
 package net.ladenthin.btcdetector.persistence;
 
-import org.bitcoinj.core.Address;
+import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.Sha256Hash;
 
@@ -45,12 +45,12 @@ public class DBMakerPersistence implements Persistence {
     }
 
     @Override
-    public Coin getAmount(Address address) {
+    public Coin getAmount(LegacyAddress address) {
         return null;
     }
 
     @Override
-    public void putTransaction(Sha256Hash transactionHash, List<Address> addresses) {
+    public void putTransaction(Sha256Hash transactionHash, List<LegacyAddress> addresses) {
 
     }
 
@@ -65,24 +65,24 @@ public class DBMakerPersistence implements Persistence {
     }
 
     @Override
-    public void changeAmount(Address address, Coin amountToChange) {
+    public void changeAmount(LegacyAddress address, Coin amountToChange) {
         //adresses.put(toAddress.getHash160(), 0L);
         //adresses2.add(ByteBuffer.wrap(toAddress.getHash160()).asReadOnlyBuffer());
         //db.commit();
     }
 
     @Override
-    public void putNewAmount(Address address, Coin toWrite) {
+    public void putNewAmount(LegacyAddress address, Coin toWrite) {
 
     }
 
     @Override
-    public List<Address> getAddressesFromTransaction(Sha256Hash transactionHash) {
+    public List<LegacyAddress> getAddressesFromTransaction(Sha256Hash transactionHash) {
         return null;
     }
 
     @Override
-    public Coin getAllAmountsFromAddresses(List<Address> addresses) {
+    public Coin getAllAmountsFromAddresses(List<LegacyAddress> addresses) {
         return null;
     }
 }

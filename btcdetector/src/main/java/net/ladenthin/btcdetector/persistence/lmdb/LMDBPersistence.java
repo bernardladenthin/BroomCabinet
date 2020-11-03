@@ -5,10 +5,10 @@ import net.ladenthin.btcdetector.configuration.LmdbConfigurationReadOnly;
 import net.ladenthin.btcdetector.configuration.LmdbConfigurationWrite;
 import net.ladenthin.btcdetector.persistence.Persistence;
 import net.ladenthin.btcdetector.persistence.PersistenceUtils;
-import org.bitcoinj.core.Address;
+import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.Sha256Hash;
-import org.lmdbjava.CursorIterator;
+import org.lmdbjava.CursorIterable;
 import org.lmdbjava.Dbi;
 import org.lmdbjava.Env;
 import org.lmdbjava.EnvFlags;
@@ -90,7 +90,7 @@ public class LMDBPersistence implements Persistence {
     }
 
     @Override
-    public Coin getAmount(Address address) {
+    public Coin getAmount(LegacyAddress address) {
         try (Txn<ByteBuffer> txn = env.txnRead()) {
             ByteBuffer key = persistenceUtils.addressToByteBufferDirect(address);
             ByteBuffer byteBuffer = lmdb_h160ToAmount.get(txn, key);
@@ -105,7 +105,7 @@ public class LMDBPersistence implements Persistence {
     }
 
     @Override
-    public void putTransaction(Sha256Hash transactionHash, List<Address> addresses) {
+    public void putTransaction(Sha256Hash transactionHash, List<LegacyAddress> addresses) {
         ByteBuffer transactionHashByteBuffer = persistenceUtils.hashToByteBufferDirect(transactionHash);
         ByteBuffer hash160sByteBuffer = persistenceUtils.addressListToByteBufferDirect(addresses);
         try (Txn<ByteBuffer> txn = env.txnWrite()) {
@@ -128,11 +128,11 @@ public class LMDBPersistence implements Persistence {
     @Override
     public void writeAllAmounts(File file) throws IOException {
         try (Txn<ByteBuffer> txn = env.txnRead()) {
-            try (CursorIterator<ByteBuffer> iterate = lmdb_h160ToAmount.iterate(txn, KeyRange.all())) {
+            try (CursorIterable<ByteBuffer> iterable = lmdb_h160ToAmount.iterate(txn, KeyRange.all())) {
                 try (FileWriter writer = new FileWriter(file)) {
-                    for (final CursorIterator.KeyVal<ByteBuffer> kv : iterate.iterable()) {
+                    for (final CursorIterable.KeyVal<ByteBuffer> kv : iterable) {
                         ByteBuffer addressAsByteBuffer = kv.key();
-                        Address address = persistenceUtils.byteBufferToAddress(addressAsByteBuffer);
+                        LegacyAddress address = persistenceUtils.byteBufferToAddress(addressAsByteBuffer);
                         String line = address.toBase58() + Prober.CSV_SEPARATOR + kv.val().getLong() + System.lineSeparator();
                         writer.write(line);
                     }
@@ -142,14 +142,14 @@ public class LMDBPersistence implements Persistence {
     }
 
     @Override
-    public void changeAmount(Address address, Coin amountToChange) {
+    public void changeAmount(LegacyAddress address, Coin amountToChange) {
         Coin valueInDB = getAmount(address);
         Coin toWrite = valueInDB.add(amountToChange);
         putNewAmount(address, toWrite);
     }
 
     @Override
-    public void putNewAmount(Address address, Coin toWrite) {
+    public void putNewAmount(LegacyAddress address, Coin toWrite) {
         ByteBuffer key = persistenceUtils.addressToByteBufferDirect(address);
         try (Txn<ByteBuffer> txn = env.txnWrite()) {
             if (lmdbConfigurationWrite.deleteEmptyAddresses && toWrite.isZero()) {
@@ -163,7 +163,7 @@ public class LMDBPersistence implements Persistence {
     }
 
     @Override
-    public List<Address> getAddressesFromTransaction(Sha256Hash transactionHash) {
+    public List<LegacyAddress> getAddressesFromTransaction(Sha256Hash transactionHash) {
         ByteBuffer transactionHashByteBuffer = persistenceUtils.hashToByteBufferDirect(transactionHash);
         ByteBuffer hash160sByteBuffer;
         try (Txn<ByteBuffer> txn = env.txnRead()) {
@@ -173,14 +173,14 @@ public class LMDBPersistence implements Persistence {
         if (hash160sByteBuffer == null) {
             throw new RuntimeException("Transaction is not available: " + transactionHash);
         }
-        List<Address> addresses = persistenceUtils.byteBufferToAddressList(hash160sByteBuffer);
+        List<LegacyAddress> addresses = persistenceUtils.byteBufferToAddressList(hash160sByteBuffer);
         return addresses;
     }
 
     @Override
-    public Coin getAllAmountsFromAddresses(List<Address> addresses) {
+    public Coin getAllAmountsFromAddresses(List<LegacyAddress> addresses) {
         Coin allAmounts = Coin.ZERO;
-        for (Address address : addresses) {
+        for (LegacyAddress address : addresses) {
             allAmounts = allAmounts.add(getAmount(address));
         }
         return allAmounts;

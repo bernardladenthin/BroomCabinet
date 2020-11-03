@@ -1,6 +1,6 @@
 package net.ladenthin.btcdetector.persistence;
 
-import org.bitcoinj.core.Address;
+import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.Sha256Hash;
 
@@ -30,31 +30,31 @@ public class PersistenceUtils {
         return newValue;
     }
 
-    public ByteBuffer addressListToByteBufferDirect(List<Address> addresses) {
-        ByteBuffer byteBuffer = ByteBuffer.allocateDirect(Address.LENGTH * addresses.size());
-        for (Address address : addresses) {
+    public ByteBuffer addressListToByteBufferDirect(List<LegacyAddress> addresses) {
+        ByteBuffer byteBuffer = ByteBuffer.allocateDirect(LegacyAddress.LENGTH * addresses.size());
+        for (LegacyAddress address : addresses) {
             byteBuffer.put(address.getHash160());
         }
         byteBuffer.flip();
         return byteBuffer;
     }
 
-    public List<Address> byteBufferToAddressList(ByteBuffer byteBuffer) {
-        List<Address> addresses = new ArrayList<>();
-        int count = byteBuffer.remaining() / Address.LENGTH;
+    public List<LegacyAddress> byteBufferToAddressList(ByteBuffer byteBuffer) {
+        List<LegacyAddress> addresses = new ArrayList<>();
+        int count = byteBuffer.remaining() / LegacyAddress.LENGTH;
         for (int i = 0; i < count; i++) {
-            byte[] hash160 = new byte[Address.LENGTH];
+            byte[] hash160 = new byte[LegacyAddress.LENGTH];
             byteBuffer.get(hash160);
-            addresses.add(new Address(networkParameters, hash160));
+            addresses.add(new LegacyAddress(networkParameters, hash160));
         }
         return addresses;
     }
 
-    public Address byteBufferToAddress(ByteBuffer byteBuffer) {
-        return new Address(networkParameters, byteBufferToBytes(byteBuffer));
+    public LegacyAddress byteBufferToAddress(ByteBuffer byteBuffer) {
+        return new LegacyAddress(networkParameters, byteBufferToBytes(byteBuffer));
     }
 
-    public ByteBuffer addressToByteBufferDirect(Address address) {
+    public ByteBuffer addressToByteBufferDirect(LegacyAddress address) {
         return bytesToByteBufferDirect(address.getHash160());
     }
 

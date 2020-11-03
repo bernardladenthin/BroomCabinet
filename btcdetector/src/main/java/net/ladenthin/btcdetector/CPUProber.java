@@ -1,10 +1,10 @@
 package net.ladenthin.btcdetector;
 
 import net.ladenthin.btcdetector.configuration.ProbeAddressesCPU;
-import org.bitcoinj.core.Address;
+import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.DumpedPrivateKey;
 import org.bitcoinj.core.ECKey;
-import org.spongycastle.util.encoders.Hex;
+import org.bouncycastle.util.encoders.Hex;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -92,7 +92,7 @@ public class CPUProber extends Prober {
             }
         } else {
             if (logger.isTraceEnabled()) {
-                Address address = new Address(networkParameters, hash160);
+                LegacyAddress address = new LegacyAddress(networkParameters, hash160);
                 String base58 = address.toBase58();
                 String privateKeyAsWiF = key.getPrivateKeyAsWiF(networkParameters);
                 logger.trace("MISS: not found the public address "+base58+" for the private key: " + privateKeyAsWiF + " compressed: " + key.isCompressed());

@@ -5,11 +5,13 @@ import net.ladenthin.btcdetector.persistence.PersistenceUtils;
 import net.ladenthin.btcdetector.persistence.lmdb.LMDBPersistence;
 import net.ladenthin.javacommons.StreamHelper;
 import org.bitcoinj.core.Address;
+import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.Block;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.Context;
+import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.NetworkParameters;
-import org.bitcoinj.core.ScriptException;
+import org.bitcoinj.script.ScriptException;
 import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.Transaction;
 import org.bitcoinj.core.TransactionInput;
@@ -213,13 +215,18 @@ public class Analyser implements Runnable {
     }
 
     private void processOutputs(Sha256Hash transactionHash, List<TransactionOutput> outputs) {
-        List<Address> allOutputAddresses = new ArrayList<>();
+        List<LegacyAddress> allOutputAddresses = new ArrayList<>();
         for (TransactionOutput output : outputs) {
             try {
                 Script scriptPubKey = output.getScriptPubKey();
                 Address toAddress = scriptPubKey.getToAddress(networkParameters, true);
-                allOutputAddresses.add(toAddress);
-                persistence.changeAmount(toAddress, output.getValue());
+                if (toAddress instanceof LegacyAddress) {
+                    LegacyAddress legacyAddress = (LegacyAddress)toAddress;
+                    allOutputAddresses.add(legacyAddress);
+                    persistence.changeAmount(legacyAddress, output.getValue());
+                } else {
+                    logger.warn("Skip toAddress in case of none LegacyAddress: " + toAddress);
+                }
             } catch(ScriptException e) {
                 // https://blockchain.info/tx/e411dbebd2f7d64dafeef9b14b5c59ec60c36779d43f850e5e347abee1e1a455
                 // not able to decode address
@@ -252,12 +259,12 @@ public class Analyser implements Runnable {
                 if (transactionOutPoint != null) {
                     Sha256Hash transactionOutPointHash = transactionOutPoint.getHash();
                     // gather coins from this out point transaction
-                    List<Address> addressesFromTransaction = persistence.getAddressesFromTransaction(transactionOutPointHash);
+                    List<LegacyAddress> addressesFromTransaction = persistence.getAddressesFromTransaction(transactionOutPointHash);
                     if (false) {
                         // currently not needed
                         Coin allAmountsFromAddresses = persistence.getAllAmountsFromAddresses(addressesFromTransaction);
                     }
-                    for (Address address : addressesFromTransaction) {
+                    for (LegacyAddress address : addressesFromTransaction) {
                         persistence.putNewAmount(address, Coin.ZERO);
                     }
                     // do not delete transaction at this point, the following is possible:
@@ -268,8 +275,11 @@ public class Analyser implements Runnable {
                     Coin inputValue = input.getValue();
                     if (inputValue != null) {
                         // TODO: find an transaction similar like this and calculate correct the input: 56336a227949d2b510fd024bf39f3e1c72ea32302db69ed1aa9a8ef61a31387f
-                        Address fromAddress = input.getFromAddress();
-                        persistence.changeAmount(fromAddress, Coin.valueOf(-inputValue.getValue()));
+                        List<ECKey> pubKeys = input.getScriptSig().getPubKeys();
+                        for (ECKey ecKey : pubKeys) {
+                            LegacyAddress fromAddress = new LegacyAddress( networkParameters, ecKey.getPubKeyHash() );
+                            persistence.changeAmount( fromAddress, Coin.valueOf( -inputValue.getValue() ) );
+                        }
                     }
                 }
 
