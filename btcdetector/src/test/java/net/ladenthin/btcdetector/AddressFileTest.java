@@ -12,9 +12,10 @@ public class AddressFileTest {
 
     private static final TestAddresses testAddresses = new TestAddresses(0, false);
 
-    private static final String SEGWIT_PUBLIC_ADDRESS = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
-
     StaticKey staticKey = new StaticKey();
+    
+    
+    KeyUtility keyUtility =     new KeyUtility(testAddresses.networkParameters, new ByteBufferUtility(false));
 
     @Before
     public void init() throws IOException {
@@ -23,46 +24,46 @@ public class AddressFileTest {
     @Test
     public void fromBase58CSVLine_TestUncompressed() throws IOException {
         // act
-        ByteBuffer byteBuffer = new AddressFile(testAddresses.networkParameters).fromBase58CSVLine(staticKey.publicKeyUncompressed);
+        AddressToCoin addressToCoin = AddressToCoin.fromBase58CSVLine(staticKey.publicKeyUncompressed,keyUtility );
 
         // assert
-        assertThat(byteBuffer, is(equalTo(staticKey.byteBufferPublicKeyUncompressed)));
+        assertThat(addressToCoin.getHash160(), is(equalTo(staticKey.byteBufferPublicKeyUncompressed)));
     }
 
     @Test
     public void fromBase58CSVLine_TestCompressed() throws IOException {
         // act
-        ByteBuffer byteBuffer = new AddressFile(testAddresses.networkParameters).fromBase58CSVLine(staticKey.publicKeyCompressed);
+        AddressToCoin addressToCoin = AddressToCoin.fromBase58CSVLine(staticKey.publicKeyCompressed, keyUtility);
 
         // assert
-        assertThat(byteBuffer, is(equalTo(staticKey.byteBufferPublicKeyCompressed)));
+        assertThat(addressToCoin.getHash160(), is(equalTo(staticKey.byteBufferPublicKeyCompressed)));
     }
 
     @Test
     public void fromBase58CSVLine_addressLineIsEmpty_returnNull() throws IOException {
         // act
-        ByteBuffer byteBuffer = new AddressFile(testAddresses.networkParameters).fromBase58CSVLine("");
+        AddressToCoin addressToCoin = AddressToCoin.fromBase58CSVLine("", keyUtility);
 
         // assert
-        assertThat(byteBuffer, is(nullValue()));
+        assertThat(addressToCoin, is(nullValue()));
     }
 
     @Test
     public void fromBase58CSVLine_addressLineStartsWithIgnoreLineSign_returnNull() throws IOException {
         // act
-        ByteBuffer byteBuffer = new AddressFile(testAddresses.networkParameters).fromBase58CSVLine(AddressFile.IGNORE_LINE_PREFIX + " test");
+        AddressToCoin addressToCoin = AddressToCoin.fromBase58CSVLine(AddressFile.IGNORE_LINE_PREFIX + " test", keyUtility);
 
         // assert
-        assertThat(byteBuffer, is(nullValue()));
+        assertThat(addressToCoin, is(nullValue()));
     }
 
     @Test
     public void fromBase58CSVLine_addressStartsWithbc1_returnNull() throws IOException {
         // act
-        ByteBuffer byteBuffer = new AddressFile(testAddresses.networkParameters).fromBase58CSVLine(SEGWIT_PUBLIC_ADDRESS);
+        AddressToCoin addressToCoin = AddressToCoin.fromBase58CSVLine(TestAddresses.SEGWIT_PUBLIC_ADDRESS, keyUtility);
 
         // assert
-        assertThat(byteBuffer, is(nullValue()));
+        assertThat(addressToCoin, is(nullValue()));
     }
 
 }

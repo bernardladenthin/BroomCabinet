@@ -1,12 +1,9 @@
 package net.ladenthin.btcdetector.persistence.lmdb;
 
-import net.ladenthin.btcdetector.configuration.LmdbConfigurationReadOnly;
-import net.ladenthin.btcdetector.configuration.LmdbConfigurationWrite;
 import net.ladenthin.btcdetector.persistence.Persistence;
 import net.ladenthin.btcdetector.persistence.PersistenceUtils;
 import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.Coin;
-import org.bitcoinj.core.Sha256Hash;
 import org.lmdbjava.CursorIterable;
 import org.lmdbjava.Dbi;
 import org.lmdbjava.Env;
@@ -20,17 +17,19 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Map;
 import net.ladenthin.btcdetector.AddressFile;
 import net.ladenthin.btcdetector.ByteBufferUtility;
 import net.ladenthin.btcdetector.KeyUtility;
+import net.ladenthin.btcdetector.configuration.LmdbConfigurationReadOnly;
+import net.ladenthin.btcdetector.configuration.LmdbConfigurationWrite;
 
 import static org.lmdbjava.DbiFlags.MDB_CREATE;
 import static org.lmdbjava.Env.create;
 
 public class LMDBPersistence implements Persistence {
 
-    private static final String DB_NAME_h160ToAmount = "h160ToAmount";
-    private static final String DB_NAME_transactionHashToAddresses = "transactionHashToAddresses";
+    private static final String DB_NAME_HASH160_TO_COINT = "hash160toCoin";
     private static final int DB_COUNT = 2;
 
     private final PersistenceUtils persistenceUtils;
@@ -39,7 +38,6 @@ public class LMDBPersistence implements Persistence {
     private final KeyUtility keyUtility;
     private Env<ByteBuffer> env;
     private Dbi<ByteBuffer> lmdb_h160ToAmount;
-    private Dbi<ByteBuffer> lmdb_transactionHashToAddresses;
 
     public LMDBPersistence(LmdbConfigurationWrite lmdbConfigurationWrite, PersistenceUtils persistenceUtils) {
         this.lmdbConfigurationReadOnly = null;
@@ -76,12 +74,10 @@ public class LMDBPersistence implements Persistence {
                     .open(lmdbDirectory, EnvFlags.MDB_NOSYNC, EnvFlags.MDB_NOMETASYNC, EnvFlags.MDB_WRITEMAP, EnvFlags.MDB_MAPASYNC);
             // We need a Dbi for each DB. A Dbi roughly equates to a sorted map. The
             // MDB_CREATE flag causes the DB to be created if it doesn't already exist.
-            lmdb_h160ToAmount = env.openDbi(DB_NAME_h160ToAmount, MDB_CREATE);
-            lmdb_transactionHashToAddresses = env.openDbi(DB_NAME_transactionHashToAddresses, MDB_CREATE);
+            lmdb_h160ToAmount = env.openDbi(DB_NAME_HASH160_TO_COINT, MDB_CREATE);
         } else if (lmdbConfigurationReadOnly != null) {
             env = create().setMaxDbs(DB_COUNT).open(new File(lmdbConfigurationReadOnly.lmdbDirectory), EnvFlags.MDB_RDONLY_ENV);
-            lmdb_h160ToAmount = env.openDbi(DB_NAME_h160ToAmount);
-            lmdb_transactionHashToAddresses = env.openDbi(DB_NAME_transactionHashToAddresses);
+            lmdb_h160ToAmount = env.openDbi(DB_NAME_HASH160_TO_COINT);
         } else {
             throw new IllegalArgumentException();
         }
@@ -90,7 +86,6 @@ public class LMDBPersistence implements Persistence {
     @Override
     public void close() {
         lmdb_h160ToAmount.close();
-        lmdb_transactionHashToAddresses.close();
     }
 
     @Override
@@ -107,30 +102,19 @@ public class LMDBPersistence implements Persistence {
             return valueInDB;
         }
     }
-
+    
+    
     @Override
-    public void putTransaction(Sha256Hash transactionHash, List<LegacyAddress> addresses) {
-        ByteBuffer transactionHashByteBuffer = persistenceUtils.hashToByteBufferDirect(transactionHash);
-        ByteBuffer hash160sByteBuffer = persistenceUtils.addressListToByteBufferDirect(addresses);
-        try (Txn<ByteBuffer> txn = env.txnWrite()) {
-            lmdb_transactionHashToAddresses.put(txn, transactionHashByteBuffer, hash160sByteBuffer);
-            txn.commit();
+    public boolean containsAddress(ByteBuffer hash160) {
+        try (Txn<ByteBuffer> txn = env.txnRead()) {
+            ByteBuffer byteBuffer = lmdb_h160ToAmount.get(txn, hash160);
             txn.close();
+            return byteBuffer != null;
         }
     }
-
+    
     @Override
-    public void removeTransaction(Sha256Hash transactionHash) {
-        ByteBuffer transactionHashByteBuffer = persistenceUtils.hashToByteBufferDirect(transactionHash);
-        try (Txn<ByteBuffer> txn = env.txnWrite()) {
-            lmdb_transactionHashToAddresses.delete(txn, transactionHashByteBuffer);
-            txn.commit();
-            txn.close();
-        }
-    }
-
-    @Override
-    public void writeAllAmounts(File file) throws IOException {
+    public void writeAllAmountsToAddressFile(File file) throws IOException {
         try (Txn<ByteBuffer> txn = env.txnRead()) {
             try (CursorIterable<ByteBuffer> iterable = lmdb_h160ToAmount.iterate(txn, KeyRange.all())) {
                 try (FileWriter writer = new FileWriter(file)) {
@@ -142,6 +126,14 @@ public class LMDBPersistence implements Persistence {
                     }
                 }
             }
+        }
+    }
+    
+    @Override
+    public void putAllAmounts(Map<ByteBuffer, Coin> amounts) throws IOException {
+        for (Map.Entry<ByteBuffer, Coin> entry : amounts.entrySet()) {
+            LegacyAddress address = keyUtility.byteBufferToAddress(entry.getKey());
+            putNewAmount(address, entry.getValue());
         }
     }
 
@@ -164,21 +156,6 @@ public class LMDBPersistence implements Persistence {
             txn.commit();
             txn.close();
         }
-    }
-
-    @Override
-    public List<LegacyAddress> getAddressesFromTransaction(Sha256Hash transactionHash) {
-        ByteBuffer transactionHashByteBuffer = persistenceUtils.hashToByteBufferDirect(transactionHash);
-        ByteBuffer hash160sByteBuffer;
-        try (Txn<ByteBuffer> txn = env.txnRead()) {
-            hash160sByteBuffer = lmdb_transactionHashToAddresses.get(txn, transactionHashByteBuffer);
-            txn.close();
-        }
-        if (hash160sByteBuffer == null) {
-            throw new RuntimeException("Transaction is not available: " + transactionHash);
-        }
-        List<LegacyAddress> addresses = persistenceUtils.byteBufferToAddressList(hash160sByteBuffer);
-        return addresses;
     }
 
     @Override

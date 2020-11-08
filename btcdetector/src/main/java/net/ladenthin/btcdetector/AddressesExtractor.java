@@ -18,12 +18,8 @@ public class AddressesExtractor implements Runnable {
 
     private final ExtractAddresses extractAddresses;
 
-    // ##################################################
-    // bitcoinj
     private NetworkParameters networkParameters;
 
-    // ##################################################
-    // persistence
     private LMDBPersistence persistence;
 
     public AddressesExtractor(ExtractAddresses extractAddresses) {
@@ -41,7 +37,7 @@ public class AddressesExtractor implements Runnable {
             File addressesFile = new File(extractAddresses.addressesFile);
             // delete before write all addresses
             addressesFile.delete();
-            persistence.writeAllAmounts(addressesFile);
+            persistence.writeAllAmountsToAddressFile(addressesFile);
             logger.info("writeAllAmounts done");
         } catch (IOException e) {
             throw new RuntimeException(e);

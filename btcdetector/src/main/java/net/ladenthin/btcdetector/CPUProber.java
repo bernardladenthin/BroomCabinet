@@ -16,7 +16,7 @@ import java.util.concurrent.Future;
 public class CPUProber extends Prober {
 
     private final ProbeAddressesCPU probeAddressesCPU;
-    private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
+    private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
 
     private final List<Future<Void>> producers = new ArrayList<>();
     private final List<Future<Void>> consumers = new ArrayList<>();
@@ -29,7 +29,7 @@ public class CPUProber extends Prober {
 
     @Override
     public void run() {
-        readAdresses();
+        initLMDB();
         addSchutdownHook();
         startConsumer();
         startProducer();
@@ -101,7 +101,7 @@ public class CPUProber extends Prober {
             byte[] hash160 = key.getPubKeyHash();
             ByteBuffer hash160AsByteBuffer = byteBufferUtility.byteArrayToByteBuffer(hash160);
             checkedKeys.incrementAndGet();
-            if (addresses.contains(hash160AsByteBuffer)) {
+            if (persistence.containsAddress(hash160AsByteBuffer)) {
                 hits.incrementAndGet();
                 String hitMessage = HIT_PREFIX + keyUtility.createKeyDetails(key);
                 logger.info(hitMessage);

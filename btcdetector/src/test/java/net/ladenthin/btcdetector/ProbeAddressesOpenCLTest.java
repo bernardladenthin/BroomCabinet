@@ -62,7 +62,6 @@ public class ProbeAddressesOpenCLTest {
         
         List<String> files = new ArrayList<>();
         files.add(tempAddressesFile.getAbsolutePath());
-        probeAddressesOpenCL.addressesFiles = files;
         
         OpenCLProber openCLProber = new OpenCLProber(probeAddressesOpenCL);
         openCLProber.run();

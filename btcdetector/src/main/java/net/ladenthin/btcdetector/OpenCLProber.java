@@ -14,7 +14,7 @@ public class OpenCLProber extends Prober {
 
     @Override
     public void run() {
-        readAdresses();
+        initLMDB();
         addSchutdownHook();
         startStatisticsTimer();
     }

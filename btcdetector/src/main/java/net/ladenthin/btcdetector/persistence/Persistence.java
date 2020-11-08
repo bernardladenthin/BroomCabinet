@@ -2,22 +2,21 @@ package net.ladenthin.btcdetector.persistence;
 
 import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.Coin;
-import org.bitcoinj.core.Sha256Hash;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Map;
 
 public interface Persistence {
 
     void init();
     void close();
     Coin getAmount(LegacyAddress address);
+    boolean containsAddress(ByteBuffer hash160);
 
-    void putTransaction(Sha256Hash transactionHash, List<LegacyAddress> addresses);
-    void removeTransaction(Sha256Hash transactionHash);
-
-    void writeAllAmounts(File file) throws IOException;
+    void writeAllAmountsToAddressFile(File file) throws IOException;
 
     /**
      * @param amountToChange positive means add, negative means substract the amount
@@ -25,8 +24,7 @@ public interface Persistence {
     void changeAmount(LegacyAddress address, Coin amountToChange);
 
     void putNewAmount(LegacyAddress address, Coin toWrite);
-
-    List<LegacyAddress> getAddressesFromTransaction(Sha256Hash transactionHash);
+    void putAllAmounts(Map<ByteBuffer, Coin> amounts) throws IOException;
 
     Coin getAllAmountsFromAddresses(List<LegacyAddress> addresses);
 }

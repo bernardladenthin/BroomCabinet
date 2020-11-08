@@ -1,8 +1,6 @@
 package net.ladenthin.btcdetector.cli;
 
 import com.google.gson.Gson;
-import net.ladenthin.btcdetector.AddressesExtractor;
-import net.ladenthin.btcdetector.Analyser;
 import net.ladenthin.btcdetector.CPUProber;
 import net.ladenthin.btcdetector.configuration.Command;
 import net.ladenthin.btcdetector.configuration.Configuration;
@@ -12,6 +10,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import net.ladenthin.btcdetector.AddressFilesToLMDB;
+import net.ladenthin.btcdetector.AddressesExtractor;
 import net.ladenthin.btcdetector.OpenCLProber;
 
 // VM option: -Dorg.slf4j.simpleLogger.defaultLogLevel=trace
@@ -56,10 +56,6 @@ public class Main implements Runnable {
                 CPUProber prober = new CPUProber(configuration.probeAddressesCPU);
                 prober.run();
                 break;
-            case BlockchainAnalysis:
-                Analyser analyser = new Analyser(configuration.blockchainAnalysis);
-                analyser.run();
-                break;
             case ExtractAddresses:
                 AddressesExtractor addressesExtractor = new AddressesExtractor(configuration.extractAddresses);
                 addressesExtractor.run();
@@ -67,6 +63,10 @@ public class Main implements Runnable {
             case ProbeAddressesOpenCL:
                 OpenCLProber openCLProber = new OpenCLProber(configuration.probeAddressesOpenCl);
                 openCLProber.run();
+                break;
+            case AddressFilesToLMDB:
+                AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(configuration.addressFilesToLMDB);
+                addressFilesToLMDB.run();
                 break;
             default:
                 throw new UnsupportedOperationException(Command.ProbeAddressesOpenCL.toString() + " currently not supported." );
