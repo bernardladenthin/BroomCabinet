@@ -12,16 +12,31 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import net.ladenthin.btcdetector.OpenCLProber;
 
 // VM option: -Dorg.slf4j.simpleLogger.defaultLogLevel=trace
 public class Main implements Runnable {
 
     private final static Logger logger = LoggerFactory.getLogger(Main.class);
 
-    private final File configFile;
-
-    public Main(File configFile) {
-        this.configFile = configFile;
+    private final Configuration configuration;
+    
+    public Main(Configuration configuration) {
+        this.configuration = configuration;
+    }
+    
+    public static Main createFromConfigurationFile(File configFile) {
+        try {
+            return createFromConfigurationString(new StreamHelper().readFullyAsUTF8String(configFile));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    
+    public static Main createFromConfigurationString(String configurationString) {
+        Gson gson = new Gson();
+        final Configuration configuration = gson.fromJson(configurationString, Configuration.class);
+        return new Main(configuration);
     }
 
     public static void main(String[] args) {
@@ -29,35 +44,32 @@ public class Main implements Runnable {
             logger.error("Invalid arguments. Pass path to configuration as first argument.");
             return;
         }
-        new Main(new File(args[0])).run();
+        Main main = createFromConfigurationFile(new File(args[0]));
+        main.run();
     }
 
     @Override
     public void run() {
-        try {
-            Gson gson = new Gson();
-            String configurationString = new StreamHelper().readFullyAsUTF8String(configFile);
-            logger.info("Check configuration");
-            Configuration configuration = gson.fromJson(configurationString, Configuration.class);
-            logger.info(configuration.command.name());
-            switch (configuration.command) {
-                case ProbeAddressesCPU:
-                    CPUProber prober = new CPUProber(configuration.probeAddressesCPU);
-                    prober.run();
-                    break;
-                case BlockchainAnalysis:
-                    Analyser analyser = new Analyser(configuration.blockchainAnalysis);
-                    analyser.run();
-                    break;
-                case ExtractAddresses:
-                    AddressesExtractor addressesExtractor = new AddressesExtractor(configuration.extractAddresses);
-                    addressesExtractor.run();
-                    break;
-                case ProbeAddressesOpenCL:
-                    throw new UnsupportedOperationException(Command.ProbeAddressesOpenCL.toString() + " currently not supported." );
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        logger.info(configuration.command.name());
+        switch (configuration.command) {
+            case ProbeAddressesCPU:
+                CPUProber prober = new CPUProber(configuration.probeAddressesCPU);
+                prober.run();
+                break;
+            case BlockchainAnalysis:
+                Analyser analyser = new Analyser(configuration.blockchainAnalysis);
+                analyser.run();
+                break;
+            case ExtractAddresses:
+                AddressesExtractor addressesExtractor = new AddressesExtractor(configuration.extractAddresses);
+                addressesExtractor.run();
+                break;
+            case ProbeAddressesOpenCL:
+                OpenCLProber openCLProber = new OpenCLProber(configuration.probeAddressesOpenCl);
+                openCLProber.run();
+                break;
+            default:
+                throw new UnsupportedOperationException(Command.ProbeAddressesOpenCL.toString() + " currently not supported." );
         }
     }
 }

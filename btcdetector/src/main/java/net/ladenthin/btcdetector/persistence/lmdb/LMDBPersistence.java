@@ -1,6 +1,5 @@
 package net.ladenthin.btcdetector.persistence.lmdb;
 
-import net.ladenthin.btcdetector.Prober;
 import net.ladenthin.btcdetector.configuration.LmdbConfigurationReadOnly;
 import net.ladenthin.btcdetector.configuration.LmdbConfigurationWrite;
 import net.ladenthin.btcdetector.persistence.Persistence;
@@ -21,6 +20,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import net.ladenthin.btcdetector.AddressFile;
+import net.ladenthin.btcdetector.ByteBufferUtility;
+import net.ladenthin.btcdetector.KeyUtility;
 
 import static org.lmdbjava.DbiFlags.MDB_CREATE;
 import static org.lmdbjava.Env.create;
@@ -31,10 +33,10 @@ public class LMDBPersistence implements Persistence {
     private static final String DB_NAME_transactionHashToAddresses = "transactionHashToAddresses";
     private static final int DB_COUNT = 2;
 
-
     private final PersistenceUtils persistenceUtils;
     private final LmdbConfigurationWrite lmdbConfigurationWrite;
     private final LmdbConfigurationReadOnly lmdbConfigurationReadOnly;
+    private final KeyUtility keyUtility;
     private Env<ByteBuffer> env;
     private Dbi<ByteBuffer> lmdb_h160ToAmount;
     private Dbi<ByteBuffer> lmdb_transactionHashToAddresses;
@@ -43,12 +45,14 @@ public class LMDBPersistence implements Persistence {
         this.lmdbConfigurationReadOnly = null;
         this.lmdbConfigurationWrite = lmdbConfigurationWrite;
         this.persistenceUtils = persistenceUtils;
+        this.keyUtility = new KeyUtility(persistenceUtils.networkParameters, new ByteBufferUtility(true));
     }
 
     public LMDBPersistence(LmdbConfigurationReadOnly lmdbConfigurationReadOnly, PersistenceUtils persistenceUtils) {
         this.lmdbConfigurationReadOnly = lmdbConfigurationReadOnly;
         lmdbConfigurationWrite = null;
         this.persistenceUtils = persistenceUtils;
+        this.keyUtility = new KeyUtility(persistenceUtils.networkParameters, new ByteBufferUtility(true));
     }
 
     @Override
@@ -92,7 +96,7 @@ public class LMDBPersistence implements Persistence {
     @Override
     public Coin getAmount(LegacyAddress address) {
         try (Txn<ByteBuffer> txn = env.txnRead()) {
-            ByteBuffer key = persistenceUtils.addressToByteBufferDirect(address);
+            ByteBuffer key = keyUtility.addressToByteBuffer(address);
             ByteBuffer byteBuffer = lmdb_h160ToAmount.get(txn, key);
             txn.close();
 
@@ -132,8 +136,8 @@ public class LMDBPersistence implements Persistence {
                 try (FileWriter writer = new FileWriter(file)) {
                     for (final CursorIterable.KeyVal<ByteBuffer> kv : iterable) {
                         ByteBuffer addressAsByteBuffer = kv.key();
-                        LegacyAddress address = persistenceUtils.byteBufferToAddress(addressAsByteBuffer);
-                        String line = address.toBase58() + Prober.CSV_SEPARATOR + kv.val().getLong() + System.lineSeparator();
+                        LegacyAddress address = keyUtility.byteBufferToAddress(addressAsByteBuffer);
+                        String line = address.toBase58() + AddressFile.SEPARATOR + kv.val().getLong() + System.lineSeparator();
                         writer.write(line);
                     }
                 }
@@ -150,7 +154,7 @@ public class LMDBPersistence implements Persistence {
 
     @Override
     public void putNewAmount(LegacyAddress address, Coin toWrite) {
-        ByteBuffer key = persistenceUtils.addressToByteBufferDirect(address);
+        ByteBuffer key = keyUtility.addressToByteBuffer(address);
         try (Txn<ByteBuffer> txn = env.txnWrite()) {
             if (lmdbConfigurationWrite.deleteEmptyAddresses && toWrite.isZero()) {
                 lmdb_h160ToAmount.delete(txn, key);

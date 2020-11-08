@@ -5,4 +5,5 @@ public class Configuration {
     public BlockchainAnalysis blockchainAnalysis;
     public ExtractAddresses extractAddresses;
     public ProbeAddressesCPU probeAddressesCPU;
+    public ProbeAddressesOpenCL probeAddressesOpenCl;
 }

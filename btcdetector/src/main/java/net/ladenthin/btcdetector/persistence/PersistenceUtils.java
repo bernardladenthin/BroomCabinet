@@ -7,13 +7,14 @@ import org.bitcoinj.core.Sha256Hash;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import net.ladenthin.btcdetector.ByteBufferUtility;
 
 public class PersistenceUtils {
 
     private final ByteBuffer emptyByteBuffer = ByteBuffer.allocateDirect(0).asReadOnlyBuffer();
     private final ByteBuffer zeroByteBuffer = longValueToByteBufferDirectAsReadOnlyBuffer(0L);
 
-    private final NetworkParameters networkParameters;
+    public final NetworkParameters networkParameters;
 
     public PersistenceUtils(NetworkParameters networkParameters) {
         this.networkParameters = networkParameters;
@@ -50,28 +51,8 @@ public class PersistenceUtils {
         return addresses;
     }
 
-    public LegacyAddress byteBufferToAddress(ByteBuffer byteBuffer) {
-        return new LegacyAddress(networkParameters, byteBufferToBytes(byteBuffer));
-    }
-
-    public ByteBuffer addressToByteBufferDirect(LegacyAddress address) {
-        return bytesToByteBufferDirect(address.getHash160());
-    }
-
-    public byte[] byteBufferToBytes(ByteBuffer byteBuffer) {
-        byte[] bytes = new byte[byteBuffer.remaining()];
-        byteBuffer.get(bytes);
-        return bytes;
-    }
-
-    public ByteBuffer bytesToByteBufferDirect(byte[] bytes) {
-        ByteBuffer key = ByteBuffer.allocateDirect(bytes.length);
-        key.put(bytes).flip();
-        return key;
-    }
-
     public ByteBuffer hashToByteBufferDirect(Sha256Hash hash) {
-        return bytesToByteBufferDirect(hash.getBytes());
+        return new ByteBufferUtility(true).byteArrayToByteBuffer(hash.getBytes());
     }
 
     public ByteBuffer longValueToByteBufferDirectAsReadOnlyBuffer(long value) {

@@ -38,15 +38,9 @@ public class ProberTest {
         return addresses;
     }
 
-    private String createFoundFile() throws IOException {
-        return folder.newFile("foundFile.txt").getAbsolutePath();
-    }
-
     @Test
     public void readAdresses_readAllFromFile_noExceptionThrown() throws IOException {
         ProbeAddresses pa = new ProbeAddresses();
-        pa.selftestFirst = false;
-        pa.foundFile = createFoundFile();
         pa.addressesFiles = createAddressesFiles();
 
         ProberTestImpl prober = new ProberTestImpl(pa);
@@ -56,8 +50,6 @@ public class ProberTest {
     @Test
     public void readAdresses_selftestFirstEnabled_noExceptionThrown() throws IOException {
         ProbeAddresses pa = new ProbeAddresses();
-        pa.selftestFirst = true;
-        pa.foundFile = createFoundFile();
         pa.addressesFiles = createAddressesFiles();
 
         ProberTestImpl prober = new ProberTestImpl(pa);
@@ -67,8 +59,6 @@ public class ProberTest {
     @Test(expected = RuntimeException.class)
     public void readAdresses_addressesFileNotExisting_exceptionThrown() throws IOException {
         ProbeAddresses pa = new ProbeAddresses();
-        pa.selftestFirst = true;
-        pa.foundFile = createFoundFile();
         pa.addressesFiles = Arrays.asList("notExisting.txt");
 
         ProberTestImpl prober = new ProberTestImpl(pa);
