@@ -45,7 +45,7 @@ public class TestAddressesFiles {
 
         Files.write(one.toPath(), Arrays.asList(
                 testAddresses.getIndexAsBase58String(0) + AddressFile.SEPARATOR + amountFirstAddress,
-                testAddresses.getIndexAsBase58String(1) + AddressFile.SEPARATOR + amountOtherAddresses,
+                testAddresses.getIndexAsBase58String(1) + AddressToCoin.TAB_SPLIT + amountOtherAddresses,
                 testAddresses.getIndexAsBase58String(2)
         ));
         Files.write(two.toPath(), Arrays.asList(

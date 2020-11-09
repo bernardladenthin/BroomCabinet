@@ -8,8 +8,11 @@ import org.bitcoinj.core.AddressFormatException;
 import org.bitcoinj.core.Coin;
 
 public class AddressToCoin {
+
     private final ByteBuffer hash160;
     private final Coin coin;
+
+    public static String TAB_SPLIT = "\t";
 
     public AddressToCoin(ByteBuffer hash160, Coin coin) {
         this.hash160 = hash160;
@@ -23,10 +26,10 @@ public class AddressToCoin {
     public ByteBuffer getHash160() {
         return hash160;
     }
-    
+
     @Nullable
     public static AddressToCoin fromBase58CSVLine(String line, KeyUtility keyUtility) {
-        String[] lineSplitted = line.split(SEPARATOR);
+        String[] lineSplitted = line.split(SEPARATOR + "|" + TAB_SPLIT);
         String base58Address = lineSplitted[0];
         base58Address = base58Address.trim();
         if (base58Address.isEmpty() || base58Address.startsWith(IGNORE_LINE_PREFIX)) {
@@ -48,5 +51,5 @@ public class AddressToCoin {
             return null;
         }
     }
-    
+
 }
