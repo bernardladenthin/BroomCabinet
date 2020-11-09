@@ -36,4 +36,12 @@ public class ProberTest {
         ProberTestImpl prober = new ProberTestImpl(pa);
         prober.startStatisticsTimer();
     }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void startStatisticsTimer_invalidparameter_throwsException() throws IOException {
+        ProbeAddresses pa = new ProbeAddresses();
+        pa.printStatisticsEveryNSeconds = 0;
+        ProberTestImpl prober = new ProberTestImpl(pa);
+        prober.startStatisticsTimer();
+    }
 }

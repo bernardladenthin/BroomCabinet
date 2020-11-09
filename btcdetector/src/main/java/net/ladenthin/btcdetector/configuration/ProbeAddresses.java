@@ -4,5 +4,5 @@ import java.util.List;
 
 public class ProbeAddresses {
     public LmdbConfigurationReadOnly lmdbConfigurationReadOnly;
-    public int printStatisticsEveryNSeconds;
+    public int printStatisticsEveryNSeconds = 60;
 }
