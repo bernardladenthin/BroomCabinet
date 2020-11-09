@@ -1,20 +1,11 @@
 package net.ladenthin.btcdetector;
 
 import net.ladenthin.btcdetector.configuration.ProbeAddresses;
-import net.ladenthin.javacommons.StreamHelper;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.params.MainNetParams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.Deque;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -22,12 +13,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import net.ladenthin.btcdetector.persistence.Persistence;
 import net.ladenthin.btcdetector.persistence.PersistenceUtils;
 import net.ladenthin.btcdetector.persistence.lmdb.LMDBPersistence;
-import org.bitcoinj.core.ECKey;
-import org.bouncycastle.util.encoders.Hex;
 
 public abstract class Prober implements Runnable {
 
-    private static final int MILLISECONDS_TO_SECONDS = 1000;
+    private static final int ONE_SECOND_IN_MILLISECONDS = 1000;
     public static final String MISS_PREFIX = "miss: Could not find the address: ";
     public static final String HIT_PREFIX = "hit: Found the address: ";
 
@@ -44,7 +33,7 @@ public abstract class Prober implements Runnable {
 
     protected final ProbeAddresses probeAddresses;
     protected final Timer timer = new Timer();
-    
+
     protected Persistence persistence;
 
     protected Prober(ProbeAddresses probeAddresses) {
@@ -54,7 +43,7 @@ public abstract class Prober implements Runnable {
     void setLogger(Logger logger) {
         this.logger = logger;
     }
-    
+
     protected void initLMDB() {
         PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
         persistence = new LMDBPersistence(probeAddresses.lmdbConfigurationReadOnly, persistenceUtils);
@@ -62,21 +51,29 @@ public abstract class Prober implements Runnable {
     }
 
     protected void startStatisticsTimer() {
-        long period = probeAddresses.printStatisticsEveryNSeconds * MILLISECONDS_TO_SECONDS;
-        if (period < 1) {
-            period = 60 * MILLISECONDS_TO_SECONDS;
+        long period = probeAddresses.printStatisticsEveryNSeconds * ONE_SECOND_IN_MILLISECONDS;
+        if (period <= 0) {
+            throw new IllegalArgumentException("period must be greater than 0.");
         }
         startTime = System.currentTimeMillis();
 
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
+                // get transient information
                 long uptime = System.currentTimeMillis() - startTime;
                 long keys = checkedKeys.get();
-                // prevent division by zero in the statistics log
-                long uptimeInSeconds = Math.max(uptime / (long) MILLISECONDS_TO_SECONDS, 1);
+                
+                // calculate uptime
+                long uptimeInSeconds = uptime / (long) ONE_SECOND_IN_MILLISECONDS;
                 long uptimeInMinutes = uptimeInSeconds / 60;
-                logger.info("Statistics: Checked " + (keys / 1_000_000L) + "M keys in " + uptimeInMinutes + " minutes. [" + keys / uptimeInSeconds + " keys/second] [" + keys / uptimeInMinutes + " keys/minute]. " + emptyConsumer.get() + " times an empty consumer." + hits.get() + " hits.");
+                
+                // calculate per time, prevent division by zero with Math.max
+                long keysPerSecond = keys / Math.max(uptimeInSeconds, 1);
+                long keysPerMinute = keys / Math.max(uptimeInMinutes, 1);
+                
+                // log the information
+                logger.info("Statistics: Checked " + (keys / 1_000_000L) + "M keys in " + uptimeInMinutes + " minutes. [" + keysPerSecond + " keys/second] [" + keysPerMinute + " keys/minute]. " + emptyConsumer.get() + " times an empty consumer. " + hits.get() + " hits.");
             }
         }, period, period);
     }
