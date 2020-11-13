@@ -25,6 +25,7 @@ public abstract class Prober implements Runnable {
     protected final NetworkParameters networkParameters = MainNetParams.get();
     protected final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
     protected final AtomicLong checkedKeys = new AtomicLong();
+    protected final AtomicLong checkedKeysSumOfTimeToCheckContains = new AtomicLong();
     protected final AtomicLong emptyConsumer = new AtomicLong();
     protected final AtomicLong hits = new AtomicLong();
     protected long startTime;
@@ -48,6 +49,21 @@ public abstract class Prober implements Runnable {
         PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
         persistence = new LMDBPersistence(probeAddresses.lmdbConfigurationReadOnly, persistenceUtils);
         persistence.init();
+        logger.info("Stats: " + persistence.getStatsAsString());
+    }
+
+    private String createStatisticsMessage(long uptime, long keys, long keysSumOfTimeToCheckContains, long emptyConsumer, long hits) {
+        // calculate uptime
+        long uptimeInSeconds = uptime / (long) ONE_SECOND_IN_MILLISECONDS;
+        long uptimeInMinutes = uptimeInSeconds / 60;
+        // calculate per time, prevent division by zero with Math.max
+        long keysPerSecond = keys / Math.max(uptimeInSeconds, 1);
+        long keysPerMinute = keys / Math.max(uptimeInMinutes, 1);
+        // calculate average contains time
+        long averageContainsTime = keysSumOfTimeToCheckContains / keys;
+
+        String message = "Statistics: [Checked " + (keys / 1_000_000L) + " M keys in " + uptimeInMinutes + " minutes] [" + keysPerSecond + " keys/second] [" + keysPerMinute + " keys/minute] [Times an empty consumer: " + emptyConsumer + "] [Average contains time: " + averageContainsTime + " ms] [Hits: " + hits + "]";
+        return message;
     }
 
     protected void startStatisticsTimer() {
@@ -62,18 +78,11 @@ public abstract class Prober implements Runnable {
             public void run() {
                 // get transient information
                 long uptime = System.currentTimeMillis() - startTime;
-                long keys = checkedKeys.get();
-                
-                // calculate uptime
-                long uptimeInSeconds = uptime / (long) ONE_SECOND_IN_MILLISECONDS;
-                long uptimeInMinutes = uptimeInSeconds / 60;
-                
-                // calculate per time, prevent division by zero with Math.max
-                long keysPerSecond = keys / Math.max(uptimeInSeconds, 1);
-                long keysPerMinute = keys / Math.max(uptimeInMinutes, 1);
-                
+
+                String message = createStatisticsMessage(uptime, checkedKeys.get(), checkedKeysSumOfTimeToCheckContains.get(), emptyConsumer.get(), hits.get());
+
                 // log the information
-                logger.info("Statistics: Checked " + (keys / 1_000_000L) + "M keys in " + uptimeInMinutes + " minutes. [" + keysPerSecond + " keys/second] [" + keysPerMinute + " keys/minute]. " + emptyConsumer.get() + " times an empty consumer. " + hits.get() + " hits.");
+                logger.info(message);
             }
         }, period, period);
     }

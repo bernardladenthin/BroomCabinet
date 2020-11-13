@@ -23,6 +23,8 @@ import net.ladenthin.btcdetector.ByteBufferUtility;
 import net.ladenthin.btcdetector.KeyUtility;
 import net.ladenthin.btcdetector.configuration.LmdbConfigurationReadOnly;
 import net.ladenthin.btcdetector.configuration.LmdbConfigurationWrite;
+import org.lmdbjava.BufferProxy;
+import org.lmdbjava.ByteBufferProxy;
 
 import static org.lmdbjava.DbiFlags.MDB_CREATE;
 import static org.lmdbjava.Env.create;
@@ -55,13 +57,17 @@ public class LMDBPersistence implements Persistence {
 
     @Override
     public void init() {
+
         if (lmdbConfigurationWrite != null) {
             // -Xmx10G -XX:MaxDirectMemorySize=5G
             // We always need an Env. An Env owns a physical on-disk storage file. One
             // Env can store many different databases (ie sorted maps).
             File lmdbDirectory = new File(lmdbConfigurationWrite.lmdbDirectory);
             lmdbDirectory.mkdirs();
-            env = create()
+
+            BufferProxy<ByteBuffer> bufferProxy = getBufferProxyByUseProxyOptimal(lmdbConfigurationWrite.useProxyOptimal);
+
+            env = create(bufferProxy)
                     // LMDB also needs to know how large our DB might be. Over-estimating is OK.
                     .setMapSize(lmdbConfigurationWrite.mapSizeInMiB * 1_024L * 1_024L)
                     // LMDB also needs to know how many DBs (Dbi) we want to store in this Env.
@@ -76,10 +82,25 @@ public class LMDBPersistence implements Persistence {
             // MDB_CREATE flag causes the DB to be created if it doesn't already exist.
             lmdb_h160ToAmount = env.openDbi(DB_NAME_HASH160_TO_COINT, MDB_CREATE);
         } else if (lmdbConfigurationReadOnly != null) {
-            env = create().setMaxDbs(DB_COUNT).open(new File(lmdbConfigurationReadOnly.lmdbDirectory), EnvFlags.MDB_RDONLY_ENV);
+            BufferProxy<ByteBuffer> bufferProxy = getBufferProxyByUseProxyOptimal(lmdbConfigurationReadOnly.useProxyOptimal);
+            env = create(bufferProxy).setMaxDbs(DB_COUNT).open(new File(lmdbConfigurationReadOnly.lmdbDirectory), EnvFlags.MDB_RDONLY_ENV);
             lmdb_h160ToAmount = env.openDbi(DB_NAME_HASH160_TO_COINT);
         } else {
             throw new IllegalArgumentException();
+        }
+    }
+
+    /**
+     * https://github.com/lmdbjava/lmdbjava/wiki/Buffers
+     *
+     * @param useProxyOptimal
+     * @return
+     */
+    private BufferProxy<ByteBuffer> getBufferProxyByUseProxyOptimal(boolean useProxyOptimal) {
+        if (useProxyOptimal) {
+            return ByteBufferProxy.PROXY_OPTIMAL;
+        } else {
+            return ByteBufferProxy.PROXY_SAFE;
         }
     }
 
@@ -102,8 +123,7 @@ public class LMDBPersistence implements Persistence {
             return valueInDB;
         }
     }
-    
-    
+
     @Override
     public boolean containsAddress(ByteBuffer hash160) {
         try (Txn<ByteBuffer> txn = env.txnRead()) {
@@ -112,7 +132,7 @@ public class LMDBPersistence implements Persistence {
             return byteBuffer != null;
         }
     }
-    
+
     @Override
     public void writeAllAmountsToAddressFile(File file) throws IOException {
         try (Txn<ByteBuffer> txn = env.txnRead()) {
@@ -128,7 +148,7 @@ public class LMDBPersistence implements Persistence {
             }
         }
     }
-    
+
     @Override
     public void putAllAmounts(Map<ByteBuffer, Coin> amounts) throws IOException {
         for (Map.Entry<ByteBuffer, Coin> entry : amounts.entrySet()) {
@@ -165,6 +185,11 @@ public class LMDBPersistence implements Persistence {
             allAmounts = allAmounts.add(getAmount(address));
         }
         return allAmounts;
+    }
+
+    @Override
+    public String getStatsAsString() {
+        return getStats().toString();
     }
 
     public Stat getStats() {

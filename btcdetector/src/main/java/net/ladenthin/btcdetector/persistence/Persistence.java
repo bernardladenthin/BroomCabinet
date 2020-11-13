@@ -19,6 +19,7 @@ public interface Persistence {
     void writeAllAmountsToAddressFile(File file) throws IOException;
 
     /**
+     * @param address the address to change
      * @param amountToChange positive means add, negative means substract the amount
      */
     void changeAmount(LegacyAddress address, Coin amountToChange);
@@ -27,4 +28,6 @@ public interface Persistence {
     void putAllAmounts(Map<ByteBuffer, Coin> amounts) throws IOException;
 
     Coin getAllAmountsFromAddresses(List<LegacyAddress> addresses);
+    
+    String getStatsAsString();
 }

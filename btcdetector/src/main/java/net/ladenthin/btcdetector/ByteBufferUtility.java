@@ -2,6 +2,8 @@ package net.ladenthin.btcdetector;
 
 import java.nio.ByteBuffer;
 import org.bouncycastle.util.encoders.Hex;
+import sun.misc.Cleaner;
+import sun.nio.ch.DirectBuffer;
 
 public class ByteBufferUtility {
     
@@ -12,6 +14,20 @@ public class ByteBufferUtility {
 
     public ByteBufferUtility(boolean allocateDirect) {
         this.allocateDirect = allocateDirect;
+    }
+    
+    /**
+     * https://stackoverflow.com/questions/8462200/examples-of-forcing-freeing-of-native-memory-direct-bytebuffer-has-allocated-us
+     * @param byteBuffer the ByteBuffer to free 
+     */
+    public static void freeByteBuffer(ByteBuffer byteBuffer) {
+        if (byteBuffer == null) {
+            return;
+        }
+        Cleaner cleaner = ((DirectBuffer) byteBuffer).cleaner();
+        if (cleaner != null) {
+            cleaner.clean();
+        }
     }
     
     // <editor-fold defaultstate="collapsed" desc="ByteBuffer byte array conversion">

@@ -20,53 +20,52 @@ import org.jocl.*;
 import org.junit.Ignore;
 
 public class ProbeAddressesOpenCLTest {
-    
+
     /**
      * The source code of the OpenCL program to execute
      */
-    private static String programSource =
-        "__kernel void "+
-        "sampleKernel(__global const float *a,"+
-        "             __global const float *b,"+
-        "             __global float *c)"+
-        "{"+
-        "    int gid = get_global_id(0);"+
-        "    c[gid] = a[gid] * b[gid];"+
-        "}";
-    
-    
+    private static String programSource
+            = "__kernel void "
+            + "sampleKernel(__global const float *a,"
+            + "             __global const float *b,"
+            + "             __global float *c)"
+            + "{"
+            + "    int gid = get_global_id(0);"
+            + "    c[gid] = a[gid] * b[gid];"
+            + "}";
+
     private static final TestAddresses testAddresses = new TestAddresses(1024, false);
-    
+
     @Rule
     public TemporaryFolder tempFolder = new TemporaryFolder();
     private File tempAddressesFile;
-    
+
     @Before
     public void init() throws IOException {
         createTemporaryAddressesFile();
     }
-    
+
     public void fillAddressesFiles(File file) throws IOException {
         FileUtils.writeStringToFile(file, testAddresses.getAsBase58Strings(), StandardCharsets.UTF_8.name());
     }
-    
+
     public void createTemporaryAddressesFile() throws IOException {
-       tempAddressesFile = tempFolder.newFile("addresses.csv");
-       fillAddressesFiles(tempAddressesFile);
+        tempAddressesFile = tempFolder.newFile("addresses.csv");
+        fillAddressesFiles(tempAddressesFile);
     }
-    
+
     @Test
     @Ignore
     public void run_alive_beep() throws IOException {
         ProbeAddressesOpenCL probeAddressesOpenCL = new ProbeAddressesOpenCL();
-        
+
         List<String> files = new ArrayList<>();
         files.add(tempAddressesFile.getAbsolutePath());
-        
+
         OpenCLProber openCLProber = new OpenCLProber(probeAddressesOpenCL);
         openCLProber.run();
     }
-    
+
     @Test
     public void joclTest() {
         // Create input- and output data 
@@ -74,8 +73,7 @@ public class ProbeAddressesOpenCLTest {
         float srcArrayA[] = new float[n];
         float srcArrayB[] = new float[n];
         float dstArray[] = new float[n];
-        for (int i=0; i<n; i++)
-        {
+        for (int i = 0; i < n; i++) {
             srcArrayA[i] = i;
             srcArrayB[i] = i;
         }
@@ -105,12 +103,12 @@ public class ProbeAddressesOpenCLTest {
         // Initialize the context properties
         cl_context_properties contextProperties = new cl_context_properties();
         contextProperties.addProperty(CL_CONTEXT_PLATFORM, platform);
-        
+
         // Obtain the number of devices for the platform
         int numDevicesArray[] = new int[1];
         clGetDeviceIDs(platform, deviceType, 0, null, numDevicesArray);
         int numDevices = numDevicesArray[0];
-        
+
         // Obtain a device ID 
         cl_device_id devices[] = new cl_device_id[numDevices];
         clGetDeviceIDs(platform, deviceType, numDevices, devices, null);
@@ -118,52 +116,52 @@ public class ProbeAddressesOpenCLTest {
 
         // Create a context for the selected device
         cl_context context = clCreateContext(
-            contextProperties, 1, new cl_device_id[]{device}, 
-            null, null, null);
-        
+                contextProperties, 1, new cl_device_id[]{device},
+                null, null, null);
+
         // Create a command-queue for the selected device
         cl_queue_properties properties = new cl_queue_properties();
         cl_command_queue commandQueue = clCreateCommandQueueWithProperties(
-            context, device, properties, null);
+                context, device, properties, null);
 
         // Allocate the memory objects for the input- and output data
-        cl_mem srcMemA = clCreateBuffer(context, 
-            CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-            Sizeof.cl_float * n, srcA, null);
-        cl_mem srcMemB = clCreateBuffer(context, 
-            CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-            Sizeof.cl_float * n, srcB, null);
-        cl_mem dstMem = clCreateBuffer(context, 
-            CL_MEM_READ_WRITE, 
-            Sizeof.cl_float * n, null, null);
-        
+        cl_mem srcMemA = clCreateBuffer(context,
+                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                Sizeof.cl_float * n, srcA, null);
+        cl_mem srcMemB = clCreateBuffer(context,
+                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                Sizeof.cl_float * n, srcB, null);
+        cl_mem dstMem = clCreateBuffer(context,
+                CL_MEM_READ_WRITE,
+                Sizeof.cl_float * n, null, null);
+
         // Create the program from the source code
         cl_program program = clCreateProgramWithSource(context,
-            1, new String[]{ programSource }, null, null);
-        
+                1, new String[]{programSource}, null, null);
+
         // Build the program
         clBuildProgram(program, 0, null, null, null, null);
-        
+
         // Create the kernel
         cl_kernel kernel = clCreateKernel(program, "sampleKernel", null);
-        
+
         // Set the arguments for the kernel
         int a = 0;
         clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(srcMemA));
         clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(srcMemB));
         clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(dstMem));
-        
+
         // Set the work-item dimensions
         long global_work_size[] = new long[]{n};
-        
+
         // Execute the kernel
         clEnqueueNDRangeKernel(commandQueue, kernel, 1, null,
-            global_work_size, null, 0, null, null);
-        
+                global_work_size, null, 0, null, null);
+
         // Read the output data
         clEnqueueReadBuffer(commandQueue, dstMem, CL_TRUE, 0,
-            n * Sizeof.cl_float, dst, 0, null, null);
-        
+                n * Sizeof.cl_float, dst, 0, null, null);
+
         // Release kernel, program, and memory objects
         clReleaseMemObject(srcMemA);
         clReleaseMemObject(srcMemB);
@@ -172,26 +170,23 @@ public class ProbeAddressesOpenCLTest {
         clReleaseProgram(program);
         clReleaseCommandQueue(commandQueue);
         clReleaseContext(context);
-        
+
         // Verify the result
         boolean passed = true;
         final float epsilon = 1e-7f;
-        for (int i=0; i<n; i++)
-        {
+        for (int i = 0; i < n; i++) {
             float x = dstArray[i];
             float y = srcArrayA[i] * srcArrayB[i];
             boolean epsilonEqual = Math.abs(x - y) <= epsilon * Math.abs(x);
-            if (!epsilonEqual)
-            {
+            if (!epsilonEqual) {
                 passed = false;
                 break;
             }
         }
-        System.out.println("Test "+(passed?"PASSED":"FAILED"));
-        if (n <= 10)
-        {
-            System.out.println("Result: "+Arrays.toString(dstArray));
+        System.out.println("Test " + (passed ? "PASSED" : "FAILED"));
+        if (n <= 10) {
+            System.out.println("Result: " + Arrays.toString(dstArray));
         }
     }
-    
+
 }

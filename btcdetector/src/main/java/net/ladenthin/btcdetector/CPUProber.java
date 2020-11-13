@@ -64,6 +64,7 @@ public class CPUProber extends Prober {
      * This method runs in multiple threads.
      */
     private void produceKeysRunner(long seed) {
+        logger.trace("Start produceKeysRunner.");
         // It is already thread local, no need for {@link java.util.concurrent.ThreadLocalRandom}.
         logger.info("Initialize random with seed: " + seed);
         Random random = new Random(seed);
@@ -75,21 +76,31 @@ public class CPUProber extends Prober {
     /**
      * This method runs in multiple threads.
      */
-    private void consumeKeysRunner() throws InterruptedException {
+    private void consumeKeysRunner() {
+        logger.trace("Start consumeKeysRunner.");
         while (shouldRun.get()) {
             if (keysQueue.size() > 100_000) {
                 logger.warn("Attention, queue size is above 100000. Please increase consumer threads.");
             }
             consumeKeys();
             emptyConsumer.incrementAndGet();
-            Thread.sleep(probeAddressesCPU.delayEmptyConsumer);
+            try {
+                Thread.sleep(probeAddressesCPU.delayEmptyConsumer);
+            } catch (InterruptedException e) {
+                // we need to catch the exception to not break the thread
+                logger.error("Ignore InterruptedException during Thread.sleep.", e);
+            }
         }
     }
 
     void produceKey(Random random) {
         BigInteger secret = keyUtility.createSecret(random);
+
+        // create uncompressed
         ECKey ecKeyCompressed = ECKey.fromPrivate(secret, true);
         keysQueue.add(ecKeyCompressed);
+
+        // create compressed
         ECKey ecKey = ecKeyCompressed.decompress();
         keysQueue.add(ecKey);
     }
@@ -100,8 +111,28 @@ public class CPUProber extends Prober {
 
             byte[] hash160 = key.getPubKeyHash();
             ByteBuffer hash160AsByteBuffer = byteBufferUtility.byteArrayToByteBuffer(hash160);
+
+            long timeBefore = System.currentTimeMillis();
+            if (logger.isDebugEnabled()) {
+                logger.debug("Time before persistence.containsAddress: " + timeBefore);
+            }
+
+            boolean containsAddress = persistence.containsAddress(hash160AsByteBuffer);
+            // Free the buffer immediately, a direct buffer keeps a long time in memory otherwise.
+            ByteBufferUtility.freeByteBuffer(hash160AsByteBuffer);
+
+            long timeAfter = System.currentTimeMillis();
+            long timeDelta = timeAfter - timeBefore;
+
             checkedKeys.incrementAndGet();
-            if (persistence.containsAddress(hash160AsByteBuffer)) {
+            checkedKeysSumOfTimeToCheckContains.addAndGet(timeDelta);
+
+            if (logger.isDebugEnabled()) {
+                logger.debug("Time after persistence.containsAddress: " + timeAfter);
+                logger.debug("Time delta: " + timeDelta);
+            }
+
+            if (containsAddress) {
                 hits.incrementAndGet();
                 String hitMessage = HIT_PREFIX + keyUtility.createKeyDetails(key);
                 logger.info(hitMessage);
