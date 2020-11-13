@@ -5,15 +5,11 @@ import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.List;
 import net.ladenthin.btcdetector.configuration.LmdbConfigurationReadOnly;
-import net.ladenthin.btcdetector.configuration.LmdbConfigurationWrite;
 import net.ladenthin.btcdetector.persistence.Persistence;
 import net.ladenthin.btcdetector.persistence.PersistenceUtils;
 import net.ladenthin.btcdetector.persistence.lmdb.LMDBPersistence;
 import org.bitcoinj.core.Coin;
-import org.bitcoinj.core.Context;
 import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.params.MainNetParams;
@@ -29,12 +25,11 @@ import org.junit.runner.RunWith;
 @RunWith(DataProviderRunner.class)
 public class AddressFileToLMDBTest {
 
-
     @DataProvider
     public static Object[][] compressed() {
         return new Object[][]{
-                {true},
-                {false}
+            {true},
+            {false}
         };
     }
 
@@ -75,6 +70,5 @@ public class AddressFileToLMDBTest {
 
         persistence.close();
     }
-
 
 }

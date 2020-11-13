@@ -9,11 +9,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import net.ladenthin.btcdetector.persistence.lmdb.LMDBPersistence;
-import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.LegacyAddress;
 
 public class AddressFilesToLMDB implements Runnable {

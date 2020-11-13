@@ -1,7 +1,6 @@
 package net.ladenthin.btcdetector;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import org.junit.Before;
 import org.junit.Test;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -13,9 +12,8 @@ public class AddressFileTest {
     private static final TestAddresses testAddresses = new TestAddresses(0, false);
 
     StaticKey staticKey = new StaticKey();
-    
-    
-    KeyUtility keyUtility =     new KeyUtility(testAddresses.networkParameters, new ByteBufferUtility(false));
+
+    KeyUtility keyUtility = new KeyUtility(testAddresses.networkParameters, new ByteBufferUtility(false));
 
     @Before
     public void init() throws IOException {
@@ -24,7 +22,7 @@ public class AddressFileTest {
     @Test
     public void fromBase58CSVLine_TestUncompressed() throws IOException {
         // act
-        AddressToCoin addressToCoin = AddressToCoin.fromBase58CSVLine(staticKey.publicKeyUncompressed,keyUtility );
+        AddressToCoin addressToCoin = AddressToCoin.fromBase58CSVLine(staticKey.publicKeyUncompressed, keyUtility);
 
         // assert
         assertThat(addressToCoin.getHash160(), is(equalTo(staticKey.byteBufferPublicKeyUncompressed)));

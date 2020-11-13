@@ -31,25 +31,27 @@ public class CPUProberTest {
     @DataProvider
     public static Object[][] compressed() {
         return new Object[][]{
-                {true},
-                {false}
+            {true},
+            {false}
         };
     }
-    
+
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
 
-    private ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);  ;
+    private ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
+
+    ;
 
     @Test
     @UseDataProvider("compressed")
     public void myTest(boolean compressed) throws IOException, InterruptedException {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
         File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, compressed);
-        
+
         ProbeAddressesCPU pa = new ProbeAddressesCPU();
         pa.lmdbConfigurationReadOnly = new LmdbConfigurationReadOnly();
-        
+
         pa.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
         CPUProber cpuProber = new CPUProber(pa);
         cpuProber.initLMDB();
@@ -64,7 +66,7 @@ public class CPUProberTest {
 
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), new ByteBufferUtility(false));
         String hitMessage = CPUProber.HIT_PREFIX + keyUtility.createKeyDetails(key);
-        
+
         verify(logger, times(1)).info(logCaptor.capture());
 
         List<String> arguments = logCaptor.getAllValues();

@@ -7,20 +7,19 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import static net.ladenthin.btcdetector.TestAddresses.SEGWIT_PUBLIC_ADDRESS;
-import net.ladenthin.btcdetector.configuration.LmdbConfigurationWrite;
 import org.bitcoinj.core.Coin;
 import org.junit.rules.TemporaryFolder;
 
 public class TestAddressesFiles {
-    
+
     private final static String ADDRESS_FILE_ONE = "addressesOne.txt";
     private final static String ADDRESS_FILE_TWO = "addressesTwo.txt";
     private final static String ADDRESS_FILE_THREE = "addressesThree.txt";
     public final static int NUMBER_OF_ADRESSES = 5;
-    
+
     public static final Coin amountFirstAddress = Coin.FIFTY_COINS;
     public static final Coin amountOtherAddresses = Coin.SATOSHI;
-    
+
     public final static Coin[] AMOUNTS = {
         amountFirstAddress,
         amountOtherAddresses,
@@ -28,15 +27,14 @@ public class TestAddressesFiles {
         amountOtherAddresses,
         amountOtherAddresses
     };
-    
+
     private final boolean compressed;
-    private final TestAddresses testAddresses ;
+    private final TestAddresses testAddresses;
 
     public TestAddressesFiles(boolean compressed) {
         this.compressed = compressed;
         testAddresses = new TestAddresses(NUMBER_OF_ADRESSES, compressed);
     }
-    
 
     public List<String> createAddressesFiles(TemporaryFolder folder) throws IOException {
         File one = folder.newFile(ADDRESS_FILE_ONE);
@@ -63,5 +61,5 @@ public class TestAddressesFiles {
         addresses.add(three.getAbsolutePath());
         return addresses;
     }
-    
+
 }
