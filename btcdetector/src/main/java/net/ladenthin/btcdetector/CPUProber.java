@@ -4,14 +4,15 @@ import net.ladenthin.btcdetector.configuration.ProbeAddressesCPU;
 import org.bitcoinj.core.ECKey;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class CPUProber extends Prober {
 
@@ -20,11 +21,12 @@ public class CPUProber extends Prober {
 
     private final List<Future<Void>> producers = new ArrayList<>();
     private final List<Future<Void>> consumers = new ArrayList<>();
-    private final ConcurrentLinkedQueue<ECKey> keysQueue = new ConcurrentLinkedQueue<>();
+    private final LinkedBlockingQueue<ECKey> keysQueue;
 
     public CPUProber(ProbeAddressesCPU probeAddressesCPU) {
         super(probeAddressesCPU);
         this.probeAddressesCPU = probeAddressesCPU;
+        this.keysQueue = new LinkedBlockingQueue<>(probeAddressesCPU.queueSize);
     }
 
     @Override
@@ -63,13 +65,15 @@ public class CPUProber extends Prober {
     /**
      * This method runs in multiple threads.
      */
-    private void produceKeysRunner(long seed) {
+    private void produceKeysRunner(long seed) throws NoSuchAlgorithmException {
         logger.trace("Start produceKeysRunner.");
         // It is already thread local, no need for {@link java.util.concurrent.ThreadLocalRandom}.
-        logger.info("Initialize random with seed: " + seed);
-        Random random = new Random(seed);
+        int bitLength = probeAddressesCPU.bitLength;
+        logger.info("Initialize random with seed: " + seed + ", bit length: " + bitLength);
+        Random random = SecureRandom.getInstanceStrong();
+        random.setSeed(seed);
         while (shouldRun.get()) {
-            produceKey(random);
+            produceKey(bitLength, random);
         }
     }
 
@@ -79,8 +83,8 @@ public class CPUProber extends Prober {
     private void consumeKeysRunner() {
         logger.trace("Start consumeKeysRunner.");
         while (shouldRun.get()) {
-            if (keysQueue.size() > 100_000) {
-                logger.warn("Attention, queue size is above 100000. Please increase consumer threads.");
+            if (keysQueue.size() >= probeAddressesCPU.queueSize) {
+                logger.warn("Attention, queue is full. Please increase queue size.");
             }
             consumeKeys();
             emptyConsumer.incrementAndGet();
@@ -93,16 +97,27 @@ public class CPUProber extends Prober {
         }
     }
 
-    void produceKey(Random random) {
-        BigInteger secret = keyUtility.createSecret(random);
+    void produceKey(int bitLength, Random random) {
+        BigInteger secret = null;
+        try {
+            secret = keyUtility.createSecret(bitLength, random);
+            if (secret.equals(BigInteger.ZERO) || secret.equals(BigInteger.ONE)) {
+                // ignore these, prevent an IllegalArgumentException
+                return;
+            }
 
-        // create uncompressed
-        ECKey ecKeyCompressed = ECKey.fromPrivate(secret, true);
-        keysQueue.add(ecKeyCompressed);
+            // create uncompressed
+            ECKey ecKeyCompressed = ECKey.fromPrivate(secret, true);
+            keysQueue.put(ecKeyCompressed);
 
-        // create compressed
-        ECKey ecKey = ecKeyCompressed.decompress();
-        keysQueue.add(ecKey);
+            // create compressed
+            ECKey ecKey = ecKeyCompressed.decompress();
+            keysQueue.put(ecKey);
+        } catch (Exception e) {
+            // fromPrivate can throw an IllegalArgumentException
+            // save the secret to be able to recover the issue
+            logger.error("Error in produceKey for secret " + secret + ".", e);
+        }
     }
 
     void consumeKeys() {

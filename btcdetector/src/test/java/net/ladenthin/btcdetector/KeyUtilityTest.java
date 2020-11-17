@@ -3,6 +3,7 @@ package net.ladenthin.btcdetector;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Random;
 import org.junit.Before;
 import org.junit.Test;
@@ -116,7 +117,7 @@ public class KeyUtilityTest {
     @Test
     public void createSecret() throws IOException {
         // act
-        BigInteger secret = new KeyUtility(null, new ByteBufferUtility(false)).createSecret(new Random(42));
+        BigInteger secret = new KeyUtility(null, new ByteBufferUtility(false)).createSecret(KeyUtility.BIT_LENGTH, new Random(42));
 
         // assert
         assertThat(secret.toString(), is(not(equalTo(""))));
@@ -137,7 +138,7 @@ public class KeyUtilityTest {
         String keyDetails = keyUtility.createKeyDetails(ecKey);
 
         // assert
-        assertThat(keyDetails, is(equalTo("WiF: ["+staticKey.privateKeyWiFUncompressed+"] publicKeyAsHex: ["+staticKey.publicKeyUncompressedHex+"] publicKeyHash160Hex: ["+staticKey.publicKeyUncompressedHash160Hex+"] publicKeyHash160Base58: ["+staticKey.publicKeyUncompressed+"] Compressed: [false]")));
+        assertThat(keyDetails, is(equalTo("privateKeyBigInteger: ["+staticKey.privateKeyBigInteger+"] privateKeyBytes: ["+Arrays.toString(staticKey.privateKeyBytes)+"] privateKeyHex: ["+staticKey.privateKeyHex+"] WiF: ["+staticKey.privateKeyWiFUncompressed+"] publicKeyAsHex: ["+staticKey.publicKeyUncompressedHex+"] publicKeyHash160Hex: ["+staticKey.publicKeyUncompressedHash160Hex+"] publicKeyHash160Base58: ["+staticKey.publicKeyUncompressed+"] Compressed: [false]")));
     }
     
     @Test
@@ -153,7 +154,7 @@ public class KeyUtilityTest {
         String keyDetails = keyUtility.createKeyDetails(ecKey);
 
         // assert
-        assertThat(keyDetails, is(equalTo("WiF: ["+staticKey.privateKeyWiFCompressed+"] publicKeyAsHex: ["+staticKey.publicKeyCompressedHex+"] publicKeyHash160Hex: ["+staticKey.publicKeyCompressedHash160Hex+"] publicKeyHash160Base58: ["+staticKey.publicKeyCompressed+"] Compressed: [true]")));
+        assertThat(keyDetails, is(equalTo("privateKeyBigInteger: ["+staticKey.privateKeyBigInteger+"] privateKeyBytes: ["+Arrays.toString(staticKey.privateKeyBytes)+"] privateKeyHex: ["+staticKey.privateKeyHex+"] WiF: ["+staticKey.privateKeyWiFCompressed+"] publicKeyAsHex: ["+staticKey.publicKeyCompressedHex+"] publicKeyHash160Hex: ["+staticKey.publicKeyCompressedHash160Hex+"] publicKeyHash160Base58: ["+staticKey.publicKeyCompressed+"] Compressed: [true]")));
     }
     // </editor-fold>
 }

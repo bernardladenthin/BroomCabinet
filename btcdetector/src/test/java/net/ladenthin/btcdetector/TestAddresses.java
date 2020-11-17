@@ -45,7 +45,7 @@ public class TestAddresses {
 
     public TestAddresses(int numberOfAddresses, boolean compressed) {
         for (int i = 0; i < numberOfAddresses; i++) {
-            BigInteger secret = new KeyUtility(null, new ByteBufferUtility(false)).createSecret(random);
+            BigInteger secret = new KeyUtility(null, new ByteBufferUtility(false)).createSecret(KeyUtility.BIT_LENGTH, random);
             ECKey ecKey = ECKey.fromPrivate(secret, compressed);
             ecKeys.add(ecKey);
         }

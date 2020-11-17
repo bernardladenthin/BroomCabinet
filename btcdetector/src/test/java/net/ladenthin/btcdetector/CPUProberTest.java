@@ -61,7 +61,7 @@ public class CPUProberTest {
         Logger logger = mock(Logger.class);
         cpuProber.setLogger(logger);
         final Random randomForProducer = new Random(TestAddresses.RANDOM_SEED);
-        cpuProber.produceKey(randomForProducer);
+        cpuProber.produceKey(KeyUtility.BIT_LENGTH, randomForProducer);
         cpuProber.consumeKeys();
 
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), new ByteBufferUtility(false));

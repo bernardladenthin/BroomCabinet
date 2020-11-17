@@ -60,7 +60,7 @@ public abstract class Prober implements Runnable {
         long keysPerSecond = keys / Math.max(uptimeInSeconds, 1);
         long keysPerMinute = keys / Math.max(uptimeInMinutes, 1);
         // calculate average contains time
-        long averageContainsTime = keysSumOfTimeToCheckContains / keys;
+        long averageContainsTime = keysSumOfTimeToCheckContains / Math.max(keys, 1);
 
         String message = "Statistics: [Checked " + (keys / 1_000_000L) + " M keys in " + uptimeInMinutes + " minutes] [" + keysPerSecond + " keys/second] [" + keysPerMinute + " keys/minute] [Times an empty consumer: " + emptyConsumer + "] [Average contains time: " + averageContainsTime + " ms] [Hits: " + hits + "]";
         return message;
