@@ -1,1 +1,2 @@
-mvn clean compile assembly:single
+call mvn clean
+call mvn compile assembly:single
