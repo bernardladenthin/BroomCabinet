@@ -519,7 +519,7 @@ public class ProbeAddressesOpenCLTest {
         clReleaseCommandQueue(commandQueue);
         clReleaseContext(context);
         
-        ECKey expectedPrivateKey = new ECKey(staticKey.privateKeyBigInteger, null, true);
+        ECKey expectedPrivateKey = new ECKey(new StaticKey().privateKeyBigInteger, null, true);
         byte[] expectedPublicKeyBytes = expectedPrivateKey.getPubKey();
         byte[] windowNaf = windowNaf((byte)4, new StaticKey().privateKeyBigInteger);
         System.out.println("windowNaf: " + Arrays.toString(windowNaf)); // may help to debug OpenCL w-NAF
