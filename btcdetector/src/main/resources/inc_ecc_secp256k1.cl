@@ -1839,7 +1839,7 @@ DECLSPEC int convert_to_window_naf (u32 *naf, const u32 *k)
 
 DECLSPEC void point_mul (u32 *r, const u32 *k, GLOBAL_AS const secp256k1_t *tmps)
 {
-  u32 naf[32 + 1] = { 0 }; // we need one extra slot
+  u32 naf[SECP256K1_NAF_SIZE] = { 0 };
   int loop_start = convert_to_window_naf(naf, k);
   
   // first set:
@@ -1992,30 +1992,8 @@ DECLSPEC void point_mul (u32 *r, const u32 *k, GLOBAL_AS const secp256k1_t *tmps
   r[0] = r[0] | type << 24; // 0x02 or 0x03
 }
 
-DECLSPEC u32 parse_public (secp256k1_t *r, const u32 *k)
+DECLSPEC u32 transform_public (secp256k1_t *r, const u32 *x, const u32 first_byte)
 {
-  // verify:
-
-  const u32 first_byte = k[0] & 0xff;
-
-  if ((first_byte != '\x02') && (first_byte != '\x03'))
-  {
-    return 1;
-  }
-
-  // load k into x without the first byte:
-
-  u32 x[8];
-
-  x[0] = (k[7] & 0xff00) << 16 | (k[7] & 0xff0000) | (k[7] & 0xff000000) >> 16 | (k[8] & 0xff);
-  x[1] = (k[6] & 0xff00) << 16 | (k[6] & 0xff0000) | (k[6] & 0xff000000) >> 16 | (k[7] & 0xff);
-  x[2] = (k[5] & 0xff00) << 16 | (k[5] & 0xff0000) | (k[5] & 0xff000000) >> 16 | (k[6] & 0xff);
-  x[3] = (k[4] & 0xff00) << 16 | (k[4] & 0xff0000) | (k[4] & 0xff000000) >> 16 | (k[5] & 0xff);
-  x[4] = (k[3] & 0xff00) << 16 | (k[3] & 0xff0000) | (k[3] & 0xff000000) >> 16 | (k[4] & 0xff);
-  x[5] = (k[2] & 0xff00) << 16 | (k[2] & 0xff0000) | (k[2] & 0xff000000) >> 16 | (k[3] & 0xff);
-  x[6] = (k[1] & 0xff00) << 16 | (k[1] & 0xff0000) | (k[1] & 0xff000000) >> 16 | (k[2] & 0xff);
-  x[7] = (k[0] & 0xff00) << 16 | (k[0] & 0xff0000) | (k[0] & 0xff000000) >> 16 | (k[1] & 0xff);
-
   u32 p[8];
 
   p[0] = SECP256K1_P0;
@@ -2066,4 +2044,31 @@ DECLSPEC u32 parse_public (secp256k1_t *r, const u32 *k)
   point_get_coords (r, x, y);
 
   return 0;
+}
+
+DECLSPEC u32 parse_public (secp256k1_t *r, const u32 *k)
+{
+  // verify:
+
+  const u32 first_byte = k[0] & 0xff;
+
+  if ((first_byte != '\x02') && (first_byte != '\x03'))
+  {
+    return 1;
+  }
+
+  // load k into x without the first byte:
+
+  u32 x[8];
+
+  x[0] = (k[7] & 0xff00) << 16 | (k[7] & 0xff0000) | (k[7] & 0xff000000) >> 16 | (k[8] & 0xff);
+  x[1] = (k[6] & 0xff00) << 16 | (k[6] & 0xff0000) | (k[6] & 0xff000000) >> 16 | (k[7] & 0xff);
+  x[2] = (k[5] & 0xff00) << 16 | (k[5] & 0xff0000) | (k[5] & 0xff000000) >> 16 | (k[6] & 0xff);
+  x[3] = (k[4] & 0xff00) << 16 | (k[4] & 0xff0000) | (k[4] & 0xff000000) >> 16 | (k[5] & 0xff);
+  x[4] = (k[3] & 0xff00) << 16 | (k[3] & 0xff0000) | (k[3] & 0xff000000) >> 16 | (k[4] & 0xff);
+  x[5] = (k[2] & 0xff00) << 16 | (k[2] & 0xff0000) | (k[2] & 0xff000000) >> 16 | (k[3] & 0xff);
+  x[6] = (k[1] & 0xff00) << 16 | (k[1] & 0xff0000) | (k[1] & 0xff000000) >> 16 | (k[2] & 0xff);
+  x[7] = (k[0] & 0xff00) << 16 | (k[0] & 0xff0000) | (k[0] & 0xff000000) >> 16 | (k[1] & 0xff);
+
+  return transform_public(r, x, first_byte);
 }

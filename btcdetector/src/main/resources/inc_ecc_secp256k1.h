@@ -10,6 +10,7 @@
 
 #define SECP256K1_B 7
 
+// finite field Fp
 #define SECP256K1_P0 0xfffffc2f
 #define SECP256K1_P1 0xfffffffe
 #define SECP256K1_P2 0xffffffff
@@ -19,6 +20,7 @@
 #define SECP256K1_P6 0xffffffff
 #define SECP256K1_P7 0xffffffff
 
+// prime order N
 #define SECP256K1_N0 0xd0364141
 #define SECP256K1_N1 0xbfd25e8c
 #define SECP256K1_N2 0xaf48a03b
@@ -28,12 +30,24 @@
 #define SECP256K1_N6 0xffffffff
 #define SECP256K1_N7 0xffffffff
 
+#define SECP256K1_PRE_COMPUTED_XY_SIZE 96
+#define SECP256K1_NAF_SIZE 33 // 32+1, we need one extra slot
+
+#define PUBLIC_KEY_LENGTH_WITHOUT_PARITY 8
+// 8+1 to make room for the parity
+#define PUBLIC_KEY_LENGTH_WITH_PARITY 9
+
+// (32*8 == 256)
+#define PRIVATE_KEY_LENGTH 8
+
 typedef struct secp256k1
 {
-  u32 xy[96]; // pre-computed points: (x1,y1,-y1),(x3,y3,-y3),(x5,y5,-y5),(x7,y7,-y7)
+  u32 xy[SECP256K1_PRE_COMPUTED_XY_SIZE]; // pre-computed points: (x1,y1,-y1),(x3,y3,-y3),(x5,y5,-y5),(x7,y7,-y7)
 
 } secp256k1_t;
 
+
+DECLSPEC u32  transform_public (secp256k1_t *r, const u32 *x, const u32 first_byte);
 DECLSPEC u32  parse_public (secp256k1_t *r, const u32 *k);
 
 DECLSPEC void point_mul (u32 *r, const u32 *k, GLOBAL_AS const secp256k1_t *tmps);
