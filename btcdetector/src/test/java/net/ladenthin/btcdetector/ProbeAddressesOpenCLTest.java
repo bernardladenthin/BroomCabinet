@@ -380,9 +380,55 @@ public class ProbeAddressesOpenCLTest {
     
     @Test
     public void hashcatOpenCl() throws IOException {
-        
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
+        
+        if (false) {
+            int xIn[] = new int[9];
+            if (false){
+                xIn[0] = 0x00000002;
+                xIn[1] = 0x79be667e;
+                xIn[2] = 0xf9dcbbac;
+                xIn[3] = 0x55a06295;
+                xIn[4] = 0xce870b07;
+                xIn[5] = 0x029bfcdb;
+                xIn[6] = 0x2dce28d9;
+                xIn[7] = 0x59f2815b;
+                xIn[8] = 0x16f81798;
+            } else if(false) {
+                xIn[0] = 0x0279be66;
+                xIn[1] = 0x7ef9dcbb;
+                xIn[2] = 0xac55a062;
+                xIn[3] = 0x95ce870b;
+                xIn[4] = 0x07029bfc;
+                xIn[5] = 0xdb2dce28;
+                xIn[6] = 0xd959f281;
+                xIn[7] = 0x5b16f817;
+                xIn[8] = 0x98000000;
+            } else if(true) {
+                xIn[0] = 0x66BE7902;
+                xIn[1] = 0xBBDCF97E;
+                xIn[2] = 0x62A055AC;
+                xIn[3] = 0x0B87CE95;
+                xIn[4] = 0xFC9B0207;
+                xIn[5] = 0x28CE2DDB;
+                xIn[6] = 0x81F259D9;
+                xIn[7] = 0x17F8165B;
+                xIn[8] = 0x00000098;
+            }
+
+            System.out.println("====================================");
+            for (int i = 0; i < xIn.length; i++) {
+                System.out.println("xIn["+i+"]: " + Integer.toHexString(xIn[i]));
+            }
+            System.out.println("====================================");
+            int[] xOut = reverseEngineeringLoadKIntoXWithoutTheFirstByte(xIn);
+
+            for (int i = 0; i < xOut.length; i++) {
+                System.out.println("xOut["+i+"]: " + Integer.toHexString(xOut[i]));
+            }
+            System.out.println("====================================");
+        }
         
         List<String> resourceNames = new ArrayList<>();
         resourceNames.add("inc_defines.h");
@@ -486,9 +532,17 @@ public class ProbeAddressesOpenCLTest {
 
         // Build the program
         clBuildProgram(program, 0, null, null, null, null);
+        
+        // decide between transform/parse public
+        final String kernelName;
+        if (true) {
+            kernelName = "generateKeysKernel_transform_public";
+        } else {
+            kernelName = "generateKeysKernel_parse_public";
+        }
 
         // Create the kernel
-        cl_kernel kernel = clCreateKernel(program, "generateKeysKernel", null);
+        cl_kernel kernel = clCreateKernel(program, kernelName, null);
 
         // Set the arguments for the kernel
         int a = 0;
@@ -499,12 +553,19 @@ public class ProbeAddressesOpenCLTest {
         long global_work_size[] = new long[]{workSize};
 
         // Execute the kernel
+        System.out.println("execute ...");
         clEnqueueNDRangeKernel(commandQueue, kernel, 1, null,
                 global_work_size, null, 0, null, null);
         
         // Read the output data
         clEnqueueReadBuffer(commandQueue, dstMemR, CL_TRUE, 0,
                 dstMemSize, r, 0, null, null);
+        
+        
+        for (int i = 0; i < dst_r.length; i++) {
+            System.out.println("dst_r["+i+"]: " + Integer.toHexString(dst_r[i]));
+        }
+        
         byte[] dst_r_AsByteArray = KeyUtility.publicKeyByteArrayFromIntArray(dst_r);
         ECKey resultOpenCLKey = new ECKey(null, dst_r_AsByteArray);
         byte[] resultOpenCLPubKey = resultOpenCLKey.getPubKey();
@@ -596,5 +657,18 @@ public class ProbeAddressesOpenCLTest {
         return wnafShort;
     }
 
+    public int[] reverseEngineeringLoadKIntoXWithoutTheFirstByte(int[] k) {
+        int x[] = new int[8];
+
+        x[0] = (k[7] & 0xff00) << 16 | (k[7] & 0xff0000) | (k[7] & 0xff000000) >> 16 | (k[8] & 0xff);
+        x[1] = (k[6] & 0xff00) << 16 | (k[6] & 0xff0000) | (k[6] & 0xff000000) >> 16 | (k[7] & 0xff);
+        x[2] = (k[5] & 0xff00) << 16 | (k[5] & 0xff0000) | (k[5] & 0xff000000) >> 16 | (k[6] & 0xff);
+        x[3] = (k[4] & 0xff00) << 16 | (k[4] & 0xff0000) | (k[4] & 0xff000000) >> 16 | (k[5] & 0xff);
+        x[4] = (k[3] & 0xff00) << 16 | (k[3] & 0xff0000) | (k[3] & 0xff000000) >> 16 | (k[4] & 0xff);
+        x[5] = (k[2] & 0xff00) << 16 | (k[2] & 0xff0000) | (k[2] & 0xff000000) >> 16 | (k[3] & 0xff);
+        x[6] = (k[1] & 0xff00) << 16 | (k[1] & 0xff0000) | (k[1] & 0xff000000) >> 16 | (k[2] & 0xff);
+        x[7] = (k[0] & 0xff00) << 16 | (k[0] & 0xff0000) | (k[0] & 0xff000000) >> 16 | (k[1] & 0xff);
+        return x;
+    }
 
 }
