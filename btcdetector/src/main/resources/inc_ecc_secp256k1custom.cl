@@ -145,15 +145,6 @@ __kernel void generateKeysKernel_transform_public(__global u32 *r, __global cons
     k_local[6] = k[6];
     k_local[7] = k[7];
     
-    k_local[7] = 0x68e23530;
-    k_local[6] = 0xdeb6d501;
-    k_local[5] = 0x1ab56d8a;
-    k_local[4] = 0xd9f7b4a3;
-    k_local[3] = 0xb424f111;
-    k_local[2] = 0x2f086063;
-    k_local[1] = 0x57497495;
-    k_local[0] = 0x929f72dc;
-    
     const u32 first_byte = SECP256K1_G0 & 0xff;
     transform_public(&g_xy_local, g_local, first_byte);
     point_mul(r_local, k_local, &g_xy_local);
