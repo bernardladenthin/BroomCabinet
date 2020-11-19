@@ -377,6 +377,8 @@ public class ProbeAddressesOpenCLTest {
         return contents;
     }
     
+    private final static int PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array = 9;
+    private final static int PRIVATE_KEY_LENGTH_U32Array = 8;
     
     @Test
     public void hashcatOpenCl() throws IOException {
@@ -384,7 +386,7 @@ public class ProbeAddressesOpenCLTest {
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
         
         if (false) {
-            int xIn[] = new int[9];
+            int xIn[] = new int[PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array];
             if (false){
                 xIn[0] = 0x00000002;
                 xIn[1] = 0x79be667e;
@@ -457,9 +459,9 @@ public class ProbeAddressesOpenCLTest {
         
         // Create input- and output data
         // out:
-        int dst_r[] = new int[9*workSize];
+        int dst_r[] = new int[PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array*workSize];
         // in:
-        int src_k[] = new int[8*workSize];
+        int src_k[] = new int[PRIVATE_KEY_LENGTH_U32Array*workSize];
         
         StaticKey staticKey = new StaticKey();
         int[] staticPrivateKeyAsByteArray = KeyUtility.privateKeyIntsFromByteArray(staticKey.privateKeyBytes);
