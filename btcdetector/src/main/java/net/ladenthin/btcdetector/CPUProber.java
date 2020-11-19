@@ -100,6 +100,7 @@ public class CPUProber extends Prober {
     void produceKey(int bitLength, Random random) {
         BigInteger secret = null;
         try {
+            // Specifically, any 256-bit number between 0x1 and 0xFFFF FFFF FFFF FFFF FFFF FFFF FFFF FFFE BAAE DCE6 AF48 A03B BFD2 5E8C D036 4141 is a valid private key.
             secret = keyUtility.createSecret(bitLength, random);
             if (secret.equals(BigInteger.ZERO) || secret.equals(BigInteger.ONE)) {
                 // ignore these, prevent an IllegalArgumentException
