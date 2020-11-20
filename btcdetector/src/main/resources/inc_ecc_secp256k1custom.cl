@@ -1,3 +1,21 @@
+/*
+// example private key (in)
+// hex: 68e23530deb6d5011ab56d8ad9f7b4a3b424f1112f08606357497495929f72dc
+// decimal: 47440210799387980664936216788675555637818488436833759923669526136462528967388
+// WiF
+// to generate the public key (out)
+// 025d99d81d9e731e0d7eebd1c858b1155da7981b1f0a16d322a361f8b589ad2e3b
+// hex:
+k_local[7] = 0x68e23530;
+k_local[6] = 0xdeb6d501;
+k_local[5] = 0x1ab56d8a;
+k_local[4] = 0xd9f7b4a3;
+k_local[3] = 0xb424f111;
+k_local[2] = 0x2f086063;
+k_local[1] = 0x57497495;
+k_local[0] = 0x929f72dc;
+*/
+
 __kernel void generateKeysKernel_parse_public(__global u32 *r, __global const u32 *k)
 {
     u32 g_local[PUBLIC_KEY_LENGTH_WITH_PARITY];
