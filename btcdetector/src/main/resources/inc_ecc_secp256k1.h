@@ -30,6 +30,30 @@
 #define SECP256K1_N6 0xffffffff
 #define SECP256K1_N7 0xffffffff
 
+// the base point G in compressed form for transform_public
+// G = 02 79BE667E F9DCBBAC 55A06295 CE870B07 029BFCDB 2DCE28D9 59F2815B 16F81798
+#define SECP256K1_G_PARITY 0x00000002
+#define SECP256K1_G0 0x16f81798
+#define SECP256K1_G1 0x59f2815b
+#define SECP256K1_G2 0x2dce28d9
+#define SECP256K1_G3 0x029bfcdb
+#define SECP256K1_G4 0xce870b07
+#define SECP256K1_G5 0x55a06295
+#define SECP256K1_G6 0xf9dcbbac
+#define SECP256K1_G7 0x79be667e
+
+// the base point G in compressed form for parse_public
+// parity and reversed byte/char (8 bit) byte order
+#define SECP256K1_G_STRING0 0x66be7902
+#define SECP256K1_G_STRING1 0xbbdcf97e
+#define SECP256K1_G_STRING2 0x62a055ac
+#define SECP256K1_G_STRING3 0x0b87ce95
+#define SECP256K1_G_STRING4 0xfc9b0207
+#define SECP256K1_G_STRING5 0x28ce2ddb
+#define SECP256K1_G_STRING6 0x81f259d9
+#define SECP256K1_G_STRING7 0x17f8165b
+#define SECP256K1_G_STRING8 0x00000098
+
 #define SECP256K1_PRE_COMPUTED_XY_SIZE 96
 #define SECP256K1_NAF_SIZE 33 // 32+1, we need one extra slot
 

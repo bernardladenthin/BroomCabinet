@@ -91,16 +91,25 @@ public class KeyUtility {
     }
     // </editor-fold>
 
+    /**
+     * Different order for the generateKeysKernel_transform_public kernel
+     * Example for:
+     * <pre>68e23530deb6d5011ab56d8ad9f7b4a3b424f1112f08606357497495929f72dc<pre>
+     * which will be transformed to
+     * <pre>929f72dc 57497495 2f086063 b424f111 d9f7b4a3 1ab56d8a deb6d501 68e23530</pre>.
+     * @param b
+     * @return 
+     */
     public static int[] privateKeyIntsFromByteArray(byte[] b) {
         int[] intArray = new int[8];
-        byteArrayToIntArray(b, 0, intArray, 0);
-        byteArrayToIntArray(b, 4, intArray, 1);
-        byteArrayToIntArray(b, 8, intArray, 2);
-        byteArrayToIntArray(b, 12, intArray, 3);
-        byteArrayToIntArray(b, 16, intArray, 4);
-        byteArrayToIntArray(b, 20, intArray, 5);
-        byteArrayToIntArray(b, 24, intArray, 6);
-        byteArrayToIntArray(b, 28, intArray, 7);
+        byteArrayToIntArray(b, 0, intArray, 7);
+        byteArrayToIntArray(b, 4, intArray, 6);
+        byteArrayToIntArray(b, 8, intArray, 5);
+        byteArrayToIntArray(b, 12, intArray, 4);
+        byteArrayToIntArray(b, 16, intArray, 3);
+        byteArrayToIntArray(b, 20, intArray, 2);
+        byteArrayToIntArray(b, 24, intArray, 1);
+        byteArrayToIntArray(b, 28, intArray, 0);
         return intArray;
     }
 

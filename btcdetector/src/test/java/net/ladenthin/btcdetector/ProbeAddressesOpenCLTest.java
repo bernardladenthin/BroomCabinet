@@ -385,53 +385,6 @@ public class ProbeAddressesOpenCLTest {
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
         
-        if (false) {
-            int xIn[] = new int[PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array];
-            if (false){
-                xIn[0] = 0x00000002;
-                xIn[1] = 0x79be667e;
-                xIn[2] = 0xf9dcbbac;
-                xIn[3] = 0x55a06295;
-                xIn[4] = 0xce870b07;
-                xIn[5] = 0x029bfcdb;
-                xIn[6] = 0x2dce28d9;
-                xIn[7] = 0x59f2815b;
-                xIn[8] = 0x16f81798;
-            } else if(false) {
-                xIn[0] = 0x0279be66;
-                xIn[1] = 0x7ef9dcbb;
-                xIn[2] = 0xac55a062;
-                xIn[3] = 0x95ce870b;
-                xIn[4] = 0x07029bfc;
-                xIn[5] = 0xdb2dce28;
-                xIn[6] = 0xd959f281;
-                xIn[7] = 0x5b16f817;
-                xIn[8] = 0x98000000;
-            } else if(true) {
-                xIn[0] = 0x66BE7902;
-                xIn[1] = 0xBBDCF97E;
-                xIn[2] = 0x62A055AC;
-                xIn[3] = 0x0B87CE95;
-                xIn[4] = 0xFC9B0207;
-                xIn[5] = 0x28CE2DDB;
-                xIn[6] = 0x81F259D9;
-                xIn[7] = 0x17F8165B;
-                xIn[8] = 0x00000098;
-            }
-
-            System.out.println("====================================");
-            for (int i = 0; i < xIn.length; i++) {
-                System.out.println("xIn["+i+"]: " + Integer.toHexString(xIn[i]));
-            }
-            System.out.println("====================================");
-            int[] xOut = reverseEngineeringLoadKIntoXWithoutTheFirstByte(xIn);
-
-            for (int i = 0; i < xOut.length; i++) {
-                System.out.println("xOut["+i+"]: " + Integer.toHexString(xOut[i]));
-            }
-            System.out.println("====================================");
-        }
-        
         List<String> resourceNames = new ArrayList<>();
         resourceNames.add("inc_defines.h");
         resourceNames.add("inc_vendor.h");
@@ -537,11 +490,15 @@ public class ProbeAddressesOpenCLTest {
         
         // decide between transform/parse public
         final String kernelName;
-        if (true) {
+        if (false) {
             kernelName = "generateKeysKernel_transform_public";
         } else {
             kernelName = "generateKeysKernel_parse_public";
         }
+        
+        System.out.println(LOG_SEPARATE_LINE);
+        System.out.println("Kernel name: " + kernelName );
+        System.out.println(LOG_SEPARATE_LINE);
 
         // Create the kernel
         cl_kernel kernel = clCreateKernel(program, kernelName, null);
@@ -562,11 +519,6 @@ public class ProbeAddressesOpenCLTest {
         // Read the output data
         clEnqueueReadBuffer(commandQueue, dstMemR, CL_TRUE, 0,
                 dstMemSize, r, 0, null, null);
-        
-        
-        for (int i = 0; i < dst_r.length; i++) {
-            System.out.println("dst_r["+i+"]: " + Integer.toHexString(dst_r[i]));
-        }
         
         byte[] dst_r_AsByteArray = KeyUtility.publicKeyByteArrayFromIntArray(dst_r);
         ECKey resultOpenCLKey = new ECKey(null, dst_r_AsByteArray);
@@ -596,6 +548,13 @@ public class ProbeAddressesOpenCLTest {
         
         assertThat(resultOpenCLPubKey, is(equalTo(expectedPublicKeyBytes)));
         assertThat(resultOpenCLPubKeyHashBase58, is(equalTo(staticKey.publicKeyCompressed)));
+    }
+    private static final String LOG_SEPARATE_LINE = "-------------------------------------------------------";
+
+    private void dump_asIntKey(String name, int[] dst_r) {
+        for (int i = 0; i < dst_r.length; i++) {
+            System.out.println(name + "["+i+"]: " + Integer.toHexString(dst_r[i]));
+        }
     }
     
     // from https://java-browser.yawk.at/org.bouncycastle/bcprov-jdk15/1.46/org/bouncycastle/math/ec/WNafMultiplier.java
@@ -657,20 +616,6 @@ public class ProbeAddressesOpenCLTest {
         byte[] wnafShort = new byte[length];
         System.arraycopy(wnaf, 0, wnafShort, 0, length);
         return wnafShort;
-    }
-
-    public int[] reverseEngineeringLoadKIntoXWithoutTheFirstByte(int[] k) {
-        int x[] = new int[8];
-
-        x[0] = (k[7] & 0xff00) << 16 | (k[7] & 0xff0000) | (k[7] & 0xff000000) >> 16 | (k[8] & 0xff);
-        x[1] = (k[6] & 0xff00) << 16 | (k[6] & 0xff0000) | (k[6] & 0xff000000) >> 16 | (k[7] & 0xff);
-        x[2] = (k[5] & 0xff00) << 16 | (k[5] & 0xff0000) | (k[5] & 0xff000000) >> 16 | (k[6] & 0xff);
-        x[3] = (k[4] & 0xff00) << 16 | (k[4] & 0xff0000) | (k[4] & 0xff000000) >> 16 | (k[5] & 0xff);
-        x[4] = (k[3] & 0xff00) << 16 | (k[3] & 0xff0000) | (k[3] & 0xff000000) >> 16 | (k[4] & 0xff);
-        x[5] = (k[2] & 0xff00) << 16 | (k[2] & 0xff0000) | (k[2] & 0xff000000) >> 16 | (k[3] & 0xff);
-        x[6] = (k[1] & 0xff00) << 16 | (k[1] & 0xff0000) | (k[1] & 0xff000000) >> 16 | (k[2] & 0xff);
-        x[7] = (k[0] & 0xff00) << 16 | (k[0] & 0xff0000) | (k[0] & 0xff000000) >> 16 | (k[1] & 0xff);
-        return x;
     }
 
 }
