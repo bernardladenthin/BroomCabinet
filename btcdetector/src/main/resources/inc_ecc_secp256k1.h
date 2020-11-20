@@ -11,6 +11,7 @@
 #define SECP256K1_B 7
 
 // finite field Fp
+// p = FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFE FFFFFC2F
 #define SECP256K1_P0 0xfffffc2f
 #define SECP256K1_P1 0xfffffffe
 #define SECP256K1_P2 0xffffffff
@@ -21,6 +22,7 @@
 #define SECP256K1_P7 0xffffffff
 
 // prime order N
+// n = FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFE BAAEDCE6 AF48A03B BFD25E8C D0364141
 #define SECP256K1_N0 0xd0364141
 #define SECP256K1_N1 0xbfd25e8c
 #define SECP256K1_N2 0xaf48a03b
@@ -44,6 +46,7 @@
 
 // the base point G in compressed form for parse_public
 // parity and reversed byte/char (8 bit) byte order
+// G = 02 79BE667E F9DCBBAC 55A06295 CE870B07 029BFCDB 2DCE28D9 59F2815B 16F81798
 #define SECP256K1_G_STRING0 0x66be7902
 #define SECP256K1_G_STRING1 0xbbdcf97e
 #define SECP256K1_G_STRING2 0x62a055ac
