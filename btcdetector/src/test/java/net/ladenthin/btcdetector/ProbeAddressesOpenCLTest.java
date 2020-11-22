@@ -7,6 +7,7 @@ import java.math.BigInteger;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.MappedByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -22,12 +23,14 @@ import static org.jocl.CL.*;
 import java.util.Arrays;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.params.MainNetParams;
+import org.bouncycastle.util.encoders.Hex;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
 import org.jocl.*;
 import org.junit.Ignore;
+import sun.nio.ch.DirectBuffer;
 
 public class ProbeAddressesOpenCLTest {
 
@@ -382,6 +385,7 @@ public class ProbeAddressesOpenCLTest {
     private final static int PRIVATE_KEY_LENGTH_U32Array = 8;
     
     @Test
+    @Ignore
     public void hashcatOpenCl() throws IOException {
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
@@ -584,7 +588,24 @@ public class ProbeAddressesOpenCLTest {
         assertThat(resultOpenCLPubKeyHashBase58, is(equalTo(staticKey.publicKeyCompressed)));
     }
     
+    private final static int BYTES_FOR_INT = 4;
     
+    // https://stackoverflow.com/questions/12893758/how-to-reverse-the-byte-array-in-java
+    public static void reverse(byte[] array) {
+        if (array == null) {
+            return;
+        }
+        int i = 0;
+        int j = array.length - 1;
+        byte tmp;
+        while (j > i) {
+            tmp = array[j];
+            array[j] = array[i];
+            array[i] = tmp;
+            j--;
+            i++;
+        }
+    }
     
     @Test
     public void hashcatOpenClGrid() throws IOException {
@@ -615,13 +636,19 @@ public class ProbeAddressesOpenCLTest {
         String[] openClPrograms = resourceNamesContentWithReplacements.toArray(new String[0]);
         
         int workDim =  1;
-        int workSize = 3;
+        int workSize = 1;
         
         // Create input- and output data
         // in:
-        int src_k[] = new int[PRIVATE_KEY_LENGTH_U32Array*workSize];
+        int srcKU32ArraySize = PRIVATE_KEY_LENGTH_U32Array*workSize;
+        int srcKByteBufferCapacity = BYTES_FOR_INT*srcKU32ArraySize;
+        ByteBuffer srcKByteBuffer = ByteBuffer.allocateDirect(srcKByteBufferCapacity);
+        
         // out:
-        int dst_r[] = new int[PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array*workSize];
+        int dstRU32ArraySize = PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array*workSize;
+        int dstRByteBufferCapacity = BYTES_FOR_INT*dstRU32ArraySize;
+        ByteBuffer dstRByteBuffer = ByteBuffer.allocateDirect(dstRByteBufferCapacity);
+        int dst_r[] = new int[dstRU32ArraySize];
         
         StaticKey staticKey = new StaticKey();
         
@@ -631,15 +658,21 @@ public class ProbeAddressesOpenCLTest {
         for (int i = 0; i < workSize; i++) {
             // todo: generate random keys here
             byte[] key = staticKey.privateKeyBytes;
-            privateKeys[i] = key;
-            int[] staticPrivateKeyAsByteArray = KeyUtility.privateKeyIntsFromByteArray(key);
-            System.arraycopy(staticPrivateKeyAsByteArray, 0 , src_k, PRIVATE_KEY_LENGTH_U32Array*i, PRIVATE_KEY_LENGTH_U32Array);
-        }
+            System.out.println("Key to write: " + Hex.toHexString(key));
+            
+            // put key in reverse order because the ByteBuffer put writes in reverse order, a flip has no effect
+            byte[] keyReverse = key.clone();
+            reverse(keyReverse);
+            srcKByteBuffer.put(keyReverse, 0, keyReverse.length);
 
-        Pointer src_k_pointer = Pointer.to(src_k);
+            privateKeys[i] = key;
+        }
+        
+        Pointer src_k_pointer = Pointer.to(srcKByteBuffer);
+        
         Pointer dst_r_pointer = Pointer.to(dst_r);
         
-        long srcMemSize = Sizeof.cl_int8 * src_k.length;
+        long srcMemSize = Sizeof.cl_int8 * srcKU32ArraySize;
         long dstMemSize = Sizeof.cl_int8 * dst_r.length;
         
         
@@ -775,6 +808,14 @@ public class ProbeAddressesOpenCLTest {
         // Read the output data
         clEnqueueReadBuffer(commandQueue, dstMemR, CL_TRUE, 0,
                 dstMemSize, dst_r_pointer, 0, null, null);
+        
+        System.out.println("=== read buffer:");
+        for (int i = 0; i < dst_r.length; i++) {
+            byte[] byteArray = KeyUtility.intToByteArray(dst_r[i]);
+            System.out.println("dstR[" + i + "]: " + Hex.toHexString(byteArray));
+        }
+        System.out.println("");
+        System.out.println("");
         
         for (int i = 0; i < workSize; i++) {
             int pubKeyInts[] = new int[PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array];
