@@ -608,6 +608,7 @@ public class ProbeAddressesOpenCLTest {
     }
     
     @Test
+    @Ignore
     public void hashcatOpenClGrid() throws IOException {
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
@@ -636,7 +637,7 @@ public class ProbeAddressesOpenCLTest {
         String[] openClPrograms = resourceNamesContentWithReplacements.toArray(new String[0]);
         
         int workDim =  1;
-        int workSize = 2;
+        int workSize = 1024;
         
         // Create input- and output data
         // in:
@@ -804,12 +805,13 @@ public class ProbeAddressesOpenCLTest {
 
         // Set the work-item dimensions
         long global_work_size[] = new long[]{workSize};
+        long localWorkSize[] = new long[]{1};
 
         // Execute the kernel
         System.out.println("execute ...");
         clEnqueueNDRangeKernel(commandQueue, kernel, workDim, null,
                 global_work_size,
-                null, // local_work_size, enabling the system to choose the work-group size.
+                localWorkSize, // local_work_size, enabling the system to choose the work-group size.
                 0, null, null);
         System.out.println("... executed");
         
@@ -863,6 +865,162 @@ public class ProbeAddressesOpenCLTest {
         
         System.out.println("release");
         
+        if(true) {
+        // Release kernel, program, and memory objects
+        clReleaseMemObject(srcMemK);
+        clReleaseMemObject(dstMemR);
+        clReleaseKernel(kernel);
+        clReleaseProgram(program);
+        clReleaseCommandQueue(commandQueue);
+        clReleaseContext(context);
+        }
+    }
+    
+    @Test
+    public void openClCrashTest() throws IOException {
+        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
+        KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
+        
+        List<String> resourceNames = new ArrayList<>();
+        resourceNames.add("inc_defines.h");
+        resourceNames.add("inc_vendor.h");
+        resourceNames.add("inc_types.h");
+        resourceNames.add("inc_platform.h");
+        resourceNames.add("inc_platform.cl");
+        resourceNames.add("inc_common.h");
+        resourceNames.add("inc_common.cl");
+
+        resourceNames.add("inc_ecc_secp256k1.h");
+        resourceNames.add("inc_ecc_secp256k1.cl");
+        resourceNames.add("inc_ecc_secp256k1custom.cl");
+        
+        List<String> resourceNamesContent = getResourceNamesContent(resourceNames);
+        List<String> resourceNamesContentWithReplacements = new ArrayList<>();
+        for (String content : resourceNamesContent) {
+            String contentWithReplacements = content;
+            contentWithReplacements = contentWithReplacements.replaceAll("#include.*", "");
+            contentWithReplacements = contentWithReplacements.replaceAll("GLOBAL_AS const secp256k1_t \\*tmps", "const secp256k1_t \\*tmps");
+            resourceNamesContentWithReplacements.add(contentWithReplacements);
+        }
+        String[] openClPrograms = resourceNamesContentWithReplacements.toArray(new String[0]);
+        
+        int workDim =  1;
+        int workSize = 32;
+        
+        // Create input- and output data
+        // in:
+        int srcKU32ArraySize = PRIVATE_KEY_LENGTH_U32Array*workSize;
+        long srcMemSize = Sizeof.cl_int8 * srcKU32ArraySize;
+        int srcKByteBufferCapacity = BYTES_FOR_INT*srcKU32ArraySize;
+        ByteBuffer srcKByteBuffer = ByteBuffer.allocateDirect(srcKByteBufferCapacity);
+        Pointer src_k_pointer = Pointer.to(srcKByteBuffer);
+        
+        // out:
+        int dstRU32ArraySize = PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array*workSize;
+        long dstMemSize = Sizeof.cl_int8 * dstRU32ArraySize;
+        int dstRByteBufferCapacity = BYTES_FOR_INT*dstRU32ArraySize;
+        ByteBuffer dstRByteBuffer = ByteBuffer.allocateDirect(dstRByteBufferCapacity);
+        Pointer dst_r_pointer = Pointer.to(dstRByteBuffer);
+        
+        // The platform, device type and device number
+        // that will be used
+        final int platformIndex = 0;
+        final long deviceType = CL_DEVICE_TYPE_ALL;
+        final int deviceIndex = 0;
+
+        // Enable exceptions and subsequently omit error checks in this sample
+        CL.setExceptionsEnabled(true);
+
+        // Obtain the number of platforms
+        int numPlatformsArray[] = new int[1];
+        clGetPlatformIDs(0, null, numPlatformsArray);
+        int numPlatforms = numPlatformsArray[0];
+        
+        System.out.println("Obtain a platform ID");
+        // Obtain a platform ID
+        cl_platform_id platforms[] = new cl_platform_id[numPlatforms];
+        clGetPlatformIDs(platforms.length, platforms, null);
+        cl_platform_id platform = platforms[platformIndex];
+
+        System.out.println("Initialize the context properties");
+        // Initialize the context properties
+        cl_context_properties contextProperties = new cl_context_properties();
+        contextProperties.addProperty(CL_CONTEXT_PLATFORM, platform);
+
+        System.out.println("Obtain the number of devices for the platform");
+        // Obtain the number of devices for the platform
+        int numDevicesArray[] = new int[1];
+        clGetDeviceIDs(platform, deviceType, 0, null, numDevicesArray);
+        int numDevices = numDevicesArray[0];
+
+        System.out.println("Obtain a device ID");
+        // Obtain a device ID 
+        cl_device_id devices[] = new cl_device_id[numDevices];
+        clGetDeviceIDs(platform, deviceType, numDevices, devices, null);
+        cl_device_id device = devices[deviceIndex];
+        final cl_device_id[] cl_device_ids = new cl_device_id[]{device};
+
+        // Create a context for the selected device
+        cl_context context = clCreateContext(contextProperties, 1, cl_device_ids, null, null, null);
+
+        // Create a command-queue for the selected device
+        cl_queue_properties properties = new cl_queue_properties();
+        cl_command_queue commandQueue = clCreateCommandQueueWithProperties(
+                context, device, properties, null);
+        
+        System.out.println("Allocate the memory objects for the input- and output data");
+        // Allocate the memory objects for the input- and output data
+        cl_mem srcMemK = clCreateBuffer(context,
+                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                srcMemSize, src_k_pointer, null);
+        
+        System.out.println("CL_MEM_READ_WRITE");
+        cl_mem dstMemR = clCreateBuffer(context,
+                CL_MEM_READ_WRITE,
+                dstMemSize, null, null);
+        
+        System.out.println("Create the program from the source code");
+        // Create the program from the source code
+        cl_program program = clCreateProgramWithSource(context, openClPrograms.length, openClPrograms, null, null);
+
+        // Build the program
+        clBuildProgram(program, 0, null, null, null, null);
+        
+        final String kernelName  = "test_kernel_do_nothing";
+        
+        System.out.println(LOG_SEPARATE_LINE);
+        System.out.println("Kernel name: " + kernelName );
+        System.out.println(LOG_SEPARATE_LINE);
+
+        // Create the kernel
+        cl_kernel kernel = clCreateKernel(program, kernelName, null);
+        
+        // Set the arguments for the kernel
+        int a = 0;
+        clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(dstMemR));
+        clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(srcMemK));
+
+        // Set the work-item dimensions
+        long global_work_size[] = new long[]{workSize};
+        long localWorkSize[] = new long[]{1};
+
+        // Execute the kernel
+        System.out.println("execute ...");
+        clEnqueueNDRangeKernel(commandQueue, kernel, workDim, null, global_work_size,
+                localWorkSize, // local_work_size, enabling the system to choose the work-group size.
+                0, null, null);
+        System.out.println("... executed");
+        
+        System.out.println("Read the output data");
+        // Read the output data
+        clEnqueueReadBuffer(commandQueue, dstMemR, CL_TRUE, 0, dstMemSize, dst_r_pointer, 0, null, null);
+        
+        if (false) {
+            clFinish(commandQueue);
+        }
+        
+        System.out.println("release");
+        
         // Release kernel, program, and memory objects
         clReleaseMemObject(srcMemK);
         clReleaseMemObject(dstMemR);
@@ -872,6 +1030,9 @@ public class ProbeAddressesOpenCLTest {
         clReleaseContext(context);
     }
     
+    /**
+     * Read the inner bytes in reverse order. Remove padding bytes to return a clean byte array.
+     */
     private static final byte[] getPublicKeyFromByteBuffer(ByteBuffer b, int keyOffset) {
         int paddingBytes = 3;
         int publicKeyByteLength = PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array * BYTES_FOR_INT;
@@ -884,6 +1045,7 @@ public class ProbeAddressesOpenCLTest {
             for (int j = 0; j < BYTES_FOR_INT; j++) {
                 int publicKeyOffset= x+j;
                 if (publicKeyOffset == publicKey.length) {
+                    // return the public key, read of all bytes finish
                     break outer;
                 }
                 int y = BYTES_FOR_INT-j-1;

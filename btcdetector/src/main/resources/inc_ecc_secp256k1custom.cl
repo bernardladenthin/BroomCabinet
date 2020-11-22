@@ -151,3 +151,7 @@ __kernel void generateKeysKernel_transform_public_grid(__global u32 *r, __global
     r[r_offset+7] = r_local[7];
     r[r_offset+8] = r_local[8];
 }
+
+__kernel void test_kernel_do_nothing(__global u32 *r, __global const u32 *k)
+{
+}
