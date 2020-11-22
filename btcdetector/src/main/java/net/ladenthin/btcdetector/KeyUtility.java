@@ -13,6 +13,7 @@ import org.bouncycastle.util.encoders.Hex;
 /**
  * https://stackoverflow.com/questions/5399798/byte-array-and-int-conversion-in-java/11419863
  * https://stackoverflow.com/questions/21087651/how-to-efficiently-change-endianess-of-byte-array-in-java
+ * https://stackoverflow.com/questions/7619058/convert-a-byte-array-to-integer-in-java-and-vice-versa
  * @author Bernard
  */
 public class KeyUtility {

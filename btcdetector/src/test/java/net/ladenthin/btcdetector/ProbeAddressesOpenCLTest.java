@@ -424,8 +424,8 @@ public class ProbeAddressesOpenCLTest {
         Pointer r = Pointer.to(dst_r);
         Pointer k = Pointer.to(src_k);
         
-        long srcMemSize = Sizeof.cl_int8 * dst_r.length;
-        long dstMemSize = Sizeof.cl_int8 * src_k.length;
+        long srcMemSize = Sizeof.cl_int8 * src_k.length;
+        long dstMemSize = Sizeof.cl_int8 * dst_r.length;
         
         
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -615,7 +615,7 @@ public class ProbeAddressesOpenCLTest {
         String[] openClPrograms = resourceNamesContentWithReplacements.toArray(new String[0]);
         
         int workDim =  1;
-        int workSize = 2;
+        int workSize = 3;
         
         // Create input- and output data
         // in:
