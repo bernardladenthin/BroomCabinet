@@ -636,24 +636,35 @@ public class ProbeAddressesOpenCLTest {
         String[] openClPrograms = resourceNamesContentWithReplacements.toArray(new String[0]);
         
         int workDim =  1;
-        int workSize = 1;
+        int workSize = 2;
         
         // Create input- and output data
         // in:
         int srcKU32ArraySize = PRIVATE_KEY_LENGTH_U32Array*workSize;
+        long srcMemSize = Sizeof.cl_int8 * srcKU32ArraySize;
         int srcKByteBufferCapacity = BYTES_FOR_INT*srcKU32ArraySize;
         ByteBuffer srcKByteBuffer = ByteBuffer.allocateDirect(srcKByteBufferCapacity);
+        Pointer src_k_pointer = Pointer.to(srcKByteBuffer);
         
         // out:
         int dstRU32ArraySize = PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array*workSize;
+        long dstMemSize = Sizeof.cl_int8 * dstRU32ArraySize;
         int dstRByteBufferCapacity = BYTES_FOR_INT*dstRU32ArraySize;
         ByteBuffer dstRByteBuffer = ByteBuffer.allocateDirect(dstRByteBufferCapacity);
-        int dst_r[] = new int[dstRU32ArraySize];
+        Pointer dst_r_pointer = Pointer.to(dstRByteBuffer);
+        
+        
+        
+        
+        
         
         StaticKey staticKey = new StaticKey();
         
         Object[] privateKeys = new Object[workSize];
         Object[] publicKeys = new Object[workSize];
+        
+        
+        
         
         for (int i = 0; i < workSize; i++) {
             // todo: generate random keys here
@@ -668,12 +679,8 @@ public class ProbeAddressesOpenCLTest {
             privateKeys[i] = key;
         }
         
-        Pointer src_k_pointer = Pointer.to(srcKByteBuffer);
         
-        Pointer dst_r_pointer = Pointer.to(dst_r);
         
-        long srcMemSize = Sizeof.cl_int8 * srcKU32ArraySize;
-        long dstMemSize = Sizeof.cl_int8 * dst_r.length;
         
         
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -804,36 +811,25 @@ public class ProbeAddressesOpenCLTest {
                 global_work_size,
                 null, // local_work_size, enabling the system to choose the work-group size.
                 0, null, null);
+        System.out.println("... executed");
         
+        System.out.println("Read the output data");
         // Read the output data
         clEnqueueReadBuffer(commandQueue, dstMemR, CL_TRUE, 0,
                 dstMemSize, dst_r_pointer, 0, null, null);
         
-        System.out.println("=== read buffer:");
-        for (int i = 0; i < dst_r.length; i++) {
-            byte[] byteArray = KeyUtility.intToByteArray(dst_r[i]);
-            System.out.println("dstR[" + i + "]: " + Hex.toHexString(byteArray));
-        }
-        System.out.println("");
-        System.out.println("");
-        
+        System.out.println("Transform ByteBuffer to keys");
         for (int i = 0; i < workSize; i++) {
-            int pubKeyInts[] = new int[PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array];
-            System.arraycopy(dst_r, i*PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array , pubKeyInts, 0, PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array);
-            byte[] pubKeyBytes = KeyUtility.publicKeyByteArrayFromIntArray(pubKeyInts);
+            byte[] pubKeyBytes = getPublicKeyFromByteBuffer(dstRByteBuffer, i);
+            // int pubKeyInts[] = new int[PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array];
+            // System.arraycopy(dst_r, i*PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array , pubKeyInts, 0, PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array);
+            // byte[] pubKeyBytes = KeyUtility.publicKeyByteArrayFromIntArray(pubKeyInts);
             publicKeys[i] = pubKeyBytes;
         }
-        
-        
-        // Release kernel, program, and memory objects
-        clReleaseMemObject(srcMemK);
-        clReleaseMemObject(dstMemR);
-        clReleaseKernel(kernel);
-        clReleaseProgram(program);
-        clReleaseCommandQueue(commandQueue);
-        clReleaseContext(context);
+        System.out.println("Transformed.");
             
         for (int i = 0; i < workSize; i++) {
+            System.out.println("i: " + i);
             System.out.println("1");
             byte[] privateKey = (byte[]) privateKeys[i];
             byte[] publicKey = (byte[]) publicKeys[i];
@@ -864,6 +860,38 @@ public class ProbeAddressesOpenCLTest {
                 assertThat(resultOpenCLPubKeyHashBase58, is(equalTo(staticKey.publicKeyCompressed)));
             }
         }
+        
+        System.out.println("release");
+        
+        // Release kernel, program, and memory objects
+        clReleaseMemObject(srcMemK);
+        clReleaseMemObject(dstMemR);
+        clReleaseKernel(kernel);
+        clReleaseProgram(program);
+        clReleaseCommandQueue(commandQueue);
+        clReleaseContext(context);
+    }
+    
+    private static final byte[] getPublicKeyFromByteBuffer(ByteBuffer b, int keyOffset) {
+        int paddingBytes = 3;
+        int publicKeyByteLength = PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array * BYTES_FOR_INT;
+        byte[] publicKey = new byte[publicKeyByteLength - paddingBytes];
+        // its not inverted because the memory was written in OpenCL
+        int offset = publicKeyByteLength * keyOffset;
+        outer:
+        for (int i=0; i<PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array; i++) {
+            int x = i*BYTES_FOR_INT;
+            for (int j = 0; j < BYTES_FOR_INT; j++) {
+                int publicKeyOffset= x+j;
+                if (publicKeyOffset == publicKey.length) {
+                    break outer;
+                }
+                int y = BYTES_FOR_INT-j-1;
+                int byteBufferOffset = offset+x+y;
+                publicKey[publicKeyOffset] = b.get(byteBufferOffset);
+            }
+        }
+        return publicKey;
     }
     
     
