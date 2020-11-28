@@ -68,6 +68,37 @@ __kernel void generateKeysKernel_parse_public(__global u32 *r, __global const u3
     r[8] = r_local[8];
 }
 
+/*
+ * Generate a secp256k1_t struct for the public point. pre-computed points: (x1,y1,-y1),(x3,y3,-y3),(x5,y5,-y5),(x7,y7,-y7).
+ * @param r out: secp256k1_t structure, a pointer to an u32 array with a size of 96 (SECP256K1_PRE_COMPUTED_XY_SIZE).
+ */
+__kernel void get_precalculated_g(__global u32 *r)
+{
+    u32 g_local[PUBLIC_KEY_LENGTH_WITHOUT_PARITY];
+    secp256k1_t g_xy_local;
+    const u32 g_parity = SECP256K1_G_PARITY;
+    u32 return_value;
+
+    g_local[0] = SECP256K1_G0;
+    g_local[1] = SECP256K1_G1;
+    g_local[2] = SECP256K1_G2;
+    g_local[3] = SECP256K1_G3;
+    g_local[4] = SECP256K1_G4;
+    g_local[5] = SECP256K1_G5;
+    g_local[6] = SECP256K1_G6;
+    g_local[7] = SECP256K1_G7;
+    
+    return_value = transform_public(&g_xy_local, g_local, g_parity);
+    
+    if (return_value != 0) {
+        return;
+    }
+    
+    for(int i=0; i<SECP256K1_PRE_COMPUTED_XY_SIZE; i++) {
+        r[i] = g_xy_local.xy[i];
+    }
+}
+
 __kernel void generateKeysKernel_transform_public(__global u32 *r, __global const u32 *k)
 {
     u32 g_local[PUBLIC_KEY_LENGTH_WITHOUT_PARITY];
@@ -116,14 +147,11 @@ __kernel void generateKeysKernel_transform_public(__global u32 *r, __global cons
     r[8] = r_local[8];
 }
 
-__kernel void generateKeysKernel_transform_public_grid(__global u32 *r, __global const u32 *k)
+__kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k)
 {
-    u32 g_local[PUBLIC_KEY_LENGTH_WITHOUT_PARITY];
     u32 r_local[PUBLIC_KEY_LENGTH_WITH_PARITY];
     u32 k_local[PRIVATE_KEY_LENGTH];
     secp256k1_t g_xy_local;
-    const u32 g_parity = SECP256K1_G_PARITY;
-    u32 return_value;
     
     
     // get_global_id(dim) where dim is the dimension index (0 for first, 1 for second dimension etc.)
@@ -133,15 +161,6 @@ __kernel void generateKeysKernel_transform_public_grid(__global u32 *r, __global
     //int local_id = get_local_id(0);
     //int local_size = get_local_size(0);
     
-    g_local[0] = SECP256K1_G0;
-    g_local[1] = SECP256K1_G1;
-    g_local[2] = SECP256K1_G2;
-    g_local[3] = SECP256K1_G3;
-    g_local[4] = SECP256K1_G4;
-    g_local[5] = SECP256K1_G5;
-    g_local[6] = SECP256K1_G6;
-    g_local[7] = SECP256K1_G7;
-
     // global to local
     int k_offset = PRIVATE_KEY_LENGTH * global_id;
     k_local[0] = k[k_offset+0];
@@ -153,11 +172,7 @@ __kernel void generateKeysKernel_transform_public_grid(__global u32 *r, __global
     k_local[6] = k[k_offset+6];
     k_local[7] = k[k_offset+7];
     
-    return_value = transform_public(&g_xy_local, g_local, g_parity);
-    
-    if (return_value != 0) {
-        return;
-    }
+    set_precomputed_basepoint_g(&g_xy_local);
     
     point_mul(r_local, k_local, &g_xy_local);
 

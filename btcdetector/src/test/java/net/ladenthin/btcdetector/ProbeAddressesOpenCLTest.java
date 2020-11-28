@@ -21,6 +21,7 @@ import org.junit.rules.TemporaryFolder;
 import static org.jocl.CL.*;
 
 import java.util.Arrays;
+import static net.ladenthin.btcdetector.KeyUtility.byteArrayToIntArray;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.params.MainNetParams;
 import org.bouncycastle.util.encoders.Hex;
@@ -383,6 +384,7 @@ public class ProbeAddressesOpenCLTest {
     
     private final static int PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array = 9;
     private final static int PRIVATE_KEY_LENGTH_U32Array = 8;
+    private final static int SECP256K1_PRE_COMPUTED_XY_SIZE = 12*8;
     
     @Test
     @Ignore
@@ -608,7 +610,6 @@ public class ProbeAddressesOpenCLTest {
     }
     
     @Test
-    @Ignore
     public void hashcatOpenClGrid() throws IOException {
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
@@ -637,7 +638,7 @@ public class ProbeAddressesOpenCLTest {
         String[] openClPrograms = resourceNamesContentWithReplacements.toArray(new String[0]);
         
         int workDim =  1;
-        int workSize = 1024;
+        int workSize = 1;
         
         // Create input- and output data
         // in:
@@ -755,7 +756,7 @@ public class ProbeAddressesOpenCLTest {
         // Build the program
         clBuildProgram(program, 0, null, null, null, null);
         
-        final String kernelName  = "generateKeysKernel_transform_public_grid";
+        final String kernelName  = "generateKeysKernel_grid";
         
         System.out.println(LOG_SEPARATE_LINE);
         System.out.println("Kernel name: " + kernelName );
@@ -905,7 +906,7 @@ public class ProbeAddressesOpenCLTest {
         String[] openClPrograms = resourceNamesContentWithReplacements.toArray(new String[0]);
         
         int workDim =  1;
-        int workSize = 32;
+        int workSize = 1;
         
         // Create input- and output data
         // in:
@@ -1059,9 +1060,9 @@ public class ProbeAddressesOpenCLTest {
     
     private static final String LOG_SEPARATE_LINE = "-------------------------------------------------------";
 
-    private void dump_asIntKey(String name, int[] dst_r) {
-        for (int i = 0; i < dst_r.length; i++) {
-            System.out.println(name + "["+i+"]: " + Integer.toHexString(dst_r[i]));
+    private void dumpIntArray(String name, int[] intArray) {
+        for (int i = 0; i < intArray.length; i++) {
+            System.out.println(name + "["+i+"]: " + Integer.toHexString(intArray[i]));
         }
     }
     
@@ -1289,6 +1290,161 @@ public class ProbeAddressesOpenCLTest {
                    preferredVectorWidthInt, preferredVectorWidthLong,
                    preferredVectorWidthFloat, preferredVectorWidthDouble);
         }
+    }
+    
+    
+    @Test
+    @Ignore
+    public void hashcatGetPrecalculatedG() throws IOException {
+        List<String> resourceNames = new ArrayList<>();
+        resourceNames.add("inc_defines.h");
+        resourceNames.add("inc_vendor.h");
+        resourceNames.add("inc_types.h");
+        resourceNames.add("inc_platform.h");
+        resourceNames.add("inc_platform.cl");
+        resourceNames.add("inc_common.h");
+        resourceNames.add("inc_common.cl");
+
+        resourceNames.add("inc_ecc_secp256k1.h");
+        resourceNames.add("inc_ecc_secp256k1.cl");
+        resourceNames.add("inc_ecc_secp256k1custom.cl");
+        
+        System.out.println("read program");
+        List<String> resourceNamesContent = getResourceNamesContent(resourceNames);
+        List<String> resourceNamesContentWithReplacements = new ArrayList<>();
+        for (String content : resourceNamesContent) {
+            String contentWithReplacements = content;
+            contentWithReplacements = contentWithReplacements.replaceAll("#include.*", "");
+            contentWithReplacements = contentWithReplacements.replaceAll("GLOBAL_AS const secp256k1_t \\*tmps", "const secp256k1_t \\*tmps");
+            resourceNamesContentWithReplacements.add(contentWithReplacements);
+        }
+        String[] openClPrograms = resourceNamesContentWithReplacements.toArray(new String[0]);
+        
+        int workSize = 1;
+        
+        System.out.println("Create input- and output data");
+        // Create input- and output data
+        // out:
+        int dst_r[] = new int[SECP256K1_PRE_COMPUTED_XY_SIZE*workSize];
+
+        Pointer r = Pointer.to(dst_r);
+        
+        long dstMemSize = Sizeof.cl_int8 * dst_r.length;
+        
+        
+        // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        
+        // The platform, device type and device number
+        // that will be used
+        final int platformIndex = 0;
+        final long deviceType = CL_DEVICE_TYPE_ALL;
+        final int deviceIndex = 0;
+
+        // Enable exceptions and subsequently omit error checks in this sample
+        CL.setExceptionsEnabled(true);
+
+        System.out.println("Obtain the number of platforms");
+        // Obtain the number of platforms
+        int numPlatformsArray[] = new int[1];
+        clGetPlatformIDs(0, null, numPlatformsArray);
+        int numPlatforms = numPlatformsArray[0];
+
+        // Obtain a platform ID
+        cl_platform_id platforms[] = new cl_platform_id[numPlatforms];
+        clGetPlatformIDs(platforms.length, platforms, null);
+        cl_platform_id platform = platforms[platformIndex];
+
+        // Initialize the context properties
+        System.out.println("Initialize the context properties");
+        cl_context_properties contextProperties = new cl_context_properties();
+        contextProperties.addProperty(CL_CONTEXT_PLATFORM, platform);
+
+        // Obtain the number of devices for the platform
+        int numDevicesArray[] = new int[1];
+        clGetDeviceIDs(platform, deviceType, 0, null, numDevicesArray);
+        int numDevices = numDevicesArray[0];
+
+        // Obtain a device ID 
+        cl_device_id devices[] = new cl_device_id[numDevices];
+        clGetDeviceIDs(platform, deviceType, numDevices, devices, null);
+        cl_device_id device = devices[deviceIndex];
+        final cl_device_id[] cl_device_ids = new cl_device_id[]{device};
+
+        // Create a context for the selected device
+        cl_context context = clCreateContext(contextProperties, 1, cl_device_ids,
+                null, null, null);
+
+        System.out.println("Create a command-queue for the selected device");
+        // Create a command-queue for the selected device
+        cl_queue_properties properties = new cl_queue_properties();
+        cl_command_queue commandQueue = clCreateCommandQueueWithProperties(
+                context, device, properties, null);
+        
+        cl_mem dstMemR = clCreateBuffer(context,
+                CL_MEM_READ_WRITE,
+                dstMemSize, null, null);
+        
+        System.out.println("Create the program from the source code");
+        // Create the program from the source code
+        cl_program program = clCreateProgramWithSource(context,
+                openClPrograms.length, openClPrograms, null, null);
+
+        System.out.println("Build the program");
+        // Build the program
+        clBuildProgram(program, 0, null, null, null, null);
+        
+        // decide between transform/parse public
+        final String kernelName = "get_precalculated_g";
+        
+        System.out.println(LOG_SEPARATE_LINE);
+        System.out.println("Kernel name: " + kernelName );
+        System.out.println(LOG_SEPARATE_LINE);
+
+        // Create the kernel
+        cl_kernel kernel = clCreateKernel(program, kernelName, null);
+        
+        
+        final long workGroupSize[] = new long[1];
+        Pointer workGroupSizePointer = Pointer.to(workGroupSize);
+        clGetKernelWorkGroupInfo(kernel, device, CL_KERNEL_WORK_GROUP_SIZE, Sizeof.cl_long, workGroupSizePointer, null);
+        System.out.println("CL_KERNEL_WORK_GROUP_SIZE: " + workGroupSize[0]);
+        
+        final long preferredWorkGroupSizeMultiple[] = new long[1];
+        Pointer preferredWorkGroupSizeMultiplePointer = Pointer.to(preferredWorkGroupSizeMultiple);
+        clGetKernelWorkGroupInfo(kernel, device, CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE, Sizeof.cl_long, preferredWorkGroupSizeMultiplePointer, null);
+        System.out.println("CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE: " + preferredWorkGroupSizeMultiple[0]);
+        
+        final long maxWorkItemDimensions[] = new long[1];
+        Pointer maxWorkItemDimensionsPointer = Pointer.to(maxWorkItemDimensions);
+        clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS, Sizeof.cl_long, maxWorkItemDimensionsPointer, null);
+        System.out.println("CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS: " + maxWorkItemDimensions[0]);
+        
+        openClInfo();
+
+        // Set the arguments for the kernel
+        int a = 0;
+        clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(dstMemR));
+
+        // Set the work-item dimensions
+        long global_work_size[] = new long[]{workSize};
+
+        // Execute the kernel
+        System.out.println("execute ...");
+        clEnqueueNDRangeKernel(commandQueue, kernel, 1, null,
+                global_work_size, null, 0, null, null);
+        
+        // Read the output data
+        clEnqueueReadBuffer(commandQueue, dstMemR, CL_TRUE, 0,
+                dstMemSize, r, 0, null, null);
+        
+        dumpIntArray("dst_r", dst_r);
+        
+        // Release kernel, program, and memory objects
+        clReleaseMemObject(dstMemR);
+        clReleaseKernel(kernel);
+        clReleaseProgram(program);
+        clReleaseCommandQueue(commandQueue);
+        clReleaseContext(context);
     }
     
     /**
