@@ -1730,11 +1730,10 @@ DECLSPEC void point_get_coords (secp256k1_t *r, const u32 *x, const u32 *y)
   r->xy[95] = neg[7];
 }
 
-
 /*
  * Convert the tweak/scalar k to w-NAF (window size is 4).
- * @param out: naf a pointer to an u32 array with a size of 33.
- * @param in: k a pointer to a tweak/scalar which should be converted.
+ * @param naf out: w-NAF form of the tweak/scalar, a pointer to an u32 array with a size of 33.
+ * @param k in: tweak/scalar which should be converted, a pointer to an u32 array with a size of 8.
  * @return Returns the loop start index.
  */
 DECLSPEC int convert_to_window_naf (u32 *naf, const u32 *k)
@@ -1837,7 +1836,14 @@ DECLSPEC int convert_to_window_naf (u32 *naf, const u32 *k)
   return loop_start;
 }
 
-DECLSPEC void point_mul (u32 *r, const u32 *k, GLOBAL_AS const secp256k1_t *tmps)
+/*
+ * @param x1 out: x coordinate, a pointer to an u32 array with a size of 8.
+ * @param y1 out: y coordinate, a pointer to an u32 array with a size of 8.
+ * @param k in: tweak/scalar which should be converted, a pointer to an u32 array with a size of 8.
+ * @param tmps in: a basepoint for the multiplication.
+ * @return Returns the x coordinate with a leading parity/sign (for odd/even y), it is named a compressed coordinate.
+ */
+DECLSPEC void point_mul_xy (u32 *x1, u32 *y1, const u32 *k, GLOBAL_AS const secp256k1_t *tmps)
 {
   u32 naf[SECP256K1_NAF_SIZE] = { 0 };
   int loop_start = convert_to_window_naf(naf, k);
@@ -1851,7 +1857,6 @@ DECLSPEC void point_mul (u32 *r, const u32 *k, GLOBAL_AS const secp256k1_t *tmps
   const u32 x_pos = ((multiplier - 1 + odd) >> 1) * 24;
   const u32 y_pos = odd ? (x_pos + 8) : (x_pos + 16);
 
-  u32 x1[8];
 
   x1[0] = tmps->xy[x_pos + 0];
   x1[1] = tmps->xy[x_pos + 1];
@@ -1861,8 +1866,6 @@ DECLSPEC void point_mul (u32 *r, const u32 *k, GLOBAL_AS const secp256k1_t *tmps
   x1[5] = tmps->xy[x_pos + 5];
   x1[6] = tmps->xy[x_pos + 6];
   x1[7] = tmps->xy[x_pos + 7];
-
-  u32 y1[8];
 
   y1[0] = tmps->xy[y_pos + 0];
   y1[1] = tmps->xy[y_pos + 1];
@@ -1970,6 +1973,21 @@ DECLSPEC void point_mul (u32 *r, const u32 *k, GLOBAL_AS const secp256k1_t *tmps
 
   mul_mod (z1, z2, z1); // z1^3
   mul_mod (y1, y1, z1); // y1_affine
+  
+  // return values are already in x1 and y1
+}
+
+/*
+ * @param r out: x coordinate with leading parity/sign (for odd/even y), a pointer to an u32 array with a size of 9.
+ * @param k in: tweak/scalar which should be converted, a pointer to an u32 array with a size of 8.
+ * @param tmps in: a basepoint for the multiplication.
+ * @return Returns the x coordinate with a leading parity/sign (for odd/even y), it is named a compressed coordinate.
+ */
+DECLSPEC void point_mul (u32 *r, const u32 *k, GLOBAL_AS const secp256k1_t *tmps)
+{
+  u32 x[8];
+  u32 y[8];
+  point_mul_xy(x, y, k, tmps);
 
   /*
    * output:
@@ -1977,21 +1995,28 @@ DECLSPEC void point_mul (u32 *r, const u32 *k, GLOBAL_AS const secp256k1_t *tmps
 
   // shift by 1 byte (8 bits) to make room and add the parity/sign (for odd/even y):
 
-  r[8] =                (x1[0] << 24);
-  r[7] = (x1[0] >> 8) | (x1[1] << 24);
-  r[6] = (x1[1] >> 8) | (x1[2] << 24);
-  r[5] = (x1[2] >> 8) | (x1[3] << 24);
-  r[4] = (x1[3] >> 8) | (x1[4] << 24);
-  r[3] = (x1[4] >> 8) | (x1[5] << 24);
-  r[2] = (x1[5] >> 8) | (x1[6] << 24);
-  r[1] = (x1[6] >> 8) | (x1[7] << 24);
-  r[0] = (x1[7] >> 8);
+  r[8] =               (x[0] << 24);
+  r[7] = (x[0] >> 8) | (x[1] << 24);
+  r[6] = (x[1] >> 8) | (x[2] << 24);
+  r[5] = (x[2] >> 8) | (x[3] << 24);
+  r[4] = (x[3] >> 8) | (x[4] << 24);
+  r[3] = (x[4] >> 8) | (x[5] << 24);
+  r[2] = (x[5] >> 8) | (x[6] << 24);
+  r[1] = (x[6] >> 8) | (x[7] << 24);
+  r[0] = (x[7] >> 8);
 
-  const u32 type = 0x02 | (y1[0] & 1); // (note: 0b10 | 0b01 = 0x03)
+  const u32 type = 0x02 | (y[0] & 1); // (note: 0b10 | 0b01 = 0x03)
 
   r[0] = r[0] | type << 24; // 0x02 or 0x03
 }
 
+/*
+ * Transform a x coordinate and separate parity to secp256k1_t.
+ * @param r out: x and y coordinates.
+ * @param x in: x coordinate which should be converted, a pointer to an u32 array with a size of 8.
+ * @param first_byte in: The parity of the y coordinate, a u32.
+ * @return Returns 0 if successfull, returns 1 if x is greater than the basepoint.
+ */
 DECLSPEC u32 transform_public (secp256k1_t *r, const u32 *x, const u32 first_byte)
 {
   u32 p[8];
@@ -2046,6 +2071,12 @@ DECLSPEC u32 transform_public (secp256k1_t *r, const u32 *x, const u32 first_byt
   return 0;
 }
 
+/*
+ * Parse a x coordinate with leading parity to secp256k1_t.
+ * @param r out: x and y coordinates.
+ * @param k in: x coordinate which should be converted with leading parity, a pointer to an u32 array with a size of 9.
+ * @return Returns 0 if successfull, returns 1 if x is greater than the basepoint or the parity has an unexpected value.
+ */
 DECLSPEC u32 parse_public (secp256k1_t *r, const u32 *k)
 {
   // verify:
