@@ -23,7 +23,9 @@ import static org.jocl.CL.*;
 import java.util.Arrays;
 import static net.ladenthin.btcdetector.KeyUtility.byteArrayToIntArray;
 import org.bitcoinj.core.ECKey;
+import org.bitcoinj.core.Utils;
 import org.bitcoinj.params.MainNetParams;
+import org.bouncycastle.math.ec.ECPoint;
 import org.bouncycastle.util.encoders.Hex;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
@@ -384,6 +386,7 @@ public class ProbeAddressesOpenCLTest {
     
     private final static int PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array = 9;
     private final static int PRIVATE_KEY_LENGTH_U32Array = 8;
+    private final static int PUBLIC_KEY_LENGTH_X_Y_WITHOUT_PARITY = 16;
     private final static int SECP256K1_PRE_COMPUTED_XY_SIZE = 12*8;
     
     @Test
@@ -579,7 +582,7 @@ public class ProbeAddressesOpenCLTest {
         byte[] windowNaf = windowNaf((byte)4, new StaticKey().privateKeyBigInteger);
         System.out.println("windowNaf: " + Arrays.toString(windowNaf)); // may help to debug OpenCL w-NAF
         
-        System.err.println("expectedPublicKeyBytes: " + Arrays.toString(expectedPublicKeyBytes));
+        System.out.println("expectedPublicKeyBytes: " + Arrays.toString(expectedPublicKeyBytes));
         System.out.println("dst_r: " + Arrays.toString(dst_r));
         System.out.println("dst_r_AsByteArray: " + Arrays.toString(dst_r_AsByteArray));
         System.out.println("resultOpenCLPubKey: " + Arrays.toString(resultOpenCLPubKey));
@@ -649,7 +652,7 @@ public class ProbeAddressesOpenCLTest {
         Pointer src_k_pointer = Pointer.to(srcKByteBuffer);
         
         // out:
-        int dstRU32ArraySize = PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array*workSize;
+        int dstRU32ArraySize = PUBLIC_KEY_LENGTH_X_Y_WITHOUT_PARITY*workSize;
         long dstMemSize = Sizeof.cl_int8 * dstRU32ArraySize;
         int dstRByteBufferCapacity = BYTES_FOR_INT*dstRU32ArraySize;
         ByteBuffer dstRByteBuffer = ByteBuffer.allocateDirect(dstRByteBufferCapacity);
@@ -663,7 +666,7 @@ public class ProbeAddressesOpenCLTest {
         StaticKey staticKey = new StaticKey();
         
         Object[] privateKeys = new Object[workSize];
-        Object[] publicKeys = new Object[workSize];
+        PublicKeyBytes[] publicKeys = new PublicKeyBytes[workSize];
         
         
         
@@ -823,11 +826,11 @@ public class ProbeAddressesOpenCLTest {
         
         System.out.println("Transform ByteBuffer to keys");
         for (int i = 0; i < workSize; i++) {
-            byte[] pubKeyBytes = getPublicKeyFromByteBuffer(dstRByteBuffer, i);
+            PublicKeyBytes publicKeyBytes = getPublicKeyFromByteBufferXY(dstRByteBuffer, i);
             // int pubKeyInts[] = new int[PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array];
             // System.arraycopy(dst_r, i*PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array , pubKeyInts, 0, PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array);
             // byte[] pubKeyBytes = KeyUtility.publicKeyByteArrayFromIntArray(pubKeyInts);
-            publicKeys[i] = pubKeyBytes;
+            publicKeys[i] = publicKeyBytes;
         }
         System.out.println("Transformed.");
             
@@ -835,32 +838,56 @@ public class ProbeAddressesOpenCLTest {
             System.out.println("i: " + i);
             System.out.println("1");
             byte[] privateKey = (byte[]) privateKeys[i];
-            byte[] publicKey = (byte[]) publicKeys[i];
+            PublicKeyBytes publicKeyBytes = publicKeys[i];
             
             System.out.println("2");
-            ECKey resultOpenCLKey = new ECKey(null, publicKey);
-            byte[] resultOpenCLPubKey = resultOpenCLKey.getPubKey();
-            byte[] resultOpenCLPubKeyHash = resultOpenCLKey.getPubKeyHash();
-            final String resultOpenCLPubKeyHashBase58 = keyUtility.toBase58(resultOpenCLKey.getPubKeyHash());
+            
+            ECKey resultOpenCLKeyCompressed = new ECKey(privateKey, publicKeyBytes.compressed);
+            ECKey resultOpenCLKeyUncompressed = new ECKey(privateKey, publicKeyBytes.uncompressed);
+            
+            byte[] resultOpenCLKeyCompressedPubKey = resultOpenCLKeyCompressed.getPubKey();
+            byte[] resultOpenCLKeyCompressedPubKeyHash = resultOpenCLKeyCompressed.getPubKeyHash();
+            byte[] resultOpenCLKeyUncompressedPubKey = resultOpenCLKeyUncompressed.getPubKey();
+            byte[] resultOpenCLKeyUncompressedPubKeyHash = resultOpenCLKeyUncompressed.getPubKeyHash();
+            
+            System.out.println("resultOpenCLKeyCompressedPubKey: " + Arrays.toString(resultOpenCLKeyCompressedPubKey));
+            System.out.println("resultOpenCLKeyCompressedPubKeyHash: " + Arrays.toString(resultOpenCLKeyCompressedPubKeyHash));
+            System.out.println("resultOpenCLKeyUncompressedPubKey: " + Arrays.toString(resultOpenCLKeyUncompressedPubKey));
+            System.out.println("resultOpenCLKeyUncompressedPubKeyHash: " + Arrays.toString(resultOpenCLKeyUncompressedPubKeyHash));
+            
+            final String resultOpenCLKeyCompressedPubKeyHashBase58 = keyUtility.toBase58(resultOpenCLKeyCompressed.getPubKeyHash());
+            final String resultOpenCLKeyUncompressedPubKeyHashBase58 = keyUtility.toBase58(resultOpenCLKeyUncompressed.getPubKeyHash());
+            System.out.println("resultOpenCLKeyCompressedPubKeyHashBase58: " + resultOpenCLKeyCompressedPubKeyHashBase58);
+            System.out.println("resultOpenCLKeyUncompressedPubKeyHashBase58: " + resultOpenCLKeyUncompressedPubKeyHashBase58);
+            
+            System.out.println("publicKeyBytes.getCompressedKeyHash(): " + Arrays.toString(publicKeyBytes.getCompressedKeyHash()));
+            System.out.println("publicKeyBytes.getUncompressedKeyHash(): " + Arrays.toString(publicKeyBytes.getUncompressedKeyHash()));
+            
+            System.out.println("publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility): " + publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility));
+            System.out.println("publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility): " + publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility));
 
-            System.out.println("3");
+            ECKey expectedCompressedKey = new ECKey(new StaticKey().privateKeyBigInteger, null, true);
+            ECKey expectedUncompressedKey = new ECKey(new StaticKey().privateKeyBigInteger, null, false);
+            
+            byte[] expectedCompressedPublicKeyBytes = expectedCompressedKey.getPubKey();
+            byte[] expectedUncompressedPublicKeyBytes = expectedUncompressedKey.getPubKey();
 
-            ECKey expectedPrivateKey = new ECKey(new StaticKey().privateKeyBigInteger, null, true);
-            byte[] expectedPublicKeyBytes = expectedPrivateKey.getPubKey();
-            byte[] windowNaf = windowNaf((byte)4, new StaticKey().privateKeyBigInteger);
-            System.out.println("windowNaf: " + Arrays.toString(windowNaf)); // may help to debug OpenCL w-NAF
-
-            System.err.println("expectedPublicKeyBytes: " + Arrays.toString(expectedPublicKeyBytes));
-            System.out.println("publicKey: " + Arrays.toString(publicKey));
-            System.out.println("resultOpenCLPubKey: " + Arrays.toString(resultOpenCLPubKey));
-            System.out.println("resultOpenCLPubKeyHash: " + Arrays.toString(resultOpenCLPubKeyHash));
-            System.out.println("resultOpenCLPubKeyHashBase58: " + resultOpenCLPubKeyHashBase58);
-            System.out.println("");
-            System.out.println("");
-
+            System.out.println("expectedCompressedPublicKeyBytes: " + Arrays.toString(expectedCompressedPublicKeyBytes));
+            System.out.println("expectedUncompressedPublicKeyBytes: " + Arrays.toString(expectedUncompressedPublicKeyBytes));
+            
+            final String expectedCompressedPublicKeyHashBase58 = keyUtility.toBase58(expectedCompressedKey.getPubKeyHash());
+            final String expectedUncompressedPublicKeyHashBase58 = keyUtility.toBase58(expectedUncompressedKey.getPubKeyHash());
+            
             if (true) {
-                assertThat(resultOpenCLPubKey, is(equalTo(expectedPublicKeyBytes)));
-                assertThat(resultOpenCLPubKeyHashBase58, is(equalTo(staticKey.publicKeyCompressed)));
+                assertThat(resultOpenCLKeyCompressedPubKey, is(equalTo(expectedCompressedPublicKeyBytes)));
+                assertThat(resultOpenCLKeyUncompressedPubKey, is(equalTo(expectedUncompressedPublicKeyBytes)));
+                
+                assertThat(publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility), is(equalTo(staticKey.publicKeyCompressed)));
+                assertThat(resultOpenCLKeyCompressedPubKeyHashBase58, is(equalTo(staticKey.publicKeyCompressed)));
+                assertThat(resultOpenCLKeyCompressedPubKeyHashBase58, is(equalTo(expectedCompressedPublicKeyHashBase58)));
+                assertThat(publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility), is(equalTo(staticKey.publicKeyUncompressed)));
+                assertThat(resultOpenCLKeyUncompressedPubKeyHashBase58, is(equalTo(staticKey.publicKeyUncompressed)));
+                assertThat(resultOpenCLKeyUncompressedPubKeyHashBase58, is(equalTo(expectedUncompressedPublicKeyHashBase58)));
             }
         }
         
@@ -878,6 +905,7 @@ public class ProbeAddressesOpenCLTest {
     }
     
     @Test
+    @Ignore
     public void openClCrashTest() throws IOException {
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
@@ -1032,7 +1060,7 @@ public class ProbeAddressesOpenCLTest {
     }
     
     /**
-     * Read the inner bytes in reverse order. Remove padding bytes to return a clean byte array.
+     * Read the inner bytes in reverse order. Remove padding bytes to return a clean byte array. Only for x with padding
      */
     private static final byte[] getPublicKeyFromByteBuffer(ByteBuffer b, int keyOffset) {
         int paddingBytes = 3;
@@ -1044,7 +1072,7 @@ public class ProbeAddressesOpenCLTest {
         for (int i=0; i<PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array; i++) {
             int x = i*BYTES_FOR_INT;
             for (int j = 0; j < BYTES_FOR_INT; j++) {
-                int publicKeyOffset= x+j;
+                int publicKeyOffset = x+j;
                 if (publicKeyOffset == publicKey.length) {
                     // return the public key, read of all bytes finish
                     break outer;
@@ -1055,6 +1083,67 @@ public class ProbeAddressesOpenCLTest {
             }
         }
         return publicKey;
+    }
+    
+    public static class PublicKeyBytes {
+        
+        public static final int ONE_COORDINATE_BYTE_LENGTH = 32;
+        public static final int TWO_COORDINATES_BYTES_LENGTH = ONE_COORDINATE_BYTE_LENGTH * 2;
+        public static final int PARITY_BYTES_LENGTH = 1;
+        
+        // add one byte for format sign
+        final byte[] compressed = new byte[ONE_COORDINATE_BYTE_LENGTH+PARITY_BYTES_LENGTH];
+        final byte[] uncompressed = new byte[TWO_COORDINATES_BYTES_LENGTH+PARITY_BYTES_LENGTH];
+        
+        public byte[] getCompressedKeyHash() {
+            return Utils.sha256hash160(compressed);
+        }
+        
+        public byte[] getUncompressedKeyHash() {
+            return Utils.sha256hash160(uncompressed);
+        }
+        
+        public String getCompressedKeyHashAsBase58(KeyUtility keyUtility) {
+            return keyUtility.toBase58(getCompressedKeyHash());
+        }
+        
+        public String getUncompressedKeyHashAsBase58(KeyUtility keyUtility) {
+            return keyUtility.toBase58(getUncompressedKeyHash());
+        }
+    }
+    
+    /**
+     * Read the inner bytes in reverse order. Remove padding bytes to return a clean byte array.
+     * TODO: BLDEBUG Hier
+     */
+    private static final PublicKeyBytes getPublicKeyFromByteBufferXY(ByteBuffer b, int keyNumber) {
+        PublicKeyBytes publicKeyBytes = new PublicKeyBytes();
+        
+        int keyOffsetInByteBuffer = (b.limit()-1)-(PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH*keyNumber);
+        
+        // read y coordinate
+        for (int i = 0; i < PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH; i++) {
+            publicKeyBytes.uncompressed[i+PublicKeyBytes.PARITY_BYTES_LENGTH+PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH] = b.get(keyOffsetInByteBuffer-i);
+        }
+ 
+        // read x coordinate
+        for (int i = 0; i < PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH; i++) {
+            byte byteFromBuffer = b.get(keyOffsetInByteBuffer-i-PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH);
+            publicKeyBytes.uncompressed[i+PublicKeyBytes.PARITY_BYTES_LENGTH] = byteFromBuffer;
+            publicKeyBytes.compressed[i+PublicKeyBytes.PARITY_BYTES_LENGTH] = byteFromBuffer;
+        }
+        
+        // the first byte is 4 to indicate a public key with x and y coordinate (uncompressed)
+        publicKeyBytes.uncompressed[0] = 4;
+        boolean even = publicKeyBytes.uncompressed[PublicKeyBytes.PARITY_BYTES_LENGTH+PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH-1] % 2 == 0;
+        
+        if (even) {
+            publicKeyBytes.compressed[0] = 2;
+        } else {
+            publicKeyBytes.compressed[0] = 3;
+        }
+        
+        return publicKeyBytes;
     }
     
     

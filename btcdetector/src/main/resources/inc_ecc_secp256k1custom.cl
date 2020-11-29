@@ -149,18 +149,18 @@ __kernel void generateKeysKernel_transform_public(__global u32 *r, __global cons
 
 __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k)
 {
-    u32 r_local[PUBLIC_KEY_LENGTH_WITH_PARITY];
+    u32 x_local[PUBLIC_KEY_LENGTH_WITHOUT_PARITY];
+    u32 y_local[PUBLIC_KEY_LENGTH_WITHOUT_PARITY];
     u32 k_local[PRIVATE_KEY_LENGTH];
     secp256k1_t g_xy_local;
-    
-    
+
     // get_global_id(dim) where dim is the dimension index (0 for first, 1 for second dimension etc.)
     // The above call is equivalent to get_local_size(dim)*get_group_id(dim) + get_local_id(dim)
     size_t global_id = get_global_id(0);
-    
+
     //int local_id = get_local_id(0);
     //int local_size = get_local_size(0);
-    
+
     // global to local
     int k_offset = PRIVATE_KEY_LENGTH * global_id;
     k_local[0] = k[k_offset+0];
@@ -171,22 +171,33 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k)
     k_local[5] = k[k_offset+5];
     k_local[6] = k[k_offset+6];
     k_local[7] = k[k_offset+7];
-    
+
     set_precomputed_basepoint_g(&g_xy_local);
-    
-    point_mul(r_local, k_local, &g_xy_local);
+
+    point_mul_xy(x_local, y_local, k_local, &g_xy_local);
 
     // local to global
-    int r_offset = PUBLIC_KEY_LENGTH_WITH_PARITY * global_id;
-    r[r_offset+0] = r_local[0];
-    r[r_offset+1] = r_local[1];
-    r[r_offset+2] = r_local[2];
-    r[r_offset+3] = r_local[3];
-    r[r_offset+4] = r_local[4];
-    r[r_offset+5] = r_local[5];
-    r[r_offset+6] = r_local[6];
-    r[r_offset+7] = r_local[7];
-    r[r_offset+8] = r_local[8];
+    int r_offset = PUBLIC_KEY_LENGTH_X_Y_WITHOUT_PARITY * global_id;
+
+    // x
+    r[r_offset+ 0] = x_local[0];
+    r[r_offset+ 1] = x_local[1];
+    r[r_offset+ 2] = x_local[2];
+    r[r_offset+ 3] = x_local[3];
+    r[r_offset+ 4] = x_local[4];
+    r[r_offset+ 5] = x_local[5];
+    r[r_offset+ 6] = x_local[6];
+    r[r_offset+ 7] = x_local[7];
+
+    // y
+    r[r_offset+ 8] = y_local[0];
+    r[r_offset+ 9] = y_local[1];
+    r[r_offset+10] = y_local[2];
+    r[r_offset+11] = y_local[3];
+    r[r_offset+12] = y_local[4];
+    r[r_offset+13] = y_local[5];
+    r[r_offset+14] = y_local[6];
+    r[r_offset+15] = y_local[7];
 }
 
 __kernel void test_kernel_do_nothing(__global u32 *r, __global const u32 *k)

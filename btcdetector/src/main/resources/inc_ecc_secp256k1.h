@@ -200,6 +200,7 @@
 #define SECP256K1_NAF_SIZE 33 // 32+1, we need one extra slot
 
 #define PUBLIC_KEY_LENGTH_WITHOUT_PARITY 8
+#define PUBLIC_KEY_LENGTH_X_Y_WITHOUT_PARITY 16
 // 8+1 to make room for the parity
 #define PUBLIC_KEY_LENGTH_WITH_PARITY 9
 
@@ -216,6 +217,7 @@ typedef struct secp256k1
 DECLSPEC u32  transform_public (secp256k1_t *r, const u32 *x, const u32 first_byte);
 DECLSPEC u32  parse_public (secp256k1_t *r, const u32 *k);
 
+DECLSPEC void point_mul_xy (u32 *x1, u32 *y1, const u32 *k, GLOBAL_AS const secp256k1_t *tmps);
 DECLSPEC void point_mul (u32 *r, const u32 *k, GLOBAL_AS const secp256k1_t *tmps);
 
 DECLSPEC void set_precomputed_basepoint_g (secp256k1_t *r);
