@@ -2,7 +2,6 @@ package net.ladenthin.btcdetector.cli;
 
 import com.google.gson.Gson;
 import net.ladenthin.btcdetector.CPUProber;
-import net.ladenthin.btcdetector.configuration.Command;
 import net.ladenthin.btcdetector.configuration.Configuration;
 import net.ladenthin.javacommons.StreamHelper;
 import org.slf4j.Logger;
@@ -12,7 +11,6 @@ import java.io.File;
 import java.io.IOException;
 import net.ladenthin.btcdetector.AddressFilesToLMDB;
 import net.ladenthin.btcdetector.AddressesExtractor;
-import net.ladenthin.btcdetector.OpenCLProber;
 
 // VM option: -Dorg.slf4j.simpleLogger.defaultLogLevel=trace
 public class Main implements Runnable {
@@ -52,24 +50,20 @@ public class Main implements Runnable {
     public void run() {
         logger.info(configuration.command.name());
         switch (configuration.command) {
-            case ProbeAddressesCPU:
-                CPUProber prober = new CPUProber(configuration.probeAddressesCPU);
+            case Sniffing:
+                CPUProber prober = new CPUProber(configuration.sniffing);
                 prober.run();
                 break;
             case ExtractAddresses:
                 AddressesExtractor addressesExtractor = new AddressesExtractor(configuration.extractAddresses);
                 addressesExtractor.run();
                 break;
-            case ProbeAddressesOpenCL:
-                OpenCLProber openCLProber = new OpenCLProber(configuration.probeAddressesOpenCl);
-                openCLProber.run();
-                break;
             case AddressFilesToLMDB:
                 AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(configuration.addressFilesToLMDB);
                 addressFilesToLMDB.run();
                 break;
             default:
-                throw new UnsupportedOperationException(Command.ProbeAddressesOpenCL.toString() + " currently not supported." );
+                throw new UnsupportedOperationException("Command: " + configuration.command.name() + " currently not supported." );
         }
     }
 }

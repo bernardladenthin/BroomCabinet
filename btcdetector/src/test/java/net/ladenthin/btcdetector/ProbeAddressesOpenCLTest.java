@@ -9,9 +9,9 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
-import net.ladenthin.btcdetector.configuration.ProbeAddressesOpenCL;
 import org.apache.commons.io.FileUtils;
 import org.junit.Before;
 import org.junit.Rule;
@@ -21,7 +21,9 @@ import org.junit.rules.TemporaryFolder;
 import static org.jocl.CL.*;
 
 import java.util.Arrays;
+import java.util.Random;
 import static net.ladenthin.btcdetector.KeyUtility.byteArrayToIntArray;
+import static net.ladenthin.btcdetector.OpenClTask.PRIVATE_KEY_BYTES;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Utils;
 import org.bitcoinj.params.MainNetParams;
@@ -55,18 +57,6 @@ public class ProbeAddressesOpenCLTest {
     public void createTemporaryAddressesFile() throws IOException {
         tempAddressesFile = tempFolder.newFile("addresses.csv");
         fillAddressesFiles(tempAddressesFile);
-    }
-
-    @Test
-    @Ignore
-    public void run_alive_beep() throws IOException {
-        ProbeAddressesOpenCL probeAddressesOpenCL = new ProbeAddressesOpenCL();
-
-        List<String> files = new ArrayList<>();
-        files.add(tempAddressesFile.getAbsolutePath());
-
-        OpenCLProber openCLProber = new OpenCLProber(probeAddressesOpenCL);
-        openCLProber.run();
     }
 
     @Test
@@ -384,10 +374,10 @@ public class ProbeAddressesOpenCLTest {
         return contents;
     }
     
-    private final static int PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array = 9;
-    private final static int PRIVATE_KEY_LENGTH_U32Array = 8;
-    private final static int PUBLIC_KEY_LENGTH_X_Y_WITHOUT_PARITY = 16;
-    private final static int SECP256K1_PRE_COMPUTED_XY_SIZE = 12*8;
+    public final static int PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array = 9;
+    public final static int PRIVATE_KEY_LENGTH_U32Array = 8;
+    public final static int PUBLIC_KEY_LENGTH_X_Y_WITHOUT_PARITY = 16;
+    public final static int SECP256K1_PRE_COMPUTED_XY_SIZE = 12*8;
     
     @Test
     public void hashcatOpenCl() throws IOException {
@@ -592,7 +582,7 @@ public class ProbeAddressesOpenCLTest {
         assertThat(resultOpenCLPubKeyHashBase58, is(equalTo(staticKey.publicKeyCompressed)));
     }
     
-    private final static int BYTES_FOR_INT = 4;
+    public final static int BYTES_FOR_INT = 4;
     
     // https://stackoverflow.com/questions/12893758/how-to-reverse-the-byte-array-in-java
     public static void reverse(byte[] array) {
@@ -613,6 +603,9 @@ public class ProbeAddressesOpenCLTest {
     
     @Test
     public void hashcatOpenClGrid() throws IOException {
+        
+        final boolean souts = false;
+        
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
         
@@ -639,53 +632,7 @@ public class ProbeAddressesOpenCLTest {
         }
         String[] openClPrograms = resourceNamesContentWithReplacements.toArray(new String[0]);
         
-        int workDim =  1;
-        int workSize = 1024*2;
-        
-        // Create input- and output data
-        // in:
-        int srcKU32ArraySize = PRIVATE_KEY_LENGTH_U32Array*workSize;
-        int srcKByteBufferCapacity = BYTES_FOR_INT*srcKU32ArraySize;
-        long srcMemSize = srcKByteBufferCapacity;
-        ByteBuffer srcKByteBuffer = ByteBuffer.allocateDirect(srcKByteBufferCapacity);
-        Pointer src_k_pointer = Pointer.to(srcKByteBuffer);
-        
-        // out:
-        int dstRU32ArraySize = PUBLIC_KEY_LENGTH_X_Y_WITHOUT_PARITY*workSize;
-        int dstRByteBufferCapacity = BYTES_FOR_INT*dstRU32ArraySize;
-        long dstMemSize = dstRByteBufferCapacity;
-        ByteBuffer dstRByteBuffer = ByteBuffer.allocateDirect(dstRByteBufferCapacity);
-        Pointer dst_r_pointer = Pointer.to(dstRByteBuffer);
-        
-        
-        
-        
-        
-        
         StaticKey staticKey = new StaticKey();
-        
-        Object[] privateKeys = new Object[workSize];
-        PublicKeyBytes[] publicKeys = new PublicKeyBytes[workSize];
-        
-        
-        
-        
-        for (int i = 0; i < workSize; i++) {
-            // todo: generate random keys here
-            byte[] key = staticKey.privateKeyBytes;
-            System.out.println("Key to write: " + Hex.toHexString(key));
-            
-            // put key in reverse order because the ByteBuffer put writes in reverse order, a flip has no effect
-            byte[] keyReverse = key.clone();
-            reverse(keyReverse);
-            srcKByteBuffer.put(keyReverse, 0, keyReverse.length);
-
-            privateKeys[i] = key;
-        }
-        
-        
-        
-        
         
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         
@@ -733,22 +680,12 @@ public class ProbeAddressesOpenCLTest {
         // Create a context for the selected device
         cl_context context = clCreateContext(contextProperties, 1, cl_device_ids,
                 null, null, null);
+        
 
         // Create a command-queue for the selected device
         cl_queue_properties properties = new cl_queue_properties();
         cl_command_queue commandQueue = clCreateCommandQueueWithProperties(
                 context, device, properties, null);
-        
-        System.out.println("Allocate the memory objects for the input- and output data");
-        // Allocate the memory objects for the input- and output data
-        cl_mem srcMemK = clCreateBuffer(context,
-                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                srcMemSize, src_k_pointer, null);
-        
-        System.out.println("CL_MEM_READ_WRITE");
-        cl_mem dstMemR = clCreateBuffer(context,
-                CL_MEM_READ_WRITE,
-                dstMemSize, null, null);
         
         System.out.println("Create the program from the source code");
         // Create the program from the source code
@@ -786,76 +723,70 @@ public class ProbeAddressesOpenCLTest {
         openClInfo();
         }
 
-        /**
-         * The specified 256 work-items in question refers to the total number
-         * of work-items in a work-group regardless of whether it is 1-, 2- or 3-dimensions
-         * and not the number of work-items in a particular direction.
-         * For instance, valid work-group sizes in the format {x, y, z}
-         * can be {256, 1, 1} or {16, 16, 1} or {8, 8, 4}.
-         * 
-         * These examples all sum up to 256 work-items in a work-group.
-         * Hope this helps.
-         */
+        int bits = 16;
+        OpenClTask openClTask = new OpenClTask(context, bits);
+        System.out.println("openClTask.getWorkSize(): " + openClTask.getWorkSize());
         
+        Random sr = new SecureRandom();
+        BigInteger secretBase = keyUtility.createSecret(64, sr);
+        byte[] keyBase = secretBase.toByteArray();
+        System.out.println("keyBase: " + Arrays.toString(keyBase));
+        openClTask.setSrcPrivateKeyChunk(keyBase);
         
+        OpenClTask.PublicKeyBytes[] publicKeys = openClTask.executeKernel(kernel, commandQueue, new Object());
         
+        System.out.println("WARMUP ... ");
+        hashPublicKeys(publicKeys, souts);
+        hashPublicKeysFast(publicKeys, souts);
+        System.out.println("... WARMUP done.");
+        hashPublicKeys(publicKeys, souts);
+        hashPublicKeysFast(publicKeys, souts);
         
-        
-        // Set the arguments for the kernel
-        int a = 0;
-        clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(dstMemR));
-        clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(srcMemK));
-
-        // Set the work-item dimensions
-        long global_work_size[] = new long[]{workSize};
-        long localWorkSize[] = new long[]{1};
-
-        // Execute the kernel
-        System.out.println("execute ...");
-        clEnqueueNDRangeKernel(commandQueue, kernel, workDim, null,
-                global_work_size,
-                localWorkSize, // local_work_size, enabling the system to choose the work-group size.
-                0, null, null);
-        System.out.println("... executed");
-        
-        System.out.println("Read the output data");
-        // Read the output data
-        clEnqueueReadBuffer(commandQueue, dstMemR, CL_TRUE, 0,
-                dstMemSize, dst_r_pointer, 0, null, null);
-        
-        System.out.println("Transform ByteBuffer to keys");
-        for (int i = 0; i < workSize; i++) {
-            PublicKeyBytes publicKeyBytes = getPublicKeyFromByteBufferXY(dstRByteBuffer, i);
-            // int pubKeyInts[] = new int[PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array];
-            // System.arraycopy(dst_r, i*PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array , pubKeyInts, 0, PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array);
-            // byte[] pubKeyBytes = KeyUtility.publicKeyByteArrayFromIntArray(pubKeyInts);
-            publicKeys[i] = publicKeyBytes;
-        }
-        System.out.println("Transformed.");
-            
-        for (int i = 0; i < workSize; i++) {
+        for (int i = 0; i < openClTask.getWorkSize(); i++) {
+            if (i%50000 == 0) {
+                System.out.println("check: " + i);
+            }
+            if (souts) {
             System.out.println("i: " + i);
             System.out.println("1");
-            byte[] privateKey = (byte[]) privateKeys[i];
-            PublicKeyBytes publicKeyBytes = publicKeys[i];
+            }
+            byte[] privateKey = keyBase.clone();
+            openClTask.unsetLSB(privateKey, bits);
+            OpenClTask.setLSB(privateKey, i);
             
+            if(souts) {
+                System.out.println("privateKey: " + Arrays.toString(privateKey));
+            }
+            
+            OpenClTask.PublicKeyBytes publicKeyBytes = publicKeys[i];
+            
+            if (souts) {
             System.out.println("2");
+            }
             
             ECKey resultOpenCLKeyCompressed = new ECKey(privateKey, publicKeyBytes.compressed);
             ECKey resultOpenCLKeyUncompressed = new ECKey(privateKey, publicKeyBytes.uncompressed);
+            
+            if (souts) {
+            System.out.println("publicKeyBytes.compressed: " + Arrays.toString(publicKeyBytes.compressed));
+            System.out.println("publicKeyBytes.uncompressed: " + Arrays.toString(publicKeyBytes.uncompressed));
+            }
             
             byte[] resultOpenCLKeyCompressedPubKey = resultOpenCLKeyCompressed.getPubKey();
             byte[] resultOpenCLKeyCompressedPubKeyHash = resultOpenCLKeyCompressed.getPubKeyHash();
             byte[] resultOpenCLKeyUncompressedPubKey = resultOpenCLKeyUncompressed.getPubKey();
             byte[] resultOpenCLKeyUncompressedPubKeyHash = resultOpenCLKeyUncompressed.getPubKeyHash();
             
+            if (souts) {
             System.out.println("resultOpenCLKeyCompressedPubKey: " + Arrays.toString(resultOpenCLKeyCompressedPubKey));
             System.out.println("resultOpenCLKeyCompressedPubKeyHash: " + Arrays.toString(resultOpenCLKeyCompressedPubKeyHash));
             System.out.println("resultOpenCLKeyUncompressedPubKey: " + Arrays.toString(resultOpenCLKeyUncompressedPubKey));
             System.out.println("resultOpenCLKeyUncompressedPubKeyHash: " + Arrays.toString(resultOpenCLKeyUncompressedPubKeyHash));
-            
+            }
             final String resultOpenCLKeyCompressedPubKeyHashBase58 = keyUtility.toBase58(resultOpenCLKeyCompressed.getPubKeyHash());
             final String resultOpenCLKeyUncompressedPubKeyHashBase58 = keyUtility.toBase58(resultOpenCLKeyUncompressed.getPubKeyHash());
+            
+            if (souts) {
             System.out.println("resultOpenCLKeyCompressedPubKeyHashBase58: " + resultOpenCLKeyCompressedPubKeyHashBase58);
             System.out.println("resultOpenCLKeyUncompressedPubKeyHashBase58: " + resultOpenCLKeyUncompressedPubKeyHashBase58);
             
@@ -864,15 +795,19 @@ public class ProbeAddressesOpenCLTest {
             
             System.out.println("publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility): " + publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility));
             System.out.println("publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility): " + publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility));
-
-            ECKey expectedCompressedKey = new ECKey(new StaticKey().privateKeyBigInteger, null, true);
-            ECKey expectedUncompressedKey = new ECKey(new StaticKey().privateKeyBigInteger, null, false);
+            }
+            ECKey expectedUncompressedKey = new ECKey(privateKey, null);
+            BigInteger expectedPrivateKeyBigInteger = expectedUncompressedKey.getPrivKey();
+            ECKey expectedCompressedKey = new ECKey( expectedPrivateKeyBigInteger, null, true);
             
             byte[] expectedCompressedPublicKeyBytes = expectedCompressedKey.getPubKey();
             byte[] expectedUncompressedPublicKeyBytes = expectedUncompressedKey.getPubKey();
 
+            if (souts) {
+            System.out.println("expectedPrivateKeyBigInteger: " + expectedPrivateKeyBigInteger);
             System.out.println("expectedCompressedPublicKeyBytes: " + Arrays.toString(expectedCompressedPublicKeyBytes));
             System.out.println("expectedUncompressedPublicKeyBytes: " + Arrays.toString(expectedUncompressedPublicKeyBytes));
+            }
             
             final String expectedCompressedPublicKeyHashBase58 = keyUtility.toBase58(expectedCompressedKey.getPubKeyHash());
             final String expectedUncompressedPublicKeyHashBase58 = keyUtility.toBase58(expectedUncompressedKey.getPubKeyHash());
@@ -881,13 +816,8 @@ public class ProbeAddressesOpenCLTest {
                 assertThat(resultOpenCLKeyCompressedPubKey, is(equalTo(expectedCompressedPublicKeyBytes)));
                 assertThat(resultOpenCLKeyUncompressedPubKey, is(equalTo(expectedUncompressedPublicKeyBytes)));
                 
-                assertThat(publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility), is(equalTo(staticKey.publicKeyCompressed)));
-                assertThat(resultOpenCLKeyCompressedPubKeyHashBase58, is(equalTo(staticKey.publicKeyCompressed)));
-                assertThat(resultOpenCLKeyCompressedPubKeyHashBase58, is(equalTo(expectedCompressedPublicKeyHashBase58)));
-                
-                assertThat(publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility), is(equalTo(staticKey.publicKeyUncompressed)));
-                assertThat(resultOpenCLKeyUncompressedPubKeyHashBase58, is(equalTo(staticKey.publicKeyUncompressed)));
-                assertThat(resultOpenCLKeyUncompressedPubKeyHashBase58, is(equalTo(expectedUncompressedPublicKeyHashBase58)));
+                assertThat(publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility), is(equalTo(expectedCompressedPublicKeyHashBase58)));
+                assertThat(publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility), is(equalTo(expectedUncompressedPublicKeyHashBase58)));
             }
         }
         
@@ -895,167 +825,50 @@ public class ProbeAddressesOpenCLTest {
         
         if(true) {
         // Release kernel, program, and memory objects
-        clReleaseMemObject(srcMemK);
-        clReleaseMemObject(dstMemR);
+        openClTask.releaseCl();
         clReleaseKernel(kernel);
         clReleaseProgram(program);
         clReleaseCommandQueue(commandQueue);
         clReleaseContext(context);
         }
     }
-    
-    @Test
-    public void openClCrashTest() throws IOException {
-        
-        List<String> resourceNames = new ArrayList<>();
-        resourceNames.add("inc_defines.h");
-        resourceNames.add("inc_vendor.h");
-        resourceNames.add("inc_types.h");
-        resourceNames.add("inc_platform.h");
-        resourceNames.add("inc_platform.cl");
-        resourceNames.add("inc_common.h");
-        resourceNames.add("inc_common.cl");
 
-        resourceNames.add("inc_ecc_secp256k1.h");
-        resourceNames.add("inc_ecc_secp256k1.cl");
-        resourceNames.add("inc_ecc_secp256k1custom.cl");
-        
-        List<String> resourceNamesContent = getResourceNamesContent(resourceNames);
-        List<String> resourceNamesContentWithReplacements = new ArrayList<>();
-        for (String content : resourceNamesContent) {
-            String contentWithReplacements = content;
-            contentWithReplacements = contentWithReplacements.replaceAll("#include.*", "");
-            contentWithReplacements = contentWithReplacements.replaceAll("GLOBAL_AS const secp256k1_t \\*tmps", "const secp256k1_t \\*tmps");
-            resourceNamesContentWithReplacements.add(contentWithReplacements);
+    private void hashPublicKeysFast(OpenClTask.PublicKeyBytes[] publicKeys, final boolean souts) {
+        System.out.println("execute hash fast ...");
+        long beforeHash = System.currentTimeMillis();
+        for (int i = 0; i < publicKeys.length; i++) {
+            byte[] compressedKeyHashFast = publicKeys[i].getCompressedKeyHashFast();
+            byte[] uncompressedKeyHashFast = publicKeys[i].getUncompressedKeyHashFast();
+            
+            //assertThat(compressedKeyHash, is(equalTo(compressedKeyHashFast)));
+            //assertThat(uncompressedKeyHash, is(equalTo(uncompressedKeyHashFast)));
+            
+            if (souts) {
+                System.out.println("publicKeys["+i+"].compressedKeyHashFast: " + Arrays.toString(compressedKeyHashFast));
+                System.out.println("publicKeys["+i+"].uncompressedKeyHashFast: " + Arrays.toString(uncompressedKeyHashFast));
+            }
         }
-        String[] openClPrograms = resourceNamesContentWithReplacements.toArray(new String[0]);
-        
-        int workDim =  1;
-        int workSize = 128;
-        
-        // Create input- and output data
-        // in:
-        int srcKU32ArraySize = PRIVATE_KEY_LENGTH_U32Array*workSize;
-        int srcKByteBufferCapacity = BYTES_FOR_INT*srcKU32ArraySize;
-        long srcMemSize = srcKByteBufferCapacity;
-        ByteBuffer srcKByteBuffer = ByteBuffer.allocateDirect(srcKByteBufferCapacity);
-        Pointer src_k_pointer = Pointer.to(srcKByteBuffer);
-        
-        // out:
-        int dstRU32ArraySize = PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array*workSize;
-        int dstRByteBufferCapacity = BYTES_FOR_INT*dstRU32ArraySize;
-        long dstMemSize = dstRByteBufferCapacity;
-        ByteBuffer dstRByteBuffer = ByteBuffer.allocateDirect(dstRByteBufferCapacity);
-        System.out.println("dstRByteBuffer.capacity(): " + dstRByteBuffer.capacity());
-        Pointer dst_r_pointer = Pointer.to(dstRByteBuffer);
-        
-        // The platform, device type and device number
-        // that will be used
-        final int platformIndex = 0;
-        final long deviceType = CL_DEVICE_TYPE_ALL;
-        final int deviceIndex = 0;
+        long afterHash = System.currentTimeMillis();
+        System.out.println("... hashed fast in: " + (afterHash - beforeHash) + "ms");
+    }
 
-        // Enable exceptions and subsequently omit error checks in this sample
-        CL.setExceptionsEnabled(true);
-
-        // Obtain the number of platforms
-        int numPlatformsArray[] = new int[1];
-        clGetPlatformIDs(0, null, numPlatformsArray);
-        int numPlatforms = numPlatformsArray[0];
-        
-        System.out.println("Obtain a platform ID");
-        // Obtain a platform ID
-        cl_platform_id platforms[] = new cl_platform_id[numPlatforms];
-        clGetPlatformIDs(platforms.length, platforms, null);
-        cl_platform_id platform = platforms[platformIndex];
-
-        System.out.println("Initialize the context properties");
-        // Initialize the context properties
-        cl_context_properties contextProperties = new cl_context_properties();
-        contextProperties.addProperty(CL_CONTEXT_PLATFORM, platform);
-
-        System.out.println("Obtain the number of devices for the platform");
-        // Obtain the number of devices for the platform
-        int numDevicesArray[] = new int[1];
-        clGetDeviceIDs(platform, deviceType, 0, null, numDevicesArray);
-        int numDevices = numDevicesArray[0];
-
-        System.out.println("Obtain a device ID");
-        // Obtain a device ID 
-        cl_device_id devices[] = new cl_device_id[numDevices];
-        clGetDeviceIDs(platform, deviceType, numDevices, devices, null);
-        cl_device_id device = devices[deviceIndex];
-        final cl_device_id[] cl_device_ids = new cl_device_id[]{device};
-
-        // Create a context for the selected device
-        cl_context context = clCreateContext(contextProperties, 1, cl_device_ids, null, null, null);
-
-        // Create a command-queue for the selected device
-        cl_queue_properties properties = new cl_queue_properties();
-        cl_command_queue commandQueue = clCreateCommandQueueWithProperties(
-                context, device, properties, null);
-        
-        System.out.println("Allocate the memory objects for the input- and output data");
-        
-        System.out.println("CL_MEM_READ_WRITE");
-        cl_mem dstMemR = clCreateBuffer(context,
-                CL_MEM_READ_WRITE,
-                dstMemSize, null, null);
-        
-        System.out.println("Create the program from the source code");
-        // Create the program from the source code
-        cl_program program = clCreateProgramWithSource(context, openClPrograms.length, openClPrograms, null, null);
-
-        // Build the program
-        clBuildProgram(program, 0, null, null, null, null);
-        
-        final String kernelName  = "test_kernel_do_nothing";
-        
-        System.out.println(LOG_SEPARATE_LINE);
-        System.out.println("Kernel name: " + kernelName );
-        System.out.println(LOG_SEPARATE_LINE);
-
-        // Create the kernel
-        cl_kernel kernel = clCreateKernel(program, kernelName, null);
-        
-        // Set the arguments for the kernel
-        int a = 0;
-        clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(dstMemR));
-
-        // Set the work-item dimensions
-        long global_work_size[] = new long[]{workSize};
-        long localWorkSize[] = new long[]{1};
-
-        // Execute the kernel
-        System.out.println("execute ...");
-        clEnqueueNDRangeKernel(commandQueue, kernel, workDim, null, global_work_size,
-                localWorkSize, // local_work_size, enabling the system to choose the work-group size.
-                0, null, null);
-        System.out.println("... executed");
-        
-        System.out.println("Read the output data");
-        // Read the output data
-        System.out.println("read dstMemSize: " + dstMemSize);
-        clEnqueueReadBuffer(commandQueue, dstMemR, CL_TRUE, 0, dstMemSize, dst_r_pointer, 0, null, null);
-        
-        if (true) {
-            clFinish(commandQueue);
+    private void hashPublicKeys(OpenClTask.PublicKeyBytes[] publicKeys, final boolean souts) {
+        System.out.println("execute hash ...");
+        long beforeHash = System.currentTimeMillis();
+        for (int i = 0; i < publicKeys.length; i++) {
+            byte[] compressedKeyHash = publicKeys[i].getCompressedKeyHash();
+            byte[] uncompressedKeyHash = publicKeys[i].getUncompressedKeyHash();
+            
+            //assertThat(compressedKeyHash, is(equalTo(compressedKeyHashFast)));
+            //assertThat(uncompressedKeyHash, is(equalTo(uncompressedKeyHashFast)));
+            
+            if (souts) {
+                System.out.println("publicKeys["+i+"].compressedKeyHash: " + Arrays.toString(compressedKeyHash));
+                System.out.println("publicKeys["+i+"].uncompressedKeyHash: " + Arrays.toString(uncompressedKeyHash));
+            }
         }
-        
-        System.out.println("release");
-        
-        // Release kernel, program, and memory objects
-        System.out.println("clReleaseMemObject(dstMemR)");
-        clReleaseMemObject(dstMemR);
-        System.out.println("clReleaseKernel(kernel)");
-        clReleaseKernel(kernel);
-        System.out.println("clReleaseProgram(program)");
-        clReleaseProgram(program);
-        System.out.println("clReleaseCommandQueue(commandQueue)");
-        clReleaseCommandQueue(commandQueue);
-        System.out.println("clReleaseContext(context)");
-        clReleaseContext(context);
-        System.out.println("EXIT");
+        long afterHash = System.currentTimeMillis();
+        System.out.println("... hashed in: " + (afterHash - beforeHash) + "ms");
     }
     
     /**
@@ -1084,70 +897,6 @@ public class ProbeAddressesOpenCLTest {
         return publicKey;
     }
     
-    public static class PublicKeyBytes {
-        
-        public static final int ONE_COORDINATE_BYTE_LENGTH = 32;
-        public static final int TWO_COORDINATES_BYTES_LENGTH = ONE_COORDINATE_BYTE_LENGTH * 2;
-        public static final int PARITY_BYTES_LENGTH = 1;
-        
-        // add one byte for format sign
-        final byte[] compressed = new byte[ONE_COORDINATE_BYTE_LENGTH+PARITY_BYTES_LENGTH];
-        final byte[] uncompressed = new byte[TWO_COORDINATES_BYTES_LENGTH+PARITY_BYTES_LENGTH];
-        
-        public byte[] getCompressedKeyHash() {
-            return Utils.sha256hash160(compressed);
-        }
-        
-        public byte[] getUncompressedKeyHash() {
-            return Utils.sha256hash160(uncompressed);
-        }
-        
-        public String getCompressedKeyHashAsBase58(KeyUtility keyUtility) {
-            return keyUtility.toBase58(getCompressedKeyHash());
-        }
-        
-        public String getUncompressedKeyHashAsBase58(KeyUtility keyUtility) {
-            return keyUtility.toBase58(getUncompressedKeyHash());
-        }
-    }
-    
-    /**
-     * Read the inner bytes in reverse order. Remove padding bytes to return a clean byte array.
-     * TODO: BLDEBUG Hier
-     */
-    private static final PublicKeyBytes getPublicKeyFromByteBufferXY(ByteBuffer b, int keyNumber) {
-        PublicKeyBytes publicKeyBytes = new PublicKeyBytes();
-        
-        int keyOffsetInByteBuffer = (b.limit()-1)-(PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH*keyNumber);
-        
-        // read y coordinate
-        for (int i = 0; i < PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH; i++) {
-            int index = i+PublicKeyBytes.PARITY_BYTES_LENGTH+PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH;
-            publicKeyBytes.uncompressed[index] = b.get(keyOffsetInByteBuffer-i);
-        }
- 
-        // read x coordinate
-        for (int i = 0; i < PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH; i++) {
-            byte byteFromBuffer = b.get(keyOffsetInByteBuffer-i-PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH);
-            int index = i+PublicKeyBytes.PARITY_BYTES_LENGTH;
-            publicKeyBytes.uncompressed[index] = byteFromBuffer;
-            publicKeyBytes.compressed[index] = byteFromBuffer;
-        }
-        
-        // the first byte is 4 to indicate a public key with x and y coordinate (uncompressed)
-        publicKeyBytes.uncompressed[0] = 4;
-        
-        int indexLastYCoordinateByte = PublicKeyBytes.PARITY_BYTES_LENGTH+PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH-1;
-        boolean even = publicKeyBytes.uncompressed[indexLastYCoordinateByte] % 2 == 0;
-        
-        if (even) {
-            publicKeyBytes.compressed[0] = 2;
-        } else {
-            publicKeyBytes.compressed[0] = 3;
-        }
-        
-        return publicKeyBytes;
-    }
     
     
     private static final String LOG_SEPARATE_LINE = "-------------------------------------------------------";

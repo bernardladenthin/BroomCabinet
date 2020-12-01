@@ -11,8 +11,10 @@ import org.junit.rules.TemporaryFolder;
 import java.io.IOException;
 import java.util.List;
 import java.util.Random;
+import net.ladenthin.btcdetector.configuration.ConsumerJava;
 import net.ladenthin.btcdetector.configuration.LmdbConfigurationReadOnly;
-import net.ladenthin.btcdetector.configuration.ProbeAddressesCPU;
+import net.ladenthin.btcdetector.configuration.ProducerJava;
+import net.ladenthin.btcdetector.configuration.Sniffing;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.params.MainNetParams;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -49,11 +51,13 @@ public class CPUProberTest {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
         File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, compressed);
 
-        ProbeAddressesCPU pa = new ProbeAddressesCPU();
-        pa.lmdbConfigurationReadOnly = new LmdbConfigurationReadOnly();
-
-        pa.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
-        CPUProber cpuProber = new CPUProber(pa);
+        Sniffing sniffing = new Sniffing();
+        sniffing.consumerJava = new ConsumerJava();
+        sniffing.producerJava = new ProducerJava();
+        sniffing.consumerJava.lmdbConfigurationReadOnly = new LmdbConfigurationReadOnly();
+        sniffing.consumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        
+        CPUProber cpuProber = new CPUProber(sniffing);
         cpuProber.initLMDB();
 
         ECKey key = getFirstAddressHash160FromTestAddress(compressed);

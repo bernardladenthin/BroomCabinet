@@ -156,21 +156,21 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k)
 
     // get_global_id(dim) where dim is the dimension index (0 for first, 1 for second dimension etc.)
     // The above call is equivalent to get_local_size(dim)*get_group_id(dim) + get_local_id(dim)
-    size_t global_id = get_global_id(0);
+    // size_t global_id = get_global_id(0);
+    u32 global_id = get_global_id(0);
 
     //int local_id = get_local_id(0);
     //int local_size = get_local_size(0);
 
     // global to local
-    int k_offset = PRIVATE_KEY_LENGTH * global_id;
-    k_local[0] = k[k_offset+0];
-    k_local[1] = k[k_offset+1];
-    k_local[2] = k[k_offset+2];
-    k_local[3] = k[k_offset+3];
-    k_local[4] = k[k_offset+4];
-    k_local[5] = k[k_offset+5];
-    k_local[6] = k[k_offset+6];
-    k_local[7] = k[k_offset+7];
+    k_local[0] = k[0] | global_id;
+    k_local[1] = k[1];
+    k_local[2] = k[2];
+    k_local[3] = k[3];
+    k_local[4] = k[4];
+    k_local[5] = k[5];
+    k_local[6] = k[6];
+    k_local[7] = k[7];
 
     set_precomputed_basepoint_g(&g_xy_local);
 
