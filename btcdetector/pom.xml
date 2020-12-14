@@ -17,6 +17,14 @@
         <slf4j.version>1.8.0-beta4</slf4j.version>
         <logback.version>1.2.3</logback.version>
     </properties>
+    
+    
+    <repositories>
+        <repository>
+          <id>jitpack.io</id>
+          <url>https://jitpack.io</url>
+        </repository>
+      </repositories>
 
     <build>
         <resources>
@@ -118,7 +126,11 @@
             <artifactId>commons-codec</artifactId>
             <version>1.15</version>
         </dependency>
-
+        <dependency>
+          <groupId>com.github.sealedtx</groupId>
+          <artifactId>bitcoin-cash-converter</artifactId>
+          <version>1.0</version>
+        </dependency>
 
         <dependency>
             <groupId>junit</groupId>

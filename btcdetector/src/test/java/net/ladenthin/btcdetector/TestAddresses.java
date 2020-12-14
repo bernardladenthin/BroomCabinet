@@ -3,6 +3,7 @@ package net.ladenthin.btcdetector;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,8 +37,6 @@ public class TestAddresses {
     };
 
     public final NetworkParameters networkParameters = MainNetParams.get();
-
-    public static final String SEGWIT_PUBLIC_ADDRESS = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
 
     Random random = new Random(RANDOM_SEED);
 

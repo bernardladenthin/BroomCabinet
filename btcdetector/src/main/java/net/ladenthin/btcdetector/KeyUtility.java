@@ -19,8 +19,8 @@ import org.bouncycastle.util.encoders.Hex;
 public class KeyUtility {
 
     @Nullable
-    private final NetworkParameters networkParameters;
-    private final ByteBufferUtility byteBufferUtility;
+    public final NetworkParameters networkParameters;
+    public final ByteBufferUtility byteBufferUtility;
 
     public static final int BIT_LENGTH = 256;
 

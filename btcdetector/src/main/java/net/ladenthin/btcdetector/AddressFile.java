@@ -23,8 +23,9 @@ public class AddressFile {
         this.networkParameters = networkParameters;
         keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
     }
-
-    public final void readFromFile(@Nonnull File file, @Nonnull Consumer<AddressToCoin> addressConsumer) throws IOException {
+    
+    public final ReadStatistic readFromFile(@Nonnull File file, @Nonnull Consumer<AddressToCoin> addressConsumer) throws IOException {
+        ReadStatistic readStatistic = new ReadStatistic();
         try (Scanner sc = new Scanner(new FileInputStream(file))) {
 
             while (sc.hasNextLine()) {
@@ -32,9 +33,13 @@ public class AddressFile {
                 AddressToCoin addressToCoin = AddressToCoin.fromBase58CSVLine(line, keyUtility);
                 if (addressToCoin != null) {
                     addressConsumer.accept(addressToCoin);
+                    readStatistic.successful++;
+                } else {
+                    readStatistic.error++;
                 }
             }
             sc.close();
         }
+        return readStatistic;
     }
 }

@@ -41,7 +41,7 @@ public class AddressFilesToLMDB implements Runnable {
                 File addressesFile = new File(addressesFilePath);
                 AddressFile addressFile = new AddressFile(networkParameters);
                 logger.info("process " + addressesFilePath);
-                addressFile.readFromFile(addressesFile, addressToCoin -> {
+                ReadStatistic readStatistic = addressFile.readFromFile(addressesFile, addressToCoin -> {
                     LegacyAddress address = new KeyUtility(networkParameters, new ByteBufferUtility(false)).byteBufferToAddress(addressToCoin.getHash160());
                     persistence.putNewAmount(address, addressToCoin.getCoin());
                     addressCounter.incrementAndGet();
@@ -51,6 +51,7 @@ public class AddressFilesToLMDB implements Runnable {
                     }
                 });
                 logProgress();
+                logger.info("finished: " + addressesFilePath + " : " + readStatistic);
             }
             logProgress();
             logger.info("writeAllAmounts done");

@@ -6,7 +6,6 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import static net.ladenthin.btcdetector.TestAddresses.SEGWIT_PUBLIC_ADDRESS;
 import org.bitcoinj.core.Coin;
 import org.junit.rules.TemporaryFolder;
 
@@ -52,7 +51,7 @@ public class TestAddressesFiles {
         Files.write(three.toPath(), Arrays.asList(
                 "# Test",
                 "1WrongAddressFormat",
-                SEGWIT_PUBLIC_ADDRESS,
+                new StaticSegwitAddress().publicAddress,
                 testAddresses.getIndexAsBase58String(4)
         ));
         List<String> addresses = new ArrayList<>();
