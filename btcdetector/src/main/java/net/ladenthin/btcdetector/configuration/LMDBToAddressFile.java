@@ -1,6 +1,6 @@
 package net.ladenthin.btcdetector.configuration;
 
-public class ExtractAddresses {
+public class LMDBToAddressFile {
     public LmdbConfigurationReadOnly lmdbConfigurationReadOnly;
     public String addressesFile;
 }

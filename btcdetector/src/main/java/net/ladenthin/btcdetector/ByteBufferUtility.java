@@ -69,7 +69,7 @@ public class ByteBufferUtility {
     public ByteBuffer getByteBufferFromHex(String hex) {
         byte[] decoded = Hex.decode(hex);
         // wrap() delivers a buffer which is already flipped
-        final ByteBuffer byteBuffer = ByteBuffer.wrap(decoded);
+        final ByteBuffer byteBuffer = byteArrayToByteBuffer(decoded);
         return byteBuffer;
     }
     // </editor-fold>

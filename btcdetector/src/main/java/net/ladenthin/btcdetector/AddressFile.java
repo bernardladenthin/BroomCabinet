@@ -17,29 +17,34 @@ public class AddressFile {
     private KeyUtility keyUtility;
 
     public static final String IGNORE_LINE_PREFIX = "#";
+    public static final String ADDRESS_HEADER = "address";
     public final static String SEPARATOR = ",";
 
     public AddressFile(@Nonnull NetworkParameters networkParameters) {
         this.networkParameters = networkParameters;
-        keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
+        keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(true));
     }
     
-    public final ReadStatistic readFromFile(@Nonnull File file, @Nonnull Consumer<AddressToCoin> addressConsumer) throws IOException {
-        ReadStatistic readStatistic = new ReadStatistic();
+    public void readFromFile(@Nonnull File file, ReadStatistic readStatistic, @Nonnull Consumer<AddressToCoin> addressConsumer) throws IOException {
         try (Scanner sc = new Scanner(new FileInputStream(file))) {
 
             while (sc.hasNextLine()) {
                 String line = sc.nextLine();
-                AddressToCoin addressToCoin = AddressToCoin.fromBase58CSVLine(line, keyUtility);
-                if (addressToCoin != null) {
-                    addressConsumer.accept(addressToCoin);
-                    readStatistic.successful++;
-                } else {
-                    readStatistic.error++;
+                try {
+                    AddressToCoin addressToCoin = AddressToCoin.fromBase58CSVLine(line, keyUtility);
+                    if (addressToCoin != null) {
+                        addressConsumer.accept(addressToCoin);
+                        readStatistic.successful++;
+                    } else {
+                        readStatistic.unsupported++;
+                    }
+                } catch (Exception e) {
+                    System.err.println("Error in line: " + line);
+                    e.printStackTrace();
+                    readStatistic.errors.add(line);
                 }
             }
             sc.close();
         }
-        return readStatistic;
     }
 }

@@ -1,6 +1,5 @@
 package net.ladenthin.btcdetector;
 
-import net.ladenthin.btcdetector.configuration.ExtractAddresses;
 import net.ladenthin.btcdetector.persistence.PersistenceUtils;
 import net.ladenthin.btcdetector.persistence.lmdb.LMDBPersistence;
 import org.bitcoinj.core.Context;
@@ -12,29 +11,29 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 
-public class AddressesExtractor implements Runnable {
+public class LMDBToAddressFile implements Runnable {
 
-    private final Logger logger = LoggerFactory.getLogger(AddressesExtractor.class);
+    private final Logger logger = LoggerFactory.getLogger(LMDBToAddressFile.class);
 
-    private final ExtractAddresses extractAddresses;
+    private final net.ladenthin.btcdetector.configuration.LMDBToAddressFile lmdbToAddressFile;
 
     private NetworkParameters networkParameters;
 
     private LMDBPersistence persistence;
 
-    public AddressesExtractor(ExtractAddresses extractAddresses) {
-        this.extractAddresses = extractAddresses;
+    public LMDBToAddressFile(net.ladenthin.btcdetector.configuration.LMDBToAddressFile lmdbToAddressFile) {
+        this.lmdbToAddressFile = lmdbToAddressFile;
     }
 
     @Override
     public void run() {
         createNetworkParameter();
         PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
-        persistence = new LMDBPersistence(extractAddresses.lmdbConfigurationReadOnly, persistenceUtils);
+        persistence = new LMDBPersistence(lmdbToAddressFile.lmdbConfigurationReadOnly, persistenceUtils);
         persistence.init();
         try {
             logger.info("writeAllAmounts ...");
-            File addressesFile = new File(extractAddresses.addressesFile);
+            File addressesFile = new File(lmdbToAddressFile.addressesFile);
             // delete before write all addresses
             addressesFile.delete();
             persistence.writeAllAmountsToAddressFile(addressesFile);

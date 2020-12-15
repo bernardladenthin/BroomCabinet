@@ -1,22 +1,29 @@
 package net.ladenthin.btcdetector;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
 public class ReadStatistic {
 
     public long successful = 0;
-    public long error = 0;
+    public long unsupported = 0;
+    
+    public final List<String> errors = new ArrayList<>();
 
     // generated
     @Override
     public String toString() {
-        return "ReadStatistic{" + "successful=" + successful + ", error=" + error + '}';
+        return "ReadStatistic{" + "successful=" + successful + ", unsupported=" + unsupported + ", errors=" + errors + '}';
     }
 
     // generated
     @Override
     public int hashCode() {
         int hash = 5;
-        hash = 17 * hash + (int) (this.successful ^ (this.successful >>> 32));
-        hash = 17 * hash + (int) (this.error ^ (this.error >>> 32));
+        hash = 89 * hash + (int) (this.successful ^ (this.successful >>> 32));
+        hash = 89 * hash + (int) (this.unsupported ^ (this.unsupported >>> 32));
+        hash = 89 * hash + Objects.hashCode(this.errors);
         return hash;
     }
 
@@ -36,10 +43,17 @@ public class ReadStatistic {
         if (this.successful != other.successful) {
             return false;
         }
-        if (this.error != other.error) {
+        if (this.unsupported != other.unsupported) {
+            return false;
+        }
+        if (!Objects.equals(this.errors, other.errors)) {
             return false;
         }
         return true;
     }
+    
+
+    
+    
 
 }

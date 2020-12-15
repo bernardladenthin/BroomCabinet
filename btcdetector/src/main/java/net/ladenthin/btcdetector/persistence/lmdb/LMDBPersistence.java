@@ -32,7 +32,7 @@ import static org.lmdbjava.Env.create;
 public class LMDBPersistence implements Persistence {
 
     private static final String DB_NAME_HASH160_TO_COINT = "hash160toCoin";
-    private static final int DB_COUNT = 2;
+    private static final int DB_COUNT = 1;
 
     private final PersistenceUtils persistenceUtils;
     private final LmdbConfigurationWrite lmdbConfigurationWrite;
@@ -110,10 +110,9 @@ public class LMDBPersistence implements Persistence {
     }
 
     @Override
-    public Coin getAmount(LegacyAddress address) {
+    public Coin getAmount(ByteBuffer hash160) {
         try (Txn<ByteBuffer> txn = env.txnRead()) {
-            ByteBuffer key = keyUtility.addressToByteBuffer(address);
-            ByteBuffer byteBuffer = lmdb_h160ToAmount.get(txn, key);
+            ByteBuffer byteBuffer = lmdb_h160ToAmount.get(txn, hash160);
             txn.close();
 
             Coin valueInDB = Coin.ZERO;
@@ -152,26 +151,26 @@ public class LMDBPersistence implements Persistence {
     @Override
     public void putAllAmounts(Map<ByteBuffer, Coin> amounts) throws IOException {
         for (Map.Entry<ByteBuffer, Coin> entry : amounts.entrySet()) {
-            LegacyAddress address = keyUtility.byteBufferToAddress(entry.getKey());
-            putNewAmount(address, entry.getValue());
+            ByteBuffer hash160 = entry.getKey();
+            Coin coin = entry.getValue();
+            putNewAmount(hash160, coin);
         }
     }
 
     @Override
-    public void changeAmount(LegacyAddress address, Coin amountToChange) {
-        Coin valueInDB = getAmount(address);
+    public void changeAmount(ByteBuffer hash160, Coin amountToChange) {
+        Coin valueInDB = getAmount(hash160);
         Coin toWrite = valueInDB.add(amountToChange);
-        putNewAmount(address, toWrite);
+        putNewAmount(hash160, toWrite);
     }
 
     @Override
-    public void putNewAmount(LegacyAddress address, Coin toWrite) {
-        ByteBuffer key = keyUtility.addressToByteBuffer(address);
+    public void putNewAmount(ByteBuffer hash160, Coin toWrite) {
         try (Txn<ByteBuffer> txn = env.txnWrite()) {
             if (lmdbConfigurationWrite.deleteEmptyAddresses && toWrite.isZero()) {
-                lmdb_h160ToAmount.delete(txn, key);
+                lmdb_h160ToAmount.delete(txn, hash160);
             } else {
-                lmdb_h160ToAmount.put(txn, key, persistenceUtils.longToByteBufferDirect(toWrite.longValue()));
+                lmdb_h160ToAmount.put(txn, hash160, persistenceUtils.longToByteBufferDirect(toWrite.longValue()));
             }
             txn.commit();
             txn.close();
@@ -179,10 +178,10 @@ public class LMDBPersistence implements Persistence {
     }
 
     @Override
-    public Coin getAllAmountsFromAddresses(List<LegacyAddress> addresses) {
+    public Coin getAllAmountsFromAddresses(List<ByteBuffer> hash160s) {
         Coin allAmounts = Coin.ZERO;
-        for (LegacyAddress address : addresses) {
-            allAmounts = allAmounts.add(getAmount(address));
+        for (ByteBuffer hash160 : hash160s) {
+            allAmounts = allAmounts.add(getAmount(hash160));
         }
         return allAmounts;
     }

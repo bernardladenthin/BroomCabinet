@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import net.ladenthin.btcdetector.AddressFilesToLMDB;
-import net.ladenthin.btcdetector.AddressesExtractor;
+import net.ladenthin.btcdetector.LMDBToAddressFile;
 
 // VM option: -Dorg.slf4j.simpleLogger.defaultLogLevel=trace
 public class Main implements Runnable {
@@ -54,9 +54,9 @@ public class Main implements Runnable {
                 CPUProber prober = new CPUProber(configuration.sniffing);
                 prober.run();
                 break;
-            case ExtractAddresses:
-                AddressesExtractor addressesExtractor = new AddressesExtractor(configuration.extractAddresses);
-                addressesExtractor.run();
+            case LMDBToAddressFile:
+                LMDBToAddressFile lmdbToAddressFile = new LMDBToAddressFile(configuration.lmdbToAddressFile);
+                lmdbToAddressFile.run();
                 break;
             case AddressFilesToLMDB:
                 AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(configuration.addressFilesToLMDB);

@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import javax.annotation.Nullable;
 import static net.ladenthin.btcdetector.AddressFile.IGNORE_LINE_PREFIX;
+import static net.ladenthin.btcdetector.AddressFile.ADDRESS_HEADER;
 import static net.ladenthin.btcdetector.AddressFile.SEPARATOR;
 import org.bitcoinj.core.AddressFormatException;
 import org.bitcoinj.core.Base58;
@@ -13,6 +14,7 @@ import org.bitcoinj.core.Bech32;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.SegwitAddress;
 import org.bitcoinj.core.Sha256Hash;
+import org.bitcoinj.script.Script;
 import org.bouncycastle.util.encoders.Hex;
 
 public class AddressToCoin {
@@ -45,11 +47,9 @@ public class AddressToCoin {
         String[] lineSplitted = line.split(SEPARATOR + "|" + TAB_SPLIT);
         String address = lineSplitted[0];
         address = address.trim();
-        if (address.isEmpty() || address.startsWith(IGNORE_LINE_PREFIX)) {
+        if (address.isEmpty() || address.startsWith(IGNORE_LINE_PREFIX) || address.startsWith(ADDRESS_HEADER)) {
             return null;
         }
-        
-        
         
         if( address.startsWith("q")) {
             // q: bitcoin cash Base58 (P2PKH)
@@ -57,10 +57,16 @@ public class AddressToCoin {
             address = AddressConverter.toLegacyAddress(address);
         }
         
-        if (address.startsWith("bc1")) {
-            // bitcoin Bech32 (P2WPKH)
+        if (address.startsWith("d-") || address.startsWith("m-") || address.startsWith("s-")) {
+            // blockchair format for Bitcoin (d-) and Bitcoin Cash (m-) and (s-) (P2MS)
+            return null;
+        } else if (address.startsWith("bc1")) {
+            // bitcoin Bech32 (P2WPKH) or bitcoin Bech32 (P2WSH)
             Coin amount = getCoinIfExists(lineSplitted);
             SegwitAddress segwitAddress = SegwitAddress.fromBech32(keyUtility.networkParameters, address);
+            if (segwitAddress.getOutputScriptType() == Script.ScriptType.P2WSH) {
+                return null;
+            }
             byte[] hash = segwitAddress.getHash();
             ByteBuffer hash160 = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash);
             return new AddressToCoin(hash160, amount);
@@ -68,9 +74,10 @@ public class AddressToCoin {
             // litecoin Bech32 (P2WPKH)
             //https://privatekeys.pw/litecoin/address/ltc1qd5wm03t5kcdupjuyq5jffpuacnaqahvfsdu8smf8z0u0pqdqpatqsdrn8h
             return null;
-        } else if (address.startsWith("7") || address.startsWith("A") || address.startsWith("M") || address.startsWith("p")  ) {
+        } else if (address.startsWith("7") || address.startsWith("A") || address.startsWith("9") || address.startsWith("M") || address.startsWith("p")  ) {
             // 7: dash Base58 (P2SH)
             // A: dogecoin Base58 (P2SH)
+            // 9: dogecoin Base58 (P2SH)
             // M: litecoin Base58 (P2SH)
             // p: bitcoin cash Base58 (P2SH)
             // it's a multisig dash address Base58 (P2SH) and we can't use script hash
@@ -86,13 +93,10 @@ public class AddressToCoin {
             return new AddressToCoin(hash160AsByteBuffer, amount);
         } else {
             // bitcoin Base58 (P2PKH)
-            try {
-                ByteBuffer hash160 = keyUtility.getHash160ByteBufferFromBase58String(address);
-                Coin amount = getCoinIfExists(lineSplitted);
-                return new AddressToCoin(hash160, amount);
-            } catch (AddressFormatException afe) {
-                return null;
-            }
+            ByteBuffer hash160 = keyUtility.getHash160ByteBufferFromBase58String(address);
+            Coin amount = getCoinIfExists(lineSplitted);
+            return new AddressToCoin(hash160, amount);
+
         }
     }
     

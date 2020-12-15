@@ -47,9 +47,11 @@ public class CPUProberTest {
 
     @Test
     @UseDataProvider("compressed")
-    public void myTest(boolean compressed) throws IOException, InterruptedException {
+    public void runProber_testAddressGiven_hitExpected(boolean compressed) throws IOException, InterruptedException {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
-        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, compressed);
+        
+        TestAddressesFiles testAddresses = new TestAddressesFiles(compressed);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses);
 
         Sniffing sniffing = new Sniffing();
         sniffing.consumerJava = new ConsumerJava();

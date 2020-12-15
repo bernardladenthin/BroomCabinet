@@ -9,7 +9,7 @@ import java.util.List;
 import org.bitcoinj.core.Coin;
 import org.junit.rules.TemporaryFolder;
 
-public class TestAddressesFiles {
+public class TestAddressesFiles implements AddressesFiles {
 
     private final static String ADDRESS_FILE_ONE = "addressesOne.txt";
     private final static String ADDRESS_FILE_TWO = "addressesTwo.txt";
@@ -27,14 +27,13 @@ public class TestAddressesFiles {
         amountOtherAddresses
     };
 
-    private final boolean compressed;
     private final TestAddresses testAddresses;
 
     public TestAddressesFiles(boolean compressed) {
-        this.compressed = compressed;
         testAddresses = new TestAddresses(NUMBER_OF_ADRESSES, compressed);
     }
 
+    @Override
     public List<String> createAddressesFiles(TemporaryFolder folder) throws IOException {
         File one = folder.newFile(ADDRESS_FILE_ONE);
         File two = folder.newFile(ADDRESS_FILE_TWO);
@@ -51,7 +50,7 @@ public class TestAddressesFiles {
         Files.write(three.toPath(), Arrays.asList(
                 "# Test",
                 "1WrongAddressFormat",
-                new StaticSegwitAddress().publicAddress,
+                new StaticBitcoinP2WPKHAddress().publicAddress,
                 testAddresses.getIndexAsBase58String(4)
         ));
         List<String> addresses = new ArrayList<>();

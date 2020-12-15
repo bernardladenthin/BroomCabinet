@@ -8,11 +8,12 @@ import org.junit.rules.TemporaryFolder;
 
 public class TestAddressesLMDB {
     
-    public File createTestLMDB(TemporaryFolder folder, boolean compressed) throws IOException {
+    
+    public File createTestLMDB(TemporaryFolder folder, AddressesFiles addressesFiles) throws IOException {
         net.ladenthin.btcdetector.configuration.AddressFilesToLMDB addressFilesToLMDBConfigurationWrite = new net.ladenthin.btcdetector.configuration.AddressFilesToLMDB();
-        TestAddressesFiles testAddresses = new TestAddressesFiles(compressed);
-        List<String> addressesFiles = testAddresses.createAddressesFiles(folder);
-        addressFilesToLMDBConfigurationWrite.addressesFiles.addAll(addressesFiles);
+        
+        List<String> files = addressesFiles.createAddressesFiles(folder);
+        addressFilesToLMDBConfigurationWrite.addressesFiles.addAll(files);
         addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite = new LmdbConfigurationWrite();
         File lmdbFolder = folder.newFolder("lmdb");
         String lmdbFolderPath = lmdbFolder.getAbsolutePath();
