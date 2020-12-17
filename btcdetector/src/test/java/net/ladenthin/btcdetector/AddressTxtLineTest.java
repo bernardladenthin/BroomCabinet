@@ -40,6 +40,10 @@ public class AddressTxtLineTest {
     @Before
     public void init() throws IOException {
     }
+    
+    private void assertThatDefaultCoinIsSet(AddressToCoin addressToCoin) {
+        assertThat(addressToCoin.getCoin(), is(equalTo(AddressTxtLine.DEFAULT_COIN)));
+    }
 
     @Test
     public void fromLine_addressLineIsEmpty_returnNull() throws IOException {
@@ -66,7 +70,7 @@ public class AddressTxtLineTest {
 
         // assert
         assertThat(addressToCoin.getHash160(), is(equalTo(staticKey.byteBufferPublicKeyUncompressed)));
-        assertThat(addressToCoin.getCoin(), is(equalTo(AddressTxtLine.DEFAULT_COIN)));
+        assertThatDefaultCoinIsSet(addressToCoin);
     }
 
     @Test
@@ -76,7 +80,7 @@ public class AddressTxtLineTest {
 
         // assert
         assertThat(addressToCoin.getHash160(), is(equalTo(staticKey.byteBufferPublicKeyCompressed)));
-        assertThat(addressToCoin.getCoin(), is(equalTo(AddressTxtLine.DEFAULT_COIN)));
+        assertThatDefaultCoinIsSet(addressToCoin);
     }
 
     @Test
@@ -98,7 +102,7 @@ public class AddressTxtLineTest {
 
         // assert
         assertThat(addressToCoin.getHash160(), is(equalTo(staticKey.byteBufferPublicKeyUncompressed)));
-        assertThat(addressToCoin.getCoin(), is(equalTo(AddressTxtLine.DEFAULT_COIN)));
+        assertThatDefaultCoinIsSet(addressToCoin);
     }
 
     @Test
@@ -118,6 +122,7 @@ public class AddressTxtLineTest {
 
         // assert
         assertThat(addressToCoin.getHash160(), is(equalTo(staticBitcoinP2WPKHAddress.byteBuffer_publicKeyHash)));
+        assertThatDefaultCoinIsSet(addressToCoin);
     }
 
     @Test
@@ -148,6 +153,7 @@ public class AddressTxtLineTest {
 
         // assert
         assertThat(addressToCoin.getHash160(), is(equalTo(staticDashP2PKHAddress.byteBuffer_publicKeyHash)));
+        assertThatDefaultCoinIsSet(addressToCoin);
     }
 
     @Test
@@ -178,6 +184,7 @@ public class AddressTxtLineTest {
 
         // assert
         assertThat(addressToCoin.getHash160(), is(equalTo(staticDogecoinP2PKHAddress.byteBuffer_publicKeyHash)));
+        assertThatDefaultCoinIsSet(addressToCoin);
     }
 
     @Test
@@ -198,6 +205,7 @@ public class AddressTxtLineTest {
 
         // assert
         assertThat(addressToCoin.getHash160(), is(equalTo(staticLitecoinP2PKHAddress.byteBuffer_publicKeyHash)));
+        assertThatDefaultCoinIsSet(addressToCoin);
     }
 
     @Test
@@ -218,6 +226,7 @@ public class AddressTxtLineTest {
 
         // assert
         assertThat(addressToCoin.getHash160(), is(equalTo(staticBitcoinCashP2PKHAddress.byteBuffer_publicKeyHash)));
+        assertThatDefaultCoinIsSet(addressToCoin);
     }
 
     @Test
