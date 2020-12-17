@@ -24,8 +24,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import net.ladenthin.btcdetector.AddressFile;
-import net.ladenthin.btcdetector.AddressToCoin;
+import net.ladenthin.btcdetector.AddressTxtLine;
 import org.bitcoinj.core.Coin;
 import org.junit.rules.TemporaryFolder;
 
@@ -60,8 +59,8 @@ public class TestAddressesFiles implements AddressesFiles {
         File three = folder.newFile(ADDRESS_FILE_THREE);
 
         Files.write(one.toPath(), Arrays.asList(
-                testAddresses.getIndexAsBase58String(0) + AddressFile.SEPARATOR + amountFirstAddress,
-                testAddresses.getIndexAsBase58String(1) + AddressToCoin.TAB_SPLIT + amountOtherAddresses,
+                testAddresses.getIndexAsBase58String(0) + AddressTxtLine.SEPARATOR + amountFirstAddress,
+                testAddresses.getIndexAsBase58String(1) + AddressTxtLine.TAB_SPLIT + amountOtherAddresses,
                 testAddresses.getIndexAsBase58String(2)
         ));
         Files.write(two.toPath(), Arrays.asList(

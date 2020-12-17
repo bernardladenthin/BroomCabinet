@@ -34,10 +34,6 @@ public class AddressFile {
     @Nonnull
     private KeyUtility keyUtility;
 
-    public static final String IGNORE_LINE_PREFIX = "#";
-    public static final String ADDRESS_HEADER = "address";
-    public final static String SEPARATOR = ",";
-
     public AddressFile(@Nonnull NetworkParameters networkParameters) {
         this.networkParameters = networkParameters;
         keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(true));
@@ -46,10 +42,11 @@ public class AddressFile {
     public void readFromFile(@Nonnull File file, ReadStatistic readStatistic, @Nonnull Consumer<AddressToCoin> addressConsumer) throws IOException {
         try (Scanner sc = new Scanner(new FileInputStream(file))) {
 
+            AddressTxtLine addressTxtLine = new AddressTxtLine();
             while (sc.hasNextLine()) {
                 String line = sc.nextLine();
                 try {
-                    AddressToCoin addressToCoin = AddressToCoin.fromBase58CSVLine(line, keyUtility);
+                    AddressToCoin addressToCoin = addressTxtLine.fromLine(line, keyUtility);
                     if (addressToCoin != null) {
                         addressConsumer.accept(addressToCoin);
                         readStatistic.successful++;

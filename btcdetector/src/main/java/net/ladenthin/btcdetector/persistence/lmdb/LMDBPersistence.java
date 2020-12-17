@@ -36,7 +36,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
-import net.ladenthin.btcdetector.AddressFile;
+import net.ladenthin.btcdetector.AddressTxtLine;
 import net.ladenthin.btcdetector.ByteBufferUtility;
 import net.ladenthin.btcdetector.KeyUtility;
 import net.ladenthin.btcdetector.configuration.CLMDBConfigurationReadOnly;
@@ -158,7 +158,7 @@ public class LMDBPersistence implements Persistence {
                     for (final CursorIterable.KeyVal<ByteBuffer> kv : iterable) {
                         ByteBuffer addressAsByteBuffer = kv.key();
                         LegacyAddress address = keyUtility.byteBufferToAddress(addressAsByteBuffer);
-                        String line = address.toBase58() + AddressFile.SEPARATOR + kv.val().getLong() + System.lineSeparator();
+                        String line = address.toBase58() + AddressTxtLine.SEPARATOR + kv.val().getLong() + System.lineSeparator();
                         writer.write(line);
                     }
                 }
@@ -183,15 +183,15 @@ public class LMDBPersistence implements Persistence {
     }
 
     @Override
-    public void putNewAmount(ByteBuffer hash160, Coin toWrite) {
+    public void putNewAmount(ByteBuffer hash160, Coin amount) {
         try (Txn<ByteBuffer> txn = env.txnWrite()) {
-            if (lmdbConfigurationWrite.deleteEmptyAddresses && toWrite.isZero()) {
+            if (lmdbConfigurationWrite.deleteEmptyAddresses && amount.isZero()) {
                 lmdb_h160ToAmount.delete(txn, hash160);
             } else {
                 if (lmdbConfigurationWrite.useStaticAmount) {
-                    toWrite = Coin.SATOSHI;
+                    amount = Coin.SATOSHI;
                 }
-                lmdb_h160ToAmount.put(txn, hash160, persistenceUtils.longToByteBufferDirect(toWrite.longValue()));
+                lmdb_h160ToAmount.put(txn, hash160, persistenceUtils.longToByteBufferDirect(amount.longValue()));
             }
             txn.commit();
             txn.close();
