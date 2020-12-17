@@ -18,16 +18,22 @@
 // @formatter:on
 package net.ladenthin.btcdetector;
 
-import net.ladenthin.btcdetector.configuration.CConsumerJava;
+import com.tngtech.java.junit.dataprovider.DataProvider;
 
-public class ProberTestImpl extends Prober {
+public class CommonDataProvider {
 
-    protected ProberTestImpl(CConsumerJava consumerJava) {
-        super(consumerJava);
-    }
+    /**
+     * For {@link #compressedAndAmount()}.
+     */
+    public final static String DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT = "compressedAndStaticAmount";
 
-    @Override
-    public void run() {
-
+    @DataProvider
+    public static Object[][] compressedAndStaticAmount() {
+        return new Object[][]{
+            {true, true},
+            {false, true},
+            {true, false},
+            {false, false}
+        };
     }
 }

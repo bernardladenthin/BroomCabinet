@@ -1,6 +1,23 @@
+// @formatter:off
+/**
+ * Copyright 2020 Bernard Ladenthin bernard.ladenthin@gmail.com
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+// @formatter:on
 package net.ladenthin.btcdetector;
 
-import com.tngtech.java.junit.dataprovider.DataProvider;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.File;
@@ -11,10 +28,13 @@ import org.junit.rules.TemporaryFolder;
 import java.io.IOException;
 import java.util.List;
 import java.util.Random;
-import net.ladenthin.btcdetector.configuration.ConsumerJava;
-import net.ladenthin.btcdetector.configuration.LmdbConfigurationReadOnly;
-import net.ladenthin.btcdetector.configuration.ProducerJava;
-import net.ladenthin.btcdetector.configuration.Sniffing;
+import net.ladenthin.btcdetector.configuration.CConsumerJava;
+import net.ladenthin.btcdetector.configuration.CLMDBConfigurationReadOnly;
+import net.ladenthin.btcdetector.configuration.CProducerJava;
+import net.ladenthin.btcdetector.configuration.CSniffing;
+import net.ladenthin.btcdetector.staticaddresses.TestAddresses;
+import net.ladenthin.btcdetector.staticaddresses.TestAddressesFiles;
+import net.ladenthin.btcdetector.staticaddresses.TestAddressesLMDB;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.params.MainNetParams;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -30,35 +50,25 @@ import static org.mockito.Mockito.verify;
 @RunWith(DataProviderRunner.class)
 public class CPUProberTest {
 
-    @DataProvider
-    public static Object[][] compressed() {
-        return new Object[][]{
-            {true},
-            {false}
-        };
-    }
-
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
 
     private ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
 
-    ;
-
     @Test
-    @UseDataProvider("compressed")
-    public void runProber_testAddressGiven_hitExpected(boolean compressed) throws IOException, InterruptedException {
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
+    public void runProber_testAddressGiven_hitExpected(boolean compressed, boolean useStaticAmount) throws IOException, InterruptedException {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
-        
-        TestAddressesFiles testAddresses = new TestAddressesFiles(compressed);
-        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses);
 
-        Sniffing sniffing = new Sniffing();
-        sniffing.consumerJava = new ConsumerJava();
-        sniffing.producerJava = new ProducerJava();
-        sniffing.consumerJava.lmdbConfigurationReadOnly = new LmdbConfigurationReadOnly();
+        TestAddressesFiles testAddresses = new TestAddressesFiles(compressed);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, useStaticAmount);
+
+        CSniffing sniffing = new CSniffing();
+        sniffing.consumerJava = new CConsumerJava();
+        sniffing.producerJava = new CProducerJava();
+        sniffing.consumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         sniffing.consumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
-        
+
         CPUProber cpuProber = new CPUProber(sniffing);
         cpuProber.initLMDB();
 

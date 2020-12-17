@@ -1,3 +1,21 @@
+// @formatter:off
+/**
+ * Copyright 2020 Bernard Ladenthin bernard.ladenthin@gmail.com
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+// @formatter:on
 package net.ladenthin.btcdetector;
 
 import java.nio.ByteBuffer;
@@ -16,7 +34,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import net.ladenthin.btcdetector.configuration.ConsumerJava;
+import net.ladenthin.btcdetector.configuration.CConsumerJava;
 import net.ladenthin.btcdetector.persistence.Persistence;
 import net.ladenthin.btcdetector.persistence.PersistenceUtils;
 import net.ladenthin.btcdetector.persistence.lmdb.LMDBPersistence;
@@ -40,7 +58,7 @@ public abstract class Prober implements Runnable {
 
     protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
-    protected final ConsumerJava consumerJava;
+    protected final CConsumerJava consumerJava;
     protected final Timer timer = new Timer();
 
     protected Persistence persistence;
@@ -49,7 +67,7 @@ public abstract class Prober implements Runnable {
     protected final LinkedBlockingQueue<ECKey> keysQueue;
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
 
-    protected Prober(ConsumerJava consumerJava) {
+    protected Prober(CConsumerJava consumerJava) {
         this.consumerJava = consumerJava;
         this.keysQueue = new LinkedBlockingQueue<>(consumerJava.queueSize);
     }

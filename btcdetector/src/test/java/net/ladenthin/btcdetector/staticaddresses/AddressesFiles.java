@@ -16,18 +16,13 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector;
+package net.ladenthin.btcdetector.staticaddresses;
 
-import net.ladenthin.btcdetector.configuration.CConsumerJava;
+import java.io.IOException;
+import java.util.List;
+import org.junit.rules.TemporaryFolder;
 
-public class ProberTestImpl extends Prober {
+public interface AddressesFiles {
 
-    protected ProberTestImpl(CConsumerJava consumerJava) {
-        super(consumerJava);
-    }
-
-    @Override
-    public void run() {
-
-    }
+    List<String> createAddressesFiles(TemporaryFolder folder) throws IOException;
 }

@@ -16,18 +16,12 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector;
+package net.ladenthin.btcdetector.staticaddresses;
 
-import net.ladenthin.btcdetector.configuration.CConsumerJava;
+/**
+ * https://privatekeys.pw/dogecoin/address/A8c3xNz2mqsDLFwv5KL5fpH12QEwDaoTXo
+ */
+public class StaticDogecoinP2SHAddress {
 
-public class ProberTestImpl extends Prober {
-
-    protected ProberTestImpl(CConsumerJava consumerJava) {
-        super(consumerJava);
-    }
-
-    @Override
-    public void run() {
-
-    }
+    final public String publicAddress = "A8c3xNz2mqsDLFwv5KL5fpH12QEwDaoTXo";
 }

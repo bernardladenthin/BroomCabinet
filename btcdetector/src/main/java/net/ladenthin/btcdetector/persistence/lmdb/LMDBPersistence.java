@@ -1,3 +1,21 @@
+// @formatter:off
+/**
+ * Copyright 2020 Bernard Ladenthin bernard.ladenthin@gmail.com
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+// @formatter:on
 package net.ladenthin.btcdetector.persistence.lmdb;
 
 import net.ladenthin.btcdetector.persistence.Persistence;
@@ -21,8 +39,8 @@ import java.util.Map;
 import net.ladenthin.btcdetector.AddressFile;
 import net.ladenthin.btcdetector.ByteBufferUtility;
 import net.ladenthin.btcdetector.KeyUtility;
-import net.ladenthin.btcdetector.configuration.LmdbConfigurationReadOnly;
-import net.ladenthin.btcdetector.configuration.LmdbConfigurationWrite;
+import net.ladenthin.btcdetector.configuration.CLMDBConfigurationReadOnly;
+import net.ladenthin.btcdetector.configuration.CLMDBConfigurationWrite;
 import org.lmdbjava.BufferProxy;
 import org.lmdbjava.ByteBufferProxy;
 
@@ -35,20 +53,20 @@ public class LMDBPersistence implements Persistence {
     private static final int DB_COUNT = 1;
 
     private final PersistenceUtils persistenceUtils;
-    private final LmdbConfigurationWrite lmdbConfigurationWrite;
-    private final LmdbConfigurationReadOnly lmdbConfigurationReadOnly;
+    private final CLMDBConfigurationWrite lmdbConfigurationWrite;
+    private final CLMDBConfigurationReadOnly lmdbConfigurationReadOnly;
     private final KeyUtility keyUtility;
     private Env<ByteBuffer> env;
     private Dbi<ByteBuffer> lmdb_h160ToAmount;
 
-    public LMDBPersistence(LmdbConfigurationWrite lmdbConfigurationWrite, PersistenceUtils persistenceUtils) {
+    public LMDBPersistence(CLMDBConfigurationWrite lmdbConfigurationWrite, PersistenceUtils persistenceUtils) {
         this.lmdbConfigurationReadOnly = null;
         this.lmdbConfigurationWrite = lmdbConfigurationWrite;
         this.persistenceUtils = persistenceUtils;
         this.keyUtility = new KeyUtility(persistenceUtils.networkParameters, new ByteBufferUtility(true));
     }
 
-    public LMDBPersistence(LmdbConfigurationReadOnly lmdbConfigurationReadOnly, PersistenceUtils persistenceUtils) {
+    public LMDBPersistence(CLMDBConfigurationReadOnly lmdbConfigurationReadOnly, PersistenceUtils persistenceUtils) {
         this.lmdbConfigurationReadOnly = lmdbConfigurationReadOnly;
         lmdbConfigurationWrite = null;
         this.persistenceUtils = persistenceUtils;
@@ -170,6 +188,9 @@ public class LMDBPersistence implements Persistence {
             if (lmdbConfigurationWrite.deleteEmptyAddresses && toWrite.isZero()) {
                 lmdb_h160ToAmount.delete(txn, hash160);
             } else {
+                if (lmdbConfigurationWrite.useStaticAmount) {
+                    toWrite = Coin.SATOSHI;
+                }
                 lmdb_h160ToAmount.put(txn, hash160, persistenceUtils.longToByteBufferDirect(toWrite.longValue()));
             }
             txn.commit();

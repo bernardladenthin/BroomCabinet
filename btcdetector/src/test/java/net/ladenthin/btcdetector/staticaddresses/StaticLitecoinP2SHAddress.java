@@ -16,18 +16,12 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector;
+package net.ladenthin.btcdetector.staticaddresses;
 
-import net.ladenthin.btcdetector.configuration.CConsumerJava;
+/**
+ * https://privatekeys.pw/litecoin/address/M8T1B2Z97gVdvmfkQcAtYbEepune1tzGua
+ */
+public class StaticLitecoinP2SHAddress {
 
-public class ProberTestImpl extends Prober {
-
-    protected ProberTestImpl(CConsumerJava consumerJava) {
-        super(consumerJava);
-    }
-
-    @Override
-    public void run() {
-
-    }
+    final public String publicAddress = "M8T1B2Z97gVdvmfkQcAtYbEepune1tzGua";
 }

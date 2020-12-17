@@ -16,18 +16,12 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector;
+package net.ladenthin.btcdetector.staticaddresses;
 
-import net.ladenthin.btcdetector.configuration.CConsumerJava;
+/**
+ * https://privatekeys.pw/bitcoin-cash/address/d-414f1537e051163a5a558d5e9ee37439
+ */
+public class StaticBitcoinP2MSAddress {
 
-public class ProberTestImpl extends Prober {
-
-    protected ProberTestImpl(CConsumerJava consumerJava) {
-        super(consumerJava);
-    }
-
-    @Override
-    public void run() {
-
-    }
+    final public String publicAddress = "d-414f1537e051163a5a558d5e9ee37439";
 }

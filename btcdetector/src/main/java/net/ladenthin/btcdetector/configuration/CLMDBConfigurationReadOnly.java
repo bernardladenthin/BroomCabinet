@@ -16,18 +16,16 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector;
+package net.ladenthin.btcdetector.configuration;
 
-import net.ladenthin.btcdetector.configuration.CConsumerJava;
-
-public class ProberTestImpl extends Prober {
-
-    protected ProberTestImpl(CConsumerJava consumerJava) {
-        super(consumerJava);
-    }
-
-    @Override
-    public void run() {
-
-    }
+public class CLMDBConfigurationReadOnly {
+    /**
+     * The directory of the LMDB database.
+     */
+    public String lmdbDirectory;
+    
+    /**
+     * The LMDB proxy (see {@link org.lmdbjava.ByteBufferProxy}).
+     */
+    public boolean useProxyOptimal = true;
 }

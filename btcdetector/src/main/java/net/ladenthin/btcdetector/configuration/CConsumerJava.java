@@ -16,18 +16,12 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector;
+package net.ladenthin.btcdetector.configuration;
 
-import net.ladenthin.btcdetector.configuration.CConsumerJava;
-
-public class ProberTestImpl extends Prober {
-
-    protected ProberTestImpl(CConsumerJava consumerJava) {
-        super(consumerJava);
-    }
-
-    @Override
-    public void run() {
-
-    }
+public class CConsumerJava {
+    public CLMDBConfigurationReadOnly lmdbConfigurationReadOnly;
+    public int printStatisticsEveryNSeconds = 60;
+    public int threads = 1;
+    public long delayEmptyConsumer = 10;
+    public int queueSize = 100000;
 }

@@ -16,18 +16,20 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector;
+package net.ladenthin.btcdetector.configuration;
 
-import net.ladenthin.btcdetector.configuration.CConsumerJava;
+import java.util.ArrayList;
+import java.util.List;
 
-public class ProberTestImpl extends Prober {
-
-    protected ProberTestImpl(CConsumerJava consumerJava) {
-        super(consumerJava);
-    }
-
-    @Override
-    public void run() {
-
-    }
+public class CAddressFilesToLMDB {
+    
+    /**
+     * The list of addresses files which should be read.
+     */
+    public List<String> addressesFiles = new ArrayList<>();
+    
+    /**
+     * The configuration to write a LMDB database.
+     */
+    public CLMDBConfigurationWrite lmdbConfigurationWrite;
 }

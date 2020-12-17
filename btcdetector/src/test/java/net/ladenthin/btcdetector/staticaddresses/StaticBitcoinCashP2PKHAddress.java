@@ -16,18 +16,18 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector;
+package net.ladenthin.btcdetector.staticaddresses;
 
-import net.ladenthin.btcdetector.configuration.CConsumerJava;
+import java.nio.ByteBuffer;
+import net.ladenthin.btcdetector.ByteBufferUtility;
 
-public class ProberTestImpl extends Prober {
+/**
+ * https://privatekeys.pw/bitcoin-cash/address/qz7xc0vl85nck65ffrsx5wvewjznp9lflgktxc5878
+ */
+public class StaticBitcoinCashP2PKHAddress {
 
-    protected ProberTestImpl(CConsumerJava consumerJava) {
-        super(consumerJava);
-    }
-
-    @Override
-    public void run() {
-
-    }
+    final public String publicAddress = "qz7xc0vl85nck65ffrsx5wvewjznp9lflgktxc5878";
+    final public String publicKeyHash = "bc6c3d9f3d278b6a8948e06a399974853097e9fa";
+    
+    final public ByteBuffer byteBuffer_publicKeyHash = new ByteBufferUtility(false).getByteBufferFromHex(publicKeyHash);
 }

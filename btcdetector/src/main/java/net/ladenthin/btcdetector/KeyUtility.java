@@ -1,3 +1,21 @@
+// @formatter:off
+/**
+ * Copyright 2020 Bernard Ladenthin bernard.ladenthin@gmail.com
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+// @formatter:on
 package net.ladenthin.btcdetector;
 
 import java.math.BigInteger;
@@ -14,7 +32,6 @@ import org.bouncycastle.util.encoders.Hex;
  * https://stackoverflow.com/questions/5399798/byte-array-and-int-conversion-in-java/11419863
  * https://stackoverflow.com/questions/21087651/how-to-efficiently-change-endianess-of-byte-array-in-java
  * https://stackoverflow.com/questions/7619058/convert-a-byte-array-to-integer-in-java-and-vice-versa
- * @author Bernard
  */
 public class KeyUtility {
 
