@@ -23,12 +23,24 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import net.ladenthin.btcdetector.AddressTxtLine;
 import org.bitcoinj.core.Coin;
 import org.junit.rules.TemporaryFolder;
 
 public class TestAddressesFiles implements AddressesFiles {
+
+    public final static Set<String> compressedTestAddressesAsLines = new HashSet<>();
+    public final static Set<String> uncompressedTestAddressesAsLines = new HashSet<>();
+    public final static Set<String> compressedTestAddressesWithStaticAmountAsLines = new HashSet<>();
+    public final static Set<String> uncompressedTestAddressesWithStaticAmountAsLines = new HashSet<>();
+    
+    public final static Set<String> compressedTestAddressesAsHexLines = new HashSet<>();
+    public final static Set<String> uncompressedTestAddressesAsHexLines = new HashSet<>();
+    public final static Set<String> compressedTestAddressesWithStaticAmountAsHexLines = new HashSet<>();
+    public final static Set<String> uncompressedTestAddressesWithStaticAmountAsHexLines = new HashSet<>();
 
     private final static String ADDRESS_FILE_ONE = "addressesOne.txt";
     private final static String ADDRESS_FILE_TWO = "addressesTwo.txt";
@@ -50,6 +62,72 @@ public class TestAddressesFiles implements AddressesFiles {
 
     public TestAddressesFiles(boolean compressed) {
         testAddresses = new TestAddresses(NUMBER_OF_ADRESSES, compressed);
+
+        {
+            uncompressedTestAddressesAsLines.add("15daqrFSG8d1EMfCWdWZWeZMSDFkqR834t,1");
+            uncompressedTestAddressesAsLines.add("18DBt2Ght4y9nx69fXT7w8vVq9n5BqfRev,1");
+            uncompressedTestAddressesAsLines.add("1AK4RGZoDCsSwjx3zzPwo4nbFzrJapr9m9,1");
+            uncompressedTestAddressesAsLines.add("1BZVqUAK8KBbAL3r7wC3Chq8csTBYYCdZU,5000000000");
+            uncompressedTestAddressesAsLines.add("1KYinnpkcc4KKNB8C73z9kgXCLpKdzor4V,1");
+            uncompressedTestAddressesAsLines.add("1NEJvEj6jB7f9aBhT4wXZnBR9uGJrKanhJ,1");
+        }
+        {
+            compressedTestAddressesAsLines.add("142XRqAwF7Xy5owyHW7u6vCooyGusQYZF4,1");
+            compressedTestAddressesAsLines.add("1AcXATyTTvLm12dpBiTxdDxCtHhFyPNS1C,5000000000");
+            compressedTestAddressesAsLines.add("1FpKH5GHTwNqJuiHdgL4tJYNvxEMhGzcap,1");
+            compressedTestAddressesAsLines.add("1N2BnKNAqBnNBv4EnmEtjFxoewZ5NBsbVm,1");
+            compressedTestAddressesAsLines.add("1NEJvEj6jB7f9aBhT4wXZnBR9uGJrKanhJ,1");
+            compressedTestAddressesAsLines.add("1NsremZJgQWR4Vx4VARAUv4HLq9NbxPyYi,1");
+        }
+        {
+            uncompressedTestAddressesWithStaticAmountAsLines.add("15daqrFSG8d1EMfCWdWZWeZMSDFkqR834t,1");
+            uncompressedTestAddressesWithStaticAmountAsLines.add("18DBt2Ght4y9nx69fXT7w8vVq9n5BqfRev,1");
+            uncompressedTestAddressesWithStaticAmountAsLines.add("1AK4RGZoDCsSwjx3zzPwo4nbFzrJapr9m9,1");
+            uncompressedTestAddressesWithStaticAmountAsLines.add("1BZVqUAK8KBbAL3r7wC3Chq8csTBYYCdZU,1");
+            uncompressedTestAddressesWithStaticAmountAsLines.add("1KYinnpkcc4KKNB8C73z9kgXCLpKdzor4V,1");
+            uncompressedTestAddressesWithStaticAmountAsLines.add("1NEJvEj6jB7f9aBhT4wXZnBR9uGJrKanhJ,1");
+        }
+        {
+            compressedTestAddressesWithStaticAmountAsLines.add("142XRqAwF7Xy5owyHW7u6vCooyGusQYZF4,1");
+            compressedTestAddressesWithStaticAmountAsLines.add("1AcXATyTTvLm12dpBiTxdDxCtHhFyPNS1C,1");
+            compressedTestAddressesWithStaticAmountAsLines.add("1FpKH5GHTwNqJuiHdgL4tJYNvxEMhGzcap,1");
+            compressedTestAddressesWithStaticAmountAsLines.add("1N2BnKNAqBnNBv4EnmEtjFxoewZ5NBsbVm,1");
+            compressedTestAddressesWithStaticAmountAsLines.add("1NEJvEj6jB7f9aBhT4wXZnBR9uGJrKanhJ,1");
+            compressedTestAddressesWithStaticAmountAsLines.add("1NsremZJgQWR4Vx4VARAUv4HLq9NbxPyYi,1");
+        }
+        
+        {
+            uncompressedTestAddressesAsHexLines.add("15daqrFSG8d1EMfCWdWZWeZMSDFkqR834t");
+            uncompressedTestAddressesAsHexLines.add("18DBt2Ght4y9nx69fXT7w8vVq9n5BqfRev");
+            uncompressedTestAddressesAsHexLines.add("1AK4RGZoDCsSwjx3zzPwo4nbFzrJapr9m9");
+            uncompressedTestAddressesAsHexLines.add("1BZVqUAK8KBbAL3r7wC3Chq8csTBYYCdZU");
+            uncompressedTestAddressesAsHexLines.add("1KYinnpkcc4KKNB8C73z9kgXCLpKdzor4V");
+            uncompressedTestAddressesAsHexLines.add("1NEJvEj6jB7f9aBhT4wXZnBR9uGJrKanhJ");
+        }
+        {
+            compressedTestAddressesAsHexLines.add("142XRqAwF7Xy5owyHW7u6vCooyGusQYZF4");
+            compressedTestAddressesAsHexLines.add("1AcXATyTTvLm12dpBiTxdDxCtHhFyPNS1C");
+            compressedTestAddressesAsHexLines.add("1FpKH5GHTwNqJuiHdgL4tJYNvxEMhGzcap");
+            compressedTestAddressesAsHexLines.add("1N2BnKNAqBnNBv4EnmEtjFxoewZ5NBsbVm");
+            compressedTestAddressesAsHexLines.add("1NEJvEj6jB7f9aBhT4wXZnBR9uGJrKanhJ");
+            compressedTestAddressesAsHexLines.add("1NsremZJgQWR4Vx4VARAUv4HLq9NbxPyYi");
+        }
+        {
+            uncompressedTestAddressesWithStaticAmountAsHexLines.add("15daqrFSG8d1EMfCWdWZWeZMSDFkqR834t");
+            uncompressedTestAddressesWithStaticAmountAsHexLines.add("18DBt2Ght4y9nx69fXT7w8vVq9n5BqfRev");
+            uncompressedTestAddressesWithStaticAmountAsHexLines.add("1AK4RGZoDCsSwjx3zzPwo4nbFzrJapr9m9");
+            uncompressedTestAddressesWithStaticAmountAsHexLines.add("1BZVqUAK8KBbAL3r7wC3Chq8csTBYYCdZU");
+            uncompressedTestAddressesWithStaticAmountAsHexLines.add("1KYinnpkcc4KKNB8C73z9kgXCLpKdzor4V");
+            uncompressedTestAddressesWithStaticAmountAsHexLines.add("1NEJvEj6jB7f9aBhT4wXZnBR9uGJrKanhJ");
+        }
+        {
+            compressedTestAddressesWithStaticAmountAsHexLines.add("142XRqAwF7Xy5owyHW7u6vCooyGusQYZF4");
+            compressedTestAddressesWithStaticAmountAsHexLines.add("1AcXATyTTvLm12dpBiTxdDxCtHhFyPNS1C");
+            compressedTestAddressesWithStaticAmountAsHexLines.add("1FpKH5GHTwNqJuiHdgL4tJYNvxEMhGzcap");
+            compressedTestAddressesWithStaticAmountAsHexLines.add("1N2BnKNAqBnNBv4EnmEtjFxoewZ5NBsbVm");
+            compressedTestAddressesWithStaticAmountAsHexLines.add("1NEJvEj6jB7f9aBhT4wXZnBR9uGJrKanhJ");
+            compressedTestAddressesWithStaticAmountAsHexLines.add("1NsremZJgQWR4Vx4VARAUv4HLq9NbxPyYi");
+        }
     }
 
     @Override

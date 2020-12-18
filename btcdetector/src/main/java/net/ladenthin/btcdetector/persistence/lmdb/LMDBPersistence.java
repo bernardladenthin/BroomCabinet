@@ -151,14 +151,19 @@ public class LMDBPersistence implements Persistence {
     }
 
     @Override
-    public void writeAllAmountsToAddressFile(File file) throws IOException {
+    public void writeAllAmountsToAddressFile(File file, boolean hex) throws IOException {
         try (Txn<ByteBuffer> txn = env.txnRead()) {
             try (CursorIterable<ByteBuffer> iterable = lmdb_h160ToAmount.iterate(txn, KeyRange.all())) {
                 try (FileWriter writer = new FileWriter(file)) {
                     for (final CursorIterable.KeyVal<ByteBuffer> kv : iterable) {
                         ByteBuffer addressAsByteBuffer = kv.key();
                         LegacyAddress address = keyUtility.byteBufferToAddress(addressAsByteBuffer);
-                        String line = address.toBase58() + AddressTxtLine.SEPARATOR + kv.val().getLong() + System.lineSeparator();
+                        final String line;
+                        if (hex) {
+                            line = String.format("%-34s", address.toBase58()) + System.lineSeparator();
+                        } else {
+                            line = address.toBase58() + AddressTxtLine.SEPARATOR + kv.val().getLong() + System.lineSeparator();
+                        }
                         writer.write(line);
                     }
                 }

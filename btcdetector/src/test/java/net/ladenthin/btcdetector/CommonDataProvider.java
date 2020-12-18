@@ -36,4 +36,17 @@ public class CommonDataProvider {
             {false, false}
         };
     }
+    
+    /**
+     * For {@link #staticAmount()}.
+     */
+    public final static String DATA_PROVIDER_STATIC_AMOUNT = "staticAmount";
+
+    @DataProvider
+    public static Object[][] staticAmount() {
+        return new Object[][]{
+            {true},
+            {false},
+        };
+    }
 }

@@ -33,7 +33,13 @@ public interface Persistence {
     Coin getAmount(ByteBuffer hash160);
     boolean containsAddress(ByteBuffer hash160);
 
-    void writeAllAmountsToAddressFile(File file) throws IOException;
+    /**
+     * 
+     * @param file
+     * @param hex If enabled, the addresses will be written as hex output without amount.
+     * @throws IOException 
+     */
+    void writeAllAmountsToAddressFile(File file, boolean hex) throws IOException;
 
     /**
      * @param hash160 the hash160 to change its amount

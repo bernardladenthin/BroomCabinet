@@ -21,4 +21,8 @@ package net.ladenthin.btcdetector.configuration;
 public class CLMDBToAddressFile {
     public CLMDBConfigurationReadOnly lmdbConfigurationReadOnly;
     public String addressesFile;
+    /**
+     * If enabled, the addresses will be written as hex output without amount.
+     */
+    public boolean hex;
 }
