@@ -770,8 +770,13 @@ public class ProbeAddressesOpenCLTest {
         System.out.println("keyBase: " + Arrays.toString(keyBase));
         openClTask.setSrcPrivateKeyChunk(keyBase);
         
-        ByteBuffer clonedDstByteBuffer = openClTask.executeKernel(kernel, commandQueue, new Object());
+        ByteBuffer clonedDstByteBuffer = openClTask.executeKernel(kernel, commandQueue);
         OpenClTask.PublicKeyBytes[] publicKeys = transformByteBufferToPublicKeyBytes(clonedDstByteBuffer, openClTask.getWorkSize());
+        {
+            // free and do not use anymore
+            ByteBufferUtility.freeByteBuffer(clonedDstByteBuffer);
+            clonedDstByteBuffer = null;
+        }
         
         System.out.println("WARMUP ... ");
         hashPublicKeys(publicKeys, souts);

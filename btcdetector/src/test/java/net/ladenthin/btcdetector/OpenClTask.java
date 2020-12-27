@@ -64,12 +64,9 @@ public class OpenClTask {
     private final cl_context context;
     private final int bits;
     private final ByteBuffer srcByteBuffer;
-    private final ByteBuffer dstByteBuffer;
     private final Pointer srcPointer;
-    private final Pointer dstPointer;
 
     private final cl_mem srcMem;
-    private final cl_mem dstMem;
 
     // Only available after init
     public OpenClTask(cl_context context, int bits) {
@@ -81,11 +78,7 @@ public class OpenClTask {
         this.bits = bits;
 
         srcByteBuffer = ByteBuffer.allocateDirect(getSrcSizeInBytes());
-        dstByteBuffer = ByteBuffer.allocateDirect(getDstSizeInBytes());
-        
         srcPointer = Pointer.to(srcByteBuffer);
-        dstPointer = Pointer.to(dstByteBuffer);
-
         srcMem = clCreateBuffer(
                 context,
                 CL_MEM_READ_ONLY ,
@@ -93,24 +86,6 @@ public class OpenClTask {
                 srcPointer,
                 null
         );
-
-        if (USE_HOST_PTR) {
-            dstMem = clCreateBuffer(
-                    context,
-                    CL_MEM_USE_HOST_PTR,
-                    getDstSizeInBytes(),
-                    dstPointer,
-                    null
-            );
-        } else {
-            dstMem = clCreateBuffer(
-                    context,
-                    CL_MEM_WRITE_ONLY,
-                    getDstSizeInBytes(),
-                    null,
-                    null
-            );
-        }
 
     }
 
@@ -166,86 +141,98 @@ public class OpenClTask {
         privateKey[privateKey.length - 1] |= iAsBytes[3];
     }
 
-    public ByteBuffer executeKernel(cl_kernel kernel, cl_command_queue commandQueue, Object clLock) {
-
-        synchronized (clLock) {
-            // Set the arguments for the kernel
-            int a = 0;
-            clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(dstMem));
-            clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(srcMem));
-
-            // Set the work-item dimensions
-            long global_work_size[] = new long[]{getWorkSize()};
-            long localWorkSize[] = new long[]{1};
-            localWorkSize = null;
-            int workDim = 1;
-
-            {
-                // write src buffer
-                clEnqueueWriteBuffer(
-                        commandQueue,
-                        srcMem,
-                        CL_TRUE,
-                        0,
-                        getSrcSizeInBytes(),
-                        srcPointer,
-                        0,
-                        null,
-                        null
-                );
-                clFinish(commandQueue);
-            }
-            {
-                // execute the kernel
-                System.out.println("execute kernel ...");
-                long beforeExecute = System.currentTimeMillis();
-                clEnqueueNDRangeKernel(
-                        commandQueue,
-                        kernel,
-                        workDim,
-                        null,
-                        global_work_size,
-                        localWorkSize, // local_work_size, enabling the system to choose the work-group size.
-                        0,
-                        null,
-                        null
-                );
-                clFinish(commandQueue);
-
-                long afterExecute = System.currentTimeMillis();
-                System.out.println("... executed in: " + (afterExecute - beforeExecute) + "ms");
-            }
-            {
-                // read the dst buffer
-                System.out.println("Read the output data: " + ((getDstSizeInBytes() / 1024) / 1024) + "Mb ...");
-                long beforeRead = System.currentTimeMillis();
-
-                clEnqueueReadBuffer(
-                        commandQueue,
-                        dstMem,
-                        CL_TRUE,
-                        0,
-                        getDstSizeInBytes(),
-                        dstPointer,
-                        0,
-                        null,
-                        null
-                );
-                clFinish(commandQueue);
-                
-                long afterRead = System.currentTimeMillis();
-                System.out.println("... read in: " + (afterRead - beforeRead) + "ms");
-            }
-            {
-                // clone the dst buffer
-                System.out.println("Clone the dst buffer ...");
-                long beforeClone = System.currentTimeMillis();
-                ByteBuffer cloneByteBuffer = cloneByteBuffer(dstByteBuffer);
-                long afterClone = System.currentTimeMillis();
-                System.out.println("... clone in: " + (afterClone - beforeClone) + "ms");
-                return cloneByteBuffer;
-            }
+    public ByteBuffer executeKernel(cl_kernel kernel, cl_command_queue commandQueue) {
+        // allocate a new dst buffer that a clone afterwards is not necessary
+        final ByteBuffer dstByteBuffer = ByteBuffer.allocateDirect(getDstSizeInBytes());
+        final Pointer dstPointer = Pointer.to(dstByteBuffer);
+        final cl_mem dstMem;
+        if (USE_HOST_PTR) {
+            dstMem = clCreateBuffer(
+                    context,
+                    CL_MEM_USE_HOST_PTR,
+                    getDstSizeInBytes(),
+                    dstPointer,
+                    null
+            );
+        } else {
+            dstMem = clCreateBuffer(
+                    context,
+                    CL_MEM_WRITE_ONLY,
+                    getDstSizeInBytes(),
+                    null,
+                    null
+            );
         }
+
+        // Set the arguments for the kernel
+        int a = 0;
+        clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(dstMem));
+        clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(srcMem));
+
+        // Set the work-item dimensions
+        long global_work_size[] = new long[]{getWorkSize()};
+        long localWorkSize[] = new long[]{1};
+        localWorkSize = null;
+        int workDim = 1;
+
+        {
+            // write src buffer
+            clEnqueueWriteBuffer(
+                    commandQueue,
+                    srcMem,
+                    CL_TRUE,
+                    0,
+                    getSrcSizeInBytes(),
+                    srcPointer,
+                    0,
+                    null,
+                    null
+            );
+            clFinish(commandQueue);
+        }
+        {
+            // execute the kernel
+            System.out.println("execute kernel ...");
+            long beforeExecute = System.currentTimeMillis();
+            clEnqueueNDRangeKernel(
+                    commandQueue,
+                    kernel,
+                    workDim,
+                    null,
+                    global_work_size,
+                    localWorkSize, // local_work_size, enabling the system to choose the work-group size.
+                    0,
+                    null,
+                    null
+            );
+            clFinish(commandQueue);
+
+            long afterExecute = System.currentTimeMillis();
+            System.out.println("... executed in: " + (afterExecute - beforeExecute) + "ms");
+        }
+        {
+            // read the dst buffer
+            System.out.println("Read the output data: " + ((getDstSizeInBytes() / 1024) / 1024) + "Mb ...");
+            long beforeRead = System.currentTimeMillis();
+
+            clEnqueueReadBuffer(
+                    commandQueue,
+                    dstMem,
+                    CL_TRUE,
+                    0,
+                    getDstSizeInBytes(),
+                    dstPointer,
+                    0,
+                    null,
+                    null
+            );
+            clFinish(commandQueue);
+            clReleaseMemObject(dstMem);
+
+            long afterRead = System.currentTimeMillis();
+            System.out.println("... read in: " + (afterRead - beforeRead) + "ms");
+        }
+        return dstByteBuffer;
     }
     
     public static PublicKeyBytes[] transformByteBufferToPublicKeyBytes(ByteBuffer byteBuffer, int workSize) {
@@ -267,7 +254,7 @@ public class OpenClTask {
     /**
      * https://stackoverflow.com/questions/3366925/deep-copy-duplicate-of-javas-bytebuffer/4074089
      */
-    public static ByteBuffer cloneByteBuffer(final ByteBuffer original) {
+    private static ByteBuffer cloneByteBuffer(final ByteBuffer original) {
         // Create clone with same capacity as original.
         final ByteBuffer clone = (original.isDirect())
                 ? ByteBuffer.allocateDirect(original.capacity())
@@ -286,7 +273,6 @@ public class OpenClTask {
 
     public void releaseCl() { 
         clReleaseMemObject(srcMem);
-        clReleaseMemObject(dstMem);
     }
     
     public static class PublicKeyBytes {
