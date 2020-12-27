@@ -166,7 +166,7 @@ public class OpenClTask {
         privateKey[privateKey.length - 1] |= iAsBytes[3];
     }
 
-    public PublicKeyBytes[] executeKernel(cl_kernel kernel, cl_command_queue commandQueue, Object clLock) {
+    public ByteBuffer executeKernel(cl_kernel kernel, cl_command_queue commandQueue, Object clLock) {
 
         synchronized (clLock) {
             // Set the arguments for the kernel
@@ -236,13 +236,24 @@ public class OpenClTask {
                 long afterRead = System.currentTimeMillis();
                 System.out.println("... read in: " + (afterRead - beforeRead) + "ms");
             }
+            {
+                // clone the dst buffer
+                System.out.println("Clone the dst buffer ...");
+                long beforeClone = System.currentTimeMillis();
+                ByteBuffer cloneByteBuffer = cloneByteBuffer(dstByteBuffer);
+                long afterClone = System.currentTimeMillis();
+                System.out.println("... clone in: " + (afterClone - beforeClone) + "ms");
+                return cloneByteBuffer;
+            }
         }
-        
+    }
+    
+    public static PublicKeyBytes[] transformByteBufferToPublicKeyBytes(ByteBuffer byteBuffer, int workSize) {
         System.out.println("transform ByteBuffer to keys ...");
-        PublicKeyBytes[] publicKeys = new PublicKeyBytes[getWorkSize()];
+        PublicKeyBytes[] publicKeys = new PublicKeyBytes[workSize];
         long beforeTransform = System.currentTimeMillis();
-        for (int i = 0; i < getWorkSize(); i++) {
-            PublicKeyBytes publicKeyBytes = getPublicKeyFromByteBufferXY(dstByteBuffer, i);
+        for (int i = 0; i < workSize; i++) {
+            PublicKeyBytes publicKeyBytes = getPublicKeyFromByteBufferXY(byteBuffer, i);
             // int pubKeyInts[] = new int[PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array];
             // System.arraycopy(dst_r, i*PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array , pubKeyInts, 0, PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array);
             // byte[] pubKeyBytes = KeyUtility.publicKeyByteArrayFromIntArray(pubKeyInts);
@@ -250,10 +261,29 @@ public class OpenClTask {
         }
         long afterTransform = System.currentTimeMillis();
         System.out.println("... transformed in "+ (afterTransform-beforeTransform) + "ms");
-        
         return publicKeys;
     }
     
+    /**
+     * https://stackoverflow.com/questions/3366925/deep-copy-duplicate-of-javas-bytebuffer/4074089
+     */
+    public static ByteBuffer cloneByteBuffer(final ByteBuffer original) {
+        // Create clone with same capacity as original.
+        final ByteBuffer clone = (original.isDirect())
+                ? ByteBuffer.allocateDirect(original.capacity())
+                : ByteBuffer.allocate(original.capacity());
+
+        // Create a read-only copy of the original.
+        // This allows reading from the original without modifying it.
+        final ByteBuffer readOnlyCopy = original.asReadOnlyBuffer();
+
+        // Flip and read from the original.
+        readOnlyCopy.flip();
+        clone.put(readOnlyCopy);
+
+        return clone;
+    }
+
     public void releaseCl() { 
         clReleaseMemObject(srcMem);
         clReleaseMemObject(dstMem);

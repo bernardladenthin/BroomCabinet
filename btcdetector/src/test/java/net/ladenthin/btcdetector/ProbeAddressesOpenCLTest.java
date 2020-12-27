@@ -42,6 +42,7 @@ import java.util.Arrays;
 import java.util.Random;
 import static net.ladenthin.btcdetector.KeyUtility.byteArrayToIntArray;
 import static net.ladenthin.btcdetector.OpenClTask.PRIVATE_KEY_BYTES;
+import static net.ladenthin.btcdetector.OpenClTask.transformByteBufferToPublicKeyBytes;
 import net.ladenthin.btcdetector.staticaddresses.StaticKey;
 import net.ladenthin.btcdetector.staticaddresses.TestAddresses;
 import org.bitcoinj.core.ECKey;
@@ -60,6 +61,14 @@ import sun.nio.ch.DirectBuffer;
 public class ProbeAddressesOpenCLTest {
 
     private static final TestAddresses testAddresses = new TestAddresses(1024, false);
+    
+    public final static int BYTES_FOR_INT = 4;
+    /**
+     * 22:  256Mb: executed in: 1253ms, read in:  74ms
+     * 23:  512Mb: executed in: 2346ms, read in: 148ms
+     * 24: 1024Mb: executed in: 4622ms, read in: 302ms
+    */
+    private final static int BITS_FOR_GRID = 23;
 
     @Rule
     public TemporaryFolder tempFolder = new TemporaryFolder();
@@ -602,8 +611,6 @@ public class ProbeAddressesOpenCLTest {
         assertThat(resultOpenCLPubKeyHashBase58, is(equalTo(staticKey.publicKeyCompressed)));
     }
     
-    public final static int BYTES_FOR_INT = 4;
-    
     // https://stackoverflow.com/questions/12893758/how-to-reverse-the-byte-array-in-java
     public static void reverse(byte[] array) {
         boolean useXorSwap = false;
@@ -754,8 +761,7 @@ public class ProbeAddressesOpenCLTest {
         openClInfo();
         }
 
-        int bits = 8;
-        OpenClTask openClTask = new OpenClTask(context, bits);
+        OpenClTask openClTask = new OpenClTask(context, BITS_FOR_GRID);
         System.out.println("openClTask.getWorkSize(): " + openClTask.getWorkSize());
         
         Random sr = new SecureRandom();
@@ -764,7 +770,8 @@ public class ProbeAddressesOpenCLTest {
         System.out.println("keyBase: " + Arrays.toString(keyBase));
         openClTask.setSrcPrivateKeyChunk(keyBase);
         
-        OpenClTask.PublicKeyBytes[] publicKeys = openClTask.executeKernel(kernel, commandQueue, new Object());
+        ByteBuffer clonedDstByteBuffer = openClTask.executeKernel(kernel, commandQueue, new Object());
+        OpenClTask.PublicKeyBytes[] publicKeys = transformByteBufferToPublicKeyBytes(clonedDstByteBuffer, openClTask.getWorkSize());
         
         System.out.println("WARMUP ... ");
         hashPublicKeys(publicKeys, souts);
@@ -782,7 +789,7 @@ public class ProbeAddressesOpenCLTest {
             System.out.println("1");
             }
             byte[] privateKey = keyBase.clone();
-            openClTask.unsetLSB(privateKey, bits);
+            openClTask.unsetLSB(privateKey, BITS_FOR_GRID);
             OpenClTask.setLSB(privateKey, i);
             
             if(souts) {
