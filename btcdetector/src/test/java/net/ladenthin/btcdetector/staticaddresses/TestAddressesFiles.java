@@ -146,7 +146,7 @@ public class TestAddressesFiles implements AddressesFiles {
         ));
         Files.write(three.toPath(), Arrays.asList(
                 "# Test",
-                "1WrongAddressFormat",
+                "1WrOngAddressFormat",
                 new StaticBitcoinP2WPKHAddress().publicAddress,
                 testAddresses.getIndexAsBase58String(4)
         ));

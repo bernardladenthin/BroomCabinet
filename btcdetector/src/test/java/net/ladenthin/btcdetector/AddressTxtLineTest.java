@@ -18,17 +18,22 @@
 // @formatter:on
 package net.ladenthin.btcdetector;
 
+import com.tngtech.java.junit.dataprovider.DataProviderRunner;
+import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.IOException;
 import net.ladenthin.btcdetector.staticaddresses.*;
 import net.ladenthin.btcdetector.staticaddresses.StaticKey;
 import net.ladenthin.btcdetector.staticaddresses.TestAddresses;
+import org.bitcoinj.core.AddressFormatException;
 import org.bitcoinj.core.Coin;
 import org.junit.Before;
 import org.junit.Test;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.*;
+import org.junit.runner.RunWith;
 
+@RunWith(DataProviderRunner.class)
 public class AddressTxtLineTest {
 
     private static final TestAddresses testAddresses = new TestAddresses(0, false);
@@ -40,7 +45,7 @@ public class AddressTxtLineTest {
     @Before
     public void init() throws IOException {
     }
-    
+
     private void assertThatDefaultCoinIsSet(AddressToCoin addressToCoin) {
         assertThat(addressToCoin.getCoin(), is(equalTo(AddressTxtLine.DEFAULT_COIN)));
     }
@@ -230,7 +235,7 @@ public class AddressTxtLineTest {
     }
 
     @Test
-    public void fromLine_StaticBitcoinP2MSAddress_returnPublicKeyHash() throws IOException {
+    public void fromLine_StaticBitcoinP2MSAddress_returnNull() throws IOException {
         // act
         StaticBitcoinP2MSAddress staticBitcoinP2MSAddress = new StaticBitcoinP2MSAddress();
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticBitcoinP2MSAddress.publicAddress, keyUtility);
@@ -240,7 +245,7 @@ public class AddressTxtLineTest {
     }
 
     @Test
-    public void fromLine_StaticBitcoinCashP2MSAddress_returnPublicKeyHash() throws IOException {
+    public void fromLine_StaticBitcoinCashP2MSAddress_returnNull() throws IOException {
         // act
         StaticBitcoinCashP2MSAddress staticBitcoinCashP2MSAddress = new StaticBitcoinCashP2MSAddress();
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticBitcoinCashP2MSAddress.publicAddress, keyUtility);
@@ -250,7 +255,7 @@ public class AddressTxtLineTest {
     }
 
     @Test
-    public void fromLine_StaticBitcoinCashP2MSXAddress_returnPublicKeyHash() throws IOException {
+    public void fromLine_StaticBitcoinCashP2MSXAddress_returnNull() throws IOException {
         // act
         StaticBitcoinCashP2MSXAddress staticBitcoinCashP2MSXAddress = new StaticBitcoinCashP2MSXAddress();
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticBitcoinCashP2MSXAddress.publicAddress, keyUtility);
@@ -260,12 +265,49 @@ public class AddressTxtLineTest {
     }
 
     @Test(expected = java.lang.IllegalStateException.class)
-    public void fromLine_InvalidP2WPKHAddressGive_exceptionExpected() throws IOException {
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BITCOIN_INVALID_P2WPKH_ADDRESSES, location = CommonDataProvider.class)
+    public void fromLine_InvalidP2WPKHAddressGive_throwsException(String base58) throws IOException {
         // act
-        AddressToCoin addressToCoin = new AddressTxtLine().fromLine("bc1pmfr3p9j00pfxjh0zmgp99y8zftmd3s5pmedqhyptwy6lm87hf5ss52r5n8", keyUtility);
+        new AddressTxtLine().fromLine(base58, keyUtility);
+    }
+
+    @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BITCOIN_CASH_ADDRESSES_CHECKSUM_INVALID, location = CommonDataProvider.class)
+    public void fromLine_bitcoinCashAddressChecksumInvalid_parseAnyway(String base58, String expectedHash160) throws IOException {
+        // act
+        AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
+
+        // assert
+        String hash160AsHex = keyUtility.byteBufferUtility.getHexFromByteBuffer(addressToCoin.getHash160());
+        assertThat(hash160AsHex, is(equalTo(expectedHash160)));
+    }
+
+    @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BITCOIN_CASH_ADDRESSES_INTERNAL_PURPOSE, location = CommonDataProvider.class)
+    public void fromLine_bitcoinCashAddressInternalPurpose_parseAnyway(String base58) throws IOException {
+        // act
+        AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
 
         // assert
         assertThat(addressToCoin, is(nullValue()));
+    }
+
+    @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BITCOIN_ADDRESSES_CORRECT_BASE_58, location = CommonDataProvider.class)
+    public void fromLine_bitcoinAddressChecksumInvalid_parseAnyway(String base58, String expectedHash160) throws IOException {
+        // act
+        AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
+
+        // assert
+        String hash160AsHex = keyUtility.byteBufferUtility.getHexFromByteBuffer(addressToCoin.getHash160());
+        assertThat(hash160AsHex, is(equalTo(expectedHash160)));
+    }
+
+    @Test(expected = AddressFormatException.InvalidCharacter.class)
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BITCOIN_ADDRESSES_INVALID_BASE_58, location = CommonDataProvider.class)
+    public void fromLine_bitcoinAddressInternalPurpose_throwsException(String base58) throws IOException {
+        // act
+        new AddressTxtLine().fromLine(base58, keyUtility);
     }
 
 }

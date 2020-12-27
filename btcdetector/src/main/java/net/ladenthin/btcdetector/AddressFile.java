@@ -25,6 +25,8 @@ import java.util.Scanner;
 import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import org.bitcoinj.core.NetworkParameters;
+import org.lmdbjava.Env;
+import org.lmdbjava.LmdbException;
 
 public class AddressFile {
 
@@ -53,6 +55,9 @@ public class AddressFile {
                     } else {
                         readStatistic.unsupported++;
                     }
+                } catch(LmdbException e) {
+                    // do not catch expections from LMDB (e. g. MapFullException).
+                    throw e;
                 } catch (Exception e) {
                     System.err.println("Error in line: " + line);
                     e.printStackTrace();

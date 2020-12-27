@@ -21,16 +21,18 @@ package net.ladenthin.btcdetector;
 import com.github.kiulian.converter.AddressConverter;
 import java.nio.ByteBuffer;
 import javax.annotation.Nullable;
+import org.bitcoinj.core.AddressFormatException;
 import org.bitcoinj.core.Base58;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.SegwitAddress;
 import org.bitcoinj.script.Script;
 
 /**
- * Most txt files have a common format which uses Base58 address and separated anmount.
+ * Most txt files have a common format which uses Base58 address and separated
+ * anmount.
  */
 public class AddressTxtLine {
-    
+
     /**
      * Should not be {@link Coin#ZERO} because it can't be written to LMDB.
      */
@@ -43,6 +45,7 @@ public class AddressTxtLine {
 
     /**
      * If no coins can be found in the line {@link #DEFAULT_COIN} is used.
+     *
      * @param line The line to parse.
      * @param keyUtility The {@link KeyUtility}.
      * @return Returns an {@link AddressToCoin} instance.
@@ -91,21 +94,31 @@ public class AddressTxtLine {
             // X: dash Base58 (P2PKH)
             // D: dogecoin Base58 (P2PKH)
             // L: litecoin Base58 (P2PKH)
-            byte[] hash160 = getHash160fromBase58AddressUnchecked(address);
-            ByteBuffer hash160AsByteBuffer = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash160);
-            return new AddressToCoin(hash160AsByteBuffer, amount);
+            ByteBuffer hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility);
+            return new AddressToCoin(hash160, amount);
         } else {
             // bitcoin Base58 (P2PKH)
-            ByteBuffer hash160 = keyUtility.getHash160ByteBufferFromBase58String(address);
+            ByteBuffer hash160;
+            try {
+                hash160 = keyUtility.getHash160ByteBufferFromBase58String(address);
+            } catch (AddressFormatException.InvalidChecksum e) {
+                hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility);
+            }
             return new AddressToCoin(hash160, amount);
-
         }
+    }
+
+    private ByteBuffer getHash160AsByteBufferFromBase58AddressUnchecked(String base58, KeyUtility keyUtility) {
+        byte[] hash160 = getHash160fromBase58AddressUnchecked(base58);
+        ByteBuffer hash160AsByteBuffer = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash160);
+        return hash160AsByteBuffer;
     }
 
     private byte[] getHash160fromBase58AddressUnchecked(String base58) {
         byte[] decoded = Base58.decode(base58);
         byte[] hash160 = new byte[20];
-        System.arraycopy(decoded, 1, hash160, 0, hash160.length);
+        int toCopy = Math.min(decoded.length - 1, hash160.length);
+        System.arraycopy(decoded, 1, hash160, 0, toCopy);
         return hash160;
     }
 

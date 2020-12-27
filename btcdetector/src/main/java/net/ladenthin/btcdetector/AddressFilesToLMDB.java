@@ -69,7 +69,7 @@ public class AddressFilesToLMDB implements Runnable {
                     persistence.putNewAmount(hash160, addressToCoin.getCoin());
                     addressCounter.incrementAndGet();
 
-                    if (addressCounter.get() % 100_000 == 0) {
+                    if (addressCounter.get() % 1_000_000 == 0) {
                         logProgress();
                     }
                 });
