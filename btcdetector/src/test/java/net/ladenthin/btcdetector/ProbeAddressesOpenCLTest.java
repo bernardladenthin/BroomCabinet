@@ -68,7 +68,7 @@ public class ProbeAddressesOpenCLTest {
      * 23:  512Mb: executed in: 2346ms, read in: 148ms
      * 24: 1024Mb: executed in: 4622ms, read in: 302ms
     */
-    private final static int BITS_FOR_GRID = 23;
+    private final static int BITS_FOR_GRID = 20;
 
     @Rule
     public TemporaryFolder tempFolder = new TemporaryFolder();
@@ -771,7 +771,7 @@ public class ProbeAddressesOpenCLTest {
         openClTask.setSrcPrivateKeyChunk(keyBase);
         
         ByteBuffer clonedDstByteBuffer = openClTask.executeKernel(kernel, commandQueue);
-        OpenClTask.PublicKeyBytes[] publicKeys = transformByteBufferToPublicKeyBytes(clonedDstByteBuffer, openClTask.getWorkSize());
+        PublicKeyBytes[] publicKeys = transformByteBufferToPublicKeyBytes(clonedDstByteBuffer, openClTask.getWorkSize());
         {
             // free and do not use anymore
             ByteBufferUtility.freeByteBuffer(clonedDstByteBuffer);
@@ -801,7 +801,7 @@ public class ProbeAddressesOpenCLTest {
                 System.out.println("privateKey: " + Arrays.toString(privateKey));
             }
             
-            OpenClTask.PublicKeyBytes publicKeyBytes = publicKeys[i];
+            PublicKeyBytes publicKeyBytes = publicKeys[i];
             
             if (souts) {
             System.out.println("2");
@@ -876,7 +876,7 @@ public class ProbeAddressesOpenCLTest {
         }
     }
 
-    private void hashPublicKeysFast(OpenClTask.PublicKeyBytes[] publicKeys, final boolean souts) {
+    private void hashPublicKeysFast(PublicKeyBytes[] publicKeys, final boolean souts) {
         System.out.println("execute hash fast ...");
         long beforeHash = System.currentTimeMillis();
         for (int i = 0; i < publicKeys.length; i++) {
@@ -895,7 +895,7 @@ public class ProbeAddressesOpenCLTest {
         System.out.println("... hashed fast in: " + (afterHash - beforeHash) + "ms");
     }
 
-    private void hashPublicKeys(OpenClTask.PublicKeyBytes[] publicKeys, final boolean souts) {
+    private void hashPublicKeys(PublicKeyBytes[] publicKeys, final boolean souts) {
         System.out.println("execute hash ...");
         long beforeHash = System.currentTimeMillis();
         for (int i = 0; i < publicKeys.length; i++) {

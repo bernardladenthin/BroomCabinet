@@ -22,12 +22,12 @@ import java.nio.ByteBuffer;
 import net.ladenthin.btcdetector.ByteBufferUtility;
 
 /**
- * https://privatekeys.pw/litecoin/address/M8T1B2Z97gVdvmfkQcAtYbEepune1tzGua
+ * https://bitinfocharts.com/de/feathercoin/address/7E2vzSfb8o3N8E3PEZ6A48sp6bUGUTA8ro
  */
-public class StaticLitecoinP2SHAddress {
+public class StaticFeathercoinP2PKHAddress {
 
-    final public String publicAddress = "M8T1B2Z97gVdvmfkQcAtYbEepune1tzGua";
-    final public String scriptHash = "0605bfbd71b78f7e9fc815fe9cc90aaeb1d9a728 ";
+    final public String publicAddress = "7E2vzSfb8o3N8E3PEZ6A48sp6bUGUTA8ro";
+    final public String publicKeyHash = "7842e48f5012d40ec702ec41d377559bc51f817a";
     
-    final public ByteBuffer byteBuffer_scriptHash = new ByteBufferUtility(false).getByteBufferFromHex(scriptHash);
+    final public ByteBuffer byteBuffer_publicKeyHash = new ByteBufferUtility(false).getByteBufferFromHex(publicKeyHash);
 }

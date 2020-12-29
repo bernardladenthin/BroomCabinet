@@ -19,13 +19,7 @@
 package net.ladenthin.btcdetector;
 
 import java.nio.ByteBuffer;
-import java.util.concurrent.Semaphore;
 import static net.ladenthin.btcdetector.ProbeAddressesOpenCLTest.reverse;
-import org.apache.commons.codec.digest.DigestUtils;
-import org.bitcoinj.core.Sha256Hash;
-import org.bitcoinj.core.Utils;
-import org.bouncycastle.crypto.digests.RIPEMD160Digest;
-import static org.jocl.CL.CL_MEM_COPY_HOST_PTR;
 import static org.jocl.CL.CL_MEM_READ_ONLY;
 import static org.jocl.CL.CL_MEM_USE_HOST_PTR;
 import static org.jocl.CL.CL_MEM_WRITE_ONLY;
@@ -44,10 +38,6 @@ import org.jocl.cl_context;
 import org.jocl.cl_kernel;
 import org.jocl.cl_mem;
 
-/**
- *
- * @author Bernard
- */
 public class OpenClTask {
 
     /**
@@ -86,7 +76,6 @@ public class OpenClTask {
                 srcPointer,
                 null
         );
-
     }
 
     public int getWorkSize() {
@@ -165,14 +154,12 @@ public class OpenClTask {
         }
 
         // Set the arguments for the kernel
-        int a = 0;
-        clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(dstMem));
-        clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(srcMem));
+        clSetKernelArg(kernel, 0, Sizeof.cl_mem, Pointer.to(dstMem));
+        clSetKernelArg(kernel, 1, Sizeof.cl_mem, Pointer.to(srcMem));
 
         // Set the work-item dimensions
         long global_work_size[] = new long[]{getWorkSize()};
-        long localWorkSize[] = new long[]{1};
-        localWorkSize = null;
+        long localWorkSize[] = null; // new long[]{1}; // enabling the system to choose the work-group size.
         int workDim = 1;
 
         {
@@ -200,7 +187,7 @@ public class OpenClTask {
                     workDim,
                     null,
                     global_work_size,
-                    localWorkSize, // local_work_size, enabling the system to choose the work-group size.
+                    localWorkSize,
                     0,
                     null,
                     null
@@ -273,57 +260,6 @@ public class OpenClTask {
 
     public void releaseCl() { 
         clReleaseMemObject(srcMem);
-    }
-    
-    public static class PublicKeyBytes {
-        
-        public static final int ONE_COORDINATE_BYTE_LENGTH = 32;
-        public static final int TWO_COORDINATES_BYTES_LENGTH = ONE_COORDINATE_BYTE_LENGTH * 2;
-        public static final int PARITY_BYTES_LENGTH = 1;
-        
-        // add one byte for format sign
-        final byte[] compressed = new byte[ONE_COORDINATE_BYTE_LENGTH+PARITY_BYTES_LENGTH];
-        final byte[] uncompressed = new byte[TWO_COORDINATES_BYTES_LENGTH+PARITY_BYTES_LENGTH];
-        
-        public byte[] getCompressedKeyHash() {
-            return Utils.sha256hash160(compressed);
-        }
-        
-        public byte[] getUncompressedKeyHash() {
-            return Utils.sha256hash160(uncompressed);
-        }
-        
-        public byte[] getCompressedKeyHashFast() {
-            return sha256hash160Fast(compressed);
-        }
-        
-        public byte[] getUncompressedKeyHashFast() {
-            return sha256hash160Fast(uncompressed);
-        }
-        
-        
-
-    /**
-     * Calculates RIPEMD160(SHA256(input)). This is used in Address calculations.
-     * Same as {@link Utils#sha256hash160(byte[])} but using {@link DigestUtils}.
-     */
-    public static byte[] sha256hash160Fast(byte[] input) {
-        byte[] sha256 = DigestUtils.sha256(input);
-        RIPEMD160Digest digest = new RIPEMD160Digest();
-        digest.update(sha256, 0, sha256.length);
-        byte[] out = new byte[20];
-        digest.doFinal(out, 0);
-        return out;
-    }
-        
-        
-        public String getCompressedKeyHashAsBase58(KeyUtility keyUtility) {
-            return keyUtility.toBase58(getCompressedKeyHash());
-        }
-        
-        public String getUncompressedKeyHashAsBase58(KeyUtility keyUtility) {
-            return keyUtility.toBase58(getUncompressedKeyHash());
-        }
     }
     
     /**

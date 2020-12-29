@@ -18,10 +18,16 @@
 // @formatter:on
 package net.ladenthin.btcdetector.staticaddresses;
 
+import java.nio.ByteBuffer;
+import net.ladenthin.btcdetector.ByteBufferUtility;
+
 /**
  * https://privatekeys.pw/dash/address/7dZe6LvtGPd2TLPpARzThqdF4YwAZvAKDv
  */
 public class StaticDashP2SHAddress {
 
     final public String publicAddress = "7dZe6LvtGPd2TLPpARzThqdF4YwAZvAKDv";
+    final public String scriptHash = "7a5c931f83bb3a356c2dcf72b24e1bea461df587";
+
+    final public ByteBuffer byteBuffer_scriptHash = new ByteBufferUtility(false).getByteBufferFromHex(scriptHash);
 }

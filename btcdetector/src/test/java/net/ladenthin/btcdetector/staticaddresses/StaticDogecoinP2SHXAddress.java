@@ -18,10 +18,16 @@
 // @formatter:on
 package net.ladenthin.btcdetector.staticaddresses;
 
+import java.nio.ByteBuffer;
+import net.ladenthin.btcdetector.ByteBufferUtility;
+
 /**
  * https://privatekeys.pw/dogecoin/address/9tp7THhBG3fNNFka1AJm95DU3E4x3pwQA3
  */
 public class StaticDogecoinP2SHXAddress {
 
     final public String publicAddress = "9tp7THhBG3fNNFka1AJm95DU3E4x3pwQA3";
+    final public String scriptHash = "1a11b73ad3dd99d77da9f858cf323205a84dd5da";
+    
+    final public ByteBuffer byteBuffer_scriptHash = new ByteBufferUtility(false).getByteBufferFromHex(scriptHash);
 }

@@ -82,18 +82,30 @@ public class AddressTxtLine {
             // litecoin Bech32 (P2WPKH)
             //https://privatekeys.pw/litecoin/address/ltc1qd5wm03t5kcdupjuyq5jffpuacnaqahvfsdu8smf8z0u0pqdqpatqsdrn8h
             return null;
-        } else if (address.startsWith("7") || address.startsWith("A") || address.startsWith("9") || address.startsWith("M") || address.startsWith("p")) {
-            // 7: dash Base58 (P2SH)
-            // A: dogecoin Base58 (P2SH)
-            // 9: dogecoin Base58 (P2SH)
-            // M: litecoin Base58 (P2SH)
-            // p: bitcoin cash Base58 (P2SH)
-            // it's a multisig dash address Base58 (P2SH) and we can't use script hash
+        } else if (address.startsWith("p")) {
+            // p: bitcoin cash / CashAddr (P2SH), this is a unique format and does not work
             return null;
-        } else if (address.startsWith("X") || address.startsWith("D") || address.startsWith("L")) {
-            // X: dash Base58 (P2PKH)
-            // D: dogecoin Base58 (P2PKH)
-            // L: litecoin Base58 (P2PKH)
+        } else if (address.startsWith("7") || address.startsWith("A") || address.startsWith("9") || address.startsWith("M") || address.startsWith("X") || address.startsWith("D") || address.startsWith("L") || address.startsWith("G") || address.startsWith("B") || address.startsWith("V") || address.startsWith("N") || address.startsWith("4") || address.startsWith("R")) {
+            // prefix clashes for signs: 7
+            //
+            // Base58 P2SH
+            // 7: dash
+            // A: dogecoin
+            // 9: dogecoin
+            // M: litecoin
+            //
+            // Base58 P2PKH
+            // X: dash
+            // D: dogecoin
+            // L: litecoin
+            // G: bitcoin gold
+            // B: blackcoin
+            // 7: feathercoin
+            // V: vertcoin
+            // N: namecoin
+            // 4: novacoin
+            // R: reddcoin
+
             ByteBuffer hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility);
             return new AddressToCoin(hash160, amount);
         } else {

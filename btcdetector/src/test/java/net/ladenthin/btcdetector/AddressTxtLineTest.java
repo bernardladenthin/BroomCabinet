@@ -141,13 +141,14 @@ public class AddressTxtLineTest {
     }
 
     @Test
-    public void fromLine_StaticDashP2SHAddress_returnNull() throws IOException {
+    public void fromLine_StaticDashP2SHAddress_returnScriptHash() throws IOException {
         // act
         StaticDashP2SHAddress staticDashP2SHAddress = new StaticDashP2SHAddress();
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticDashP2SHAddress.publicAddress, keyUtility);
 
         // assert
-        assertThat(addressToCoin, is(nullValue()));
+        assertThat(addressToCoin.getHash160(), is(equalTo(staticDashP2SHAddress.byteBuffer_scriptHash)));
+        assertThatDefaultCoinIsSet(addressToCoin);
     }
 
     @Test
@@ -162,23 +163,25 @@ public class AddressTxtLineTest {
     }
 
     @Test
-    public void fromLine_StaticDogecoinP2SHAddress_returnNull() throws IOException {
+    public void fromLine_StaticDogecoinP2SHAddress_returnScriptHash() throws IOException {
         // act
         StaticDogecoinP2SHAddress staticDogecoinP2SHAddress = new StaticDogecoinP2SHAddress();
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticDogecoinP2SHAddress.publicAddress, keyUtility);
 
         // assert
-        assertThat(addressToCoin, is(nullValue()));
+        assertThat(addressToCoin.getHash160(), is(equalTo(staticDogecoinP2SHAddress.byteBuffer_scriptHash)));
+        assertThatDefaultCoinIsSet(addressToCoin);
     }
 
     @Test
-    public void fromLine_StaticDogecoinP2SHXAddress_returnNull() throws IOException {
+    public void fromLine_StaticDogecoinP2SHXAddress_returnScriptHash() throws IOException {
         // act
         StaticDogecoinP2SHXAddress staticDogecoinP2SHXAddress = new StaticDogecoinP2SHXAddress();
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticDogecoinP2SHXAddress.publicAddress, keyUtility);
 
         // assert
-        assertThat(addressToCoin, is(nullValue()));
+        assertThat(addressToCoin.getHash160(), is(equalTo(staticDogecoinP2SHXAddress.byteBuffer_scriptHash)));
+        assertThatDefaultCoinIsSet(addressToCoin);
     }
 
     @Test
@@ -193,13 +196,14 @@ public class AddressTxtLineTest {
     }
 
     @Test
-    public void fromLine_StaticLitecoinP2SHAddress_returnNull() throws IOException {
+    public void fromLine_StaticLitecoinP2SHAddress_returnScriptHash() throws IOException {
         // act
         StaticLitecoinP2SHAddress staticLitecoinP2SHAddress = new StaticLitecoinP2SHAddress();
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticLitecoinP2SHAddress.publicAddress, keyUtility);
 
         // assert
-        assertThat(addressToCoin, is(nullValue()));
+        assertThat(addressToCoin.getHash160(), is(equalTo(staticLitecoinP2SHAddress.byteBuffer_scriptHash)));
+        assertThatDefaultCoinIsSet(addressToCoin);
     }
 
     @Test
@@ -231,6 +235,83 @@ public class AddressTxtLineTest {
 
         // assert
         assertThat(addressToCoin.getHash160(), is(equalTo(staticBitcoinCashP2PKHAddress.byteBuffer_publicKeyHash)));
+        assertThatDefaultCoinIsSet(addressToCoin);
+    }
+
+    @Test
+    public void fromLine_StaticBitcoinGoldP2PKHAddress_returnPublicKeyHash() throws IOException {
+        // act
+        StaticBitcoinGoldP2PKHAddress staticBitcoinGoldP2PKHAddress = new StaticBitcoinGoldP2PKHAddress();
+        AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticBitcoinGoldP2PKHAddress.publicAddress, keyUtility);
+
+        // assert
+        assertThat(addressToCoin.getHash160(), is(equalTo(staticBitcoinGoldP2PKHAddress.byteBuffer_publicKeyHash)));
+        assertThatDefaultCoinIsSet(addressToCoin);
+    }
+
+    @Test
+    public void fromLine_StaticBlackcoinP2PKHAddress_returnPublicKeyHash() throws IOException {
+        // act
+        StaticBlackcoinP2PKHAddress staticBlackcoinP2PKHAddress = new StaticBlackcoinP2PKHAddress();
+        AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticBlackcoinP2PKHAddress.publicAddress, keyUtility);
+
+        // assert
+        assertThat(addressToCoin.getHash160(), is(equalTo(staticBlackcoinP2PKHAddress.byteBuffer_publicKeyHash)));
+        assertThatDefaultCoinIsSet(addressToCoin);
+    }
+
+    @Test
+    public void fromLine_StaticFeathercoinP2PKHAddress_returnPublicKeyHash() throws IOException {
+        // act
+        StaticFeathercoinP2PKHAddress staticFeathercoinP2PKHAddress = new StaticFeathercoinP2PKHAddress();
+        AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticFeathercoinP2PKHAddress.publicAddress, keyUtility);
+
+        // assert
+        assertThat(addressToCoin.getHash160(), is(equalTo(staticFeathercoinP2PKHAddress.byteBuffer_publicKeyHash)));
+        assertThatDefaultCoinIsSet(addressToCoin);
+    }
+
+    @Test
+    public void fromLine_StaticNamecoinP2PKHAddress_returnPublicKeyHash() throws IOException {
+        // act
+        StaticNamecoinP2PKHAddress staticNamecoinP2PKHAddress = new StaticNamecoinP2PKHAddress();
+        AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticNamecoinP2PKHAddress.publicAddress, keyUtility);
+
+        // assert
+        assertThat(addressToCoin.getHash160(), is(equalTo(staticNamecoinP2PKHAddress.byteBuffer_publicKeyHash)));
+        assertThatDefaultCoinIsSet(addressToCoin);
+    }
+
+    @Test
+    public void fromLine_StaticNovacoinP2PKHAddress_returnPublicKeyHash() throws IOException {
+        // act
+        StaticNovacoinP2PKHAddress staticNovacoinP2PKHAddress = new StaticNovacoinP2PKHAddress();
+        AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticNovacoinP2PKHAddress.publicAddress, keyUtility);
+
+        // assert
+        assertThat(addressToCoin.getHash160(), is(equalTo(staticNovacoinP2PKHAddress.byteBuffer_publicKeyHash)));
+        assertThatDefaultCoinIsSet(addressToCoin);
+    }
+
+    @Test
+    public void fromLine_StaticReddcoinP2PKHAddress_returnPublicKeyHash() throws IOException {
+        // act
+        StaticReddcoinP2PKHAddress staticReddcoinP2PKHAddress = new StaticReddcoinP2PKHAddress();
+        AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticReddcoinP2PKHAddress.publicAddress, keyUtility);
+
+        // assert
+        assertThat(addressToCoin.getHash160(), is(equalTo(staticReddcoinP2PKHAddress.byteBuffer_publicKeyHash)));
+        assertThatDefaultCoinIsSet(addressToCoin);
+    }
+
+    @Test
+    public void fromLine_StaticVertcoinP2PKHAddress_returnPublicKeyHash() throws IOException {
+        // act
+        StaticVertcoinP2PKHAddress staticVertcoinP2PKHAddress = new StaticVertcoinP2PKHAddress();
+        AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticVertcoinP2PKHAddress.publicAddress, keyUtility);
+
+        // assert
+        assertThat(addressToCoin.getHash160(), is(equalTo(staticVertcoinP2PKHAddress.byteBuffer_publicKeyHash)));
         assertThatDefaultCoinIsSet(addressToCoin);
     }
 
