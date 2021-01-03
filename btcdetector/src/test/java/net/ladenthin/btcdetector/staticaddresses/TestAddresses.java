@@ -61,6 +61,12 @@ public class TestAddresses {
     Random random = new Random(RANDOM_SEED);
 
     private final List<ECKey> ecKeys = new ArrayList<>();
+    
+    public static ECKey getFirstAddressHash160FromTestAddress(boolean compressed) {
+        TestAddresses testAddressesCompressed = new TestAddresses(1, compressed);
+        ECKey key = testAddressesCompressed.getECKeys().get(0);
+        return key;
+    }
 
     public TestAddresses(int numberOfAddresses, boolean compressed) {
         for (int i = 0; i < numberOfAddresses; i++) {

@@ -771,7 +771,7 @@ public class ProbeAddressesOpenCLTest {
         openClTask.setSrcPrivateKeyChunk(keyBase);
         
         ByteBuffer clonedDstByteBuffer = openClTask.executeKernel(kernel, commandQueue);
-        PublicKeyBytes[] publicKeys = transformByteBufferToPublicKeyBytes(clonedDstByteBuffer, openClTask.getWorkSize());
+        PublicKeyBytes[] publicKeys = transformByteBufferToPublicKeyBytes(clonedDstByteBuffer, openClTask.getWorkSize(), secretBase);
         {
             // free and do not use anymore
             ByteBufferUtility.freeByteBuffer(clonedDstByteBuffer);
@@ -807,12 +807,12 @@ public class ProbeAddressesOpenCLTest {
             System.out.println("2");
             }
             
-            ECKey resultOpenCLKeyCompressed = new ECKey(privateKey, publicKeyBytes.compressed);
-            ECKey resultOpenCLKeyUncompressed = new ECKey(privateKey, publicKeyBytes.uncompressed);
+            ECKey resultOpenCLKeyCompressed = new ECKey(privateKey, publicKeyBytes.getCompressed());
+            ECKey resultOpenCLKeyUncompressed = new ECKey(privateKey, publicKeyBytes.getUncompressed());
             
             if (souts) {
-            System.out.println("publicKeyBytes.compressed: " + Arrays.toString(publicKeyBytes.compressed));
-            System.out.println("publicKeyBytes.uncompressed: " + Arrays.toString(publicKeyBytes.uncompressed));
+            System.out.println("publicKeyBytes.compressed: " + Arrays.toString(publicKeyBytes.getCompressed()));
+            System.out.println("publicKeyBytes.uncompressed: " + Arrays.toString(publicKeyBytes.getUncompressed()));
             }
             
             byte[] resultOpenCLKeyCompressedPubKey = resultOpenCLKeyCompressed.getPubKey();

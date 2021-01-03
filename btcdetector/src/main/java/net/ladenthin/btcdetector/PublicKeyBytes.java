@@ -18,6 +18,7 @@
 // @formatter:on
 package net.ladenthin.btcdetector;
 
+import java.math.BigInteger;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.bitcoinj.core.Utils;
 import org.bouncycastle.crypto.digests.RIPEMD160Digest;
@@ -27,25 +28,73 @@ public class PublicKeyBytes {
     public static final int ONE_COORDINATE_BYTE_LENGTH = 32;
     public static final int TWO_COORDINATES_BYTES_LENGTH = ONE_COORDINATE_BYTE_LENGTH * 2;
     public static final int PARITY_BYTES_LENGTH = 1;
+    
+    public static final int LAST_Y_COORDINATE_BYTE_INDEX = PublicKeyBytes.PARITY_BYTES_LENGTH+PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH-1;
+    
+    /**
+     * The first byte (parity) is 4 to indicate a public key with x and y coordinate (uncompressed).
+     */
+    public static final int PARITY_UNCOMPRESSED = 4;
+    public static final int PARITY_COMPRESSED_EVEN = 2;
+    public static final int PARITY_COMPRESSED_ODD = 3;
 
-    // add one byte for format sign
-    final byte[] compressed = new byte[ONE_COORDINATE_BYTE_LENGTH + PARITY_BYTES_LENGTH];
-    final byte[] uncompressed = new byte[TWO_COORDINATES_BYTES_LENGTH + PARITY_BYTES_LENGTH];
+    private final byte[] compressed;
+    private final byte[] uncompressed;
+    private final BigInteger secretKey;
+    
+    public BigInteger getSecretKey() {
+        return secretKey;
+    }
 
-    public byte[] getCompressedKeyHash() {
-        return Utils.sha256hash160(compressed);
+    public byte[] getCompressed() {
+        return compressed;
+    }
+
+    public byte[] getUncompressed() {
+        return uncompressed;
+    }
+    
+    public PublicKeyBytes(BigInteger secretKey, byte[] uncompressed) {
+        this(secretKey, uncompressed, createCompressedBytes(uncompressed));
+    }
+    
+    public PublicKeyBytes(BigInteger secretKey, byte[] uncompressed, byte[] compressed) {
+        this.secretKey = secretKey;
+        this.uncompressed = uncompressed;
+        this.compressed = compressed;
+    }
+    
+    public static byte[] createCompressedBytes(byte[] uncompressed) {
+        // add one byte for format sign
+        byte[] compressed = new byte[PARITY_BYTES_LENGTH + ONE_COORDINATE_BYTE_LENGTH];
+        
+        // copy x
+        System.arraycopy(uncompressed, PARITY_BYTES_LENGTH, compressed, PublicKeyBytes.PARITY_BYTES_LENGTH, PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH);
+        
+        boolean even = uncompressed[LAST_Y_COORDINATE_BYTE_INDEX] % 2 == 0;
+        
+        if (even) {
+            compressed[0] = PARITY_COMPRESSED_EVEN;
+        } else {
+            compressed[0] = PARITY_COMPRESSED_ODD;
+        }
+        return compressed;
     }
 
     public byte[] getUncompressedKeyHash() {
         return Utils.sha256hash160(uncompressed);
     }
 
-    public byte[] getCompressedKeyHashFast() {
-        return sha256hash160Fast(compressed);
+    public byte[] getCompressedKeyHash() {
+        return Utils.sha256hash160(compressed);
     }
 
     public byte[] getUncompressedKeyHashFast() {
         return sha256hash160Fast(uncompressed);
+    }
+
+    public byte[] getCompressedKeyHashFast() {
+        return sha256hash160Fast(compressed);
     }
 
     /**

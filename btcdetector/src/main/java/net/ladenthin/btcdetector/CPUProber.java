@@ -93,12 +93,9 @@ public class CPUProber extends Prober {
             }
 
             // create uncompressed
-            ECKey ecKeyCompressed = ECKey.fromPrivate(secret, true);
-            keysQueue.put(ecKeyCompressed);
-
-            // create compressed
-            ECKey ecKey = ecKeyCompressed.decompress();
-            keysQueue.put(ecKey);
+            ECKey ecKey = ECKey.fromPrivate(secret, false);
+            PublicKeyBytes publicKeyBytes = new PublicKeyBytes(ecKey.getPrivKey(), ecKey.getPubKey());
+            keysQueue.put(publicKeyBytes);
         } catch (Exception e) {
             // fromPrivate can throw an IllegalArgumentException
             // save the secret to be able to recover the issue

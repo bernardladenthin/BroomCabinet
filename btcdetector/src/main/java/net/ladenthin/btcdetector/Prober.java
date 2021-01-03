@@ -18,6 +18,7 @@
 // @formatter:on
 package net.ladenthin.btcdetector;
 
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -64,7 +65,7 @@ public abstract class Prober implements Runnable {
     protected Persistence persistence;
     
     private final List<Future<Void>> consumers = new ArrayList<>();
-    protected final LinkedBlockingQueue<ECKey> keysQueue;
+    protected final LinkedBlockingQueue<PublicKeyBytes> keysQueue;
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
 
     protected Prober(CConsumerJava consumerJava) {
@@ -159,43 +160,62 @@ public abstract class Prober implements Runnable {
     }
     
     void consumeKeys() {
-        ECKey key = keysQueue.poll();
-        while (key != null) {
+        PublicKeyBytes publicKeyBytes = keysQueue.poll();
+        while (publicKeyBytes != null) {
 
-            byte[] hash160 = key.getPubKeyHash();
-            ByteBuffer hash160AsByteBuffer = byteBufferUtility.byteArrayToByteBuffer(hash160);
+            byte[] hash160Uncompressed = publicKeyBytes.getUncompressedKeyHashFast();
+            ByteBuffer hash160UncompressedAsByteBuffer = byteBufferUtility.byteArrayToByteBuffer(hash160Uncompressed);
+            boolean containsAddressUncompressed = containsAddress(hash160UncompressedAsByteBuffer);
+            
+            byte[] hash160Compressed = publicKeyBytes.getCompressedKeyHashFast();
+            ByteBuffer hash160CompressedAsByteBuffer = byteBufferUtility.byteArrayToByteBuffer(hash160Compressed);
+            boolean containsAddressCompressed = containsAddress(hash160CompressedAsByteBuffer);
 
-            long timeBefore = System.currentTimeMillis();
-            if (logger.isDebugEnabled()) {
-                logger.debug("Time before persistence.containsAddress: " + timeBefore);
-            }
-
-            boolean containsAddress = persistence.containsAddress(hash160AsByteBuffer);
-            // Free the buffer immediately, a direct buffer keeps a long time in memory otherwise.
-            ByteBufferUtility.freeByteBuffer(hash160AsByteBuffer);
-
-            long timeAfter = System.currentTimeMillis();
-            long timeDelta = timeAfter - timeBefore;
-
-            checkedKeys.incrementAndGet();
-            checkedKeysSumOfTimeToCheckContains.addAndGet(timeDelta);
-
-            if (logger.isDebugEnabled()) {
-                logger.debug("Time after persistence.containsAddress: " + timeAfter);
-                logger.debug("Time delta: " + timeDelta);
-            }
-
-            if (containsAddress) {
+            if (containsAddressUncompressed) {
                 hits.incrementAndGet();
-                String hitMessage = HIT_PREFIX + keyUtility.createKeyDetails(key);
-                logger.info(hitMessage);
-            } else {
+                ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
+                String hitMessageUncompressed = HIT_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
+                logger.info(hitMessageUncompressed);
+            }
+            
+            if (containsAddressCompressed) {
+                hits.incrementAndGet();
+                ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
+                String hitMessageCompressed = HIT_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
+                logger.info(hitMessageCompressed);
+            }
+            
+            if(!containsAddressUncompressed && !containsAddressCompressed) {
                 if (logger.isTraceEnabled()) {
-                    String missMessage = MISS_PREFIX + keyUtility.createKeyDetails(key);
-                    logger.trace(missMessage);
+                    ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
+                    String missMessageUncompressed = MISS_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
+                    logger.trace(missMessageUncompressed);
+                    
+                    ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
+                    String missMessageCompressed = MISS_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
+                    logger.trace(missMessageCompressed);
                 }
             }
-            key = keysQueue.poll();
+            publicKeyBytes = keysQueue.poll();
         }
+    }
+
+    private boolean containsAddress(ByteBuffer hash160AsByteBuffer) {
+        long timeBefore = System.currentTimeMillis();
+        if (logger.isDebugEnabled()) {
+            logger.debug("Time before persistence.containsAddress: " + timeBefore);
+        }
+        boolean containsAddress = persistence.containsAddress(hash160AsByteBuffer);
+        // Free the buffer immediately, a direct buffer keeps a long time in memory otherwise.
+        ByteBufferUtility.freeByteBuffer(hash160AsByteBuffer);
+        long timeAfter = System.currentTimeMillis();
+        long timeDelta = timeAfter - timeBefore;
+        checkedKeys.incrementAndGet();
+        checkedKeysSumOfTimeToCheckContains.addAndGet(timeDelta);
+        if (logger.isDebugEnabled()) {
+            logger.debug("Time after persistence.containsAddress: " + timeAfter);
+            logger.debug("Time delta: " + timeDelta);
+        }
+        return containsAddress;
     }
 }

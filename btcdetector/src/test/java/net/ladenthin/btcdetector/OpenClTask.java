@@ -18,8 +18,11 @@
 // @formatter:on
 package net.ladenthin.btcdetector;
 
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import static net.ladenthin.btcdetector.ProbeAddressesOpenCLTest.reverse;
+import static net.ladenthin.btcdetector.PublicKeyBytes.PARITY_BYTES_LENGTH;
+import static net.ladenthin.btcdetector.PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH;
 import static org.jocl.CL.CL_MEM_READ_ONLY;
 import static org.jocl.CL.CL_MEM_USE_HOST_PTR;
 import static org.jocl.CL.CL_MEM_WRITE_ONLY;
@@ -222,12 +225,12 @@ public class OpenClTask {
         return dstByteBuffer;
     }
     
-    public static PublicKeyBytes[] transformByteBufferToPublicKeyBytes(ByteBuffer byteBuffer, int workSize) {
+    public static PublicKeyBytes[] transformByteBufferToPublicKeyBytes(ByteBuffer byteBuffer, int workSize, BigInteger secretBase) {
         System.out.println("transform ByteBuffer to keys ...");
         PublicKeyBytes[] publicKeys = new PublicKeyBytes[workSize];
         long beforeTransform = System.currentTimeMillis();
         for (int i = 0; i < workSize; i++) {
-            PublicKeyBytes publicKeyBytes = getPublicKeyFromByteBufferXY(byteBuffer, i);
+            PublicKeyBytes publicKeyBytes = getPublicKeyFromByteBufferXY(byteBuffer, i, secretBase);
             // int pubKeyInts[] = new int[PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array];
             // System.arraycopy(dst_r, i*PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array , pubKeyInts, 0, PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array);
             // byte[] pubKeyBytes = KeyUtility.publicKeyByteArrayFromIntArray(pubKeyInts);
@@ -266,8 +269,9 @@ public class OpenClTask {
      * Read the inner bytes in reverse order. Remove padding bytes to return a clean byte array.
      * TODO: BLDEBUG Hier
      */
-    private static final PublicKeyBytes getPublicKeyFromByteBufferXY(ByteBuffer b, int keyNumber) {
-        PublicKeyBytes publicKeyBytes = new PublicKeyBytes();
+    private static final PublicKeyBytes getPublicKeyFromByteBufferXY(ByteBuffer b, int keyNumber, BigInteger secretBase) {
+        byte[] uncompressed = new byte[PARITY_BYTES_LENGTH + TWO_COORDINATES_BYTES_LENGTH];
+        uncompressed[0] = PublicKeyBytes.PARITY_UNCOMPRESSED;
         
         int keyOffsetInByteBuffer = PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH*keyNumber;
         
@@ -278,24 +282,11 @@ public class OpenClTask {
         }
         
         // copy x
-        System.arraycopy(yx, PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH, publicKeyBytes.uncompressed, PublicKeyBytes.PARITY_BYTES_LENGTH, PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH);
-        // copy x
-        System.arraycopy(yx, PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH, publicKeyBytes.compressed, PublicKeyBytes.PARITY_BYTES_LENGTH, PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH);
+        System.arraycopy(yx, PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH, uncompressed, PublicKeyBytes.PARITY_BYTES_LENGTH, PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH);
         // copy y
-        System.arraycopy(yx, 0, publicKeyBytes.uncompressed, PublicKeyBytes.PARITY_BYTES_LENGTH+PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH, PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH);
+        System.arraycopy(yx, 0, uncompressed, PublicKeyBytes.PARITY_BYTES_LENGTH+PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH, PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH);
         
-        // the first byte is 4 to indicate a public key with x and y coordinate (uncompressed)
-        publicKeyBytes.uncompressed[0] = 4;
-        
-        int indexLastYCoordinateByte = PublicKeyBytes.PARITY_BYTES_LENGTH+PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH-1;
-        boolean even = publicKeyBytes.uncompressed[indexLastYCoordinateByte] % 2 == 0;
-        
-        if (even) {
-            publicKeyBytes.compressed[0] = 2;
-        } else {
-            publicKeyBytes.compressed[0] = 3;
-        }
-        
+        PublicKeyBytes publicKeyBytes = new PublicKeyBytes(secretBase.add(BigInteger.valueOf(keyNumber)), uncompressed);
         return publicKeyBytes;
     }
 }

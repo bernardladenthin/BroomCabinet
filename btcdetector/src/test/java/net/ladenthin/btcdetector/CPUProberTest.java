@@ -72,7 +72,7 @@ public class CPUProberTest {
         CPUProber cpuProber = new CPUProber(sniffing);
         cpuProber.initLMDB();
 
-        ECKey key = getFirstAddressHash160FromTestAddress(compressed);
+        ECKey key = TestAddresses.getFirstAddressHash160FromTestAddress(compressed);
 
         Logger logger = mock(Logger.class);
         cpuProber.setLogger(logger);
@@ -88,11 +88,5 @@ public class CPUProberTest {
         List<String> arguments = logCaptor.getAllValues();
 
         assertThat(arguments.get(0), is(equalTo(hitMessage)));
-    }
-
-    private ECKey getFirstAddressHash160FromTestAddress(boolean compressed) {
-        TestAddresses testAddressesCompressed = new TestAddresses(1, compressed);
-        ECKey key = testAddressesCompressed.getECKeys().get(0);
-        return key;
     }
 }
