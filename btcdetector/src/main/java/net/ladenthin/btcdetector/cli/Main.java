@@ -19,7 +19,6 @@
 package net.ladenthin.btcdetector.cli;
 
 import com.google.gson.Gson;
-import net.ladenthin.btcdetector.CPUProber;
 import net.ladenthin.btcdetector.configuration.CConfiguration;
 import net.ladenthin.javacommons.StreamHelper;
 import org.slf4j.Logger;
@@ -29,6 +28,7 @@ import java.io.File;
 import java.io.IOException;
 import net.ladenthin.btcdetector.AddressFilesToLMDB;
 import net.ladenthin.btcdetector.LMDBToAddressFile;
+import net.ladenthin.btcdetector.Sniffer;
 
 // VM option: -Dorg.slf4j.simpleLogger.defaultLogLevel=trace
 public class Main implements Runnable {
@@ -69,8 +69,8 @@ public class Main implements Runnable {
         logger.info(configuration.command.name());
         switch (configuration.command) {
             case Sniffing:
-                CPUProber prober = new CPUProber(configuration.sniffing);
-                prober.run();
+                Sniffer sniffer = new Sniffer(configuration.sniffing);
+                sniffer.run();
                 break;
             case LMDBToAddressFile:
                 LMDBToAddressFile lmdbToAddressFile = new LMDBToAddressFile(configuration.lmdbToAddressFile);

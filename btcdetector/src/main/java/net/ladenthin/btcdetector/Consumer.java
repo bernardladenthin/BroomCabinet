@@ -18,16 +18,6 @@
 // @formatter:on
 package net.ladenthin.btcdetector;
 
-import net.ladenthin.btcdetector.configuration.CConsumerJava;
-
-public class ProberTestImpl extends Prober {
-
-    protected ProberTestImpl(CConsumerJava consumerJava) {
-        super(consumerJava);
-    }
-
-    @Override
-    public void run() {
-
-    }
+interface Consumer {
+    void consumeKey(PublicKeyBytes publicKeyBytes) throws InterruptedException;
 }

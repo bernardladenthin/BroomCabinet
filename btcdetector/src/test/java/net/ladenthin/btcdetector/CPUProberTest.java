@@ -28,6 +28,7 @@ import org.junit.rules.TemporaryFolder;
 import java.io.IOException;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.btcdetector.configuration.CConsumerJava;
 import net.ladenthin.btcdetector.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.btcdetector.configuration.CProducerJava;
@@ -63,25 +64,28 @@ public class CPUProberTest {
         TestAddressesFiles testAddresses = new TestAddressesFiles(compressed);
         File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, useStaticAmount);
 
-        CSniffing sniffing = new CSniffing();
-        sniffing.consumerJava = new CConsumerJava();
-        sniffing.producerJava = new CProducerJava();
-        sniffing.consumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
-        sniffing.consumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        CProducerJava cProducerJava = new CProducerJava();
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
 
-        CPUProber cpuProber = new CPUProber(sniffing);
-        cpuProber.initLMDB();
+        final AtomicBoolean shouldRun = new AtomicBoolean(true);
+    
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun);
+        consumerJava.initLMDB();
+        
+        ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, consumerJava, consumerJava.keyUtility);
 
         ECKey key = TestAddresses.getFirstAddressHash160FromTestAddress(compressed);
 
         Logger logger = mock(Logger.class);
-        cpuProber.setLogger(logger);
+        consumerJava.setLogger(logger);
         final Random randomForProducer = new Random(TestAddresses.RANDOM_SEED);
-        cpuProber.produceKey(KeyUtility.BIT_LENGTH, randomForProducer);
-        cpuProber.consumeKeys();
+        producerJava.produceKey(KeyUtility.BIT_LENGTH, randomForProducer);
+        consumerJava.consumeKeys();
 
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), new ByteBufferUtility(false));
-        String hitMessage = CPUProber.HIT_PREFIX + keyUtility.createKeyDetails(key);
+        String hitMessage = ConsumerJava.HIT_PREFIX + keyUtility.createKeyDetails(key);
 
         verify(logger, times(1)).info(logCaptor.capture());
 

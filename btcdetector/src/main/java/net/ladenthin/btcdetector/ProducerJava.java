@@ -28,33 +28,30 @@ import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import net.ladenthin.btcdetector.configuration.CConsumerJava;
+import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.btcdetector.configuration.CProducerJava;
-import net.ladenthin.btcdetector.configuration.CSniffing;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public class CPUProber extends Prober {
+public class ProducerJava {
+    
+    protected Logger logger = LoggerFactory.getLogger(this.getClass());
 
     private final CProducerJava producerJava;
-    private final CConsumerJava consumerJava;
 
     private final List<Future<Void>> producers = new ArrayList<>();
+    private final AtomicBoolean shouldRun;
+    private final Consumer consumer;
+    private final KeyUtility keyUtility;
 
-    public CPUProber(CSniffing sniffing) {
-        super(sniffing.consumerJava);
-        this.producerJava = sniffing.producerJava;
-        this.consumerJava = sniffing.consumerJava;
+    public ProducerJava(CProducerJava producerJava, AtomicBoolean shouldRun, Consumer consumer, KeyUtility keyUtility) {
+        this.producerJava = producerJava;
+        this.shouldRun = shouldRun;
+        this.consumer = consumer;
+        this.keyUtility = keyUtility;
     }
 
-    @Override
-    public void run() {
-        initLMDB();
-        addSchutdownHook();
-        startConsumer();
-        startProducer();
-        startStatisticsTimer();
-    }
-
-    private void startProducer() {
+    public void startProducer() {
         ExecutorService executor = Executors.newFixedThreadPool(producerJava.producerThreads);
         for (int i = 0; i < producerJava.producerThreads; i++) {
             producers.add(executor.submit(
@@ -95,7 +92,7 @@ public class CPUProber extends Prober {
             // create uncompressed
             ECKey ecKey = ECKey.fromPrivate(secret, false);
             PublicKeyBytes publicKeyBytes = new PublicKeyBytes(ecKey.getPrivKey(), ecKey.getPubKey());
-            keysQueue.put(publicKeyBytes);
+            consumer.consumeKey(publicKeyBytes);
         } catch (Exception e) {
             // fromPrivate can throw an IllegalArgumentException
             // save the secret to be able to recover the issue

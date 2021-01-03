@@ -266,8 +266,7 @@ public class OpenClTask {
     }
     
     /**
-     * Read the inner bytes in reverse order. Remove padding bytes to return a clean byte array.
-     * TODO: BLDEBUG Hier
+     * Read the inner bytes in reverse order.
      */
     private static final PublicKeyBytes getPublicKeyFromByteBufferXY(ByteBuffer b, int keyNumber, BigInteger secretBase) {
         byte[] uncompressed = new byte[PARITY_BYTES_LENGTH + TWO_COORDINATES_BYTES_LENGTH];

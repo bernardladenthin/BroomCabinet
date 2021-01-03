@@ -18,7 +18,6 @@
 // @formatter:on
 package net.ladenthin.btcdetector;
 
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,7 +40,7 @@ import net.ladenthin.btcdetector.persistence.PersistenceUtils;
 import net.ladenthin.btcdetector.persistence.lmdb.LMDBPersistence;
 import org.bitcoinj.core.ECKey;
 
-public abstract class Prober implements Runnable {
+public class ConsumerJava implements Consumer {
 
     private static final int ONE_SECOND_IN_MILLISECONDS = 1000;
     public static final String MISS_PREFIX = "miss: Could not find the address: ";
@@ -57,8 +56,6 @@ public abstract class Prober implements Runnable {
     protected final AtomicLong hits = new AtomicLong();
     protected long startTime;
 
-    protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
-
     protected final CConsumerJava consumerJava;
     protected final Timer timer = new Timer();
 
@@ -67,10 +64,12 @@ public abstract class Prober implements Runnable {
     private final List<Future<Void>> consumers = new ArrayList<>();
     protected final LinkedBlockingQueue<PublicKeyBytes> keysQueue;
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
+    private final AtomicBoolean shouldRun;
 
-    protected Prober(CConsumerJava consumerJava) {
+    protected ConsumerJava(CConsumerJava consumerJava, AtomicBoolean shouldRun) {
         this.consumerJava = consumerJava;
         this.keysQueue = new LinkedBlockingQueue<>(consumerJava.queueSize);
+        this.shouldRun = shouldRun;
     }
 
     void setLogger(Logger logger) {
@@ -118,15 +117,6 @@ public abstract class Prober implements Runnable {
             }
         }, period, period);
     }
-
-    protected void addSchutdownHook() {
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            shouldRun.set(false);
-            timer.cancel();
-            logger.info("Shut down.");
-        }));
-    }
-    
 
     public void startConsumer() {
         ExecutorService executor = Executors.newFixedThreadPool(consumerJava.threads);
@@ -217,5 +207,10 @@ public abstract class Prober implements Runnable {
             logger.debug("Time delta: " + timeDelta);
         }
         return containsAddress;
+    }
+
+    @Override
+    public void consumeKey(PublicKeyBytes publicKeyBytes) throws InterruptedException {
+        keysQueue.put(publicKeyBytes);
     }
 }
