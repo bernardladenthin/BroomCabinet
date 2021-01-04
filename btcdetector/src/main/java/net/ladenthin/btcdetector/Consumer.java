@@ -19,5 +19,8 @@
 package net.ladenthin.btcdetector;
 
 interface Consumer {
+
     void consumeKey(PublicKeyBytes publicKeyBytes) throws InterruptedException;
+
+    void startConsumer();
 }

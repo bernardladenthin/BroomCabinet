@@ -32,7 +32,6 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import org.mockito.ArgumentCaptor;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.verify;
 import org.slf4j.Logger;
@@ -41,13 +40,13 @@ public class ConsumerJavaTest {
 
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
-    
+
     private ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
 
     @Test(expected = org.lmdbjava.LmdbNativeException.class)
     public void initLMDB_lmdbNotExisting_noExceptionThrown() throws IOException {
         final AtomicBoolean shouldRun = new AtomicBoolean(true);
-        
+
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = folder.newFolder().getAbsolutePath();
@@ -59,20 +58,20 @@ public class ConsumerJavaTest {
     @Test
     public void startStatisticsTimer_noExceptionThrown() throws IOException, InterruptedException {
         final AtomicBoolean shouldRun = new AtomicBoolean(true);
-        
+
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.printStatisticsEveryNSeconds = 1;
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun);
         Logger logger = mock(Logger.class);
         consumerJava.setLogger(logger);
-        
+
         // act
         consumerJava.startStatisticsTimer();
-        
+
         // assert
         Thread.sleep(3900);
         consumerJava.timer.cancel();
-        
+
         List<String> arguments = logCaptor.getAllValues();
         verify(logger, atLeast(3)).info(logCaptor.capture());
 
@@ -82,10 +81,10 @@ public class ConsumerJavaTest {
     @Test(expected = IllegalArgumentException.class)
     public void startStatisticsTimer_invalidparameter_throwsException() throws IOException {
         final AtomicBoolean shouldRun = new AtomicBoolean(true);
-        
+
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.printStatisticsEveryNSeconds = 0;
-        
+
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun);
         consumerJava.startStatisticsTimer();
     }

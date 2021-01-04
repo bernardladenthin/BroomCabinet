@@ -28,30 +28,32 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
-import net.ladenthin.btcdetector.configuration.CProducerJava;
+import net.ladenthin.btcdetector.configuration.CProducerOpenCL;
 
-public class ProducerJava extends AbstractProducer {
+public class ProducerOpenCL extends AbstractProducer {
 
-    private final CProducerJava producerJava;
+    private final CProducerOpenCL producerOpenCL;
 
     private final List<Future<Void>> producers = new ArrayList<>();
 
-    public ProducerJava(CProducerJava producerJava, AtomicBoolean shouldRun, Consumer consumer, KeyUtility keyUtility) {
+    public ProducerOpenCL(CProducerOpenCL producerOpenCL, AtomicBoolean shouldRun, Consumer consumer, KeyUtility keyUtility) {
         super(shouldRun, consumer, keyUtility);
-        this.producerJava = producerJava;
+        this.producerOpenCL = producerOpenCL;
     }
 
     @Override
     public void startProducers() {
-        ExecutorService executor = Executors.newFixedThreadPool(producerJava.producerThreads);
-        for (int i = 0; i < producerJava.producerThreads; i++) {
-            producers.add(executor.submit(
-                    () -> {
-                        Random secureRandom = SecureRandom.getInstanceStrong();
-                        long secureRandomSeed = secureRandom.nextLong();
-                        produceKeysRunner(producerJava.privateKeyBitLength, secureRandomSeed);
-                        return null;
-                    }));
+        ExecutorService executor = Executors.newFixedThreadPool(producerOpenCL.resultReaderThreads);
+        if (false) {
+            for (int i = 0; i < producerOpenCL.resultReaderThreads; i++) {
+                producers.add(executor.submit(
+                        () -> {
+                            Random secureRandom = SecureRandom.getInstanceStrong();
+                            long secureRandomSeed = secureRandom.nextLong();
+                            produceKeysRunner(producerOpenCL.privateKeyBitLength, secureRandomSeed);
+                            return null;
+                        }));
+            }
         }
     }
 

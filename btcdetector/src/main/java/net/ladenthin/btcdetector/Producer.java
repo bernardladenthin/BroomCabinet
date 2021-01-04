@@ -16,8 +16,24 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector.configuration;
+package net.ladenthin.btcdetector;
 
-public class CProducerOpenCL extends CProducer {
-    public int resultReaderThreads = 1;
+import java.util.Random;
+
+public interface Producer {
+
+    /**
+     * Start multiple producer threads to procue keys with
+     * {@link #produceKeys(int, java.util.Random)} continuously.
+     */
+    void startProducers();
+
+    /**
+     * Create multiple keys for a specific bit length using {@link Random} and
+     * push them to the {@link Consumer}.
+     *
+     * @param bitLength
+     * @param random
+     */
+    void produceKeys(int bitLength, Random random);
 }

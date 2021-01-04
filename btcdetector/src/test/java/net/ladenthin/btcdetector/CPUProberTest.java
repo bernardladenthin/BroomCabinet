@@ -32,7 +32,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.btcdetector.configuration.CConsumerJava;
 import net.ladenthin.btcdetector.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.btcdetector.configuration.CProducerJava;
-import net.ladenthin.btcdetector.configuration.CSniffing;
 import net.ladenthin.btcdetector.staticaddresses.TestAddresses;
 import net.ladenthin.btcdetector.staticaddresses.TestAddressesFiles;
 import net.ladenthin.btcdetector.staticaddresses.TestAddressesLMDB;
@@ -69,19 +68,19 @@ public class CPUProberTest {
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
 
-        final AtomicBoolean shouldRun = new AtomicBoolean(true);
-    
+        AtomicBoolean shouldRun = new AtomicBoolean(true);
+
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun);
         consumerJava.initLMDB();
-        
+
         ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, consumerJava, consumerJava.keyUtility);
 
         ECKey key = TestAddresses.getFirstAddressHash160FromTestAddress(compressed);
 
         Logger logger = mock(Logger.class);
         consumerJava.setLogger(logger);
-        final Random randomForProducer = new Random(TestAddresses.RANDOM_SEED);
-        producerJava.produceKey(KeyUtility.BIT_LENGTH, randomForProducer);
+        Random randomForProducer = new Random(TestAddresses.RANDOM_SEED);
+        producerJava.produceKeys(KeyUtility.BIT_LENGTH, randomForProducer);
         consumerJava.consumeKeys();
 
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), new ByteBufferUtility(false));

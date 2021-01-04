@@ -118,6 +118,7 @@ public class ConsumerJava implements Consumer {
         }, period, period);
     }
 
+    @Override
     public void startConsumer() {
         ExecutorService executor = Executors.newFixedThreadPool(consumerJava.threads);
         for (int i = 0; i < consumerJava.threads; i++) {

@@ -23,16 +23,17 @@ import net.ladenthin.btcdetector.configuration.CSniffing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Sniffer implements Runnable  {
+public class Sniffer implements Runnable {
 
     protected Logger logger = LoggerFactory.getLogger(this.getClass());
-    
+
     private final CSniffing sniffing;
 
     protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
-    
+
     private ConsumerJava consumerJava;
     private ProducerJava producerJava;
+    private ProducerOpenCL producerOpenCL;
 
     public Sniffer(CSniffing sniffing) {
         this.sniffing = sniffing;
@@ -40,23 +41,28 @@ public class Sniffer implements Runnable  {
 
     @Override
     public void run() {
-        
+
         addSchutdownHook();
-            
+
         if (sniffing.consumerJava != null) {
             consumerJava = new ConsumerJava(sniffing.consumerJava, shouldRun);
             consumerJava.initLMDB();
             consumerJava.startConsumer();
             consumerJava.startStatisticsTimer();
         }
-        
+
         if (sniffing.producerJava != null) {
             producerJava = new ProducerJava(sniffing.producerJava, shouldRun, consumerJava, consumerJava.keyUtility);
-            producerJava.startProducer();
+            producerJava.startProducers();
         }
-        
+
+        if (sniffing.producerOpenCL != null) {
+            producerOpenCL = new ProducerOpenCL(sniffing.producerOpenCL, shouldRun, consumerJava, consumerJava.keyUtility);
+            producerOpenCL.startProducers();
+        }
+
     }
-    
+
     protected void addSchutdownHook() {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             shouldRun.set(false);

@@ -24,6 +24,7 @@ import java.util.Date;
 import java.util.Objects;
 
 public class Statistics {
+
     private final Sha256Hash currentTransactionHash;
     private final Date currentBlockTime;
 
@@ -34,11 +35,15 @@ public class Statistics {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         Statistics that = (Statistics) o;
-        return Objects.equals(currentTransactionHash, that.currentTransactionHash) &&
-                Objects.equals(currentBlockTime, that.currentBlockTime);
+        return Objects.equals(currentTransactionHash, that.currentTransactionHash)
+                && Objects.equals(currentBlockTime, that.currentBlockTime);
     }
 
     @Override
@@ -48,9 +53,9 @@ public class Statistics {
 
     @Override
     public String toString() {
-        return "Statistics{" +
-                "currentTransactionHash='" + currentTransactionHash + '\'' +
-                ", currentBlockTime=" + currentBlockTime +
-                '}';
+        return "Statistics{"
+                + "currentTransactionHash='" + currentTransactionHash + '\''
+                + ", currentBlockTime=" + currentBlockTime
+                + '}';
     }
 }
