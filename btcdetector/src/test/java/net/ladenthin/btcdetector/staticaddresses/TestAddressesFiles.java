@@ -58,10 +58,10 @@ public class TestAddressesFiles implements AddressesFiles {
         amountOtherAddresses
     };
 
-    private final TestAddresses testAddresses;
+    private final TestAddresses42 testAddresses;
 
     public TestAddressesFiles(boolean compressed) {
-        testAddresses = new TestAddresses(NUMBER_OF_ADRESSES, compressed);
+        testAddresses = new TestAddresses42(NUMBER_OF_ADRESSES, compressed);
 
         {
             uncompressedTestAddressesAsLines.add("15daqrFSG8d1EMfCWdWZWeZMSDFkqR834t,1");
@@ -155,6 +155,11 @@ public class TestAddressesFiles implements AddressesFiles {
         addresses.add(two.getAbsolutePath());
         addresses.add(three.getAbsolutePath());
         return addresses;
+    }
+
+    @Override
+    public TestAddresses getTestAddresses() {
+        return testAddresses; 
     }
 
 }

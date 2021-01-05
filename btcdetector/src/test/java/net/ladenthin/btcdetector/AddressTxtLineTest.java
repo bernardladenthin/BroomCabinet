@@ -23,7 +23,6 @@ import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.IOException;
 import net.ladenthin.btcdetector.staticaddresses.*;
 import net.ladenthin.btcdetector.staticaddresses.StaticKey;
-import net.ladenthin.btcdetector.staticaddresses.TestAddresses;
 import org.bitcoinj.core.AddressFormatException;
 import org.bitcoinj.core.Coin;
 import org.junit.Before;
@@ -36,7 +35,7 @@ import org.junit.runner.RunWith;
 @RunWith(DataProviderRunner.class)
 public class AddressTxtLineTest {
 
-    private static final TestAddresses testAddresses = new TestAddresses(0, false);
+    private static final TestAddresses42 testAddresses = new TestAddresses42(0, false);
 
     StaticKey staticKey = new StaticKey();
 

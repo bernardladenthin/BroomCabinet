@@ -61,4 +61,9 @@ public class StaticAddressesFiles implements AddressesFiles {
         return addresses;
     }
 
+    @Override
+    public TestAddresses getTestAddresses() {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
 }

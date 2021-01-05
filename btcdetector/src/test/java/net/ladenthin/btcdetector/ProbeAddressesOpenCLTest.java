@@ -45,6 +45,7 @@ import static net.ladenthin.btcdetector.OpenClTask.PRIVATE_KEY_BYTES;
 import static net.ladenthin.btcdetector.OpenClTask.transformByteBufferToPublicKeyBytes;
 import net.ladenthin.btcdetector.staticaddresses.StaticKey;
 import net.ladenthin.btcdetector.staticaddresses.TestAddresses;
+import net.ladenthin.btcdetector.staticaddresses.TestAddresses42;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Utils;
 import org.bitcoinj.params.MainNetParams;
@@ -60,7 +61,7 @@ import sun.nio.ch.DirectBuffer;
 
 public class ProbeAddressesOpenCLTest {
 
-    private static final TestAddresses testAddresses = new TestAddresses(1024, false);
+    private static final TestAddresses42 testAddresses = new TestAddresses42(1024, false);
     
     public final static int BYTES_FOR_INT = 4;
     /**

@@ -47,18 +47,14 @@ public class AddressFileToLMDBTest extends LMDBBase {
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
     public void addressFilesToLMDB_createLMDB_containingTestAddressesHashesWithCorrectAmount(boolean compressed, boolean useStaticAmount) throws IOException {
         // arrange, act
-        AddressesFiles testAddresses = new TestAddressesFiles(compressed);
-        Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddresses);
+        AddressesFiles addressesFiles = new TestAddressesFiles(compressed);
+        Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, addressesFiles);
 
         // assert
         try {
             Coin[] amounts = new Coin[TestAddressesFiles.NUMBER_OF_ADRESSES];
-            String[] base58Adresses;
-            if (compressed) {
-                base58Adresses = TestAddresses.SEED_42_COMPRESSED_HASH160;
-            } else {
-                base58Adresses = TestAddresses.SEED_42_UNCOMPRESSED_HASH160;
-            }
+            String[] base58Adresses = addressesFiles.getTestAddresses().getAsBase58StringList().toArray(new String[0]);
+            
             for (int i = 0; i < amounts.length; i++) {
                 ByteBuffer hash160 = keyUtility.addressToByteBuffer(LegacyAddress.fromBase58(networkParameters, base58Adresses[i]));
                 amounts[i] = persistence.getAmount(hash160);

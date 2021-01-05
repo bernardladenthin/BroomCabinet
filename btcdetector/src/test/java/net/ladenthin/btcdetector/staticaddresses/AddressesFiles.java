@@ -25,4 +25,6 @@ import org.junit.rules.TemporaryFolder;
 public interface AddressesFiles {
 
     List<String> createAddressesFiles(TemporaryFolder folder) throws IOException;
+
+    TestAddresses getTestAddresses();
 }

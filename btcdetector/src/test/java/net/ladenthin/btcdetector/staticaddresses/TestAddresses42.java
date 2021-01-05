@@ -18,14 +18,12 @@
 // @formatter:on
 package net.ladenthin.btcdetector.staticaddresses;
 
-import java.util.List;
-import org.bitcoinj.core.ECKey;
+public class TestAddresses42 extends AbstractTestAddresses {
 
-public interface TestAddresses {
-    
-    List<ECKey> getECKeys();
-    
-    String getAsBase58Strings();
-    
-    List<String> getAsBase58StringList();
+    public final static int RANDOM_SEED = 42;
+
+    public TestAddresses42(int numberOfAddresses, boolean compressed) {
+        super(RANDOM_SEED, numberOfAddresses, compressed);
+    }
+
 }

@@ -21,7 +21,7 @@ package net.ladenthin.btcdetector;
 import org.junit.Test;
 
 import java.io.IOException;
-import net.ladenthin.btcdetector.staticaddresses.TestAddresses;
+import net.ladenthin.btcdetector.staticaddresses.TestAddresses42;
 import org.bitcoinj.core.ECKey;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
@@ -32,8 +32,8 @@ public class PublicKeyBytesTest {
     @Test
     public void createPublicKeyBytes_publicKeyGiven_PublicKeyAndHashesEquals() throws IOException, InterruptedException {
         // arrange
-        ECKey keyUncompressed = TestAddresses.getFirstAddressHash160FromTestAddress(false);
-        ECKey keyCompressed = TestAddresses.getFirstAddressHash160FromTestAddress(true);
+        ECKey keyUncompressed = new TestAddresses42(1, false).getECKeys().get(0);
+        ECKey keyCompressed = new TestAddresses42(1, true).getECKeys().get(0);
         
         // act
         PublicKeyBytes publicKeyBytes = new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey());
