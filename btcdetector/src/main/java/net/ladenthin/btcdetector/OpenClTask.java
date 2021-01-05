@@ -241,26 +241,6 @@ public class OpenClTask {
         System.out.println("... transformed in "+ (afterTransform-beforeTransform) + "ms");
         return publicKeys;
     }
-    
-    /**
-     * https://stackoverflow.com/questions/3366925/deep-copy-duplicate-of-javas-bytebuffer/4074089
-     */
-    private static ByteBuffer cloneByteBuffer(final ByteBuffer original) {
-        // Create clone with same capacity as original.
-        final ByteBuffer clone = (original.isDirect())
-                ? ByteBuffer.allocateDirect(original.capacity())
-                : ByteBuffer.allocate(original.capacity());
-
-        // Create a read-only copy of the original.
-        // This allows reading from the original without modifying it.
-        final ByteBuffer readOnlyCopy = original.asReadOnlyBuffer();
-
-        // Flip and read from the original.
-        readOnlyCopy.flip();
-        clone.put(readOnlyCopy);
-
-        return clone;
-    }
 
     public void releaseCl() { 
         clReleaseMemObject(srcMem);
@@ -290,7 +270,29 @@ public class OpenClTask {
         return publicKeyBytes;
     }
     
-    // https://stackoverflow.com/questions/12893758/how-to-reverse-the-byte-array-in-java
+    /**
+     * https://stackoverflow.com/questions/3366925/deep-copy-duplicate-of-javas-bytebuffer/4074089
+     */
+    private static ByteBuffer cloneByteBuffer(final ByteBuffer original) {
+        // Create clone with same capacity as original.
+        final ByteBuffer clone = (original.isDirect())
+                ? ByteBuffer.allocateDirect(original.capacity())
+                : ByteBuffer.allocate(original.capacity());
+
+        // Create a read-only copy of the original.
+        // This allows reading from the original without modifying it.
+        final ByteBuffer readOnlyCopy = original.asReadOnlyBuffer();
+
+        // Flip and read from the original.
+        readOnlyCopy.flip();
+        clone.put(readOnlyCopy);
+
+        return clone;
+    }
+    
+    /**
+     * https://stackoverflow.com/questions/12893758/how-to-reverse-the-byte-array-in-java
+     */
     public static void reverse(byte[] array) {
         if (array == null) {
             return;
