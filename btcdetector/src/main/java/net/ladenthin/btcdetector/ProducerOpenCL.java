@@ -27,6 +27,7 @@ import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.btcdetector.configuration.CProducerOpenCL;
 
@@ -35,6 +36,7 @@ public class ProducerOpenCL extends AbstractProducer {
     private final CProducerOpenCL producerOpenCL;
 
     private final List<Future<Void>> producers = new ArrayList<>();
+    private ThreadPoolExecutor resultReaderThreadPoolExecutor;
 
     public ProducerOpenCL(CProducerOpenCL producerOpenCL, AtomicBoolean shouldRun, Consumer consumer, KeyUtility keyUtility) {
         super(shouldRun, consumer, keyUtility);
@@ -43,10 +45,10 @@ public class ProducerOpenCL extends AbstractProducer {
 
     @Override
     public void startProducers() {
-        ExecutorService executor = Executors.newFixedThreadPool(producerOpenCL.resultReaderThreads);
+        resultReaderThreadPoolExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(producerOpenCL.resultReaderThreads);
         if (false) {
             for (int i = 0; i < producerOpenCL.resultReaderThreads; i++) {
-                producers.add(executor.submit(
+                producers.add(resultReaderThreadPoolExecutor.submit(
                         () -> {
                             Random secureRandom = SecureRandom.getInstanceStrong();
                             long secureRandomSeed = secureRandom.nextLong();

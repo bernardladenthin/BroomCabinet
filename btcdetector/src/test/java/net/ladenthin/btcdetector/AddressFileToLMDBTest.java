@@ -25,7 +25,6 @@ import java.nio.ByteBuffer;
 import net.ladenthin.btcdetector.persistence.Persistence;
 import net.ladenthin.btcdetector.staticaddresses.StaticAddressesFiles;
 import net.ladenthin.btcdetector.staticaddresses.*;
-import net.ladenthin.btcdetector.staticaddresses.TestAddresses;
 import net.ladenthin.btcdetector.staticaddresses.TestAddressesFiles;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.LegacyAddress;
