@@ -18,11 +18,13 @@
 // @formatter:on
 package net.ladenthin.btcdetector.configuration;
 
+import net.ladenthin.btcdetector.KeyUtility;
+
 public class CProducer {
     /**
-     * Can be set to a lower value to improve a search on the puzzle transaction https://privatekeys.pw/puzzles/bitcoin-puzzle-tx
-     * <code>1</code> can't be tested because {@link ECKey#fromPrivate} throws an {@link IllegalArgumentException}.
-     * Range: {@code 2} to {@code 256}.
+     * (2<sup>{@code maxNumBits}</sup> - 1) can be set to a lower value to improve a search on specific ranges (e.g. the puzzle transaction https://privatekeys.pw/puzzles/bitcoin-puzzle-tx ).
+     * {@code 1} can't be tested because {@link ECKey#fromPrivate} throws an {@link IllegalArgumentException}.
+     * Range: {@code 2} (inclusive) to {@link net.ladenthin.btcdetector.OpenClTask#MAX_GRID_NUM_BITS} (inclusive).
      */
-    public int privateKeyBitLength = 256;
+    public int privateKeyMaxNumBits = KeyUtility.MAX_NUM_BITS;
 }

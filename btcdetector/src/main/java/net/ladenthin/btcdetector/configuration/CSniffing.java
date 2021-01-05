@@ -18,8 +18,12 @@
 // @formatter:on
 package net.ladenthin.btcdetector.configuration;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class CSniffing {
+
     public CConsumerJava consumerJava;
-    public CProducerJava producerJava;
-    public CProducerOpenCL producerOpenCL;
+    public List<CProducerJava> producerJava = new ArrayList<>();
+    public List<CProducerOpenCL> producerOpenCL = new ArrayList<>();
 }

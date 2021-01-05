@@ -18,10 +18,7 @@
 // @formatter:on
 package net.ladenthin.btcdetector;
 
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import static net.ladenthin.btcdetector.PublicKeyBytes.PARITY_BYTES_LENGTH;
-import static net.ladenthin.btcdetector.PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH;
 import static org.jocl.CL.CL_MEM_READ_ONLY;
 import static org.jocl.CL.CL_MEM_USE_HOST_PTR;
 import static org.jocl.CL.CL_MEM_WRITE_ONLY;
@@ -46,36 +43,36 @@ public class OpenClTask {
      * I din't know which is better.
      */
     private static final boolean USE_HOST_PTR = false;
-    
+
     private final static boolean USE_XOR_SWAP = false;
 
     public static final int PRIVATE_KEY_BYTES = 32;
     public static final int PUBLIC_KEY_BYTES = 64;
 
-    public static final int MAX_BITS = 32;
+    public static final int MAX_GRID_NUM_BITS = 32;
     public static final int BITS_PER_BYTE = 8;
 
     private final cl_context context;
-    private final int bits;
+    private final int gridNumBits;
     private final ByteBuffer srcByteBuffer;
     private final Pointer srcPointer;
 
     private final cl_mem srcMem;
 
     // Only available after init
-    public OpenClTask(cl_context context, int bits) {
-        if (bits > MAX_BITS) {
-            throw new IllegalArgumentException("Bit size must be lower or equal than " + MAX_BITS + ".");
+    public OpenClTask(cl_context context, int gridNumBits) {
+        if (gridNumBits > MAX_GRID_NUM_BITS) {
+            throw new IllegalArgumentException("Max grid num bits must be lower or equal than " + MAX_GRID_NUM_BITS + ".");
         }
 
         this.context = context;
-        this.bits = bits;
+        this.gridNumBits = gridNumBits;
 
         srcByteBuffer = ByteBuffer.allocateDirect(getSrcSizeInBytes());
         srcPointer = Pointer.to(srcByteBuffer);
         srcMem = clCreateBuffer(
                 context,
-                CL_MEM_READ_ONLY ,
+                CL_MEM_READ_ONLY,
                 getSrcSizeInBytes(),
                 srcPointer,
                 null
@@ -83,7 +80,7 @@ public class OpenClTask {
     }
 
     public int getWorkSize() {
-        return 1 << bits;
+        return 1 << gridNumBits;
     }
 
     public int getSrcSizeInBytes() {
@@ -97,7 +94,7 @@ public class OpenClTask {
     public void setSrcPrivateKeyChunk(byte[] privateKeyTemplate) {
         byte[] privateKey = privateKeyTemplate.clone();
 
-        unsetLSB(privateKey, bits);
+        unsetLSB(privateKey, gridNumBits);
 
         // put key in reverse order because the ByteBuffer put writes in reverse order, a flip has no effect
         reverse(privateKey);
@@ -106,7 +103,7 @@ public class OpenClTask {
     }
 
     static void unsetLSB(byte[] privateKey, int bits) throws IllegalStateException {
-        byte[] privateKeyLSB32 = new byte[] {
+        byte[] privateKeyLSB32 = new byte[]{
             privateKey[privateKey.length - 4],
             privateKey[privateKey.length - 3],
             privateKey[privateKey.length - 2],
@@ -125,7 +122,7 @@ public class OpenClTask {
         privateKey[privateKey.length - 1] = privateKeyLSB32BitsUnset[3];
 
     }
-    
+
     static void setLSB(byte[] privateKey, int value) {
         byte[] iAsBytes = KeyUtility.intToByteArray(value);
         privateKey[privateKey.length - 4] |= iAsBytes[0];
@@ -225,51 +222,11 @@ public class OpenClTask {
         }
         return dstByteBuffer;
     }
-    
-    public static PublicKeyBytes[] transformByteBufferToPublicKeyBytes(ByteBuffer byteBuffer, int workSize, BigInteger secretBase) {
-        System.out.println("transform ByteBuffer to keys ...");
-        PublicKeyBytes[] publicKeys = new PublicKeyBytes[workSize];
-        long beforeTransform = System.currentTimeMillis();
-        for (int i = 0; i < workSize; i++) {
-            PublicKeyBytes publicKeyBytes = getPublicKeyFromByteBufferXY(byteBuffer, i, secretBase);
-            // int pubKeyInts[] = new int[PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array];
-            // System.arraycopy(dst_r, i*PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array , pubKeyInts, 0, PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array);
-            // byte[] pubKeyBytes = KeyUtility.publicKeyByteArrayFromIntArray(pubKeyInts);
-            publicKeys[i] = publicKeyBytes;
-        }
-        long afterTransform = System.currentTimeMillis();
-        System.out.println("... transformed in "+ (afterTransform-beforeTransform) + "ms");
-        return publicKeys;
-    }
 
-    public void releaseCl() { 
+    public void releaseCl() {
         clReleaseMemObject(srcMem);
     }
-    
-    /**
-     * Read the inner bytes in reverse order.
-     */
-    private static final PublicKeyBytes getPublicKeyFromByteBufferXY(ByteBuffer b, int keyNumber, BigInteger secretBase) {
-        byte[] uncompressed = new byte[PARITY_BYTES_LENGTH + TWO_COORDINATES_BYTES_LENGTH];
-        uncompressed[0] = PublicKeyBytes.PARITY_UNCOMPRESSED;
-        
-        int keyOffsetInByteBuffer = PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH*keyNumber;
-        
-        // read ByteBuffer
-        byte[] yx = new byte[PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH];
-        for (int i = 0; i < PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH; i++) {
-            yx[yx.length-1-i] = b.get(keyOffsetInByteBuffer+i);
-        }
-        
-        // copy x
-        System.arraycopy(yx, PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH, uncompressed, PublicKeyBytes.PARITY_BYTES_LENGTH, PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH);
-        // copy y
-        System.arraycopy(yx, 0, uncompressed, PublicKeyBytes.PARITY_BYTES_LENGTH+PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH, PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH);
-        
-        PublicKeyBytes publicKeyBytes = new PublicKeyBytes(secretBase.add(BigInteger.valueOf(keyNumber)), uncompressed);
-        return publicKeyBytes;
-    }
-    
+
     /**
      * https://stackoverflow.com/questions/3366925/deep-copy-duplicate-of-javas-bytebuffer/4074089
      */
@@ -289,7 +246,7 @@ public class OpenClTask {
 
         return clone;
     }
-    
+
     /**
      * https://stackoverflow.com/questions/12893758/how-to-reverse-the-byte-array-in-java
      */
@@ -299,10 +256,10 @@ public class OpenClTask {
         }
         if (USE_XOR_SWAP) {
             int len = array.length;
-            for (int i = 0; i < len / 2; i++){
-                array[i]        ^= array[len-i-1];
-                array[len-i-1]  ^= array[i];
-                array[i]        ^= array[len-i-1];
+            for (int i = 0; i < len / 2; i++) {
+                array[i] ^= array[len - i - 1];
+                array[len - i - 1] ^= array[i];
+                array[i] ^= array[len - i - 1];
             }
         } else {
             int i = 0;

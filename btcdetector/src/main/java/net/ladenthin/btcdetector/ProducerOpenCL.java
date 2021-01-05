@@ -18,9 +18,8 @@
 // @formatter:on
 package net.ladenthin.btcdetector;
 
-import org.bitcoinj.core.ECKey;
+import java.io.IOException;
 import java.math.BigInteger;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -35,49 +34,55 @@ public class ProducerOpenCL extends AbstractProducer {
 
     private final CProducerOpenCL producerOpenCL;
 
-    private final List<Future<Void>> producers = new ArrayList<>();
     private ThreadPoolExecutor resultReaderThreadPoolExecutor;
+    private OpenCLContext openCLContext;
 
-    public ProducerOpenCL(CProducerOpenCL producerOpenCL, AtomicBoolean shouldRun, Consumer consumer, KeyUtility keyUtility) {
-        super(shouldRun, consumer, keyUtility);
+    public ProducerOpenCL(CProducerOpenCL producerOpenCL, AtomicBoolean shouldRun, Consumer consumer, KeyUtility keyUtility, Random random) {
+        super(shouldRun, consumer, keyUtility, random);
         this.producerOpenCL = producerOpenCL;
     }
 
     @Override
-    public void startProducers() {
-        resultReaderThreadPoolExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(producerOpenCL.resultReaderThreads);
-        if (false) {
-            for (int i = 0; i < producerOpenCL.resultReaderThreads; i++) {
-                producers.add(resultReaderThreadPoolExecutor.submit(
-                        () -> {
-                            Random secureRandom = SecureRandom.getInstanceStrong();
-                            long secureRandomSeed = secureRandom.nextLong();
-                            produceKeysRunner(producerOpenCL.privateKeyBitLength, secureRandomSeed);
-                            return null;
-                        }));
-            }
+    public void initProducers() {
+        resultReaderThreadPoolExecutor = (ThreadPoolExecutor) Executors.newCachedThreadPool();
+        
+        openCLContext = new OpenCLContext(producerOpenCL.platformIndex, producerOpenCL.deviceType, producerOpenCL.deviceIndex, producerOpenCL.gridNumBits);
+        try {
+            openCLContext.init();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
     @Override
-    public void produceKeys(int bitLength, Random random) {
+    public void produceKeys() {
         BigInteger secret = null;
         try {
-            // Specifically, any 256-bit number between 0x1 and 0xFFFF FFFF FFFF FFFF FFFF FFFF FFFF FFFE BAAE DCE6 AF48 A03B BFD2 5E8C D036 4141 is a valid private key.
-            secret = keyUtility.createSecret(bitLength, random);
+            secret = keyUtility.createSecret(producerOpenCL.privateKeyMaxNumBits, random);
             if (secret.equals(BigInteger.ZERO) || secret.equals(BigInteger.ONE)) {
                 // ignore these, prevent an IllegalArgumentException
                 return;
             }
 
-            // create uncompressed
-            ECKey ecKey = ECKey.fromPrivate(secret, false);
-            PublicKeyBytes publicKeyBytes = new PublicKeyBytes(ecKey.getPrivKey(), ecKey.getPubKey());
-            consumer.consumeKey(publicKeyBytes);
+            final BigInteger threadLocalFinalSecret = secret;
+            
+            OpenCLGridResult createKeys = openCLContext.createKeys(threadLocalFinalSecret);
+            
+            resultReaderThreadPoolExecutor.submit(
+                () ->{
+                    PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
+                    createKeys.freeResult();
+                    for (PublicKeyBytes publicKeyBytes : publicKeys) {
+                        try {
+                            consumer.consumeKey(publicKeyBytes);
+                        } catch (Exception e) {
+                            logErrorInProduceKeys(e, threadLocalFinalSecret);
+                        }
+                    }
+                }
+            );
         } catch (Exception e) {
-            // fromPrivate can throw an IllegalArgumentException
-            // save the secret to be able to recover the issue
-            logger.error("Error in produceKey for secret " + secret + ".", e);
+            logErrorInProduceKeys(e, secret);
         }
     }
 

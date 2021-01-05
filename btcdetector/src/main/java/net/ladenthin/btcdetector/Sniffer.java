@@ -18,12 +18,19 @@
 // @formatter:on
 package net.ladenthin.btcdetector;
 
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import net.ladenthin.btcdetector.configuration.CProducerJava;
+import net.ladenthin.btcdetector.configuration.CProducerOpenCL;
 import net.ladenthin.btcdetector.configuration.CSniffing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Sniffer implements Runnable {
+public class Sniffer {
 
     protected Logger logger = LoggerFactory.getLogger(this.getClass());
 
@@ -32,15 +39,13 @@ public class Sniffer implements Runnable {
     protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
     private ConsumerJava consumerJava;
-    private ProducerJava producerJava;
-    private ProducerOpenCL producerOpenCL;
 
     public Sniffer(CSniffing sniffing) {
         this.sniffing = sniffing;
     }
 
-    @Override
-    public void run() {
+    public void startRunner() {
+        ExecutorService producerExecutorService = Executors.newCachedThreadPool();
 
         addSchutdownHook();
 
@@ -51,23 +56,36 @@ public class Sniffer implements Runnable {
             consumerJava.startStatisticsTimer();
         }
 
+        // It is already thread local, no need for {@link java.util.concurrent.ThreadLocalRandom}.
+        final Random random;
+        try {
+            random = SecureRandom.getInstanceStrong();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+
         if (sniffing.producerJava != null) {
-            producerJava = new ProducerJava(sniffing.producerJava, shouldRun, consumerJava, consumerJava.keyUtility);
-            producerJava.startProducers();
+            for (CProducerJava cProducerJava : sniffing.producerJava) {
+                ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, consumerJava, consumerJava.keyUtility, random);
+                producerJava.initProducers();
+                producerExecutorService.submit(producerJava);
+            }
         }
 
         if (sniffing.producerOpenCL != null) {
-            producerOpenCL = new ProducerOpenCL(sniffing.producerOpenCL, shouldRun, consumerJava, consumerJava.keyUtility);
-            producerOpenCL.startProducers();
+            for (CProducerOpenCL cProducerOpenCL : sniffing.producerOpenCL) {
+                ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, shouldRun, consumerJava, consumerJava.keyUtility, random);
+                producerOpenCL.initProducers();
+                producerExecutorService.submit(producerOpenCL);
+            }
         }
-
     }
 
     protected void addSchutdownHook() {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             shouldRun.set(false);
             consumerJava.timer.cancel();
-            logger.info("Shut down.");
+            logger.info("Shut down, please wait for remaining tasks.");
         }));
     }
 

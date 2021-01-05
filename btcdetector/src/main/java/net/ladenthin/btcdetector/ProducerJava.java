@@ -20,13 +20,7 @@ package net.ladenthin.btcdetector;
 
 import org.bitcoinj.core.ECKey;
 import java.math.BigInteger;
-import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.btcdetector.configuration.CProducerJava;
 
@@ -34,33 +28,20 @@ public class ProducerJava extends AbstractProducer {
 
     private final CProducerJava producerJava;
 
-    private final List<Future<Void>> producers = new ArrayList<>();
-
-    public ProducerJava(CProducerJava producerJava, AtomicBoolean shouldRun, Consumer consumer, KeyUtility keyUtility) {
-        super(shouldRun, consumer, keyUtility);
+    public ProducerJava(CProducerJava producerJava, AtomicBoolean shouldRun, Consumer consumer, KeyUtility keyUtility, Random random) {
+        super(shouldRun, consumer, keyUtility, random);
         this.producerJava = producerJava;
     }
 
     @Override
-    public void startProducers() {
-        ExecutorService executor = Executors.newFixedThreadPool(producerJava.producerThreads);
-        for (int i = 0; i < producerJava.producerThreads; i++) {
-            producers.add(executor.submit(
-                    () -> {
-                        Random secureRandom = SecureRandom.getInstanceStrong();
-                        long secureRandomSeed = secureRandom.nextLong();
-                        produceKeysRunner(producerJava.privateKeyBitLength, secureRandomSeed);
-                        return null;
-                    }));
-        }
+    public void initProducers() {
     }
 
     @Override
-    public void produceKeys(int bitLength, Random random) {
+    public void produceKeys() {
         BigInteger secret = null;
         try {
-            // Specifically, any 256-bit number between 0x1 and 0xFFFF FFFF FFFF FFFF FFFF FFFF FFFF FFFE BAAE DCE6 AF48 A03B BFD2 5E8C D036 4141 is a valid private key.
-            secret = keyUtility.createSecret(bitLength, random);
+            secret = keyUtility.createSecret(producerJava.privateKeyMaxNumBits, random);
             if (secret.equals(BigInteger.ZERO) || secret.equals(BigInteger.ONE)) {
                 // ignore these, prevent an IllegalArgumentException
                 return;
@@ -71,9 +52,7 @@ public class ProducerJava extends AbstractProducer {
             PublicKeyBytes publicKeyBytes = new PublicKeyBytes(ecKey.getPrivKey(), ecKey.getPubKey());
             consumer.consumeKey(publicKeyBytes);
         } catch (Exception e) {
-            // fromPrivate can throw an IllegalArgumentException
-            // save the secret to be able to recover the issue
-            logger.error("Error in produceKey for secret " + secret + ".", e);
+            logErrorInProduceKeys(e, secret);
         }
     }
 

@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.IOException;
 import net.ladenthin.btcdetector.AddressFilesToLMDB;
 import net.ladenthin.btcdetector.LMDBToAddressFile;
+import net.ladenthin.btcdetector.OpenCLInfo;
 import net.ladenthin.btcdetector.Sniffer;
 
 // VM option: -Dorg.slf4j.simpleLogger.defaultLogLevel=trace
@@ -70,7 +71,7 @@ public class Main implements Runnable {
         switch (configuration.command) {
             case Sniffing:
                 Sniffer sniffer = new Sniffer(configuration.sniffing);
-                sniffer.run();
+                sniffer.startRunner();
                 break;
             case LMDBToAddressFile:
                 LMDBToAddressFile lmdbToAddressFile = new LMDBToAddressFile(configuration.lmdbToAddressFile);
@@ -79,6 +80,9 @@ public class Main implements Runnable {
             case AddressFilesToLMDB:
                 AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(configuration.addressFilesToLMDB);
                 addressFilesToLMDB.run();
+                break;
+            case OpenCLInfo:
+                OpenCLInfo.openClInfo();
                 break;
             default:
                 throw new UnsupportedOperationException("Command: " + configuration.command.name() + " currently not supported." );

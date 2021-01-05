@@ -16,7 +16,15 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector.configuration;
+package net.ladenthin.btcdetector;
 
-public class CProducerJava extends CProducer {
+import java.io.IOException;
+import org.junit.Test;
+
+public class OpenCLInfoTest {
+    
+    @Test
+    public void openClInfoTest() throws IOException {
+        OpenCLInfo.openClInfo();
+    }
 }

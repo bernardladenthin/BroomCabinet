@@ -122,12 +122,12 @@ public class ConsumerJavaTest {
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun);
         consumerJava.initLMDB();
 
-        ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, consumerJava, consumerJava.keyUtility);
+        Random randomForProducer = new Random(TestAddresses42.RANDOM_SEED);
+        ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, consumerJava, consumerJava.keyUtility, randomForProducer);
 
         Logger logger = mock(Logger.class);
         consumerJava.setLogger(logger);
-        Random randomForProducer = new Random(TestAddresses42.RANDOM_SEED);
-        producerJava.produceKeys(KeyUtility.BIT_LENGTH, randomForProducer);
+        producerJava.produceKeys();
         consumerJava.consumeKeys();
 
         // assert
@@ -159,13 +159,13 @@ public class ConsumerJavaTest {
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun);
         consumerJava.initLMDB();
 
-        ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, consumerJava, consumerJava.keyUtility);
+        Random randomForProducer = new Random(TestAddresses1337.RANDOM_SEED);
+        ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, consumerJava, consumerJava.keyUtility, randomForProducer);
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);
         consumerJava.setLogger(logger);
-        Random randomForProducer = new Random(TestAddresses1337.RANDOM_SEED);
-        producerJava.produceKeys(KeyUtility.BIT_LENGTH, randomForProducer);
+        producerJava.produceKeys();
         consumerJava.consumeKeys();
 
         // assert

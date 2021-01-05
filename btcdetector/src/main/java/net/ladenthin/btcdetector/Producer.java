@@ -20,20 +20,19 @@ package net.ladenthin.btcdetector;
 
 import java.util.Random;
 
-public interface Producer {
+public interface Producer extends Runnable {
 
     /**
-     * Start multiple producer threads to procue keys with
+     * Initialize the producer to procue keys with
      * {@link #produceKeys(int, java.util.Random)} continuously.
      */
-    void startProducers();
+    void initProducers();
 
     /**
      * Create multiple keys for a specific bit length using {@link Random} and
      * push them to the {@link Consumer}.
-     *
-     * @param bitLength
-     * @param random
+     * 
+     * Specifically, any 256-bit number between 0x1 and 0xFFFF FFFF FFFF FFFF FFFF FFFF FFFF FFFE BAAE DCE6 AF48 A03B BFD2 5E8C D036 4141 is a valid private key.
      */
-    void produceKeys(int bitLength, Random random);
+    void produceKeys();
 }

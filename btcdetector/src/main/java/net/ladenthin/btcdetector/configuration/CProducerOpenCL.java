@@ -18,6 +18,17 @@
 // @formatter:on
 package net.ladenthin.btcdetector.configuration;
 
+import static org.jocl.CL.CL_DEVICE_TYPE_ALL;
+
 public class CProducerOpenCL extends CProducer {
-    public int resultReaderThreads = 1;
+
+    public int platformIndex = 0;
+    public long deviceType = CL_DEVICE_TYPE_ALL;
+    public int deviceIndex = 0;
+    /**
+     * Range: {@code 1} (inclusive) to
+     * {@link net.ladenthin.btcdetector.OpenClTask#MAX_GRID_NUM_BITS}
+     * (inclusive).
+     */
+    public int gridNumBits = 20;
 }

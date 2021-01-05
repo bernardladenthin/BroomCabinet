@@ -18,8 +18,7 @@
 // @formatter:on
 package net.ladenthin.btcdetector;
 
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
+import java.math.BigInteger;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
@@ -31,24 +30,27 @@ public abstract class AbstractProducer implements Producer {
     protected final AtomicBoolean shouldRun;
     protected final Consumer consumer;
     protected final KeyUtility keyUtility;
+    protected final Random random;
 
-    public AbstractProducer(AtomicBoolean shouldRun, Consumer consumer, KeyUtility keyUtility) {
+    public AbstractProducer(AtomicBoolean shouldRun, Consumer consumer, KeyUtility keyUtility, Random random) {
         this.shouldRun = shouldRun;
         this.consumer = consumer;
         this.keyUtility = keyUtility;
+        this.random = random;
     }
 
-    /**
-     * This method may runs in multiple threads.
-     */
-    protected void produceKeysRunner(int bitLength, long seed) throws NoSuchAlgorithmException {
-        logger.trace("Start produceKeysRunner.");
-        logger.info("Initialize random with seed: " + seed + ", bit length: " + bitLength);
-        // It is already thread local, no need for {@link java.util.concurrent.ThreadLocalRandom}.
-        Random random = SecureRandom.getInstanceStrong();
-        random.setSeed(seed);
+    @Override
+    public void run() {
         while (shouldRun.get()) {
-            produceKeys(bitLength, random);
+            produceKeys();
         }
+    }
+    
+    /**
+     * fromPrivate can throw an {@link IllegalArgumentException}.
+     * @param secret the secret to be able to recover the issue
+     */
+    protected void logErrorInProduceKeys(Exception e, BigInteger secret) {
+        logger.error("Error in produceKey for secret " + secret + ".", e);
     }
 }

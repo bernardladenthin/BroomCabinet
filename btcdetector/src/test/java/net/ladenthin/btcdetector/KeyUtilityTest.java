@@ -136,7 +136,7 @@ public class KeyUtilityTest {
     @Test
     public void createSecret() throws IOException {
         // act
-        BigInteger secret = new KeyUtility(null, new ByteBufferUtility(false)).createSecret(KeyUtility.BIT_LENGTH, new Random(42));
+        BigInteger secret = new KeyUtility(null, new ByteBufferUtility(false)).createSecret(KeyUtility.MAX_NUM_BITS, new Random(42));
 
         // assert
         assertThat(secret.toString(), is(not(equalTo(""))));
