@@ -44,7 +44,7 @@ public class ProducerOpenCL extends AbstractProducer {
 
     @Override
     public void initProducers() {
-        resultReaderThreadPoolExecutor = (ThreadPoolExecutor) Executors.newCachedThreadPool();
+        resultReaderThreadPoolExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(producerOpenCL.maxResultReaderThreads);
         
         openCLContext = new OpenCLContext(producerOpenCL.platformIndex, producerOpenCL.deviceType, producerOpenCL.deviceIndex, producerOpenCL.gridNumBits);
         try {
@@ -66,6 +66,7 @@ public class ProducerOpenCL extends AbstractProducer {
 
             final BigInteger threadLocalFinalSecret = secret;
             
+            waitTillFreeThreadsInPool();
             OpenCLGridResult createKeys = openCLContext.createKeys(threadLocalFinalSecret);
             
             resultReaderThreadPoolExecutor.submit(
@@ -84,6 +85,21 @@ public class ProducerOpenCL extends AbstractProducer {
         } catch (Exception e) {
             logErrorInProduceKeys(e, secret);
         }
+    }
+    
+    private void waitTillFreeThreadsInPool() throws InterruptedException {
+        boolean waitMessageOnce = true;
+        while(getFreeThreads() < 1) {
+            Thread.sleep(producerOpenCL.delayBlockedReader);
+            if (waitMessageOnce) {
+                waitMessageOnce = false;
+                logger.warn("No possible free threads to read OpenCL results. May increase maxResultReaderThreads.");
+            }
+        }
+    }
+
+    private int getFreeThreads() {
+        return resultReaderThreadPoolExecutor.getMaximumPoolSize() - resultReaderThreadPoolExecutor.getActiveCount();
     }
 
 }

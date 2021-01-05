@@ -36,9 +36,13 @@ import org.jocl.cl_command_queue;
 import org.jocl.cl_context;
 import org.jocl.cl_kernel;
 import org.jocl.cl_mem;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class OpenClTask {
 
+    protected Logger logger = LoggerFactory.getLogger(this.getClass());
+    
     /**
      * I din't know which is better.
      */
@@ -180,7 +184,6 @@ public class OpenClTask {
         }
         {
             // execute the kernel
-            System.out.println("execute kernel ...");
             long beforeExecute = System.currentTimeMillis();
             clEnqueueNDRangeKernel(
                     commandQueue,
@@ -196,11 +199,11 @@ public class OpenClTask {
             clFinish(commandQueue);
 
             long afterExecute = System.currentTimeMillis();
-            System.out.println("... executed in: " + (afterExecute - beforeExecute) + "ms");
+            
+            logger.info("Executed OpenCL kernel in " + (afterExecute - beforeExecute) + "ms");
         }
         {
             // read the dst buffer
-            System.out.println("Read the output data: " + ((getDstSizeInBytes() / 1024) / 1024) + "Mb ...");
             long beforeRead = System.currentTimeMillis();
 
             clEnqueueReadBuffer(
@@ -218,7 +221,8 @@ public class OpenClTask {
             clReleaseMemObject(dstMem);
 
             long afterRead = System.currentTimeMillis();
-            System.out.println("... read in: " + (afterRead - beforeRead) + "ms");
+            
+            logger.info("Read OpenCL data "+((getDstSizeInBytes() / 1024) / 1024) + "Mb in " + (afterRead - beforeRead) + "ms");
         }
         return dstByteBuffer;
     }

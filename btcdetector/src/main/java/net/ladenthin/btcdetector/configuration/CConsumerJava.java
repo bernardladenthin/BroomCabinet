@@ -22,6 +22,9 @@ public class CConsumerJava {
     public CLMDBConfigurationReadOnly lmdbConfigurationReadOnly;
     public int printStatisticsEveryNSeconds = 60;
     public int threads = 1;
+    /**
+     * in ms.
+     */
     public long delayEmptyConsumer = 10;
     public int queueSize = 100000;
 }

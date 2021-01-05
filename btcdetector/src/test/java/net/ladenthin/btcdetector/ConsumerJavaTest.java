@@ -90,7 +90,7 @@ public class ConsumerJavaTest {
         List<String> arguments = logCaptor.getAllValues();
         verify(logger, atLeast(3)).info(logCaptor.capture());
 
-        assertThat(arguments.get(0), is(equalTo("Statistics: [Checked 0 M keys in 0 minutes] [0 keys/second] [0 keys/minute] [Times an empty consumer: 0] [Average contains time: 0 ms] [Hits: 0]")));
+        assertThat(arguments.get(0), is(equalTo("Statistics: [Checked 0 M keys in 0 minutes] [0 k keys/second] [0 M keys/minute] [Times an empty consumer: 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
     }
 
     @Test(expected = IllegalArgumentException.class)

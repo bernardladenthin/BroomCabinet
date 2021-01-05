@@ -31,4 +31,10 @@ public class CProducerOpenCL extends CProducer {
      * (inclusive).
      */
     public int gridNumBits = 20;
+    
+    public int maxResultReaderThreads = 4;
+    /**
+     * in ms.
+     */
+    public int delayBlockedReader = 2000;
 }
