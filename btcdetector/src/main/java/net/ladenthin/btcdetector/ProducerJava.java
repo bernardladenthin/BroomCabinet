@@ -50,7 +50,8 @@ public class ProducerJava extends AbstractProducer {
             // create uncompressed
             ECKey ecKey = ECKey.fromPrivate(secret, false);
             PublicKeyBytes publicKeyBytes = new PublicKeyBytes(ecKey.getPrivKey(), ecKey.getPubKey());
-            consumer.consumeKey(publicKeyBytes);
+            PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[]{publicKeyBytes};
+            consumer.consumeKeys(publicKeyBytesArray);
         } catch (Exception e) {
             logErrorInProduceKeys(e, secret);
         }

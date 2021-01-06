@@ -200,7 +200,9 @@ public class OpenClTask {
 
             long afterExecute = System.currentTimeMillis();
             
-            logger.info("Executed OpenCL kernel in " + (afterExecute - beforeExecute) + "ms");
+            if (logger.isTraceEnabled()) {
+                logger.trace("Executed OpenCL kernel in " + (afterExecute - beforeExecute) + "ms");
+            }
         }
         {
             // read the dst buffer
@@ -221,8 +223,9 @@ public class OpenClTask {
             clReleaseMemObject(dstMem);
 
             long afterRead = System.currentTimeMillis();
-            
-            logger.info("Read OpenCL data "+((getDstSizeInBytes() / 1024) / 1024) + "Mb in " + (afterRead - beforeRead) + "ms");
+            if (logger.isTraceEnabled()) {
+                logger.trace("Read OpenCL data "+((getDstSizeInBytes() / 1024) / 1024) + "Mb in " + (afterRead - beforeRead) + "ms");
+            }
         }
         return dstByteBuffer;
     }

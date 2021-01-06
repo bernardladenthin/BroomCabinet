@@ -62,7 +62,7 @@ public class ConsumerJava implements Consumer {
     protected Persistence persistence;
     
     private final List<Future<Void>> consumers = new ArrayList<>();
-    protected final LinkedBlockingQueue<PublicKeyBytes> keysQueue;
+    protected final LinkedBlockingQueue<PublicKeyBytes[]> keysQueue;
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
     private final AtomicBoolean shouldRun;
 
@@ -151,43 +151,48 @@ public class ConsumerJava implements Consumer {
     }
     
     void consumeKeys() {
-        PublicKeyBytes publicKeyBytes = keysQueue.poll();
-        while (publicKeyBytes != null) {
+        PublicKeyBytes[] publicKeyBytesArray = keysQueue.poll();
+        while (publicKeyBytesArray != null) {
+            for (PublicKeyBytes publicKeyBytes : publicKeyBytesArray) {
+                byte[] hash160Uncompressed = publicKeyBytes.getUncompressedKeyHashFast();
+                ByteBuffer hash160UncompressedAsByteBuffer = byteBufferUtility.byteArrayToByteBuffer(hash160Uncompressed);
+                boolean containsAddressUncompressed = containsAddress(hash160UncompressedAsByteBuffer);
 
-            byte[] hash160Uncompressed = publicKeyBytes.getUncompressedKeyHashFast();
-            ByteBuffer hash160UncompressedAsByteBuffer = byteBufferUtility.byteArrayToByteBuffer(hash160Uncompressed);
-            boolean containsAddressUncompressed = containsAddress(hash160UncompressedAsByteBuffer);
-            
-            byte[] hash160Compressed = publicKeyBytes.getCompressedKeyHashFast();
-            ByteBuffer hash160CompressedAsByteBuffer = byteBufferUtility.byteArrayToByteBuffer(hash160Compressed);
-            boolean containsAddressCompressed = containsAddress(hash160CompressedAsByteBuffer);
+                byte[] hash160Compressed = publicKeyBytes.getCompressedKeyHashFast();
+                ByteBuffer hash160CompressedAsByteBuffer = byteBufferUtility.byteArrayToByteBuffer(hash160Compressed);
+                boolean containsAddressCompressed = containsAddress(hash160CompressedAsByteBuffer);
+                
+                // Free the buffer, a direct buffer keeps a long time in memory otherwise.
+                ByteBufferUtility.freeByteBuffer(hash160UncompressedAsByteBuffer);
+                ByteBufferUtility.freeByteBuffer(hash160CompressedAsByteBuffer);
 
-            if (containsAddressUncompressed) {
-                hits.incrementAndGet();
-                ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
-                String hitMessageUncompressed = HIT_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
-                logger.info(hitMessageUncompressed);
-            }
-            
-            if (containsAddressCompressed) {
-                hits.incrementAndGet();
-                ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
-                String hitMessageCompressed = HIT_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
-                logger.info(hitMessageCompressed);
-            }
-            
-            if(!containsAddressUncompressed && !containsAddressCompressed) {
-                if (logger.isTraceEnabled()) {
+                if (containsAddressUncompressed) {
+                    hits.incrementAndGet();
                     ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
-                    String missMessageUncompressed = MISS_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
-                    logger.trace(missMessageUncompressed);
-                    
+                    String hitMessageUncompressed = HIT_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
+                    logger.info(hitMessageUncompressed);
+                }
+
+                if (containsAddressCompressed) {
+                    hits.incrementAndGet();
                     ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
-                    String missMessageCompressed = MISS_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
-                    logger.trace(missMessageCompressed);
+                    String hitMessageCompressed = HIT_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
+                    logger.info(hitMessageCompressed);
+                }
+
+                if(!containsAddressUncompressed && !containsAddressCompressed) {
+                    if (logger.isTraceEnabled()) {
+                        ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
+                        String missMessageUncompressed = MISS_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
+                        logger.trace(missMessageUncompressed);
+
+                        ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
+                        String missMessageCompressed = MISS_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
+                        logger.trace(missMessageCompressed);
+                    }
                 }
             }
-            publicKeyBytes = keysQueue.poll();
+            publicKeyBytesArray = keysQueue.poll();
         }
     }
 
@@ -197,8 +202,6 @@ public class ConsumerJava implements Consumer {
             logger.debug("Time before persistence.containsAddress: " + timeBefore);
         }
         boolean containsAddress = persistence.containsAddress(hash160AsByteBuffer);
-        // Free the buffer immediately, a direct buffer keeps a long time in memory otherwise.
-        ByteBufferUtility.freeByteBuffer(hash160AsByteBuffer);
         long timeAfter = System.currentTimeMillis();
         long timeDelta = timeAfter - timeBefore;
         checkedKeys.incrementAndGet();
@@ -211,7 +214,7 @@ public class ConsumerJava implements Consumer {
     }
 
     @Override
-    public void consumeKey(PublicKeyBytes publicKeyBytes) throws InterruptedException {
+    public void consumeKeys(PublicKeyBytes[] publicKeyBytes) throws InterruptedException {
         keysQueue.put(publicKeyBytes);
     }
 }

@@ -71,14 +71,12 @@ public class ProducerOpenCL extends AbstractProducer {
             
             resultReaderThreadPoolExecutor.submit(
                 () ->{
-                    PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
+                    PublicKeyBytes[] publicKeyBytesArray = createKeys.getPublicKeyBytes();
                     createKeys.freeResult();
-                    for (PublicKeyBytes publicKeyBytes : publicKeys) {
-                        try {
-                            consumer.consumeKey(publicKeyBytes);
-                        } catch (Exception e) {
-                            logErrorInProduceKeys(e, threadLocalFinalSecret);
-                        }
+                    try {
+                        consumer.consumeKeys(publicKeyBytesArray);
+                    } catch (Exception e) {
+                        logErrorInProduceKeys(e, threadLocalFinalSecret);
                     }
                 }
             );
@@ -88,13 +86,9 @@ public class ProducerOpenCL extends AbstractProducer {
     }
     
     private void waitTillFreeThreadsInPool() throws InterruptedException {
-        boolean waitMessageOnce = true;
         while(getFreeThreads() < 1) {
             Thread.sleep(producerOpenCL.delayBlockedReader);
-            if (waitMessageOnce) {
-                waitMessageOnce = false;
-                logger.warn("No possible free threads to read OpenCL results. May increase maxResultReaderThreads.");
-            }
+            logger.trace("No possible free threads to read OpenCL results. May increase maxResultReaderThreads.");
         }
     }
 
