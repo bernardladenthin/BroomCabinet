@@ -38,6 +38,7 @@ import net.ladenthin.btcdetector.configuration.CConsumerJava;
 import net.ladenthin.btcdetector.persistence.Persistence;
 import net.ladenthin.btcdetector.persistence.PersistenceUtils;
 import net.ladenthin.btcdetector.persistence.lmdb.LMDBPersistence;
+import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.core.ECKey;
 
 public class ConsumerJava implements Consumer {
@@ -45,6 +46,7 @@ public class ConsumerJava implements Consumer {
     private static final int ONE_SECOND_IN_MILLISECONDS = 1000;
     public static final String MISS_PREFIX = "miss: Could not find the address: ";
     public static final String HIT_PREFIX = "hit: Found the address: ";
+    public static final String HIT_SAFE_PREFIX = "hit: safe log: ";
 
     protected Logger logger = LoggerFactory.getLogger(this.getClass());
 
@@ -171,6 +173,9 @@ public class ConsumerJava implements Consumer {
         PublicKeyBytes[] publicKeyBytesArray = keysQueue.poll();
         while (publicKeyBytesArray != null) {
             for (PublicKeyBytes publicKeyBytes : publicKeyBytesArray) {
+                if (publicKeyBytes.isInvalid()) {
+                    continue;
+                }
                 byte[] hash160Uncompressed = publicKeyBytes.getUncompressedKeyHashFast();
                 
                 threadLocalReuseableByteBuffer.rewind();
@@ -187,16 +192,18 @@ public class ConsumerJava implements Consumer {
                 boolean containsAddressCompressed = containsAddress(threadLocalReuseableByteBuffer);
 
                 if (containsAddressUncompressed) {
+                    // immediately log the secret
+                    safeLog(publicKeyBytes, hash160Uncompressed, hash160Compressed);
                     hits.incrementAndGet();
-                    logger.info(HIT_PREFIX + publicKeyBytes.getSecretKey());
                     ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
                     String hitMessageUncompressed = HIT_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
                     logger.info(hitMessageUncompressed);
                 }
 
                 if (containsAddressCompressed) {
+                    // immediately log the secret
+                    safeLog(publicKeyBytes, hash160Uncompressed, hash160Compressed);
                     hits.incrementAndGet();
-                    logger.info(HIT_PREFIX + publicKeyBytes.getSecretKey());
                     ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
                     String hitMessageCompressed = HIT_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
                     logger.info(hitMessageCompressed);
@@ -216,6 +223,17 @@ public class ConsumerJava implements Consumer {
             }
             publicKeyBytesArray = keysQueue.poll();
         }
+    }
+    
+    /**
+     * Try to log safe informations which may not thrown an exception.
+     */
+    private void safeLog(PublicKeyBytes publicKeyBytes, byte[] hash160Uncompressed, byte[] hash160Compressed) {
+        logger.info(HIT_SAFE_PREFIX +"publicKeyBytes.getSecretKey(): " + publicKeyBytes.getSecretKey());
+        logger.info(HIT_SAFE_PREFIX +"publicKeyBytes.getUncompressed(): " + Hex.encodeHexString(publicKeyBytes.getUncompressed()));
+        logger.info(HIT_SAFE_PREFIX +"publicKeyBytes.getCompressed(): " + Hex.encodeHexString(publicKeyBytes.getCompressed()));
+        logger.info(HIT_SAFE_PREFIX +"hash160Uncompressed: " + Hex.encodeHexString(hash160Uncompressed));
+        logger.info(HIT_SAFE_PREFIX +"hash160Compressed: " + Hex.encodeHexString(hash160Compressed));
     }
 
     private boolean containsAddress(ByteBuffer hash160AsByteBuffer) {

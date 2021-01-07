@@ -47,7 +47,7 @@ public class AddressFileToLMDBTest extends LMDBBase {
     public void addressFilesToLMDB_createLMDB_containingTestAddressesHashesWithCorrectAmount(boolean compressed, boolean useStaticAmount) throws IOException {
         // arrange, act
         AddressesFiles addressesFiles = new TestAddressesFiles(compressed);
-        Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, addressesFiles);
+        Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, addressesFiles, false);
 
         // assert
         try {
@@ -73,7 +73,7 @@ public class AddressFileToLMDBTest extends LMDBBase {
     public void addressFilesToLMDB_createLMDBWithStaticAddresses_containingStaticHashes(boolean useStaticAmount) throws IOException {
         // arrange, act
         AddressesFiles testAddresses = new StaticAddressesFiles();
-        Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddresses);
+        Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddresses, false);
 
         // assert
         try {

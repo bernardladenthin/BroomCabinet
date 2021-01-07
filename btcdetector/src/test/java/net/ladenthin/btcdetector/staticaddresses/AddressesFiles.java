@@ -24,7 +24,7 @@ import org.junit.rules.TemporaryFolder;
 
 public interface AddressesFiles {
 
-    List<String> createAddressesFiles(TemporaryFolder folder) throws IOException;
+    List<String> createAddressesFiles(TemporaryFolder folder, boolean addInvalidAddresses) throws IOException;
 
     TestAddresses getTestAddresses();
 }

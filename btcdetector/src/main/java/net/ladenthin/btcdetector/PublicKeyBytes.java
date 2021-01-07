@@ -40,6 +40,9 @@ public class PublicKeyBytes {
     public static final int PARITY_COMPRESSED_ODD = 3;
     
     public static final int HASH160_SIZE = 20;
+    
+    public final static int PUBLIC_KEY_UNCOMPRESSED_BYTES = PARITY_BYTES_LENGTH + TWO_COORDINATES_BYTES_LENGTH;
+    public final static int PUBLIC_KEY_COMPRESSED_BYTES = PARITY_BYTES_LENGTH + ONE_COORDINATE_BYTE_LENGTH;
 
     private final byte[] compressed;
     private final byte[] uncompressed;
@@ -57,6 +60,18 @@ public class PublicKeyBytes {
         return uncompressed;
     }
     
+    public boolean isInvalid() {
+        return isInvalid(secretKey);
+    }
+    
+    public static boolean isInvalid(BigInteger secret) {
+        if (BigInteger.ZERO.equals(secret) || BigInteger.ONE.equals(secret)) {
+            // prevent an IllegalArgumentException
+            return true;
+        }
+        return false;
+    }
+    
     public PublicKeyBytes(BigInteger secretKey, byte[] uncompressed) {
         this(secretKey, uncompressed, createCompressedBytes(uncompressed));
     }
@@ -69,7 +84,7 @@ public class PublicKeyBytes {
     
     public static byte[] createCompressedBytes(byte[] uncompressed) {
         // add one byte for format sign
-        byte[] compressed = new byte[PARITY_BYTES_LENGTH + ONE_COORDINATE_BYTE_LENGTH];
+        byte[] compressed = new byte[PUBLIC_KEY_COMPRESSED_BYTES];
         
         // copy x
         System.arraycopy(uncompressed, PARITY_BYTES_LENGTH, compressed, PublicKeyBytes.PARITY_BYTES_LENGTH, PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH);

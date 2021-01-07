@@ -204,4 +204,21 @@ public class KeyUtility {
         }
     }
 
+    /**
+     * https://bitbucket.org/connect2id/nimbus-srp/pull-requests/6/remove-leading-zero-byte-when-converting/diff
+     * Converts a BigInteger into a byte array ignoring the sign of the
+     * BigInteger, according to SRP specification
+     *
+     * @param bigInteger BigInteger, must not be null
+     *
+     * @return byte array (leading byte is always != 0), empty array if
+     * BigInteger is zero.
+     */
+    public static byte[] bigIntegerToBytes(final BigInteger bigInteger) {
+        byte[] bytes = bigInteger.toByteArray();
+        if (bytes[0] == 0) {
+            return Arrays.copyOfRange(bytes, 1, bytes.length);
+        }
+        return bytes;
+    }
 }

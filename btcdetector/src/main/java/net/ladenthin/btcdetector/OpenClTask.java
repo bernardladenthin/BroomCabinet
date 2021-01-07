@@ -20,6 +20,7 @@ package net.ladenthin.btcdetector;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import org.apache.commons.codec.binary.Hex;
 import static org.jocl.CL.CL_MEM_READ_ONLY;
 import static org.jocl.CL.CL_MEM_USE_HOST_PTR;
@@ -101,11 +102,11 @@ public class OpenClTask {
 
     public void setSrcPrivateKeyChunk(BigInteger privateKeyTemplate) {
         BigInteger privateKeyChunk = privateKeyTemplate.andNot(killBits);
-        byte[] privateKeyChunkAsByteArray = privateKeyChunk.toByteArray();
-        if (true) {
-            System.out.println("privateKeyTemplate: " + Hex.encodeHexString(privateKeyTemplate.toByteArray()));
-            System.out.println("killBits: " + Hex.encodeHexString(killBits.toByteArray()));
-            System.out.println("privateKeyChunkAsByteArray: " + Hex.encodeHexString(privateKeyChunk.toByteArray()));
+        byte[] privateKeyChunkAsByteArray = KeyUtility.bigIntegerToBytes(privateKeyChunk);
+        if (logger.isTraceEnabled()) {
+            logger.trace("privateKeyTemplate: " + Hex.encodeHexString(privateKeyTemplate.toByteArray()));
+            logger.trace("killBits: " + Hex.encodeHexString(killBits.toByteArray()));
+            logger.trace("privateKeyChunkAsByteArray: " + Hex.encodeHexString(privateKeyChunk.toByteArray()));
         }
 
         // put key in reverse order because the ByteBuffer put writes in reverse order, a flip has no effect
@@ -113,6 +114,7 @@ public class OpenClTask {
         srcByteBuffer.clear();
         srcByteBuffer.put(privateKeyChunkAsByteArray, 0, privateKeyChunkAsByteArray.length);
     }
+
     
     public ByteBuffer executeKernel(cl_kernel kernel, cl_command_queue commandQueue) {
         // allocate a new dst buffer that a clone afterwards is not necessary

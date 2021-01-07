@@ -29,10 +29,10 @@ import org.junit.rules.TemporaryFolder;
 public class TestAddressesLMDB {
     
     
-    public File createTestLMDB(TemporaryFolder folder, AddressesFiles addressesFiles, boolean useStaticAmount) throws IOException {
+    public File createTestLMDB(TemporaryFolder folder, AddressesFiles addressesFiles, boolean useStaticAmount, boolean addInvalidAddresses) throws IOException {
         CAddressFilesToLMDB addressFilesToLMDBConfigurationWrite = new CAddressFilesToLMDB();
         
-        List<String> files = addressesFiles.createAddressesFiles(folder);
+        List<String> files = addressesFiles.createAddressesFiles(folder, addInvalidAddresses);
         addressFilesToLMDBConfigurationWrite.addressesFiles.addAll(files);
         addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite = new CLMDBConfigurationWrite();
         addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite.useStaticAmount = useStaticAmount;

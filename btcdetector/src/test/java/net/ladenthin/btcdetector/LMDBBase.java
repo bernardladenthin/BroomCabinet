@@ -39,10 +39,10 @@ public class LMDBBase {
     protected final NetworkParameters networkParameters = MainNetParams.get();
     protected final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(true));
     
-    protected Persistence createAndFillAndOpenLMDB(boolean useStaticAmount, AddressesFiles addressesFiles) throws IOException {
+    protected Persistence createAndFillAndOpenLMDB(boolean useStaticAmount, AddressesFiles addressesFiles, boolean addInvalidAddresses) throws IOException {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
-        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, addressesFiles, useStaticAmount);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, addressesFiles, useStaticAmount, addInvalidAddresses);
 
         CLMDBConfigurationReadOnly lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();

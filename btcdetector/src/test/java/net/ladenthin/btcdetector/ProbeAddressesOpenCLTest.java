@@ -42,6 +42,7 @@ import static org.jocl.CL.*;
 import java.util.Arrays;
 import java.util.Random;
 import net.ladenthin.btcdetector.staticaddresses.TestAddresses42;
+import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.params.MainNetParams;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -426,6 +427,19 @@ public class ProbeAddressesOpenCLTest {
         
         openCLContext.createKeys(secretKeyBase);
         openCLContext.release();
+    }
+    
+    @Test
+    public void setSrcPrivateKeyChunk_aBigIntegerHaveLeadingZeros_Copy32BytesOnlyAndNoExceptionThrown() throws IOException {
+        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
+        KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
+        
+        // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        OpenCLContext openCLContext = new OpenCLContext(0, CL_DEVICE_TYPE_ALL, 0, 20);
+        openCLContext.init();
+        
+        OpenClTask openClTask = openCLContext.getOpenClTask();
+        openClTask.setSrcPrivateKeyChunk(KeyUtilityTest.MAX_PRIVATE_KEY);
     }
     
     @Test

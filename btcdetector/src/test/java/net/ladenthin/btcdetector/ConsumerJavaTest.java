@@ -26,10 +26,12 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
+import static net.ladenthin.btcdetector.ConsumerJava.HIT_SAFE_PREFIX;
 import net.ladenthin.btcdetector.configuration.CConsumerJava;
 import net.ladenthin.btcdetector.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.btcdetector.configuration.CProducerJava;
@@ -37,6 +39,8 @@ import net.ladenthin.btcdetector.staticaddresses.TestAddresses1337;
 import net.ladenthin.btcdetector.staticaddresses.TestAddresses42;
 import net.ladenthin.btcdetector.staticaddresses.TestAddressesFiles;
 import net.ladenthin.btcdetector.staticaddresses.TestAddressesLMDB;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.params.MainNetParams;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -111,7 +115,7 @@ public class ConsumerJavaTest {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
         TestAddressesFiles testAddresses = new TestAddressesFiles(compressed);
-        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, useStaticAmount);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, useStaticAmount, false);
 
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
@@ -133,19 +137,34 @@ public class ConsumerJavaTest {
         consumerJava.consumeKeys(createHash160ByteBuffer());
 
         // assert
-        verify(logger, times(2)).info(logCaptor.capture());
+        verify(logger, times(6)).info(logCaptor.capture());
 
         List<String> arguments = logCaptor.getAllValues();
 
         ECKey key = new TestAddresses42(1, compressed).getECKeys().get(0);
+        ECKey keyUncompressed = ECKey.fromPrivate(key.getPrivKey(), false);
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), new ByteBufferUtility(false));
         
+        PublicKeyBytes publicKeyBytes = new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey());
+        
         // to prevent any exception in further hit message creation and a possible missing hit message, log the secret alone first that a recovery is possible
-        String hitMessageSafe = ConsumerJava.HIT_PREFIX + key.getPrivKey();
-        assertThat(arguments.get(0), is(equalTo(hitMessageSafe)));
+        String hitMessageSecretKey = ConsumerJava.HIT_SAFE_PREFIX + "publicKeyBytes.getSecretKey(): " + key.getPrivKey();
+        assertThat(arguments.get(0), is(equalTo(hitMessageSecretKey)));
+        
+        String hitMessagePublicKeyBytesUncompressed = ConsumerJava.HIT_SAFE_PREFIX + "publicKeyBytes.getUncompressed(): " + Hex.encodeHexString(publicKeyBytes.getUncompressed());
+        assertThat(arguments.get(1), is(equalTo(hitMessagePublicKeyBytesUncompressed)));
+        
+        String hitMessagePublicKeyBytesCompressed = ConsumerJava.HIT_SAFE_PREFIX + "publicKeyBytes.getCompressed(): " + Hex.encodeHexString(publicKeyBytes.getCompressed());
+        assertThat(arguments.get(2), is(equalTo(hitMessagePublicKeyBytesCompressed)));
+        
+        String hitMessageHash160Uncompressed = ConsumerJava.HIT_SAFE_PREFIX + "hash160Uncompressed: " + Hex.encodeHexString(publicKeyBytes.getUncompressedKeyHashFast());
+        assertThat(arguments.get(3), is(equalTo(hitMessageHash160Uncompressed)));
+        
+        String hitMessageHash160Compressed = ConsumerJava.HIT_SAFE_PREFIX + "hash160Compressed: " + Hex.encodeHexString(publicKeyBytes.getCompressedKeyHashFast());
+        assertThat(arguments.get(4), is(equalTo(hitMessageHash160Compressed)));
         
         String hitMessageFull = ConsumerJava.HIT_PREFIX + keyUtility.createKeyDetails(key);
-        assertThat(arguments.get(1), is(equalTo(hitMessageFull)));
+        assertThat(arguments.get(5), is(equalTo(hitMessageFull)));
     }
 
     @Test
@@ -154,7 +173,7 @@ public class ConsumerJavaTest {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
         TestAddressesFiles testAddresses = new TestAddressesFiles(compressed);
-        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, useStaticAmount);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, useStaticAmount, false);
 
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
@@ -189,6 +208,31 @@ public class ConsumerJavaTest {
         String missMessageCompressed = ConsumerJava.MISS_PREFIX + keyUtility.createKeyDetails(unknownKeyCompressed);
         assertThat(arguments.get(0), is(equalTo(missMessageUncompressed)));
         assertThat(arguments.get(1), is(equalTo(missMessageCompressed)));
+    }
+
+    @Test
+    public void consumeKeys_invalidSecretGiven_continueExpectedAndNoExceptionThrown() throws IOException, InterruptedException, DecoderException {
+        TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
+
+        TestAddressesFiles testAddresses = new TestAddressesFiles(false);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
+
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+
+        AtomicBoolean shouldRun = new AtomicBoolean(true);
+
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun);
+        consumerJava.initLMDB();
+
+        Logger logger = mock(Logger.class);
+        consumerJava.setLogger(logger);
+
+        PublicKeyBytes invalidPublicKeyBytes = new PublicKeyBytes(BigInteger.ONE, Hex.decodeHex("0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"));
+        PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[]{invalidPublicKeyBytes};
+        consumerJava.consumeKeys(publicKeyBytesArray);
+        consumerJava.consumeKeys(createHash160ByteBuffer());
     }
 
     private ByteBuffer createHash160ByteBuffer() {

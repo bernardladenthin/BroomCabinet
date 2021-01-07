@@ -156,6 +156,10 @@ public class OpenCLContext {
         openClTask = new OpenClTask(context, gridNumBits);
     }
     
+    OpenClTask getOpenClTask() {
+        return openClTask;
+    }
+    
     public void release() {
         openClTask.releaseCl();
         clReleaseKernel(kernel);

@@ -52,7 +52,7 @@ public class LMDBPersistencePerformanceTest {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
-        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, false);
 
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.threads = CONSUMER_THREADS;

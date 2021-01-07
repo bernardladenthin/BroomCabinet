@@ -131,7 +131,7 @@ public class TestAddressesFiles implements AddressesFiles {
     }
 
     @Override
-    public List<String> createAddressesFiles(TemporaryFolder folder) throws IOException {
+    public List<String> createAddressesFiles(TemporaryFolder folder, boolean addInvalidAddresses) throws IOException {
         File one = folder.newFile(ADDRESS_FILE_ONE);
         File two = folder.newFile(ADDRESS_FILE_TWO);
         File three = folder.newFile(ADDRESS_FILE_THREE);
@@ -144,12 +144,23 @@ public class TestAddressesFiles implements AddressesFiles {
         Files.write(two.toPath(), Arrays.asList(
                 testAddresses.getIndexAsBase58String(3)
         ));
-        Files.write(three.toPath(), Arrays.asList(
-                "# Test",
-                "1WrOngAddressFormat",
-                new StaticBitcoinP2WPKHAddress().publicAddress,
-                testAddresses.getIndexAsBase58String(4)
-        ));
+        
+        List<String> listThree = new ArrayList<>();
+        
+        {
+            listThree.add("# Test");
+            listThree.add("1WrOngAddressFormat");
+            listThree.add(new StaticBitcoinP2WPKHAddress().publicAddress);
+            listThree.add(testAddresses.getIndexAsBase58String(4));
+
+            if (addInvalidAddresses) {
+                // secret : 1
+                listThree.add("1EHNa6Q4Jz2uvNExL497mE43ikXhwF6kZm");
+                listThree.add("1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH");
+            }   
+        }
+        
+        Files.write(three.toPath(), listThree);
         List<String> addresses = new ArrayList<>();
         addresses.add(one.getAbsolutePath());
         addresses.add(two.getAbsolutePath());

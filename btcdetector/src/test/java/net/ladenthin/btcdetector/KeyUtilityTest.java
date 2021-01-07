@@ -28,6 +28,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.params.MainNetParams;
+import org.bouncycastle.util.encoders.Hex;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.*;
@@ -35,6 +36,9 @@ import static org.hamcrest.Matchers.*;
 public class KeyUtilityTest {
 
     private final StaticKey staticKey = new StaticKey();
+    
+    
+    public static final BigInteger MAX_PRIVATE_KEY = new BigInteger("2").pow(KeyUtility.MAX_NUM_BITS).subtract(BigInteger.ONE);
 
     @Before
     public void init() throws IOException {
@@ -174,6 +178,30 @@ public class KeyUtilityTest {
 
         // assert
         assertThat(keyDetails, is(equalTo("privateKeyBigInteger: [" + staticKey.privateKeyBigInteger + "] privateKeyBytes: [" + Arrays.toString(staticKey.privateKeyBytes) + "] privateKeyHex: [" + staticKey.privateKeyHex + "] WiF: [" + staticKey.privateKeyWiFCompressed + "] publicKeyAsHex: [" + staticKey.publicKeyCompressedHex + "] publicKeyHash160Hex: [" + staticKey.publicKeyCompressedHash160Hex + "] publicKeyHash160Base58: [" + staticKey.publicKeyCompressed + "] Compressed: [true]")));
+    }
+    // </editor-fold>
+    
+    
+    // <editor-fold defaultstate="collapsed" desc="bigIntegerToBytes">
+    @Test
+    public void bigIntegerToBytes_maxPrivateKeyGiven_returnWithoutLeadingZeros() throws IOException {
+        // arrange
+        BigInteger key = MAX_PRIVATE_KEY;
+        byte[] maxPrivateKey = key.toByteArray();
+        assertThat(maxPrivateKey.length, is(equalTo(33)));
+
+        // act
+        byte[] keyWithoutLeadingZeros = KeyUtility.bigIntegerToBytes(key);
+
+        // assert
+        assertThat(keyWithoutLeadingZeros.length, is(equalTo(32)));
+        
+        // copy back
+        byte[] arrayWithLeadingZero = new byte[33];
+        System.arraycopy(keyWithoutLeadingZeros, 0, arrayWithLeadingZero, 1, 32);
+        
+        // assert content equals
+        assertThat(arrayWithLeadingZero, is(equalTo(maxPrivateKey)));
     }
     // </editor-fold>
 }

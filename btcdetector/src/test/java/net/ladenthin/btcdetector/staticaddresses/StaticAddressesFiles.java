@@ -37,7 +37,7 @@ public class StaticAddressesFiles implements AddressesFiles {
     }
 
     @Override
-    public List<String> createAddressesFiles(TemporaryFolder folder) throws IOException {
+    public List<String> createAddressesFiles(TemporaryFolder folder, boolean addInvalidAddresses) throws IOException {
         File one = folder.newFile(ADDRESS_FILE_ONE);
 
         Files.write(one.toPath(), Arrays.asList(

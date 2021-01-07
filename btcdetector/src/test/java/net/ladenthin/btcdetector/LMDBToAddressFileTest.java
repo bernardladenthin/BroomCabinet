@@ -47,7 +47,7 @@ public class LMDBToAddressFileTest extends LMDBBase {
     public void writeAllAmountsToAddressFile(boolean compressed, boolean useStaticAmount) throws IOException {
         // arrange
         TestAddressesFiles testAddressesFiles = new TestAddressesFiles(compressed);
-        Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles);
+        Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false);
 
         // act
         File file = folder.newFile();
@@ -83,7 +83,7 @@ public class LMDBToAddressFileTest extends LMDBBase {
     public void writeAllAmountsToAddressFileHex(boolean compressed, boolean useStaticAmount) throws IOException {
         // arrange
         TestAddressesFiles testAddressesFiles = new TestAddressesFiles(compressed);
-        Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles);
+        Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false);
 
         // act
         File file = folder.newFile();

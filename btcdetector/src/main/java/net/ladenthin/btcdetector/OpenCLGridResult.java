@@ -20,8 +20,6 @@ package net.ladenthin.btcdetector;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import static net.ladenthin.btcdetector.PublicKeyBytes.PARITY_BYTES_LENGTH;
-import static net.ladenthin.btcdetector.PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH;
 
 public class OpenCLGridResult {
 
@@ -69,7 +67,7 @@ public class OpenCLGridResult {
      * Read the inner bytes in reverse order.
      */
     private static final PublicKeyBytes getPublicKeyFromByteBufferXY(ByteBuffer b, int keyNumber, BigInteger secretKeyBase) {
-        byte[] uncompressed = new byte[PARITY_BYTES_LENGTH + TWO_COORDINATES_BYTES_LENGTH];
+        byte[] uncompressed = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
         uncompressed[0] = PublicKeyBytes.PARITY_UNCOMPRESSED;
         
         int keyOffsetInByteBuffer = PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH*keyNumber;
