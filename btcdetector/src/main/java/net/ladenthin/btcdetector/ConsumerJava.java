@@ -54,7 +54,7 @@ public class ConsumerJava implements Consumer {
     protected final AtomicLong checkedKeysSumOfTimeToCheckContains = new AtomicLong();
     protected final AtomicLong emptyConsumer = new AtomicLong();
     protected final AtomicLong hits = new AtomicLong();
-    protected long startTime;
+    protected long startTime = 0;
 
     protected final CConsumerJava consumerJava;
     protected final Timer timer = new Timer();
@@ -72,6 +72,10 @@ public class ConsumerJava implements Consumer {
         this.shouldRun = shouldRun;
     }
 
+    Logger getLogger() {
+        return logger;
+    }
+    
     void setLogger(Logger logger) {
         this.logger = logger;
     }
@@ -102,13 +106,15 @@ public class ConsumerJava implements Consumer {
         if (period <= 0) {
             throw new IllegalArgumentException("period must be greater than 0.");
         }
-        startTime = System.currentTimeMillis();
 
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
+                if (startTime == 0) {
+                    startTime = System.currentTimeMillis();
+                }
                 // get transient information
-                long uptime = System.currentTimeMillis() - startTime;
+                long uptime = Math.max(System.currentTimeMillis() - startTime,1);
 
                 String message = createStatisticsMessage(uptime, checkedKeys.get(), checkedKeysSumOfTimeToCheckContains.get(), emptyConsumer.get(), hits.get());
 
@@ -139,13 +145,17 @@ public class ConsumerJava implements Consumer {
             if (keysQueue.size() >= consumerJava.queueSize) {
                 logger.warn("Attention, queue is full. Please increase queue size.");
             }
-            consumeKeys();
-            emptyConsumer.incrementAndGet();
             try {
+                consumeKeys();
+                emptyConsumer.incrementAndGet();
                 Thread.sleep(consumerJava.delayEmptyConsumer);
             } catch (InterruptedException e) {
                 // we need to catch the exception to not break the thread
                 logger.error("Ignore InterruptedException during Thread.sleep.", e);
+            } catch (Exception e) {
+                // log every Exception because it's hard to debug and we do not break down the thread loop
+                logger.error("Error in consumeKeysRunner()." , e);
+                e.printStackTrace();
             }
         }
     }

@@ -101,7 +101,7 @@ public class LMDBPersistence implements Persistence {
             lmdb_h160ToAmount = env.openDbi(DB_NAME_HASH160_TO_COINT, MDB_CREATE);
         } else if (lmdbConfigurationReadOnly != null) {
             BufferProxy<ByteBuffer> bufferProxy = getBufferProxyByUseProxyOptimal(lmdbConfigurationReadOnly.useProxyOptimal);
-            env = create(bufferProxy).setMaxDbs(DB_COUNT).open(new File(lmdbConfigurationReadOnly.lmdbDirectory), EnvFlags.MDB_RDONLY_ENV);
+            env = create(bufferProxy).setMaxDbs(DB_COUNT).open(new File(lmdbConfigurationReadOnly.lmdbDirectory), EnvFlags.MDB_RDONLY_ENV, EnvFlags.MDB_NOLOCK);
             lmdb_h160ToAmount = env.openDbi(DB_NAME_HASH160_TO_COINT);
         } else {
             throw new IllegalArgumentException();

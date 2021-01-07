@@ -113,7 +113,6 @@ public class ConsumerJavaTest {
         File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, useStaticAmount);
 
         CConsumerJava cConsumerJava = new CConsumerJava();
-        CProducerJava cProducerJava = new CProducerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
 
@@ -123,6 +122,8 @@ public class ConsumerJavaTest {
         consumerJava.initLMDB();
 
         Random randomForProducer = new Random(TestAddresses42.RANDOM_SEED);
+        
+        CProducerJava cProducerJava = new CProducerJava();
         ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, consumerJava, consumerJava.keyUtility, randomForProducer);
 
         Logger logger = mock(Logger.class);
@@ -150,7 +151,6 @@ public class ConsumerJavaTest {
         File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, useStaticAmount);
 
         CConsumerJava cConsumerJava = new CConsumerJava();
-        CProducerJava cProducerJava = new CProducerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
 
@@ -160,6 +160,8 @@ public class ConsumerJavaTest {
         consumerJava.initLMDB();
 
         Random randomForProducer = new Random(TestAddresses1337.RANDOM_SEED);
+        
+        CProducerJava cProducerJava = new CProducerJava();
         ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, consumerJava, consumerJava.keyUtility, randomForProducer);
 
         Logger logger = mock(Logger.class);
