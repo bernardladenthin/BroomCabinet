@@ -41,8 +41,8 @@ public class LMDBPersistencePerformanceTest {
     
     private final static int ARRAY_SIZE = 1024*8;
     private final static BigInteger PRIVATE_KEY = BigInteger.valueOf(1337);
-    private final static int CONSUMER_THREADS = 4;
-    private final static int TEST_TIME_IN_SECONDS = 9999;
+    private final static int CONSUMER_THREADS = 32;
+    private final static int TEST_TIME_IN_SECONDS = 15;
     
     private final static int KEYS_QUEUE_SIZE = CONSUMER_THREADS*2;
     private final static int PRODUCER_THREADS = KEYS_QUEUE_SIZE;

@@ -18,7 +18,9 @@
 // @formatter:on
 package net.ladenthin.btcdetector;
 
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import org.apache.commons.codec.binary.Hex;
 import static org.jocl.CL.CL_MEM_READ_ONLY;
 import static org.jocl.CL.CL_MEM_USE_HOST_PTR;
 import static org.jocl.CL.CL_MEM_WRITE_ONLY;
@@ -53,11 +55,12 @@ public class OpenClTask {
     public static final int PRIVATE_KEY_BYTES = 32;
     public static final int PUBLIC_KEY_BYTES = 64;
 
-    public static final int MAX_GRID_NUM_BITS = 32;
+    public static final int MAX_GRID_NUM_BITS = 24;
     public static final int BITS_PER_BYTE = 8;
 
     private final cl_context context;
     private final int gridNumBits;
+    private final BigInteger killBits;
     private final ByteBuffer srcByteBuffer;
     private final Pointer srcPointer;
 
@@ -68,6 +71,7 @@ public class OpenClTask {
         if (gridNumBits > MAX_GRID_NUM_BITS) {
             throw new IllegalArgumentException("Max grid num bits must be lower or equal than " + MAX_GRID_NUM_BITS + ".");
         }
+        killBits = BigInteger.valueOf(2).pow(gridNumBits).subtract(BigInteger.ONE);
 
         this.context = context;
         this.gridNumBits = gridNumBits;
@@ -88,53 +92,28 @@ public class OpenClTask {
     }
 
     public int getSrcSizeInBytes() {
-        return PRIVATE_KEY_BYTES * getWorkSize();
+        return PRIVATE_KEY_BYTES;
     }
 
     public int getDstSizeInBytes() {
         return PUBLIC_KEY_BYTES * getWorkSize();
     }
 
-    public void setSrcPrivateKeyChunk(byte[] privateKeyTemplate) {
-        byte[] privateKey = privateKeyTemplate.clone();
-
-        unsetLSB(privateKey, gridNumBits);
+    public void setSrcPrivateKeyChunk(BigInteger privateKeyTemplate) {
+        BigInteger privateKeyChunk = privateKeyTemplate.andNot(killBits);
+        byte[] privateKeyChunkAsByteArray = privateKeyChunk.toByteArray();
+        if (true) {
+            System.out.println("privateKeyTemplate: " + Hex.encodeHexString(privateKeyTemplate.toByteArray()));
+            System.out.println("killBits: " + Hex.encodeHexString(killBits.toByteArray()));
+            System.out.println("privateKeyChunkAsByteArray: " + Hex.encodeHexString(privateKeyChunk.toByteArray()));
+        }
 
         // put key in reverse order because the ByteBuffer put writes in reverse order, a flip has no effect
-        reverse(privateKey);
+        reverse(privateKeyChunkAsByteArray);
         srcByteBuffer.clear();
-        srcByteBuffer.put(privateKey, 0, privateKey.length);
+        srcByteBuffer.put(privateKeyChunkAsByteArray, 0, privateKeyChunkAsByteArray.length);
     }
-
-    static void unsetLSB(byte[] privateKey, int bits) throws IllegalStateException {
-        byte[] privateKeyLSB32 = new byte[]{
-            privateKey[privateKey.length - 4],
-            privateKey[privateKey.length - 3],
-            privateKey[privateKey.length - 2],
-            privateKey[privateKey.length - 1]
-        };
-
-        int privateKeyLSB32AsInt = KeyUtility.byteArrayToInt(privateKeyLSB32);
-        // unset bits with shift operator
-        privateKeyLSB32AsInt = privateKeyLSB32AsInt >> bits;
-        privateKeyLSB32AsInt = privateKeyLSB32AsInt << bits;
-
-        byte[] privateKeyLSB32BitsUnset = KeyUtility.intToByteArray(privateKeyLSB32AsInt);
-        privateKey[privateKey.length - 4] = privateKeyLSB32BitsUnset[0];
-        privateKey[privateKey.length - 3] = privateKeyLSB32BitsUnset[1];
-        privateKey[privateKey.length - 2] = privateKeyLSB32BitsUnset[2];
-        privateKey[privateKey.length - 1] = privateKeyLSB32BitsUnset[3];
-
-    }
-
-    static void setLSB(byte[] privateKey, int value) {
-        byte[] iAsBytes = KeyUtility.intToByteArray(value);
-        privateKey[privateKey.length - 4] |= iAsBytes[0];
-        privateKey[privateKey.length - 3] |= iAsBytes[1];
-        privateKey[privateKey.length - 2] |= iAsBytes[2];
-        privateKey[privateKey.length - 1] |= iAsBytes[3];
-    }
-
+    
     public ByteBuffer executeKernel(cl_kernel kernel, cl_command_queue commandQueue) {
         // allocate a new dst buffer that a clone afterwards is not necessary
         final ByteBuffer dstByteBuffer = ByteBuffer.allocateDirect(getDstSizeInBytes());

@@ -19,6 +19,8 @@
 package net.ladenthin.btcdetector;
 
 import com.google.common.io.Resources;
+import com.tngtech.java.junit.dataprovider.DataProviderRunner;
+import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -48,7 +50,9 @@ import static org.hamcrest.Matchers.is;
 
 import org.jocl.*;
 import org.junit.Ignore;
+import org.junit.runner.RunWith;
 
+@RunWith(DataProviderRunner.class)
 public class ProbeAddressesOpenCLTest {
 
     private static final TestAddresses42 testAddresses = new TestAddresses42(1024, false);
@@ -390,6 +394,40 @@ public class ProbeAddressesOpenCLTest {
     public final static int PUBLIC_KEY_LENGTH_X_Y_WITHOUT_PARITY = 16;
     public final static int SECP256K1_PRE_COMPUTED_XY_SIZE = 12*8;
 
+    
+    @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIT_SIZES_LOWER_THAN_25, location = CommonDataProvider.class)
+    public void createKeys_bitsLowerThan25_use32BitNevertheless(int bitSize) throws IOException {
+        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
+        KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
+        
+        // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        OpenCLContext openCLContext = new OpenCLContext(0, CL_DEVICE_TYPE_ALL, 0, bitSize);
+        openCLContext.init();
+        
+        Random sr = new SecureRandom();
+        BigInteger secretKeyBase = keyUtility.createSecret(bitSize, sr);
+        
+        openCLContext.createKeys(secretKeyBase);
+        openCLContext.release();
+    }
+    
+    @Test
+    public void createKeys_bitsLowerThanGridSize_useMoreNevertheless() throws IOException {
+        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
+        KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
+        
+        // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        OpenCLContext openCLContext = new OpenCLContext(0, CL_DEVICE_TYPE_ALL, 0, BITS_FOR_GRID);
+        openCLContext.init();
+        
+        Random sr = new SecureRandom();
+        BigInteger secretKeyBase = keyUtility.createSecret(BITS_FOR_GRID-1, sr);
+        
+        openCLContext.createKeys(secretKeyBase);
+        openCLContext.release();
+    }
+    
     @Test
     public void hashcatOpenClGrid() throws IOException {
         
@@ -419,22 +457,24 @@ public class ProbeAddressesOpenCLTest {
         hashPublicKeys(publicKeys, souts);
         hashPublicKeysFast(publicKeys, souts);
         
+        BigInteger killBits = BigInteger.valueOf(2).pow(BITS_FOR_GRID).subtract(BigInteger.ONE);
+        BigInteger privateKeyChunk = secretKeyBase.andNot(killBits);
+        
         for (int i = 0; i < publicKeys.length; i++) {
             if (i%10_000 == 0) {
                 System.out.println("progress: " + i);
             }
-            byte[] privateKey = secretKeyBase.toByteArray();
-            OpenClTask.unsetLSB(privateKey, BITS_FOR_GRID);
-            OpenClTask.setLSB(privateKey, i);
+            BigInteger privateKey = privateKeyChunk.or(BigInteger.valueOf(i));
+            byte[] privateKeyAsByteArray = privateKey.toByteArray();
             
             if(souts) {
-                System.out.println("privateKey: " + Arrays.toString(privateKey));
+                System.out.println("privateKey: " + Arrays.toString(privateKeyAsByteArray));
             }
             
             PublicKeyBytes publicKeyBytes = publicKeys[i];
             
-            ECKey resultOpenCLKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(privateKey, publicKeyBytes.getCompressed());
-            ECKey resultOpenCLKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(privateKey, publicKeyBytes.getUncompressed());
+            ECKey resultOpenCLKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(privateKeyAsByteArray, publicKeyBytes.getCompressed());
+            ECKey resultOpenCLKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(privateKeyAsByteArray, publicKeyBytes.getUncompressed());
             byte[] resultOpenCLKeyCompressedPubKey = resultOpenCLKeyCompressed.getPubKey();
             byte[] resultOpenCLKeyCompressedPubKeyHash = resultOpenCLKeyCompressed.getPubKeyHash();
             byte[] resultOpenCLKeyUncompressedPubKey = resultOpenCLKeyUncompressed.getPubKey();
@@ -485,6 +525,7 @@ public class ProbeAddressesOpenCLTest {
             assertThat(publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility), is(equalTo(expectedUncompressedPublicKeyHashBase58)));
             
         }
+        openCLContext.release();
     }
 
     private void hashPublicKeysFast(PublicKeyBytes[] publicKeys, final boolean souts) {

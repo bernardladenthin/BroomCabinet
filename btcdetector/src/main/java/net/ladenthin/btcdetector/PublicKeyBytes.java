@@ -18,6 +18,7 @@
 // @formatter:on
 package net.ladenthin.btcdetector;
 
+import com.google.common.hash.Hashing;
 import java.math.BigInteger;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.bitcoinj.core.Utils;
@@ -37,6 +38,8 @@ public class PublicKeyBytes {
     public static final int PARITY_UNCOMPRESSED = 4;
     public static final int PARITY_COMPRESSED_EVEN = 2;
     public static final int PARITY_COMPRESSED_ODD = 3;
+    
+    public static final int HASH160_SIZE = 20;
 
     private final byte[] compressed;
     private final byte[] uncompressed;
@@ -103,10 +106,10 @@ public class PublicKeyBytes {
      * {@link DigestUtils}.
      */
     public static byte[] sha256hash160Fast(byte[] input) {
-        byte[] sha256 = DigestUtils.sha256(input);
+        byte[] sha256 = Hashing.sha256().hashBytes(input).asBytes();
         RIPEMD160Digest digest = new RIPEMD160Digest();
         digest.update(sha256, 0, sha256.length);
-        byte[] out = new byte[20];
+        byte[] out = new byte[HASH160_SIZE];
         digest.doFinal(out, 0);
         return out;
     }

@@ -141,12 +141,15 @@ public class ConsumerJava implements Consumer {
      */
     private void consumeKeysRunner() {
         logger.trace("Start consumeKeysRunner.");
+        
+        ByteBuffer threadLocalReuseableByteBuffer = ByteBuffer.allocateDirect(PublicKeyBytes.HASH160_SIZE);
+        
         while (shouldRun.get()) {
             if (keysQueue.size() >= consumerJava.queueSize) {
                 logger.warn("Attention, queue is full. Please increase queue size.");
             }
             try {
-                consumeKeys();
+                consumeKeys(threadLocalReuseableByteBuffer);
                 emptyConsumer.incrementAndGet();
                 Thread.sleep(consumerJava.delayEmptyConsumer);
             } catch (InterruptedException e) {
@@ -158,26 +161,34 @@ public class ConsumerJava implements Consumer {
                 e.printStackTrace();
             }
         }
+        
+        if (threadLocalReuseableByteBuffer != null) {
+            ByteBufferUtility.freeByteBuffer(threadLocalReuseableByteBuffer);
+        }
     }
     
-    void consumeKeys() {
+    void consumeKeys(ByteBuffer threadLocalReuseableByteBuffer) {
         PublicKeyBytes[] publicKeyBytesArray = keysQueue.poll();
         while (publicKeyBytesArray != null) {
             for (PublicKeyBytes publicKeyBytes : publicKeyBytesArray) {
                 byte[] hash160Uncompressed = publicKeyBytes.getUncompressedKeyHashFast();
-                ByteBuffer hash160UncompressedAsByteBuffer = byteBufferUtility.byteArrayToByteBuffer(hash160Uncompressed);
-                boolean containsAddressUncompressed = containsAddress(hash160UncompressedAsByteBuffer);
+                
+                threadLocalReuseableByteBuffer.rewind();
+                threadLocalReuseableByteBuffer.put(hash160Uncompressed);
+                threadLocalReuseableByteBuffer.flip();
+                
+                boolean containsAddressUncompressed = containsAddress(threadLocalReuseableByteBuffer);
 
                 byte[] hash160Compressed = publicKeyBytes.getCompressedKeyHashFast();
-                ByteBuffer hash160CompressedAsByteBuffer = byteBufferUtility.byteArrayToByteBuffer(hash160Compressed);
-                boolean containsAddressCompressed = containsAddress(hash160CompressedAsByteBuffer);
+                threadLocalReuseableByteBuffer.rewind();
+                threadLocalReuseableByteBuffer.put(hash160Compressed);
+                threadLocalReuseableByteBuffer.flip();
                 
-                // Free the buffer, a direct buffer keeps a long time in memory otherwise.
-                ByteBufferUtility.freeByteBuffer(hash160UncompressedAsByteBuffer);
-                ByteBufferUtility.freeByteBuffer(hash160CompressedAsByteBuffer);
+                boolean containsAddressCompressed = containsAddress(threadLocalReuseableByteBuffer);
 
                 if (containsAddressUncompressed) {
                     hits.incrementAndGet();
+                    logger.info(HIT_PREFIX + publicKeyBytes.getSecretKey());
                     ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
                     String hitMessageUncompressed = HIT_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
                     logger.info(hitMessageUncompressed);
@@ -185,6 +196,7 @@ public class ConsumerJava implements Consumer {
 
                 if (containsAddressCompressed) {
                     hits.incrementAndGet();
+                    logger.info(HIT_PREFIX + publicKeyBytes.getSecretKey());
                     ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
                     String hitMessageCompressed = HIT_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
                     logger.info(hitMessageCompressed);

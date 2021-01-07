@@ -165,7 +165,7 @@ public class OpenCLContext {
     }
     
     public OpenCLGridResult createKeys(BigInteger secretKeyBase) {
-        openClTask.setSrcPrivateKeyChunk(secretKeyBase.toByteArray());
+        openClTask.setSrcPrivateKeyChunk(secretKeyBase);
         ByteBuffer dstByteBuffer = openClTask.executeKernel(kernel, commandQueue);
         
         OpenCLGridResult openCLGridResult = new OpenCLGridResult(secretKeyBase, openClTask.getWorkSize(), dstByteBuffer);

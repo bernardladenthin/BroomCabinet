@@ -23,6 +23,41 @@ import com.tngtech.java.junit.dataprovider.DataProvider;
 public class CommonDataProvider {
 
     /**
+     * For {@link #bitSizesLowerThan25()}.
+     */
+    public final static String DATA_PROVIDER_BIT_SIZES_LOWER_THAN_25 = "bitSizesLowerThan25";
+
+    @DataProvider
+    public static Object[][] bitSizesLowerThan25() {
+        return new Object[][]{
+            {1},
+            {2},
+            {3},
+            {4},
+            {5},
+            {6},
+            {7},
+            {8},
+            {9},
+            {10},
+            {11},
+            {12},
+            {13},
+            {14},
+            {15},
+            {16},
+            {17},
+            {18},
+            {19},
+            {20},
+            {21},
+            {22},
+            {23},
+            {net.ladenthin.btcdetector.OpenClTask.MAX_GRID_NUM_BITS}
+        };
+    }
+    
+    /**
      * For {@link #compressedAndAmount()}.
      */
     public final static String DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT = "compressedAndStaticAmount";

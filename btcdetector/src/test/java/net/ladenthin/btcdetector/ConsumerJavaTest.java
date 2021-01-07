@@ -26,6 +26,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -129,17 +130,22 @@ public class ConsumerJavaTest {
         Logger logger = mock(Logger.class);
         consumerJava.setLogger(logger);
         producerJava.produceKeys();
-        consumerJava.consumeKeys();
+        consumerJava.consumeKeys(createHash160ByteBuffer());
 
         // assert
-        verify(logger, times(1)).info(logCaptor.capture());
+        verify(logger, times(2)).info(logCaptor.capture());
 
         List<String> arguments = logCaptor.getAllValues();
 
         ECKey key = new TestAddresses42(1, compressed).getECKeys().get(0);
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), new ByteBufferUtility(false));
-        String hitMessage = ConsumerJava.HIT_PREFIX + keyUtility.createKeyDetails(key);
-        assertThat(arguments.get(0), is(equalTo(hitMessage)));
+        
+        // to prevent any exception in further hit message creation and a possible missing hit message, log the secret alone first that a recovery is possible
+        String hitMessageSafe = ConsumerJava.HIT_PREFIX + key.getPrivKey();
+        assertThat(arguments.get(0), is(equalTo(hitMessageSafe)));
+        
+        String hitMessageFull = ConsumerJava.HIT_PREFIX + keyUtility.createKeyDetails(key);
+        assertThat(arguments.get(1), is(equalTo(hitMessageFull)));
     }
 
     @Test
@@ -168,7 +174,8 @@ public class ConsumerJavaTest {
         when(logger.isTraceEnabled()).thenReturn(true);
         consumerJava.setLogger(logger);
         producerJava.produceKeys();
-        consumerJava.consumeKeys();
+        
+        consumerJava.consumeKeys(createHash160ByteBuffer());
 
         // assert
         verify(logger, times(2)).trace(logCaptor.capture());
@@ -182,5 +189,10 @@ public class ConsumerJavaTest {
         String missMessageCompressed = ConsumerJava.MISS_PREFIX + keyUtility.createKeyDetails(unknownKeyCompressed);
         assertThat(arguments.get(0), is(equalTo(missMessageUncompressed)));
         assertThat(arguments.get(1), is(equalTo(missMessageCompressed)));
+    }
+
+    private ByteBuffer createHash160ByteBuffer() {
+        ByteBuffer threadLocalReuseableByteBuffer = ByteBuffer.allocateDirect(PublicKeyBytes.HASH160_SIZE);
+        return threadLocalReuseableByteBuffer;
     }
 }
