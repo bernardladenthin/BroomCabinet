@@ -238,6 +238,62 @@ public class ConsumerJavaTest {
         consumerJava.consumeKeys(publicKeyBytesArray);
         consumerJava.consumeKeys(createHash160ByteBuffer());
     }
+    
+    @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED, location = CommonDataProvider.class)
+    public void consumeKeys_invalidPublicKeyHashUncompressedGiven_ThrowException(boolean compressed) throws IOException, InterruptedException, DecoderException {
+        TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
+
+        TestAddressesFiles testAddresses = new TestAddressesFiles(false);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
+
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        cConsumerJava.runtimePublicKeyCalculationCheck = true;
+
+        AtomicBoolean shouldRun = new AtomicBoolean(true);
+
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun);
+        consumerJava.initLMDB();
+
+        Logger logger = mock(Logger.class);
+        consumerJava.setLogger(logger);
+
+        ECKey ecKey = ECKey.fromPrivate(BigInteger.valueOf(1337), false);
+        
+        PublicKeyBytes invalidPublicKeyBytes = new PublicKeyBytes(ecKey.getPrivKey(),ecKey.getPubKey());
+        // invalidate compressed or uncompressed
+        if (compressed) {
+            invalidPublicKeyBytes.getCompressed()[7] = 0;
+        } else {
+            invalidPublicKeyBytes.getUncompressed()[7] = 0;
+        }
+        PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[]{invalidPublicKeyBytes};
+        consumerJava.consumeKeys(publicKeyBytesArray);
+        consumerJava.consumeKeys(createHash160ByteBuffer());
+        
+        // assert
+        verify(logger, times(6)).error(logCaptor.capture());
+        
+        List<String> arguments = logCaptor.getAllValues();
+        
+        if (compressed) {
+            assertThat(arguments.get(0), is(equalTo("fromPrivateCompressed.getPubKeyHash() != hash160Compressed")));
+            assertThat(arguments.get(1), is(equalTo("getSecretKey: 1337")));
+            assertThat(arguments.get(2), is(equalTo("pubKeyCompressed: 02db0c51cc634a0096374b0b895584a3ca2fb3bea4fd0ee2361f8db63a650fcee6")));
+            assertThat(arguments.get(3), is(equalTo("pubKeyCompressedFromEcKey: 02db0c51cc634a4096374b0b895584a3ca2fb3bea4fd0ee2361f8db63a650fcee6")));
+            assertThat(arguments.get(4), is(equalTo("hash160Compressed: a1039a5001eaccd75abb339b446b83b1ecf54ef7")));
+            assertThat(arguments.get(5), is(equalTo("hash160CompressedFromEcKey: 879f5696d90c1c280fa3c7d77723ebc59d7ac108")));
+        } else {
+            assertThat(arguments.get(0), is(equalTo("fromPrivateUncompressed.getPubKeyHash() != hash160Uncompressed")));
+            assertThat(arguments.get(1), is(equalTo("getSecretKey: 1337")));
+            assertThat(arguments.get(2), is(equalTo("pubKeyUncompressed: 04db0c51cc634a0096374b0b895584a3ca2fb3bea4fd0ee2361f8db63a650fcee67ec0bd2baea1ae184bd16fd397b0e64d5d28257f85836486367fe33cc5b6e6a0")));
+            assertThat(arguments.get(3), is(equalTo("pubKeyUncompressedFromEcKey: 04db0c51cc634a4096374b0b895584a3ca2fb3bea4fd0ee2361f8db63a650fcee67ec0bd2baea1ae184bd16fd397b0e64d5d28257f85836486367fe33cc5b6e6a0")));
+            assertThat(arguments.get(4), is(equalTo("hash160Uncompressed: 1a69285cb42032d77801a15a30357d510b247100")));
+            assertThat(arguments.get(5), is(equalTo("hash160UncompressedFromEcKey: e02e1cae178d3a2f84a5d897ee8b7ed6c0e2bbc4")));
+        }
+    }
 
     private ByteBuffer createHash160ByteBuffer() {
         ByteBuffer threadLocalReuseableByteBuffer = ByteBuffer.allocateDirect(PublicKeyBytes.HASH160_SIZE);

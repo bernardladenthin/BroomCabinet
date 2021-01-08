@@ -86,6 +86,19 @@ public class CommonDataProvider {
     }
     
     /**
+     * For {@link #compressed()}.
+     */
+    public final static String DATA_PROVIDER_COMPRESSED = "compressed";
+
+    @DataProvider
+    public static Object[][] compressed() {
+        return new Object[][]{
+            {true},
+            {false},
+        };
+    }
+    
+    /**
      * For {@link #bitcoinInvalidP2WPKHAddresses()}.
      */
     public final static String DATA_PROVIDER_BITCOIN_INVALID_P2WPKH_ADDRESSES = "bitcoinInvalidP2WPKHAddresses";
