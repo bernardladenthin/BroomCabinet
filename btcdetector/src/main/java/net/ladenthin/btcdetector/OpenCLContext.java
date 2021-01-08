@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.commons.codec.binary.Hex;
 import static org.jocl.CL.CL_CONTEXT_PLATFORM;
 import static org.jocl.CL.clBuildProgram;
 import static org.jocl.CL.clCreateCommandQueueWithProperties;
@@ -47,8 +48,12 @@ import org.jocl.cl_queue_properties;
 import org.jocl.CL;
 import static org.jocl.CL.clReleaseKernel;
 import static org.jocl.CL.clReleaseProgram;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class OpenCLContext {
+
+    protected Logger logger = LoggerFactory.getLogger(this.getClass());
     
     public String[] getOpenCLPrograms() throws IOException {
         List<String> resourceNamesContent = getResourceNamesContent(getResourceNames());
@@ -86,6 +91,7 @@ public class OpenCLContext {
     private final long deviceType;
     private final int deviceIndex;
     private final int gridNumBits;
+    private final BigInteger killBits;
 
     private cl_context_properties contextProperties;
     private cl_device_id device;
@@ -100,6 +106,7 @@ public class OpenCLContext {
         this.deviceType = deviceType;
         this.deviceIndex = deviceIndex;
         this.gridNumBits = gridNumBits;
+        this.killBits = BigInteger.valueOf(2).pow(gridNumBits).subtract(BigInteger.ONE);
     }
     
     public void init() throws IOException {
@@ -168,11 +175,20 @@ public class OpenCLContext {
         clReleaseContext(context);
     }
     
-    public OpenCLGridResult createKeys(BigInteger secretKeyBase) {
-        openClTask.setSrcPrivateKeyChunk(secretKeyBase);
+    public OpenCLGridResult createKeys(BigInteger privateKeyBase) {
+        privateKeyBase = privateKeyBase.andNot(killBits);
+        
+        if (logger.isTraceEnabled()) {
+            logger.trace("privateKeyTemplate: " + Hex.encodeHexString(privateKeyBase.toByteArray()));
+            logger.trace("killBits: " + Hex.encodeHexString(killBits.toByteArray()));
+            logger.trace("privateKeyChunkAsByteArray: " + Hex.encodeHexString(privateKeyBase.toByteArray()));
+        }
+        
+        
+        openClTask.setSrcPrivateKeyChunk(privateKeyBase);
         ByteBuffer dstByteBuffer = openClTask.executeKernel(kernel, commandQueue);
         
-        OpenCLGridResult openCLGridResult = new OpenCLGridResult(secretKeyBase, openClTask.getWorkSize(), dstByteBuffer);
+        OpenCLGridResult openCLGridResult = new OpenCLGridResult(privateKeyBase, openClTask.getWorkSize(), dstByteBuffer);
         return openCLGridResult;
     }
     

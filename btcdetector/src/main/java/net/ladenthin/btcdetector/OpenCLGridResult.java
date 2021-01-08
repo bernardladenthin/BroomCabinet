@@ -67,6 +67,11 @@ public class OpenCLGridResult {
      * Read the inner bytes in reverse order.
      */
     private static final PublicKeyBytes getPublicKeyFromByteBufferXY(ByteBuffer b, int keyNumber, BigInteger secretKeyBase) {
+        BigInteger secret = secretKeyBase.add(BigInteger.valueOf(keyNumber));
+        if(BigInteger.ZERO.equals(secret)) {
+            // the calculated key is invalid, return a fallback
+            return PublicKeyBytes.INVALID_KEY_ONE;
+        }
         byte[] uncompressed = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
         uncompressed[0] = PublicKeyBytes.PARITY_UNCOMPRESSED;
         
@@ -83,8 +88,24 @@ public class OpenCLGridResult {
         // copy y
         System.arraycopy(yx, 0, uncompressed, PublicKeyBytes.PARITY_BYTES_LENGTH+PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH, PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH);
         
-        PublicKeyBytes publicKeyBytes = new PublicKeyBytes(secretKeyBase.add(BigInteger.valueOf(keyNumber)), uncompressed);
+        if (false) {
+            assertValidResult(uncompressed);
+        }
+        PublicKeyBytes publicKeyBytes = new PublicKeyBytes(secret, uncompressed);
         return publicKeyBytes;
+    }
+    
+    private static void assertValidResult(byte[] uncompressed) {
+        boolean invalid = true;
+        for (int i = 1; i < uncompressed.length; i++) {
+            if (uncompressed[i] != 0) {
+                invalid = false;
+                break;
+            }
+        }
+        if (invalid) {
+            throw new RuntimeException("Invalid result from GPU, all uncompressed key bytes are 0.");
+        }
     }
     
 }

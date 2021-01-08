@@ -27,4 +27,9 @@ public class CConsumerJava {
      */
     public long delayEmptyConsumer = 10;
     public int queueSize = 100000;
+    
+    /**
+     * Test during runtime if the key calculation is correct. Decreases massive the performance. Usefull if an OpenCL producer is used.
+     */
+    public boolean runtimePublicKeyCalculationCheck;
 }

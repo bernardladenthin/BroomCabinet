@@ -61,7 +61,6 @@ public class OpenClTask {
 
     private final cl_context context;
     private final int gridNumBits;
-    private final BigInteger killBits;
     private final ByteBuffer srcByteBuffer;
     private final Pointer srcPointer;
 
@@ -72,7 +71,6 @@ public class OpenClTask {
         if (gridNumBits > MAX_GRID_NUM_BITS) {
             throw new IllegalArgumentException("Max grid num bits must be lower or equal than " + MAX_GRID_NUM_BITS + ".");
         }
-        killBits = BigInteger.valueOf(2).pow(gridNumBits).subtract(BigInteger.ONE);
 
         this.context = context;
         this.gridNumBits = gridNumBits;
@@ -100,14 +98,8 @@ public class OpenClTask {
         return PUBLIC_KEY_BYTES * getWorkSize();
     }
 
-    public void setSrcPrivateKeyChunk(BigInteger privateKeyTemplate) {
-        BigInteger privateKeyChunk = privateKeyTemplate.andNot(killBits);
-        byte[] privateKeyChunkAsByteArray = KeyUtility.bigIntegerToBytes(privateKeyChunk);
-        if (logger.isTraceEnabled()) {
-            logger.trace("privateKeyTemplate: " + Hex.encodeHexString(privateKeyTemplate.toByteArray()));
-            logger.trace("killBits: " + Hex.encodeHexString(killBits.toByteArray()));
-            logger.trace("privateKeyChunkAsByteArray: " + Hex.encodeHexString(privateKeyChunk.toByteArray()));
-        }
+    public void setSrcPrivateKeyChunk(BigInteger privateKeyBase) {
+        byte[] privateKeyChunkAsByteArray = KeyUtility.bigIntegerToBytes(privateKeyBase);
 
         // put key in reverse order because the ByteBuffer put writes in reverse order, a flip has no effect
         reverse(privateKeyChunkAsByteArray);

@@ -28,6 +28,7 @@ import org.junit.rules.TemporaryFolder;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -120,6 +121,7 @@ public class ConsumerJavaTest {
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        cConsumerJava.runtimePublicKeyCalculationCheck = true;
 
         AtomicBoolean shouldRun = new AtomicBoolean(true);
 
@@ -178,6 +180,7 @@ public class ConsumerJavaTest {
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        cConsumerJava.runtimePublicKeyCalculationCheck = true;
 
         AtomicBoolean shouldRun = new AtomicBoolean(true);
 
@@ -220,6 +223,7 @@ public class ConsumerJavaTest {
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        cConsumerJava.runtimePublicKeyCalculationCheck = true;
 
         AtomicBoolean shouldRun = new AtomicBoolean(true);
 
@@ -229,7 +233,7 @@ public class ConsumerJavaTest {
         Logger logger = mock(Logger.class);
         consumerJava.setLogger(logger);
 
-        PublicKeyBytes invalidPublicKeyBytes = new PublicKeyBytes(BigInteger.ONE, Hex.decodeHex("0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"));
+        PublicKeyBytes invalidPublicKeyBytes = PublicKeyBytes.INVALID_KEY_ONE;
         PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[]{invalidPublicKeyBytes};
         consumerJava.consumeKeys(publicKeyBytesArray);
         consumerJava.consumeKeys(createHash160ByteBuffer());

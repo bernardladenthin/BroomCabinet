@@ -442,6 +442,16 @@ public class ProbeAddressesOpenCLTest {
         openClTask.setSrcPrivateKeyChunk(KeyUtilityTest.MAX_PRIVATE_KEY);
     }
     
+    
+    @Test
+    public void maximumGridSizeTest() throws IOException {
+        int a = (int)(Integer.MAX_VALUE / PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH);
+        // https://stackoverflow.com/questions/5242533/fast-way-to-find-exponent-of-nearest-superior-power-of-2
+        int bits = a == 0 ? 0 : 32 - Integer.numberOfLeadingZeros(a - 1);
+        
+        assertThat(bits >= OpenClTask.MAX_GRID_NUM_BITS, is(equalTo(true)));
+    }
+    
     @Test
     public void hashcatOpenClGrid() throws IOException {
         

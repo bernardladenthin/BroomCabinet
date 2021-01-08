@@ -18,8 +18,10 @@
 // @formatter:on
 package net.ladenthin.btcdetector;
 
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.params.MainNetParams;
@@ -177,19 +179,30 @@ public class ConsumerJava implements Consumer {
                     continue;
                 }
                 byte[] hash160Uncompressed = publicKeyBytes.getUncompressedKeyHashFast();
-                
+
                 threadLocalReuseableByteBuffer.rewind();
                 threadLocalReuseableByteBuffer.put(hash160Uncompressed);
                 threadLocalReuseableByteBuffer.flip();
-                
+
                 boolean containsAddressUncompressed = containsAddress(threadLocalReuseableByteBuffer);
 
                 byte[] hash160Compressed = publicKeyBytes.getCompressedKeyHashFast();
                 threadLocalReuseableByteBuffer.rewind();
                 threadLocalReuseableByteBuffer.put(hash160Compressed);
                 threadLocalReuseableByteBuffer.flip();
-                
+
                 boolean containsAddressCompressed = containsAddress(threadLocalReuseableByteBuffer);
+
+                if (consumerJava.runtimePublicKeyCalculationCheck) {
+                    ECKey fromPrivateUncompressed = ECKey.fromPrivate(publicKeyBytes.getSecretKey(), false);
+                    ECKey fromPrivateCompressed = ECKey.fromPrivate(publicKeyBytes.getSecretKey(), true);
+                    if (!Arrays.equals(fromPrivateUncompressed.getPubKeyHash(), hash160Uncompressed)) {
+                        throw new IllegalStateException("fromPrivateUncompressed.getPubKeyHash() != hash160Uncompressed");
+                    }
+                    if (!Arrays.equals(fromPrivateCompressed.getPubKeyHash(), hash160Compressed)) {
+                        throw new IllegalStateException("fromPrivateCompressed.getPubKeyHash() != hash160Compressed");
+                    }
+                }
 
                 if (containsAddressUncompressed) {
                     // immediately log the secret
@@ -209,7 +222,7 @@ public class ConsumerJava implements Consumer {
                     logger.info(hitMessageCompressed);
                 }
 
-                if(!containsAddressUncompressed && !containsAddressCompressed) {
+                if (!containsAddressUncompressed && !containsAddressCompressed) {
                     if (logger.isTraceEnabled()) {
                         ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
                         String missMessageUncompressed = MISS_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);

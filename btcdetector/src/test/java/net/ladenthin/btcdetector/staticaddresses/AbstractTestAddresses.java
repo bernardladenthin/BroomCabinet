@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Random;
 import net.ladenthin.btcdetector.ByteBufferUtility;
 import net.ladenthin.btcdetector.KeyUtility;
-import static net.ladenthin.btcdetector.staticaddresses.TestAddresses42.RANDOM_SEED;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.NetworkParameters;
