@@ -29,6 +29,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.btcdetector.configuration.CProducerOpenCL;
+import org.apache.commons.codec.binary.Hex;
 
 public class ProducerOpenCL extends AbstractProducer {
 
@@ -63,10 +64,10 @@ public class ProducerOpenCL extends AbstractProducer {
                 return;
             }
 
-            final BigInteger threadLocalFinalSecret = secret;
-            
+            final BigInteger secretBase = createSecretBase(producerOpenCL, secret);
+
             waitTillFreeThreadsInPool();
-            OpenCLGridResult createKeys = openCLContext.createKeys(threadLocalFinalSecret);
+            OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
             
             resultReaderThreadPoolExecutor.submit(
                 () ->{
@@ -75,7 +76,7 @@ public class ProducerOpenCL extends AbstractProducer {
                     try {
                         consumer.consumeKeys(publicKeyBytesArray);
                     } catch (Exception e) {
-                        logErrorInProduceKeys(e, threadLocalFinalSecret);
+                        logErrorInProduceKeys(e, secretBase);
                     }
                 }
             );

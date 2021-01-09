@@ -45,11 +45,18 @@ public class ProducerJava extends AbstractProducer {
             if (PublicKeyBytes.isInvalid(secret)) {
                 return;
             }
+            
+            final BigInteger secretBase = createSecretBase(producerJava, secret);
+            
+            PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[producerJava.getWorkSize()];
+            for (int i = 0; i < publicKeyBytesArray.length; i++) {
+                // create uncompressed
+                BigInteger gridSecret = calculateSecretKey(secretBase, i);
+                ECKey ecKeyUncompressed = ECKey.fromPrivate(gridSecret, false);
+                PublicKeyBytes publicKeyBytes = new PublicKeyBytes(ecKeyUncompressed.getPrivKey(), ecKeyUncompressed.getPubKey());
+                publicKeyBytesArray[i] = publicKeyBytes;
+            }
 
-            // create uncompressed
-            ECKey ecKey = ECKey.fromPrivate(secret, false);
-            PublicKeyBytes publicKeyBytes = new PublicKeyBytes(ecKey.getPrivKey(), ecKey.getPubKey());
-            PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[]{publicKeyBytes};
             consumer.consumeKeys(publicKeyBytesArray);
         } catch (Exception e) {
             logErrorInProduceKeys(e, secret);

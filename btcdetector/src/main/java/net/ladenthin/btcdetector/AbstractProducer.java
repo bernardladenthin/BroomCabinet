@@ -21,6 +21,8 @@ package net.ladenthin.btcdetector;
 import java.math.BigInteger;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
+import net.ladenthin.btcdetector.configuration.CProducer;
+import org.apache.commons.codec.binary.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,7 +30,8 @@ public abstract class AbstractProducer implements Producer {
     
     private final static int SLEEP_WAIT_TILL_RUNNING = 10;
 
-    protected Logger logger = LoggerFactory.getLogger(this.getClass());
+    protected final static Logger logger = LoggerFactory.getLogger(AbstractProducer.class);
+    
     protected final AtomicBoolean running = new AtomicBoolean(false);
     protected final AtomicBoolean shouldRun;
     protected final Consumer consumer;
@@ -73,6 +76,27 @@ public abstract class AbstractProducer implements Producer {
             }
         }
     }
+
+    public static BigInteger createSecretBase(CProducer cProducer, BigInteger secret) {
+        BigInteger secretBase = cProducer.killBits(secret);
+        
+        if (logger.isTraceEnabled()) {
+            logger.trace("secret: " + secret);
+            logger.trace("secret as byte array: " + Hex.encodeHexString(secret.toByteArray()));
+            logger.trace("killBits: " + Hex.encodeHexString(cProducer.getKillBits().toByteArray()));
+            logger.trace("secretBase: " + secretBase);
+            logger.trace("secretBase as byte array: " + Hex.encodeHexString(secretBase.toByteArray()));
+        }
+
+        return secretBase;
+    }
     
+    public static BigInteger calculateSecretKey(BigInteger secretBase, int keyNumber) {
+        if (false) {
+            // works also but a or might be faster
+            return secretBase.add(BigInteger.valueOf(keyNumber));
+        }
+        return secretBase.or(BigInteger.valueOf(keyNumber));
+    }
     
 }

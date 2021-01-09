@@ -27,7 +27,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import net.ladenthin.btcdetector.configuration.CProducerOpenCL;
-import org.apache.commons.codec.binary.Hex;
 import static org.jocl.CL.CL_CONTEXT_PLATFORM;
 import static org.jocl.CL.clBuildProgram;
 import static org.jocl.CL.clCreateCommandQueueWithProperties;
@@ -169,14 +168,6 @@ public class OpenCLContext {
     }
 
     public OpenCLGridResult createKeys(BigInteger privateKeyBase) {
-        privateKeyBase = producerOpenCL.killBits(privateKeyBase);
-
-        if (logger.isTraceEnabled()) {
-            logger.trace("privateKeyTemplate: " + Hex.encodeHexString(privateKeyBase.toByteArray()));
-            logger.trace("killBits: " + Hex.encodeHexString(producerOpenCL.getKillBits().toByteArray()));
-            logger.trace("privateKeyChunkAsByteArray: " + Hex.encodeHexString(privateKeyBase.toByteArray()));
-        }
-
         openClTask.setSrcPrivateKeyChunk(privateKeyBase);
         ByteBuffer dstByteBuffer = openClTask.executeKernel(kernel, commandQueue);
 

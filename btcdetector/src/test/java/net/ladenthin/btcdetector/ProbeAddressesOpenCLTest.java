@@ -411,9 +411,10 @@ public class ProbeAddressesOpenCLTest {
         openCLContext.init();
         
         Random sr = new SecureRandom();
-        BigInteger secretKeyBase = keyUtility.createSecret(bitSize, sr);
+        BigInteger secret = keyUtility.createSecret(bitSize, sr);
+        BigInteger secretBase = AbstractProducer.createSecretBase(producerOpenCL, secret);
         
-        openCLContext.createKeys(secretKeyBase);
+        openCLContext.createKeys(secretBase);
         openCLContext.release();
     }
     
@@ -429,9 +430,10 @@ public class ProbeAddressesOpenCLTest {
         openCLContext.init();
         
         Random sr = new SecureRandom();
-        BigInteger secretKeyBase = keyUtility.createSecret(BITS_FOR_GRID-1, sr);
+        BigInteger secret = keyUtility.createSecret(BITS_FOR_GRID-1, sr);
+        BigInteger secretBase = AbstractProducer.createSecretBase(producerOpenCL, secret);
         
-        openCLContext.createKeys(secretKeyBase);
+        openCLContext.createKeys(secretBase);
         openCLContext.release();
     }
     
@@ -476,7 +478,9 @@ public class ProbeAddressesOpenCLTest {
         Random sr = new SecureRandom();
         BigInteger secretKeyBase = keyUtility.createSecret(KeyUtility.MAX_NUM_BITS, sr);
         
-        OpenCLGridResult createKeys = openCLContext.createKeys(secretKeyBase);
+        BigInteger secretBase = producerOpenCL.killBits(secretKeyBase);
+        
+        OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
         PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
         createKeys.freeResult();
         {
@@ -489,18 +493,17 @@ public class ProbeAddressesOpenCLTest {
         hashPublicKeys(publicKeys, souts);
         hashPublicKeysFast(publicKeys, souts);
         
-        BigInteger privateKeyChunk = producerOpenCL.killBits(secretKeyBase);
         
-        assertPublicKeyBytesCalculatedCorrect(publicKeys, privateKeyChunk, souts, keyUtility);
+        assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, souts, keyUtility);
         openCLContext.release();
     }
 
-    private static void assertPublicKeyBytesCalculatedCorrect(PublicKeyBytes[] publicKeys, BigInteger privateKeyChunk, final boolean souts, KeyUtility keyUtility) {
+    private static void assertPublicKeyBytesCalculatedCorrect(PublicKeyBytes[] publicKeys, BigInteger secretBase, final boolean souts, KeyUtility keyUtility) {
         for (int i = 0; i < publicKeys.length; i++) {
             if (i%10_000 == 0) {
                 System.out.println("progress: " + i);
             }
-            BigInteger privateKey = CProducer.calculateSecretKey(privateKeyChunk, i);
+            BigInteger privateKey = AbstractProducer.calculateSecretKey(secretBase, i);
             byte[] privateKeyAsByteArray = privateKey.toByteArray();
             
             if(souts) {

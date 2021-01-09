@@ -190,6 +190,7 @@ public class ConsumerJavaTest {
         Random randomForProducer = new Random(TestAddresses1337.RANDOM_SEED);
         
         CProducerJava cProducerJava = new CProducerJava();
+        cProducerJava.gridNumBits = 0;
         ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, consumerJava, consumerJava.keyUtility, randomForProducer);
 
         Logger logger = mock(Logger.class);

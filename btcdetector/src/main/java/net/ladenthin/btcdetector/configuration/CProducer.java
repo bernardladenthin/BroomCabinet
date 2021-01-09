@@ -43,7 +43,7 @@ public class CProducer {
      * {@link #MAX_GRID_NUM_BITS}
      * (inclusive).
      */
-    public int gridNumBits = 20;
+    public int gridNumBits = 8;
 
     public int getWorkSize() {
         return 1 << gridNumBits;
@@ -58,14 +58,6 @@ public class CProducer {
     
     public BigInteger killBits(BigInteger bigInteger) {
         return bigInteger.andNot(getKillBits());
-    }
-    
-    public static BigInteger calculateSecretKey(BigInteger privateKeyChunk, int keyNumber) {
-        if (false) {
-            // works also but a or might be faster
-            return privateKeyChunk.add(BigInteger.valueOf(keyNumber));
-        }
-        return privateKeyChunk.or(BigInteger.valueOf(keyNumber));
     }
     
     public void assertGridNumBitsCorrect() {
