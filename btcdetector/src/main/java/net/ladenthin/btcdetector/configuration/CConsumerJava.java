@@ -21,12 +21,12 @@ package net.ladenthin.btcdetector.configuration;
 public class CConsumerJava {
     public CLMDBConfigurationReadOnly lmdbConfigurationReadOnly;
     public int printStatisticsEveryNSeconds = 60;
-    public int threads = 1;
+    public int threads = 4;
     /**
      * in ms.
      */
-    public long delayEmptyConsumer = 10;
-    public int queueSize = 100000;
+    public long delayEmptyConsumer = 100;
+    public int queueSize = 10;
     
     /**
      * Test during runtime if the key calculation is correct. Decreases massive the performance. Usefull if an OpenCL producer is used.

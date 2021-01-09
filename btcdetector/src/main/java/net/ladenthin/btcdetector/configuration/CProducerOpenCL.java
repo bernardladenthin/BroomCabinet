@@ -30,5 +30,5 @@ public class CProducerOpenCL extends CProducer {
     /**
      * in ms.
      */
-    public int delayBlockedReader = 2000;
+    public int delayBlockedReader = 100;
 }

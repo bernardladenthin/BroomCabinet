@@ -66,7 +66,7 @@ public class ProbeAddressesOpenCLTest {
      * 23:  512Mb: executed in: 2346ms, read in: 148ms
      * 24: 1024Mb: executed in: 4622ms, read in: 302ms
     */
-    private final static int BITS_FOR_GRID = 16;
+    private final static int BITS_FOR_GRID = 8;
 
     @Rule
     public TemporaryFolder tempFolder = new TemporaryFolder();
