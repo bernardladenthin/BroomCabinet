@@ -46,7 +46,7 @@ public class ProducerOpenCL extends AbstractProducer {
     public void initProducers() {
         resultReaderThreadPoolExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(producerOpenCL.maxResultReaderThreads);
         
-        openCLContext = new OpenCLContext(producerOpenCL.platformIndex, producerOpenCL.deviceType, producerOpenCL.deviceIndex, producerOpenCL.gridNumBits);
+        openCLContext = new OpenCLContext(producerOpenCL);
         try {
             openCLContext.init();
         } catch (IOException e) {
@@ -94,6 +94,11 @@ public class ProducerOpenCL extends AbstractProducer {
 
     private int getFreeThreads() {
         return resultReaderThreadPoolExecutor.getMaximumPoolSize() - resultReaderThreadPoolExecutor.getActiveCount();
+    }
+
+    @Override
+    public void releaseProducers() {
+        openCLContext.release();
     }
 
 }

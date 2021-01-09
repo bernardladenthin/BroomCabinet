@@ -21,6 +21,7 @@ package net.ladenthin.btcdetector;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import net.ladenthin.btcdetector.configuration.CProducer;
 import org.apache.commons.codec.binary.Hex;
 import static org.jocl.CL.CL_MEM_READ_ONLY;
 import static org.jocl.CL.CL_MEM_USE_HOST_PTR;
@@ -53,27 +54,20 @@ public class OpenClTask {
 
     private final static boolean USE_XOR_SWAP = false;
 
-    public static final int PRIVATE_KEY_BYTES = 32;
-    public static final int PUBLIC_KEY_BYTES = 64;
-
-    public static final int MAX_GRID_NUM_BITS = 24;
     public static final int BITS_PER_BYTE = 8;
+    
+    private final CProducer cProducer;
 
     private final cl_context context;
-    private final int gridNumBits;
     private final ByteBuffer srcByteBuffer;
     private final Pointer srcPointer;
 
     private final cl_mem srcMem;
 
     // Only available after init
-    public OpenClTask(cl_context context, int gridNumBits) {
-        if (gridNumBits > MAX_GRID_NUM_BITS) {
-            throw new IllegalArgumentException("Max grid num bits must be lower or equal than " + MAX_GRID_NUM_BITS + ".");
-        }
-
+    public OpenClTask(cl_context context, CProducer cProducer) {
         this.context = context;
-        this.gridNumBits = gridNumBits;
+        this.cProducer = cProducer;
 
         srcByteBuffer = ByteBuffer.allocateDirect(getSrcSizeInBytes());
         srcPointer = Pointer.to(srcByteBuffer);
@@ -86,16 +80,12 @@ public class OpenClTask {
         );
     }
 
-    public int getWorkSize() {
-        return 1 << gridNumBits;
-    }
-
     public int getSrcSizeInBytes() {
-        return PRIVATE_KEY_BYTES;
+        return PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH;
     }
 
     public int getDstSizeInBytes() {
-        return PUBLIC_KEY_BYTES * getWorkSize();
+        return PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH * cProducer.getWorkSize();
     }
 
     public void setSrcPrivateKeyChunk(BigInteger privateKeyBase) {
@@ -136,7 +126,7 @@ public class OpenClTask {
         clSetKernelArg(kernel, 1, Sizeof.cl_mem, Pointer.to(srcMem));
 
         // Set the work-item dimensions
-        long global_work_size[] = new long[]{getWorkSize()};
+        long global_work_size[] = new long[]{cProducer.getWorkSize()};
         long localWorkSize[] = null; // new long[]{1}; // enabling the system to choose the work-group size.
         int workDim = 1;
 

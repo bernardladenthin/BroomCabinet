@@ -25,8 +25,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public abstract class AbstractProducer implements Producer {
+    
+    private final static int SLEEP_WAIT_TILL_RUNNING = 10;
 
     protected Logger logger = LoggerFactory.getLogger(this.getClass());
+    protected final AtomicBoolean running = new AtomicBoolean(false);
     protected final AtomicBoolean shouldRun;
     protected final Consumer consumer;
     protected final KeyUtility keyUtility;
@@ -41,9 +44,16 @@ public abstract class AbstractProducer implements Producer {
 
     @Override
     public void run() {
+        running.set(true);
         while (shouldRun.get()) {
             produceKeys();
         }
+        running.set(false);
+    }
+    
+    @Override
+    public boolean isRunning() {
+        return running.get();
     }
     
     /**
@@ -53,4 +63,16 @@ public abstract class AbstractProducer implements Producer {
     protected void logErrorInProduceKeys(Exception e, BigInteger secret) {
         logger.error("Error in produceKey for secret " + secret + ".", e);
     }
+
+    @Override
+    public void waitTillProducerNotRunning() {
+        while(isRunning()) {
+            try {
+                Thread.sleep(SLEEP_WAIT_TILL_RUNNING);
+            } catch (InterruptedException ex) {
+            }
+        }
+    }
+    
+    
 }

@@ -25,12 +25,6 @@ public class CProducerOpenCL extends CProducer {
     public int platformIndex = 0;
     public long deviceType = CL_DEVICE_TYPE_ALL;
     public int deviceIndex = 0;
-    /**
-     * Range: {@code 1} (inclusive) to
-     * {@link net.ladenthin.btcdetector.OpenClTask#MAX_GRID_NUM_BITS}
-     * (inclusive).
-     */
-    public int gridNumBits = 20;
     
     public int maxResultReaderThreads = 4;
     /**

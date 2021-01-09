@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import net.ladenthin.btcdetector.configuration.CProducerOpenCL;
 import org.apache.commons.codec.binary.Hex;
 import static org.jocl.CL.CL_CONTEXT_PLATFORM;
 import static org.jocl.CL.clBuildProgram;
@@ -87,11 +88,7 @@ public class OpenCLContext {
     private final static String KERNEL_NAME = "generateKeysKernel_grid";
     private final static boolean EXCEPTIONS_ENABLED = true;
     
-    private final int platformIndex;
-    private final long deviceType;
-    private final int deviceIndex;
-    private final int gridNumBits;
-    private final BigInteger killBits;
+    private final CProducerOpenCL producerOpenCL;
 
     private cl_context_properties contextProperties;
     private cl_device_id device;
@@ -101,12 +98,8 @@ public class OpenCLContext {
     private cl_kernel kernel;
     private OpenClTask openClTask;
     
-    public OpenCLContext(int platformIndex, long deviceType, int deviceIndex, int gridNumBits) {
-        this.platformIndex = platformIndex;
-        this.deviceType = deviceType;
-        this.deviceIndex = deviceIndex;
-        this.gridNumBits = gridNumBits;
-        this.killBits = BigInteger.valueOf(2).pow(gridNumBits).subtract(BigInteger.ONE);
+    public OpenCLContext(CProducerOpenCL producerOpenCL) {
+        this.producerOpenCL = producerOpenCL;
     }
     
     public void init() throws IOException {
@@ -124,7 +117,7 @@ public class OpenCLContext {
         // Obtain a platform ID
         cl_platform_id platforms[] = new cl_platform_id[numPlatforms];
         clGetPlatformIDs(platforms.length, platforms, null);
-        cl_platform_id platform = platforms[platformIndex];
+        cl_platform_id platform = platforms[producerOpenCL.platformIndex];
         
         // Initialize the context properties
         contextProperties = new cl_context_properties();
@@ -132,13 +125,13 @@ public class OpenCLContext {
         
         // Obtain the number of devices for the platform
         int numDevicesArray[] = new int[1];
-        clGetDeviceIDs(platform, deviceType, 0, null, numDevicesArray);
+        clGetDeviceIDs(platform, producerOpenCL.deviceType, 0, null, numDevicesArray);
         int numDevices = numDevicesArray[0];
         
         // Obtain a device ID 
         cl_device_id devices[] = new cl_device_id[numDevices];
-        clGetDeviceIDs(platform, deviceType, numDevices, devices, null);
-        device = devices[deviceIndex];
+        clGetDeviceIDs(platform, producerOpenCL.deviceType, numDevices, devices, null);
+        device = devices[producerOpenCL.deviceIndex];
         cl_device_id[] cl_device_ids = new cl_device_id[]{device};
         
         // Create a context for the selected device
@@ -160,13 +153,13 @@ public class OpenCLContext {
         // Create the kernel
         kernel = clCreateKernel(program, KERNEL_NAME, null);
         
-        openClTask = new OpenClTask(context, gridNumBits);
+        openClTask = new OpenClTask(context, producerOpenCL);
     }
-    
+
     OpenClTask getOpenClTask() {
         return openClTask;
     }
-    
+
     public void release() {
         openClTask.releaseCl();
         clReleaseKernel(kernel);
@@ -174,24 +167,23 @@ public class OpenCLContext {
         clReleaseCommandQueue(commandQueue);
         clReleaseContext(context);
     }
-    
+
     public OpenCLGridResult createKeys(BigInteger privateKeyBase) {
-        privateKeyBase = privateKeyBase.andNot(killBits);
-        
+        privateKeyBase = producerOpenCL.killBits(privateKeyBase);
+
         if (logger.isTraceEnabled()) {
             logger.trace("privateKeyTemplate: " + Hex.encodeHexString(privateKeyBase.toByteArray()));
-            logger.trace("killBits: " + Hex.encodeHexString(killBits.toByteArray()));
+            logger.trace("killBits: " + Hex.encodeHexString(producerOpenCL.getKillBits().toByteArray()));
             logger.trace("privateKeyChunkAsByteArray: " + Hex.encodeHexString(privateKeyBase.toByteArray()));
         }
-        
-        
+
         openClTask.setSrcPrivateKeyChunk(privateKeyBase);
         ByteBuffer dstByteBuffer = openClTask.executeKernel(kernel, commandQueue);
-        
-        OpenCLGridResult openCLGridResult = new OpenCLGridResult(privateKeyBase, openClTask.getWorkSize(), dstByteBuffer);
+
+        OpenCLGridResult openCLGridResult = new OpenCLGridResult(privateKeyBase, producerOpenCL.getWorkSize(), dstByteBuffer);
         return openCLGridResult;
     }
-    
+
     private static List<String> getResourceNamesContent(List<String> resourceNames) throws IOException {
         List<String> contents = new ArrayList<>();
         for (String resourceName : resourceNames) {

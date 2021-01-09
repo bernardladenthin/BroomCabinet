@@ -56,4 +56,8 @@ public class ProducerJava extends AbstractProducer {
         }
     }
 
+    @Override
+    public void releaseProducers() {
+    }
+
 }

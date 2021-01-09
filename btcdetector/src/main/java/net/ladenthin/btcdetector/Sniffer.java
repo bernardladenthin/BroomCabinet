@@ -20,10 +20,13 @@ package net.ladenthin.btcdetector;
 
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
 import net.ladenthin.btcdetector.configuration.CProducerJava;
 import net.ladenthin.btcdetector.configuration.CProducerOpenCL;
 import net.ladenthin.btcdetector.configuration.CSniffing;
@@ -37,6 +40,9 @@ public class Sniffer {
     private final CSniffing sniffing;
 
     protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
+    
+    private final List<ProducerOpenCL> openCLProducers = new ArrayList<>();
+    private final List<ProducerJava> javaProducers = new ArrayList<>();
 
     private ConsumerJava consumerJava;
 
@@ -66,7 +72,9 @@ public class Sniffer {
 
         if (sniffing.producerJava != null) {
             for (CProducerJava cProducerJava : sniffing.producerJava) {
+                cProducerJava.assertGridNumBitsCorrect();
                 ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, consumerJava, consumerJava.keyUtility, random);
+                javaProducers.add(producerJava);
                 producerJava.initProducers();
                 producerExecutorService.submit(producerJava);
             }
@@ -74,7 +82,9 @@ public class Sniffer {
 
         if (sniffing.producerOpenCL != null) {
             for (CProducerOpenCL cProducerOpenCL : sniffing.producerOpenCL) {
+                cProducerOpenCL.assertGridNumBitsCorrect();
                 ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, shouldRun, consumerJava, consumerJava.keyUtility, random);
+                openCLProducers.add(producerOpenCL);
                 producerOpenCL.initProducers();
                 producerExecutorService.submit(producerOpenCL);
             }
@@ -86,6 +96,17 @@ public class Sniffer {
             shouldRun.set(false);
             consumerJava.timer.cancel();
             logger.info("Shut down, please wait for remaining tasks.");
+            
+            for (ProducerOpenCL openCLProducer : openCLProducers) {
+                openCLProducer.waitTillProducerNotRunning();
+                openCLProducer.releaseProducers();
+            }
+            
+            for (ProducerJava producerJava : javaProducers) {
+                producerJava.waitTillProducerNotRunning();
+                producerJava.releaseProducers();
+            }
+            logger.info("All producers released.");
         }));
     }
 

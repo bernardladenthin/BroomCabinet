@@ -18,13 +18,72 @@
 // @formatter:on
 package net.ladenthin.btcdetector.configuration;
 
+import java.math.BigInteger;
 import net.ladenthin.btcdetector.KeyUtility;
+import net.ladenthin.btcdetector.PublicKeyBytes;
 
 public class CProducer {
+    
+    /**
+     * Lazy initialization. The configuration is changed on demand.
+     */
+    private BigInteger killBits;
+    
+    public static final int MAX_GRID_NUM_BITS = 24;
+    
     /**
      * (2<sup>{@code maxNumBits}</sup> - 1) can be set to a lower value to improve a search on specific ranges (e.g. the puzzle transaction https://privatekeys.pw/puzzles/bitcoin-puzzle-tx ).
      * {@code 1} can't be tested because {@link ECKey#fromPrivate} throws an {@link IllegalArgumentException}.
-     * Range: {@code 2} (inclusive) to {@link net.ladenthin.btcdetector.OpenClTask#MAX_GRID_NUM_BITS} (inclusive).
+     * Range: {@code 2} (inclusive) to {@link #MAX_GRID_NUM_BITS} (inclusive).
      */
     public int privateKeyMaxNumBits = KeyUtility.MAX_NUM_BITS;
+    
+    /**
+     * Range: {@code 1} (inclusive) to
+     * {@link #MAX_GRID_NUM_BITS}
+     * (inclusive).
+     */
+    public int gridNumBits = 20;
+
+    public int getWorkSize() {
+        return 1 << gridNumBits;
+    }
+    
+    public BigInteger getKillBits() {
+        if (killBits == null) {
+            killBits = BigInteger.valueOf(2).pow(gridNumBits).subtract(BigInteger.ONE);
+        }
+        return killBits;
+    }
+    
+    public BigInteger killBits(BigInteger bigInteger) {
+        return bigInteger.andNot(getKillBits());
+    }
+    
+    public static BigInteger calculateSecretKey(BigInteger privateKeyChunk, int keyNumber) {
+        if (false) {
+            // works also but a or might be faster
+            return privateKeyChunk.add(BigInteger.valueOf(keyNumber));
+        }
+        return privateKeyChunk.or(BigInteger.valueOf(keyNumber));
+    }
+    
+    public void assertGridNumBitsCorrect() {
+        {
+            // ensure the constant MAX_GRID_NUM_BITS is set correct
+            int maximumWorkSize = (int)(Integer.MAX_VALUE / PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH);
+            // https://stackoverflow.com/questions/5242533/fast-way-to-find-exponent-of-nearest-superior-power-of-2
+            int numBitsMaximum = maximumWorkSize == 0 ? 0 : 32 - Integer.numberOfLeadingZeros(maximumWorkSize - 1);
+
+            if (MAX_GRID_NUM_BITS > numBitsMaximum) {
+                throw new IllegalArgumentException("MAX_GRID_NUM_BITS is too high for 32 bit memory allocation.");
+            }
+        }
+        
+        if (gridNumBits > MAX_GRID_NUM_BITS) {
+            throw new IllegalArgumentException("gridNumBits must be lower or equal than " + MAX_GRID_NUM_BITS + ".");
+        }
+        
+    }
+    
 }

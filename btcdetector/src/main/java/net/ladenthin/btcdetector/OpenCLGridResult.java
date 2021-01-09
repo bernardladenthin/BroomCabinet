@@ -20,6 +20,7 @@ package net.ladenthin.btcdetector;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import net.ladenthin.btcdetector.configuration.CProducer;
 
 public class OpenCLGridResult {
 
@@ -67,7 +68,7 @@ public class OpenCLGridResult {
      * Read the inner bytes in reverse order.
      */
     private static final PublicKeyBytes getPublicKeyFromByteBufferXY(ByteBuffer b, int keyNumber, BigInteger secretKeyBase) {
-        BigInteger secret = secretKeyBase.add(BigInteger.valueOf(keyNumber));
+        BigInteger secret = CProducer.calculateSecretKey(secretKeyBase, keyNumber);
         if(BigInteger.ZERO.equals(secret)) {
             // the calculated key is invalid, return a fallback
             return PublicKeyBytes.INVALID_KEY_ONE;

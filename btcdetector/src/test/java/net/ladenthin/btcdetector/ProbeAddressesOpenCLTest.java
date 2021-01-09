@@ -41,6 +41,8 @@ import static org.jocl.CL.*;
 
 import java.util.Arrays;
 import java.util.Random;
+import net.ladenthin.btcdetector.configuration.CProducer;
+import net.ladenthin.btcdetector.configuration.CProducerOpenCL;
 import net.ladenthin.btcdetector.staticaddresses.TestAddresses42;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.core.ECKey;
@@ -403,7 +405,9 @@ public class ProbeAddressesOpenCLTest {
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
         
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-        OpenCLContext openCLContext = new OpenCLContext(0, CL_DEVICE_TYPE_ALL, 0, bitSize);
+        CProducerOpenCL producerOpenCL = new CProducerOpenCL();
+        producerOpenCL.gridNumBits = bitSize;
+        OpenCLContext openCLContext = new OpenCLContext(producerOpenCL);
         openCLContext.init();
         
         Random sr = new SecureRandom();
@@ -419,7 +423,9 @@ public class ProbeAddressesOpenCLTest {
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
         
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-        OpenCLContext openCLContext = new OpenCLContext(0, CL_DEVICE_TYPE_ALL, 0, BITS_FOR_GRID);
+        CProducerOpenCL producerOpenCL = new CProducerOpenCL();
+        producerOpenCL.gridNumBits = BITS_FOR_GRID;
+        OpenCLContext openCLContext = new OpenCLContext(producerOpenCL);
         openCLContext.init();
         
         Random sr = new SecureRandom();
@@ -435,21 +441,22 @@ public class ProbeAddressesOpenCLTest {
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
         
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-        OpenCLContext openCLContext = new OpenCLContext(0, CL_DEVICE_TYPE_ALL, 0, 20);
+        CProducerOpenCL producerOpenCL = new CProducerOpenCL();
+        producerOpenCL.gridNumBits = 20;
+        OpenCLContext openCLContext = new OpenCLContext(producerOpenCL);
         openCLContext.init();
         
         OpenClTask openClTask = openCLContext.getOpenClTask();
         openClTask.setSrcPrivateKeyChunk(KeyUtilityTest.MAX_PRIVATE_KEY);
+        
+        openCLContext.release();
     }
     
     
     @Test
-    public void maximumGridSizeTest() throws IOException {
-        int a = (int)(Integer.MAX_VALUE / PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH);
-        // https://stackoverflow.com/questions/5242533/fast-way-to-find-exponent-of-nearest-superior-power-of-2
-        int bits = a == 0 ? 0 : 32 - Integer.numberOfLeadingZeros(a - 1);
-        
-        assertThat(bits >= OpenClTask.MAX_GRID_NUM_BITS, is(equalTo(true)));
+    public void assertGridNumBitsCorrect_configurationConstantsSet_noExceptionThrown() throws IOException {
+        CProducer cProducer = new CProducer();
+        cProducer.assertGridNumBitsCorrect();
     }
     
     @Test
@@ -461,8 +468,9 @@ public class ProbeAddressesOpenCLTest {
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
         
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-        
-        OpenCLContext openCLContext = new OpenCLContext(0, CL_DEVICE_TYPE_ALL, 0, BITS_FOR_GRID);
+        CProducerOpenCL producerOpenCL = new CProducerOpenCL();
+        producerOpenCL.gridNumBits = BITS_FOR_GRID;
+        OpenCLContext openCLContext = new OpenCLContext(producerOpenCL);
         openCLContext.init();
         
         Random sr = new SecureRandom();
@@ -481,14 +489,18 @@ public class ProbeAddressesOpenCLTest {
         hashPublicKeys(publicKeys, souts);
         hashPublicKeysFast(publicKeys, souts);
         
-        BigInteger killBits = BigInteger.valueOf(2).pow(BITS_FOR_GRID).subtract(BigInteger.ONE);
-        BigInteger privateKeyChunk = secretKeyBase.andNot(killBits);
+        BigInteger privateKeyChunk = producerOpenCL.killBits(secretKeyBase);
         
+        assertPublicKeyBytesCalculatedCorrect(publicKeys, privateKeyChunk, souts, keyUtility);
+        openCLContext.release();
+    }
+
+    private static void assertPublicKeyBytesCalculatedCorrect(PublicKeyBytes[] publicKeys, BigInteger privateKeyChunk, final boolean souts, KeyUtility keyUtility) {
         for (int i = 0; i < publicKeys.length; i++) {
             if (i%10_000 == 0) {
                 System.out.println("progress: " + i);
             }
-            BigInteger privateKey = privateKeyChunk.or(BigInteger.valueOf(i));
+            BigInteger privateKey = CProducer.calculateSecretKey(privateKeyChunk, i);
             byte[] privateKeyAsByteArray = privateKey.toByteArray();
             
             if(souts) {
@@ -505,26 +517,26 @@ public class ProbeAddressesOpenCLTest {
             byte[] resultOpenCLKeyUncompressedPubKeyHash = resultOpenCLKeyUncompressed.getPubKeyHash();
             
             if (souts) {
-            System.out.println("publicKeyBytes.compressed: " + Arrays.toString(publicKeyBytes.getCompressed()));
-            System.out.println("publicKeyBytes.uncompressed: " + Arrays.toString(publicKeyBytes.getUncompressed()));
-            System.out.println("resultOpenCLKeyCompressedPubKey: " + Arrays.toString(resultOpenCLKeyCompressedPubKey));
-            System.out.println("resultOpenCLKeyCompressedPubKeyHash: " + Arrays.toString(resultOpenCLKeyCompressedPubKeyHash));
-            System.out.println("resultOpenCLKeyUncompressedPubKey: " + Arrays.toString(resultOpenCLKeyUncompressedPubKey));
-            System.out.println("resultOpenCLKeyUncompressedPubKeyHash: " + Arrays.toString(resultOpenCLKeyUncompressedPubKeyHash));
+                System.out.println("publicKeyBytes.compressed: " + Arrays.toString(publicKeyBytes.getCompressed()));
+                System.out.println("publicKeyBytes.uncompressed: " + Arrays.toString(publicKeyBytes.getUncompressed()));
+                System.out.println("resultOpenCLKeyCompressedPubKey: " + Arrays.toString(resultOpenCLKeyCompressedPubKey));
+                System.out.println("resultOpenCLKeyCompressedPubKeyHash: " + Arrays.toString(resultOpenCLKeyCompressedPubKeyHash));
+                System.out.println("resultOpenCLKeyUncompressedPubKey: " + Arrays.toString(resultOpenCLKeyUncompressedPubKey));
+                System.out.println("resultOpenCLKeyUncompressedPubKeyHash: " + Arrays.toString(resultOpenCLKeyUncompressedPubKeyHash));
             }
             
             String resultOpenCLKeyCompressedPubKeyHashBase58 = keyUtility.toBase58(resultOpenCLKeyCompressed.getPubKeyHash());
             String resultOpenCLKeyUncompressedPubKeyHashBase58 = keyUtility.toBase58(resultOpenCLKeyUncompressed.getPubKeyHash());
             
             if (souts) {
-            System.out.println("resultOpenCLKeyCompressedPubKeyHashBase58: " + resultOpenCLKeyCompressedPubKeyHashBase58);
-            System.out.println("resultOpenCLKeyUncompressedPubKeyHashBase58: " + resultOpenCLKeyUncompressedPubKeyHashBase58);
-            
-            System.out.println("publicKeyBytes.getCompressedKeyHash(): " + Arrays.toString(publicKeyBytes.getCompressedKeyHash()));
-            System.out.println("publicKeyBytes.getUncompressedKeyHash(): " + Arrays.toString(publicKeyBytes.getUncompressedKeyHash()));
-            
-            System.out.println("publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility): " + publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility));
-            System.out.println("publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility): " + publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility));
+                System.out.println("resultOpenCLKeyCompressedPubKeyHashBase58: " + resultOpenCLKeyCompressedPubKeyHashBase58);
+                System.out.println("resultOpenCLKeyUncompressedPubKeyHashBase58: " + resultOpenCLKeyUncompressedPubKeyHashBase58);
+                
+                System.out.println("publicKeyBytes.getCompressedKeyHash(): " + Arrays.toString(publicKeyBytes.getCompressedKeyHash()));
+                System.out.println("publicKeyBytes.getUncompressedKeyHash(): " + Arrays.toString(publicKeyBytes.getUncompressedKeyHash()));
+                
+                System.out.println("publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility): " + publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility));
+                System.out.println("publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility): " + publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility));
             }
             ECKey expectedUncompressedKey = ECKey.fromPrivate(privateKey, false);
             BigInteger expectedPrivateKeyBigInteger = expectedUncompressedKey.getPrivKey();
@@ -534,9 +546,9 @@ public class ProbeAddressesOpenCLTest {
             byte[] expectedUncompressedPublicKeyBytes = expectedUncompressedKey.getPubKey();
 
             if (souts) {
-            System.out.println("expectedPrivateKeyBigInteger: " + expectedPrivateKeyBigInteger);
-            System.out.println("expectedCompressedPublicKeyBytes: " + Arrays.toString(expectedCompressedPublicKeyBytes));
-            System.out.println("expectedUncompressedPublicKeyBytes: " + Arrays.toString(expectedUncompressedPublicKeyBytes));
+                System.out.println("expectedPrivateKeyBigInteger: " + expectedPrivateKeyBigInteger);
+                System.out.println("expectedCompressedPublicKeyBytes: " + Arrays.toString(expectedCompressedPublicKeyBytes));
+                System.out.println("expectedUncompressedPublicKeyBytes: " + Arrays.toString(expectedUncompressedPublicKeyBytes));
             }
             
             String expectedCompressedPublicKeyHashBase58 = keyUtility.toBase58(expectedCompressedKey.getPubKeyHash());
@@ -549,10 +561,9 @@ public class ProbeAddressesOpenCLTest {
             assertThat(publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility), is(equalTo(expectedUncompressedPublicKeyHashBase58)));
             
         }
-        openCLContext.release();
     }
 
-    private void hashPublicKeysFast(PublicKeyBytes[] publicKeys, final boolean souts) {
+    private static void hashPublicKeysFast(PublicKeyBytes[] publicKeys, final boolean souts) {
         System.out.println("execute hash fast ...");
         long beforeHash = System.currentTimeMillis();
         for (int i = 0; i < publicKeys.length; i++) {
@@ -571,7 +582,7 @@ public class ProbeAddressesOpenCLTest {
         System.out.println("... hashed fast in: " + (afterHash - beforeHash) + "ms");
     }
 
-    private void hashPublicKeys(PublicKeyBytes[] publicKeys, final boolean souts) {
+    private static void hashPublicKeys(PublicKeyBytes[] publicKeys, final boolean souts) {
         System.out.println("execute hash ...");
         long beforeHash = System.currentTimeMillis();
         for (int i = 0; i < publicKeys.length; i++) {
@@ -616,7 +627,7 @@ public class ProbeAddressesOpenCLTest {
         return publicKey;
     }
     
-    private void dumpIntArray(String name, int[] intArray) {
+    private static void dumpIntArray(String name, int[] intArray) {
         for (int i = 0; i < intArray.length; i++) {
             System.out.println(name + "["+i+"]: " + Integer.toHexString(intArray[i]));
         }

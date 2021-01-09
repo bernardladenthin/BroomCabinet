@@ -19,6 +19,7 @@
 package net.ladenthin.btcdetector;
 
 import com.tngtech.java.junit.dataprovider.DataProvider;
+import net.ladenthin.btcdetector.configuration.CProducerOpenCL;
 
 public class CommonDataProvider {
 
@@ -29,6 +30,11 @@ public class CommonDataProvider {
 
     @DataProvider
     public static Object[][] bitSizesLowerThan25() {
+        // if the constant was changed, the dataprovider and its test must be changed also
+        if(CProducerOpenCL.MAX_GRID_NUM_BITS != 24) {
+            throw new IllegalStateException("Adapt data provider.");
+        }
+        
         return new Object[][]{
             {1},
             {2},
@@ -53,7 +59,7 @@ public class CommonDataProvider {
             {21},
             {22},
             {23},
-            {net.ladenthin.btcdetector.OpenClTask.MAX_GRID_NUM_BITS}
+            {CProducerOpenCL.MAX_GRID_NUM_BITS}
         };
     }
     
