@@ -59,8 +59,7 @@ public class ProducerOpenCL extends AbstractProducer {
         BigInteger secret = null;
         try {
             secret = keyUtility.createSecret(producerOpenCL.privateKeyMaxNumBits, random);
-            if (secret.equals(BigInteger.ZERO) || secret.equals(BigInteger.ONE)) {
-                // ignore these, prevent an IllegalArgumentException
+            if (PublicKeyBytes.isInvalid(secret)) {
                 return;
             }
 
