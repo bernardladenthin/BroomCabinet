@@ -32,15 +32,20 @@ import org.junit.rules.TemporaryFolder;
 
 public class TestAddressesFiles implements AddressesFiles {
 
-    public final static Set<String> compressedTestAddressesAsLines = new HashSet<>();
-    public final static Set<String> uncompressedTestAddressesAsLines = new HashSet<>();
-    public final static Set<String> compressedTestAddressesWithStaticAmountAsLines = new HashSet<>();
-    public final static Set<String> uncompressedTestAddressesWithStaticAmountAsLines = new HashSet<>();
+    public final static Set<String> compressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount = new HashSet<>();
+    public final static Set<String> uncompressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount = new HashSet<>();
+    public final static Set<String> compressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount = new HashSet<>();
+    public final static Set<String> uncompressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount = new HashSet<>();
     
-    public final static Set<String> compressedTestAddressesAsHexLines = new HashSet<>();
-    public final static Set<String> uncompressedTestAddressesAsHexLines = new HashSet<>();
-    public final static Set<String> compressedTestAddressesWithStaticAmountAsHexLines = new HashSet<>();
-    public final static Set<String> uncompressedTestAddressesWithStaticAmountAsHexLines = new HashSet<>();
+    public final static Set<String> compressedTestAddressesAsFixedWidthBase58BitcoinAddress = new HashSet<>();
+    public final static Set<String> uncompressedTestAddressesAsFixedWidthBase58BitcoinAddress = new HashSet<>();
+    public final static Set<String> compressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress = new HashSet<>();
+    public final static Set<String> uncompressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress = new HashSet<>();
+    
+    public final static Set<String> compressedTestAddressesAsHexHash = new HashSet<>();
+    public final static Set<String> uncompressedTestAddressesAsHexHash = new HashSet<>();
+    public final static Set<String> compressedTestAddressesWithStaticAmountAsHexHash = new HashSet<>();
+    public final static Set<String> uncompressedTestAddressesWithStaticAmountAsHexHash = new HashSet<>();
 
     private final static String ADDRESS_FILE_ONE = "addressesOne.txt";
     private final static String ADDRESS_FILE_TWO = "addressesTwo.txt";
@@ -62,71 +67,113 @@ public class TestAddressesFiles implements AddressesFiles {
 
     public TestAddressesFiles(boolean compressed) {
         testAddresses = new TestAddresses42(NUMBER_OF_ADRESSES, compressed);
+        TestAddresses42 uc = new TestAddresses42(NUMBER_OF_ADRESSES, false);
+        TestAddresses42 co = new TestAddresses42(NUMBER_OF_ADRESSES, true);
 
         {
-            uncompressedTestAddressesAsLines.add("15daqrFSG8d1EMfCWdWZWeZMSDFkqR834t,1");
-            uncompressedTestAddressesAsLines.add("18DBt2Ght4y9nx69fXT7w8vVq9n5BqfRev,1");
-            uncompressedTestAddressesAsLines.add("1AK4RGZoDCsSwjx3zzPwo4nbFzrJapr9m9,1");
-            uncompressedTestAddressesAsLines.add("1BZVqUAK8KBbAL3r7wC3Chq8csTBYYCdZU,5000000000");
-            uncompressedTestAddressesAsLines.add("1KYinnpkcc4KKNB8C73z9kgXCLpKdzor4V,1");
-            uncompressedTestAddressesAsLines.add("1NEJvEj6jB7f9aBhT4wXZnBR9uGJrKanhJ,1");
+            // DynamicWidthBase58BitcoinAddressWithAmount
+            {
+                uncompressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(uc.getIndexAsBase58String(0)+",5000000000");
+                uncompressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(uc.getIndexAsBase58String(1)+",1");
+                uncompressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(uc.getIndexAsBase58String(2)+",1");
+                uncompressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(uc.getIndexAsBase58String(3)+",1");
+                uncompressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(uc.getIndexAsBase58String(4)+",1");
+                uncompressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(new StaticBitcoinP2WPKHAddress().publicKeyHashBase58+",1");
+            }
+            {
+                compressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(co.getIndexAsBase58String(0)+",5000000000");
+                compressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(co.getIndexAsBase58String(1)+",1");
+                compressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(co.getIndexAsBase58String(2)+",1");
+                compressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(co.getIndexAsBase58String(3)+",1");
+                compressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(co.getIndexAsBase58String(4)+",1");
+                compressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(new StaticBitcoinP2WPKHAddress().publicKeyHashBase58+",1");
+            }
+            {
+                uncompressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(uc.getIndexAsBase58String(0)+",1");
+                uncompressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(uc.getIndexAsBase58String(1)+",1");
+                uncompressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(uc.getIndexAsBase58String(2)+",1");
+                uncompressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(uc.getIndexAsBase58String(3)+",1");
+                uncompressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(uc.getIndexAsBase58String(4)+",1");
+                uncompressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(new StaticBitcoinP2WPKHAddress().publicKeyHashBase58+",1");
+            }
+            {
+                compressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(co.getIndexAsBase58String(0)+",1");
+                compressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(co.getIndexAsBase58String(1)+",1");
+                compressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(co.getIndexAsBase58String(2)+",1");
+                compressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(co.getIndexAsBase58String(3)+",1");
+                compressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(co.getIndexAsBase58String(4)+",1");
+                compressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(new StaticBitcoinP2WPKHAddress().publicKeyHashBase58 +",1");
+            }
         }
         {
-            compressedTestAddressesAsLines.add("142XRqAwF7Xy5owyHW7u6vCooyGusQYZF4,1");
-            compressedTestAddressesAsLines.add("1AcXATyTTvLm12dpBiTxdDxCtHhFyPNS1C,5000000000");
-            compressedTestAddressesAsLines.add("1FpKH5GHTwNqJuiHdgL4tJYNvxEMhGzcap,1");
-            compressedTestAddressesAsLines.add("1N2BnKNAqBnNBv4EnmEtjFxoewZ5NBsbVm,1");
-            compressedTestAddressesAsLines.add("1NEJvEj6jB7f9aBhT4wXZnBR9uGJrKanhJ,1");
-            compressedTestAddressesAsLines.add("1NsremZJgQWR4Vx4VARAUv4HLq9NbxPyYi,1");
+            //FixedWidthBase58BitcoinAddress
+            {
+                uncompressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(uc.getIndexAsBase58String(0));
+                uncompressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(uc.getIndexAsBase58String(1));
+                uncompressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(uc.getIndexAsBase58String(2));
+                uncompressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(uc.getIndexAsBase58String(3));
+                uncompressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(uc.getIndexAsBase58String(4));
+                uncompressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(new StaticBitcoinP2WPKHAddress().publicKeyHashBase58);
+            }
+            {
+                compressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(co.getIndexAsBase58String(0));
+                compressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(co.getIndexAsBase58String(1));
+                compressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(co.getIndexAsBase58String(2));
+                compressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(co.getIndexAsBase58String(3));
+                compressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(co.getIndexAsBase58String(4));
+                compressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(new StaticBitcoinP2WPKHAddress().publicKeyHashBase58);
+            }
+            {
+                uncompressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(uc.getIndexAsBase58String(0));
+                uncompressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(uc.getIndexAsBase58String(1));
+                uncompressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(uc.getIndexAsBase58String(2));
+                uncompressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(uc.getIndexAsBase58String(3));
+                uncompressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(uc.getIndexAsBase58String(4));
+                uncompressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(new StaticBitcoinP2WPKHAddress().publicKeyHashBase58);
+            }
+            {
+                compressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(co.getIndexAsBase58String(0));
+                compressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(co.getIndexAsBase58String(1));
+                compressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(co.getIndexAsBase58String(2));
+                compressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(co.getIndexAsBase58String(3));
+                compressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(co.getIndexAsBase58String(4));
+                compressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(new StaticBitcoinP2WPKHAddress().publicKeyHashBase58);
+            }
         }
         {
-            uncompressedTestAddressesWithStaticAmountAsLines.add("15daqrFSG8d1EMfCWdWZWeZMSDFkqR834t,1");
-            uncompressedTestAddressesWithStaticAmountAsLines.add("18DBt2Ght4y9nx69fXT7w8vVq9n5BqfRev,1");
-            uncompressedTestAddressesWithStaticAmountAsLines.add("1AK4RGZoDCsSwjx3zzPwo4nbFzrJapr9m9,1");
-            uncompressedTestAddressesWithStaticAmountAsLines.add("1BZVqUAK8KBbAL3r7wC3Chq8csTBYYCdZU,1");
-            uncompressedTestAddressesWithStaticAmountAsLines.add("1KYinnpkcc4KKNB8C73z9kgXCLpKdzor4V,1");
-            uncompressedTestAddressesWithStaticAmountAsLines.add("1NEJvEj6jB7f9aBhT4wXZnBR9uGJrKanhJ,1");
-        }
-        {
-            compressedTestAddressesWithStaticAmountAsLines.add("142XRqAwF7Xy5owyHW7u6vCooyGusQYZF4,1");
-            compressedTestAddressesWithStaticAmountAsLines.add("1AcXATyTTvLm12dpBiTxdDxCtHhFyPNS1C,1");
-            compressedTestAddressesWithStaticAmountAsLines.add("1FpKH5GHTwNqJuiHdgL4tJYNvxEMhGzcap,1");
-            compressedTestAddressesWithStaticAmountAsLines.add("1N2BnKNAqBnNBv4EnmEtjFxoewZ5NBsbVm,1");
-            compressedTestAddressesWithStaticAmountAsLines.add("1NEJvEj6jB7f9aBhT4wXZnBR9uGJrKanhJ,1");
-            compressedTestAddressesWithStaticAmountAsLines.add("1NsremZJgQWR4Vx4VARAUv4HLq9NbxPyYi,1");
-        }
-        
-        {
-            uncompressedTestAddressesAsHexLines.add("15daqrFSG8d1EMfCWdWZWeZMSDFkqR834t");
-            uncompressedTestAddressesAsHexLines.add("18DBt2Ght4y9nx69fXT7w8vVq9n5BqfRev");
-            uncompressedTestAddressesAsHexLines.add("1AK4RGZoDCsSwjx3zzPwo4nbFzrJapr9m9");
-            uncompressedTestAddressesAsHexLines.add("1BZVqUAK8KBbAL3r7wC3Chq8csTBYYCdZU");
-            uncompressedTestAddressesAsHexLines.add("1KYinnpkcc4KKNB8C73z9kgXCLpKdzor4V");
-            uncompressedTestAddressesAsHexLines.add("1NEJvEj6jB7f9aBhT4wXZnBR9uGJrKanhJ");
-        }
-        {
-            compressedTestAddressesAsHexLines.add("142XRqAwF7Xy5owyHW7u6vCooyGusQYZF4");
-            compressedTestAddressesAsHexLines.add("1AcXATyTTvLm12dpBiTxdDxCtHhFyPNS1C");
-            compressedTestAddressesAsHexLines.add("1FpKH5GHTwNqJuiHdgL4tJYNvxEMhGzcap");
-            compressedTestAddressesAsHexLines.add("1N2BnKNAqBnNBv4EnmEtjFxoewZ5NBsbVm");
-            compressedTestAddressesAsHexLines.add("1NEJvEj6jB7f9aBhT4wXZnBR9uGJrKanhJ");
-            compressedTestAddressesAsHexLines.add("1NsremZJgQWR4Vx4VARAUv4HLq9NbxPyYi");
-        }
-        {
-            uncompressedTestAddressesWithStaticAmountAsHexLines.add("15daqrFSG8d1EMfCWdWZWeZMSDFkqR834t");
-            uncompressedTestAddressesWithStaticAmountAsHexLines.add("18DBt2Ght4y9nx69fXT7w8vVq9n5BqfRev");
-            uncompressedTestAddressesWithStaticAmountAsHexLines.add("1AK4RGZoDCsSwjx3zzPwo4nbFzrJapr9m9");
-            uncompressedTestAddressesWithStaticAmountAsHexLines.add("1BZVqUAK8KBbAL3r7wC3Chq8csTBYYCdZU");
-            uncompressedTestAddressesWithStaticAmountAsHexLines.add("1KYinnpkcc4KKNB8C73z9kgXCLpKdzor4V");
-            uncompressedTestAddressesWithStaticAmountAsHexLines.add("1NEJvEj6jB7f9aBhT4wXZnBR9uGJrKanhJ");
-        }
-        {
-            compressedTestAddressesWithStaticAmountAsHexLines.add("142XRqAwF7Xy5owyHW7u6vCooyGusQYZF4");
-            compressedTestAddressesWithStaticAmountAsHexLines.add("1AcXATyTTvLm12dpBiTxdDxCtHhFyPNS1C");
-            compressedTestAddressesWithStaticAmountAsHexLines.add("1FpKH5GHTwNqJuiHdgL4tJYNvxEMhGzcap");
-            compressedTestAddressesWithStaticAmountAsHexLines.add("1N2BnKNAqBnNBv4EnmEtjFxoewZ5NBsbVm");
-            compressedTestAddressesWithStaticAmountAsHexLines.add("1NEJvEj6jB7f9aBhT4wXZnBR9uGJrKanhJ");
-            compressedTestAddressesWithStaticAmountAsHexLines.add("1NsremZJgQWR4Vx4VARAUv4HLq9NbxPyYi");
+            //HexHash
+            {
+                uncompressedTestAddressesAsHexHash.add(uc.getIndexAsHash160HexEncoded(0));
+                uncompressedTestAddressesAsHexHash.add(uc.getIndexAsHash160HexEncoded(1));
+                uncompressedTestAddressesAsHexHash.add(uc.getIndexAsHash160HexEncoded(2));
+                uncompressedTestAddressesAsHexHash.add(uc.getIndexAsHash160HexEncoded(3));
+                uncompressedTestAddressesAsHexHash.add(uc.getIndexAsHash160HexEncoded(4));
+                uncompressedTestAddressesAsHexHash.add(new StaticBitcoinP2WPKHAddress().publicKeyHash);
+            }
+            {
+                compressedTestAddressesAsHexHash.add(co.getIndexAsHash160HexEncoded(0));
+                compressedTestAddressesAsHexHash.add(co.getIndexAsHash160HexEncoded(1));
+                compressedTestAddressesAsHexHash.add(co.getIndexAsHash160HexEncoded(2));
+                compressedTestAddressesAsHexHash.add(co.getIndexAsHash160HexEncoded(3));
+                compressedTestAddressesAsHexHash.add(co.getIndexAsHash160HexEncoded(4));
+                compressedTestAddressesAsHexHash.add(new StaticBitcoinP2WPKHAddress().publicKeyHash);
+            }
+            {
+                uncompressedTestAddressesWithStaticAmountAsHexHash.add(uc.getIndexAsHash160HexEncoded(0));
+                uncompressedTestAddressesWithStaticAmountAsHexHash.add(uc.getIndexAsHash160HexEncoded(1));
+                uncompressedTestAddressesWithStaticAmountAsHexHash.add(uc.getIndexAsHash160HexEncoded(2));
+                uncompressedTestAddressesWithStaticAmountAsHexHash.add(uc.getIndexAsHash160HexEncoded(3));
+                uncompressedTestAddressesWithStaticAmountAsHexHash.add(uc.getIndexAsHash160HexEncoded(4));
+                uncompressedTestAddressesWithStaticAmountAsHexHash.add(new StaticBitcoinP2WPKHAddress().publicKeyHash);
+            }
+            {
+                compressedTestAddressesWithStaticAmountAsHexHash.add(co.getIndexAsHash160HexEncoded(0));
+                compressedTestAddressesWithStaticAmountAsHexHash.add(co.getIndexAsHash160HexEncoded(1));
+                compressedTestAddressesWithStaticAmountAsHexHash.add(co.getIndexAsHash160HexEncoded(2));
+                compressedTestAddressesWithStaticAmountAsHexHash.add(co.getIndexAsHash160HexEncoded(3));
+                compressedTestAddressesWithStaticAmountAsHexHash.add(co.getIndexAsHash160HexEncoded(4));
+                compressedTestAddressesWithStaticAmountAsHexHash.add(new StaticBitcoinP2WPKHAddress().publicKeyHash);
+            }
         }
     }
 

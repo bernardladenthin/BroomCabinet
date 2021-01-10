@@ -39,8 +39,10 @@ import java.util.Map;
 import net.ladenthin.btcdetector.AddressTxtLine;
 import net.ladenthin.btcdetector.ByteBufferUtility;
 import net.ladenthin.btcdetector.KeyUtility;
+import net.ladenthin.btcdetector.configuration.CAddressFileOutputFormat;
 import net.ladenthin.btcdetector.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.btcdetector.configuration.CLMDBConfigurationWrite;
+import org.apache.commons.codec.binary.Hex;
 import org.lmdbjava.BufferProxy;
 import org.lmdbjava.ByteBufferProxy;
 
@@ -151,7 +153,7 @@ public class LMDBPersistence implements Persistence {
     }
 
     @Override
-    public void writeAllAmountsToAddressFile(File file, boolean hex) throws IOException {
+    public void writeAllAmountsToAddressFile(File file, CAddressFileOutputFormat addressFileOutputFormat) throws IOException {
         try (Txn<ByteBuffer> txn = env.txnRead()) {
             try (CursorIterable<ByteBuffer> iterable = lmdb_h160ToAmount.iterate(txn, KeyRange.all())) {
                 try (FileWriter writer = new FileWriter(file)) {
@@ -159,10 +161,18 @@ public class LMDBPersistence implements Persistence {
                         ByteBuffer addressAsByteBuffer = kv.key();
                         LegacyAddress address = keyUtility.byteBufferToAddress(addressAsByteBuffer);
                         final String line;
-                        if (hex) {
-                            line = String.format("%-34s", address.toBase58()) + System.lineSeparator();
-                        } else {
-                            line = address.toBase58() + AddressTxtLine.SEPARATOR + kv.val().getLong() + System.lineSeparator();
+                        switch(addressFileOutputFormat) {
+                            case HexHash:
+                                line = Hex.encodeHexString(address.getHash()) + System.lineSeparator();
+                                break;
+                            case FixedWidthBase58BitcoinAddress:
+                                line = String.format("%-34s", address.toBase58()) + System.lineSeparator();
+                                break;
+                            case DynamicWidthBase58BitcoinAddressWithAmount:
+                                line = address.toBase58() + AddressTxtLine.SEPARATOR + kv.val().getLong() + System.lineSeparator();
+                                break;
+                            default:
+                                throw new IllegalArgumentException("Unknown addressFileOutputFormat: " + addressFileOutputFormat);
                         }
                         writer.write(line);
                     }

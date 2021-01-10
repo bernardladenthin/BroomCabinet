@@ -16,19 +16,19 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector.staticaddresses;
+package net.ladenthin.btcdetector.configuration;
 
-import java.nio.ByteBuffer;
-import net.ladenthin.btcdetector.ByteBufferUtility;
-
-/**
- * https://privatekeys.pw/bitcoin/address/bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq
- */
-public class StaticBitcoinP2WPKHAddress {
-
-    final public String publicAddress = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
-    final public String publicKeyHash = "e8df018c7e326cc253faac7e46cdc51e68542c42";
-    final public String publicKeyHashBase58 = "1NEJvEj6jB7f9aBhT4wXZnBR9uGJrKanhJ";
-    
-    final public ByteBuffer byteBuffer_publicKeyHash = new ByteBufferUtility(false).getByteBufferFromHex(publicKeyHash);
+public enum CAddressFileOutputFormat {
+    /**
+     * The hash160 will be written encoded in hex without the amount.
+     */
+    HexHash,
+    /**
+     * The addresses will be written with a fixed width and without the amount.
+     */
+    FixedWidthBase58BitcoinAddress,
+    /**
+     * The addresses will be written with amount.
+     */
+    DynamicWidthBase58BitcoinAddressWithAmount
 }

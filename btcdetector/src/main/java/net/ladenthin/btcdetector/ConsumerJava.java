@@ -122,14 +122,13 @@ public class ConsumerJava implements Consumer {
             throw new IllegalArgumentException("period must be greater than 0.");
         }
 
+        startTime = System.currentTimeMillis();
+
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                if (startTime == 0) {
-                    startTime = System.currentTimeMillis();
-                }
                 // get transient information
-                long uptime = Math.max(System.currentTimeMillis() - startTime,1);
+                long uptime = Math.max(System.currentTimeMillis() - startTime, 1);
 
                 String message = createStatisticsMessage(uptime, checkedKeys.get(), checkedKeysSumOfTimeToCheckContains.get(), emptyConsumer.get(), hits.get());
 

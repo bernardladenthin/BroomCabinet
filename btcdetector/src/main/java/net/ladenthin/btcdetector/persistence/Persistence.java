@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
+import net.ladenthin.btcdetector.configuration.CAddressFileOutputFormat;
 
 public interface Persistence {
 
@@ -36,10 +37,10 @@ public interface Persistence {
     /**
      * 
      * @param file
-     * @param hex If enabled, the addresses will be written as hex output without amount.
+     * @param addressFileOutputFormat the format
      * @throws IOException 
      */
-    void writeAllAmountsToAddressFile(File file, boolean hex) throws IOException;
+    void writeAllAmountsToAddressFile(File file, CAddressFileOutputFormat addressFileOutputFormat) throws IOException;
 
     /**
      * @param hash160 the hash160 to change its amount

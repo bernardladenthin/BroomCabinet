@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Random;
 import net.ladenthin.btcdetector.ByteBufferUtility;
 import net.ladenthin.btcdetector.KeyUtility;
+import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.NetworkParameters;
@@ -51,6 +52,10 @@ public abstract class AbstractTestAddresses implements TestAddresses {
 
     public String getIndexAsBase58String(int index) {
         return LegacyAddress.fromKey(networkParameters, getECKeys().get(index)).toBase58();
+    }
+
+    public String getIndexAsHash160HexEncoded(int index) {
+        return Hex.encodeHexString(LegacyAddress.fromKey(networkParameters, getECKeys().get(index)).getHash());
     }
 
     @Override

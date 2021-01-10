@@ -55,7 +55,7 @@ public class LMDBToAddressFile implements Runnable {
             File addressesFile = new File(lmdbToAddressFile.addressesFile);
             // delete before write all addresses
             addressesFile.delete();
-            persistence.writeAllAmountsToAddressFile(addressesFile, lmdbToAddressFile.hex);
+            persistence.writeAllAmountsToAddressFile(addressesFile, lmdbToAddressFile.addressFileOutputFormat);
             logger.info("writeAllAmounts done");
         } catch (IOException e) {
             throw new RuntimeException(e);
