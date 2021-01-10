@@ -25,6 +25,11 @@ import org.bitcoinj.core.Utils;
 import org.bouncycastle.crypto.digests.RIPEMD160Digest;
 
 public class PublicKeyBytes {
+    
+    /**
+     * Use {@link com.​google.​common.​hash.Hashing} and {@link org.bouncycastle.crypto.digests.RIPEMD160Digest} instead {@link org.bitcoinj.core.Utils#sha256hash160(byte[])}.
+     */
+    public static final boolean USE_SHA256_RIPEMD160_FAST = true;
 
     public static final int ONE_COORDINATE_BYTE_LENGTH = 32;
     public static final int TWO_COORDINATES_BYTES_LENGTH = ONE_COORDINATE_BYTE_LENGTH * 2;
@@ -44,8 +49,29 @@ public class PublicKeyBytes {
     public final static int PUBLIC_KEY_UNCOMPRESSED_BYTES = PARITY_BYTES_LENGTH + TWO_COORDINATES_BYTES_LENGTH;
     public final static int PUBLIC_KEY_COMPRESSED_BYTES = PARITY_BYTES_LENGTH + ONE_COORDINATE_BYTE_LENGTH;
 
-    private final byte[] compressed;
     private final byte[] uncompressed;
+    private final byte[] compressed;
+    
+    /**
+     * Lazy initialization.
+     */
+    private byte[] uncompressedKeyHash;
+    
+    /**
+     * Lazy initialization.
+     */
+    private byte[] compressedKeyHash;
+    
+    /**
+     * Lazy initialization.
+     */
+    private String uncompressedKeyHashBase58;
+    
+    /**
+     * Lazy initialization.
+     */
+    private String compressedKeyHashBase58;
+    
     private final BigInteger secretKey;
     
     // [4, 121, -66, 102, 126, -7, -36, -69, -84, 85, -96, 98, -107, -50, -121, 11, 7, 2, -101, -4, -37, 45, -50, 40, -39, 89, -14, -127, 91, 22, -8, 23, -104, 72, 58, -38, 119, 38, -93, -60, 101, 93, -92, -5, -4, 14, 17, 8, -88, -3, 23, -76, 72, -90, -123, 84, 25, -100, 71, -48, -113, -5, 16, -44, -72]
@@ -104,19 +130,25 @@ public class PublicKeyBytes {
     }
 
     public byte[] getUncompressedKeyHash() {
-        return Utils.sha256hash160(uncompressed);
+        if (uncompressedKeyHash == null) {
+            if (USE_SHA256_RIPEMD160_FAST) {
+                uncompressedKeyHash = sha256hash160Fast(uncompressed);
+            } else {
+                uncompressedKeyHash = Utils.sha256hash160(uncompressed);
+            }
+        }
+        return uncompressedKeyHash;
     }
 
     public byte[] getCompressedKeyHash() {
-        return Utils.sha256hash160(compressed);
-    }
-
-    public byte[] getUncompressedKeyHashFast() {
-        return sha256hash160Fast(uncompressed);
-    }
-
-    public byte[] getCompressedKeyHashFast() {
-        return sha256hash160Fast(compressed);
+        if (compressedKeyHash == null) {
+            if (USE_SHA256_RIPEMD160_FAST) {
+                compressedKeyHash = Utils.sha256hash160(compressed);
+            } else {
+                compressedKeyHash = sha256hash160Fast(compressed);
+            }
+        }
+        return compressedKeyHash;
     }
 
     /**
@@ -134,10 +166,16 @@ public class PublicKeyBytes {
     }
 
     public String getCompressedKeyHashAsBase58(KeyUtility keyUtility) {
-        return keyUtility.toBase58(getCompressedKeyHash());
+        if (uncompressedKeyHashBase58 == null) {
+            uncompressedKeyHashBase58 = keyUtility.toBase58(getCompressedKeyHash());
+        }
+        return uncompressedKeyHashBase58;
     }
 
     public String getUncompressedKeyHashAsBase58(KeyUtility keyUtility) {
-        return keyUtility.toBase58(getUncompressedKeyHash());
+        if (compressedKeyHashBase58 == null) {
+            compressedKeyHashBase58 = keyUtility.toBase58(getUncompressedKeyHash());
+        }
+        return compressedKeyHashBase58;
     }
 }

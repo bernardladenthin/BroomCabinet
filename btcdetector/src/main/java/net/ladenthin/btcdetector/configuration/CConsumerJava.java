@@ -32,4 +32,8 @@ public class CConsumerJava {
      * Test during runtime if the key calculation is correct. Decreases massive the performance. Usefull if an OpenCL producer is used.
      */
     public boolean runtimePublicKeyCalculationCheck;
+    
+    public boolean enableVanity = false;
+    
+    public String vanityPattern;
 }

@@ -570,8 +570,8 @@ public class ProbeAddressesOpenCLTest {
         System.out.println("execute hash fast ...");
         long beforeHash = System.currentTimeMillis();
         for (int i = 0; i < publicKeys.length; i++) {
-            byte[] compressedKeyHashFast = publicKeys[i].getCompressedKeyHashFast();
-            byte[] uncompressedKeyHashFast = publicKeys[i].getUncompressedKeyHashFast();
+            byte[] compressedKeyHashFast = publicKeys[i].getCompressedKeyHash();
+            byte[] uncompressedKeyHashFast = publicKeys[i].getUncompressedKeyHash();
             
             //assertThat(compressedKeyHash, is(equalTo(compressedKeyHashFast)));
             //assertThat(uncompressedKeyHash, is(equalTo(uncompressedKeyHashFast)));

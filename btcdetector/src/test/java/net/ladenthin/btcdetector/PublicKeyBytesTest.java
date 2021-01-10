@@ -23,12 +23,19 @@ import org.junit.Test;
 import java.io.IOException;
 import net.ladenthin.btcdetector.staticaddresses.TestAddresses42;
 import org.bitcoinj.core.ECKey;
+import org.bitcoinj.core.LegacyAddress;
+import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.core.Utils;
+import org.bitcoinj.params.MainNetParams;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
 public class PublicKeyBytesTest {
 
+    protected final NetworkParameters networkParameters = MainNetParams.get();
+    protected final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(true));
+    
     @Test
     public void createPublicKeyBytes_publicKeyGiven_PublicKeyAndHashesEquals() throws IOException, InterruptedException {
         // arrange
@@ -40,15 +47,18 @@ public class PublicKeyBytesTest {
         PublicKeyBytes publicKeyBytesGivenCompressed = new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey(), keyCompressed.getPubKey());
         
         // assert
-        assertThat(publicKeyBytes.getCompressed(), is(equalTo(keyCompressed.getPubKey())));
         assertThat(publicKeyBytes.getUncompressed(), is(equalTo(keyUncompressed.getPubKey())));
-        
-        assertThat(publicKeyBytes.getCompressedKeyHash(), is(equalTo(keyCompressed.getPubKeyHash())));
-        assertThat(publicKeyBytes.getCompressedKeyHashFast(), is(equalTo(keyCompressed.getPubKeyHash())));
-        
-        assertThat(publicKeyBytesGivenCompressed.getCompressedKeyHash(), is(equalTo(keyCompressed.getPubKeyHash())));
-        assertThat(publicKeyBytesGivenCompressed.getCompressedKeyHashFast(), is(equalTo(keyCompressed.getPubKeyHash())));
+        assertThat(publicKeyBytes.getUncompressedKeyHash(), is(equalTo(keyUncompressed.getPubKeyHash())));
+        assertThat(Utils.sha256hash160(publicKeyBytesGivenCompressed.getUncompressed()), is(equalTo(keyUncompressed.getPubKeyHash())));
         assertThat(publicKeyBytesGivenCompressed.getUncompressedKeyHash(), is(equalTo(keyUncompressed.getPubKeyHash())));
-        assertThat(publicKeyBytesGivenCompressed.getUncompressedKeyHashFast(), is(equalTo(keyUncompressed.getPubKeyHash())));
+        assertThat(publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility), is(equalTo(LegacyAddress.fromPubKeyHash(networkParameters, keyUncompressed.getPubKeyHash()).toBase58())));
+        assertThat(publicKeyBytesGivenCompressed.getUncompressedKeyHashAsBase58(keyUtility), is(equalTo(LegacyAddress.fromPubKeyHash(networkParameters, keyUncompressed.getPubKeyHash()).toBase58())));
+        
+        assertThat(publicKeyBytes.getCompressed(), is(equalTo(keyCompressed.getPubKey())));
+        assertThat(publicKeyBytes.getCompressedKeyHash(), is(equalTo(keyCompressed.getPubKeyHash())));
+        assertThat(Utils.sha256hash160(publicKeyBytesGivenCompressed.getCompressed()), is(equalTo(keyCompressed.getPubKeyHash())));
+        assertThat(publicKeyBytesGivenCompressed.getCompressedKeyHash(), is(equalTo(keyCompressed.getPubKeyHash())));
+        assertThat(publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility), is(equalTo(LegacyAddress.fromPubKeyHash(networkParameters, keyCompressed.getPubKeyHash()).toBase58())));
+        assertThat(publicKeyBytesGivenCompressed.getCompressedKeyHashAsBase58(keyUtility), is(equalTo(LegacyAddress.fromPubKeyHash(networkParameters, keyCompressed.getPubKeyHash()).toBase58())));
     }
 }

@@ -139,6 +139,8 @@ public class ConsumerJavaTest {
         consumerJava.consumeKeys(createHash160ByteBuffer());
 
         // assert
+        assertThat(consumerJava.hits.get(), is(equalTo(1L)));
+        assertThat(consumerJava.vanityHits.get(), is(equalTo(0L)));
         verify(logger, times(6)).info(logCaptor.capture());
 
         List<String> arguments = logCaptor.getAllValues();
@@ -159,10 +161,10 @@ public class ConsumerJavaTest {
         String hitMessagePublicKeyBytesCompressed = ConsumerJava.HIT_SAFE_PREFIX + "publicKeyBytes.getCompressed(): " + Hex.encodeHexString(publicKeyBytes.getCompressed());
         assertThat(arguments.get(2), is(equalTo(hitMessagePublicKeyBytesCompressed)));
         
-        String hitMessageHash160Uncompressed = ConsumerJava.HIT_SAFE_PREFIX + "hash160Uncompressed: " + Hex.encodeHexString(publicKeyBytes.getUncompressedKeyHashFast());
+        String hitMessageHash160Uncompressed = ConsumerJava.HIT_SAFE_PREFIX + "hash160Uncompressed: " + Hex.encodeHexString(publicKeyBytes.getUncompressedKeyHash());
         assertThat(arguments.get(3), is(equalTo(hitMessageHash160Uncompressed)));
         
-        String hitMessageHash160Compressed = ConsumerJava.HIT_SAFE_PREFIX + "hash160Compressed: " + Hex.encodeHexString(publicKeyBytes.getCompressedKeyHashFast());
+        String hitMessageHash160Compressed = ConsumerJava.HIT_SAFE_PREFIX + "hash160Compressed: " + Hex.encodeHexString(publicKeyBytes.getCompressedKeyHash());
         assertThat(arguments.get(4), is(equalTo(hitMessageHash160Compressed)));
         
         String hitMessageFull = ConsumerJava.HIT_PREFIX + keyUtility.createKeyDetails(key);
@@ -201,6 +203,8 @@ public class ConsumerJavaTest {
         consumerJava.consumeKeys(createHash160ByteBuffer());
 
         // assert
+        assertThat(consumerJava.hits.get(), is(equalTo(0L)));
+        assertThat(consumerJava.vanityHits.get(), is(equalTo(0L)));
         verify(logger, times(2)).trace(logCaptor.capture());
 
         List<String> arguments = logCaptor.getAllValues();
@@ -275,6 +279,8 @@ public class ConsumerJavaTest {
         consumerJava.consumeKeys(createHash160ByteBuffer());
         
         // assert
+        assertThat(consumerJava.hits.get(), is(equalTo(0L)));
+        assertThat(consumerJava.vanityHits.get(), is(equalTo(0L)));
         verify(logger, times(6)).error(logCaptor.capture());
         
         List<String> arguments = logCaptor.getAllValues();
@@ -293,6 +299,68 @@ public class ConsumerJavaTest {
             assertThat(arguments.get(3), is(equalTo("pubKeyUncompressedFromEcKey: 04db0c51cc634a4096374b0b895584a3ca2fb3bea4fd0ee2361f8db63a650fcee67ec0bd2baea1ae184bd16fd397b0e64d5d28257f85836486367fe33cc5b6e6a0")));
             assertThat(arguments.get(4), is(equalTo("hash160Uncompressed: 1a69285cb42032d77801a15a30357d510b247100")));
             assertThat(arguments.get(5), is(equalTo("hash160UncompressedFromEcKey: e02e1cae178d3a2f84a5d897ee8b7ed6c0e2bbc4")));
+        }
+    }
+    
+    
+    @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED, location = CommonDataProvider.class)
+    public void consumeKeys_testVanityPattern_patternMatches(boolean compressed) throws IOException, InterruptedException, DecoderException {
+        TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
+
+        TestAddressesFiles testAddresses = new TestAddressesFiles(false);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
+
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        cConsumerJava.runtimePublicKeyCalculationCheck = true;
+        cConsumerJava.enableVanity = true;
+        if (compressed) {
+            // 1JYHzX3ndZEcnjrWSQ9VC7324TJ9BAoGy4
+            cConsumerJava.vanityPattern = "1JYH.*";
+        } else {
+            // 14sNbmEhgiGX6BZe9Q5PCgTQT3576mniZt
+            cConsumerJava.vanityPattern = "14sN.*";
+        }
+
+        AtomicBoolean shouldRun = new AtomicBoolean(true);
+
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun);
+        consumerJava.initLMDB();
+
+        Logger logger = mock(Logger.class);
+        consumerJava.setLogger(logger);
+
+        // https://privatekeys.pw/key/0000000000000000000000000000000000000000000000000000000000000049
+        ECKey ecKey = ECKey.fromPrivate(BigInteger.valueOf(73), false);
+        PublicKeyBytes publicKeyBytes = new PublicKeyBytes(ecKey.getPrivKey(),ecKey.getPubKey());
+        PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[]{publicKeyBytes};
+        
+        consumerJava.consumeKeys(publicKeyBytesArray);
+        consumerJava.consumeKeys(createHash160ByteBuffer());
+        
+        // assert
+        assertThat(consumerJava.hits.get(), is(equalTo(0L)));
+        assertThat(consumerJava.vanityHits.get(), is(equalTo(1L)));
+        verify(logger, times(6)).info(logCaptor.capture());
+        
+        List<String> arguments = logCaptor.getAllValues();
+        
+        if (compressed) {
+            assertThat(arguments.get(0), is(equalTo("hit: safe log: publicKeyBytes.getSecretKey(): 73")));
+            assertThat(arguments.get(1), is(equalTo("hit: safe log: publicKeyBytes.getUncompressed(): 04af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45f98a3fd831eb2b749a93b0e6f35cfb40c8cd5aa667a15581bc2feded498fd9c6")));
+            assertThat(arguments.get(2), is(equalTo("hit: safe log: publicKeyBytes.getCompressed(): 02af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45")));
+            assertThat(arguments.get(3), is(equalTo("hit: safe log: hash160Uncompressed: 2a6f34a72c181bdd4e6d91ffa69e84fd6c49b207")));
+            assertThat(arguments.get(4), is(equalTo("hit: safe log: hash160Compressed: c065379323a549fc3547bcb1937d5dcb48df2396")));
+            assertThat(arguments.get(5), is(equalTo("vanity pattern match: privateKeyBigInteger: [73] privateKeyBytes: [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 73]] privateKeyHex: [0000000000000000000000000000000000000000000000000000000000000049] WiF: [KwDiBf89QgGbjEhKnhXJuH7LrciVrZi3qYjgd9M7rFU7fj3itoEY] publicKeyAsHex: [02af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45] publicKeyHash160Hex: [c065379323a549fc3547bcb1937d5dcb48df2396] publicKeyHash160Base58: [1JYHzX3ndZEcnjrWSQ9VC7324TJ9BAoGy4] Compressed: [true]")));
+        } else {
+            assertThat(arguments.get(0), is(equalTo("hit: safe log: publicKeyBytes.getSecretKey(): 73")));
+            assertThat(arguments.get(1), is(equalTo("hit: safe log: publicKeyBytes.getUncompressed(): 04af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45f98a3fd831eb2b749a93b0e6f35cfb40c8cd5aa667a15581bc2feded498fd9c6")));
+            assertThat(arguments.get(2), is(equalTo("hit: safe log: publicKeyBytes.getCompressed(): 02af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45")));
+            assertThat(arguments.get(3), is(equalTo("hit: safe log: hash160Uncompressed: 2a6f34a72c181bdd4e6d91ffa69e84fd6c49b207")));
+            assertThat(arguments.get(4), is(equalTo("hit: safe log: hash160Compressed: c065379323a549fc3547bcb1937d5dcb48df2396")));
+            assertThat(arguments.get(5), is(equalTo("vanity pattern match: privateKeyBigInteger: [73] privateKeyBytes: [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 73]] privateKeyHex: [0000000000000000000000000000000000000000000000000000000000000049] WiF: [5HpHagT65TZzG1PH3CSu63k8DbpvD8s5ip4nEB3kEsreJwwNRRr] publicKeyAsHex: [04af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45f98a3fd831eb2b749a93b0e6f35cfb40c8cd5aa667a15581bc2feded498fd9c6] publicKeyHash160Hex: [2a6f34a72c181bdd4e6d91ffa69e84fd6c49b207] publicKeyHash160Base58: [14sNbmEhgiGX6BZe9Q5PCgTQT3576mniZt] Compressed: [false]")));
         }
     }
 

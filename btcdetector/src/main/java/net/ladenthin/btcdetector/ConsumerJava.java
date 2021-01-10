@@ -36,6 +36,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import net.ladenthin.btcdetector.configuration.CConsumerJava;
 import net.ladenthin.btcdetector.persistence.Persistence;
 import net.ladenthin.btcdetector.persistence.PersistenceUtils;
@@ -48,6 +50,7 @@ public class ConsumerJava implements Consumer {
     private static final int ONE_SECOND_IN_MILLISECONDS = 1000;
     public static final String MISS_PREFIX = "miss: Could not find the address: ";
     public static final String HIT_PREFIX = "hit: Found the address: ";
+    public static final String VANITY_HIT_PREFIX = "vanity pattern match: ";
     public static final String HIT_SAFE_PREFIX = "hit: safe log: ";
 
     protected Logger logger = LoggerFactory.getLogger(this.getClass());
@@ -69,11 +72,19 @@ public class ConsumerJava implements Consumer {
     protected final LinkedBlockingQueue<PublicKeyBytes[]> keysQueue;
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
     private final AtomicBoolean shouldRun;
+    
+    protected final AtomicLong vanityHits = new AtomicLong();
+    private final Pattern vanityPattern;
 
     protected ConsumerJava(CConsumerJava consumerJava, AtomicBoolean shouldRun) {
         this.consumerJava = consumerJava;
         this.keysQueue = new LinkedBlockingQueue<>(consumerJava.queueSize);
         this.shouldRun = shouldRun;
+        if (consumerJava.enableVanity) {
+            this.vanityPattern = Pattern.compile(consumerJava.vanityPattern);
+        } else {
+            vanityPattern = null;
+        }
     }
 
     Logger getLogger() {
@@ -178,7 +189,7 @@ public class ConsumerJava implements Consumer {
                 if (publicKeyBytes.isInvalid()) {
                     continue;
                 }
-                byte[] hash160Uncompressed = publicKeyBytes.getUncompressedKeyHashFast();
+                byte[] hash160Uncompressed = publicKeyBytes.getUncompressedKeyHash();
 
                 threadLocalReuseableByteBuffer.rewind();
                 threadLocalReuseableByteBuffer.put(hash160Uncompressed);
@@ -186,7 +197,7 @@ public class ConsumerJava implements Consumer {
 
                 boolean containsAddressUncompressed = containsAddress(threadLocalReuseableByteBuffer);
 
-                byte[] hash160Compressed = publicKeyBytes.getCompressedKeyHashFast();
+                byte[] hash160Compressed = publicKeyBytes.getCompressedKeyHash();
                 threadLocalReuseableByteBuffer.rewind();
                 threadLocalReuseableByteBuffer.put(hash160Compressed);
                 threadLocalReuseableByteBuffer.flip();
@@ -239,6 +250,30 @@ public class ConsumerJava implements Consumer {
                     ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
                     String hitMessageCompressed = HIT_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
                     logger.info(hitMessageCompressed);
+                }
+
+                if (consumerJava.enableVanity) {
+                    String uncompressedKeyHashAsBase58 = publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility);
+                    Matcher uncompressedKeyHashAsBase58Matcher = vanityPattern.matcher(uncompressedKeyHashAsBase58);
+                    if (uncompressedKeyHashAsBase58Matcher.matches()) {
+                        // immediately log the secret
+                        safeLog(publicKeyBytes, hash160Uncompressed, hash160Compressed);
+                        vanityHits.incrementAndGet();
+                        ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
+                        String vanityHitMessageUncompressed = VANITY_HIT_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
+                        logger.info(vanityHitMessageUncompressed);
+                    }
+
+                    String compressedKeyHashAsBase58 = publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility);
+                    Matcher compressedKeyHashAsBase58Matcher = vanityPattern.matcher(compressedKeyHashAsBase58);
+                    if (compressedKeyHashAsBase58Matcher.matches()) {
+                        // immediately log the secret
+                        safeLog(publicKeyBytes, hash160Uncompressed, hash160Compressed);
+                        vanityHits.incrementAndGet();
+                        ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
+                        String vanityHitMessageCompressed = VANITY_HIT_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
+                        logger.info(vanityHitMessageCompressed);
+                    }
                 }
 
                 if (!containsAddressUncompressed && !containsAddressCompressed) {
