@@ -15,9 +15,10 @@
 #
 from selenium import webdriver
 import time
-from PIL import Image
 from io import BytesIO
 import re
+
+# pip install selenium
 
 def findAllInSource(addressPattern, driver):
   html = driver.page_source
@@ -121,5 +122,8 @@ feathercoinUrlPattern = "https://bitinfocharts.com/de/top-100-richest-feathercoi
 feathercoinAddressPattern = "[7]"+base58Pattern
 feathercoins = scrapeAddresses(feathercoinUrlPattern, feathercoinAddressPattern, driver)
 writeToFile(feathercoins, "feathercoin.txt")
+# time.sleep(120)
 
+if (False): '''
+'''
 driver.close()
