@@ -52,9 +52,11 @@ public class ProducerJava extends AbstractProducer {
             for (int i = 0; i < publicKeyBytesArray.length; i++) {
                 // create uncompressed
                 BigInteger gridSecret = calculateSecretKey(secretBase, i);
-                ECKey ecKeyUncompressed = ECKey.fromPrivate(gridSecret, false);
-                PublicKeyBytes publicKeyBytes = new PublicKeyBytes(ecKeyUncompressed.getPrivKey(), ecKeyUncompressed.getPubKey());
-                publicKeyBytesArray[i] = publicKeyBytes;
+                if (PublicKeyBytes.isInvalid(gridSecret)) {
+                    publicKeyBytesArray[i] = PublicKeyBytes.INVALID_KEY_ONE;
+                    continue;
+                }
+                publicKeyBytesArray[i] = PublicKeyBytes.fromPrivate(gridSecret);
             }
 
             consumer.consumeKeys(publicKeyBytesArray);

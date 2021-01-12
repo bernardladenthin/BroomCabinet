@@ -20,7 +20,9 @@ package net.ladenthin.btcdetector;
 
 import com.google.common.hash.Hashing;
 import java.math.BigInteger;
+import java.util.Objects;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Utils;
 import org.bouncycastle.crypto.digests.RIPEMD160Digest;
 
@@ -112,6 +114,11 @@ public class PublicKeyBytes {
         this.compressed = compressed;
     }
     
+    public static PublicKeyBytes fromPrivate(BigInteger secretKey) {
+        ECKey ecKey = ECKey.fromPrivate(secretKey, false);
+        return new PublicKeyBytes(ecKey.getPrivKey(), ecKey.getPubKey());
+    }
+    
     public static byte[] createCompressedBytes(byte[] uncompressed) {
         // add one byte for format sign
         byte[] compressed = new byte[PUBLIC_KEY_COMPRESSED_BYTES];
@@ -178,4 +185,35 @@ public class PublicKeyBytes {
         }
         return compressedKeyHashBase58;
     }
+
+    @Override
+    public int hashCode() {
+        int hash = 5;
+        hash = 17 * hash + Objects.hashCode(this.secretKey);
+        return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final PublicKeyBytes other = (PublicKeyBytes) obj;
+        if (!Objects.equals(this.secretKey, other.secretKey)) {
+            return false;
+        }
+        return true;
+    }
+
+    @Override
+    public String toString() {
+        return "PublicKeyBytes{" + "uncompressed=" + uncompressed + ", compressed=" + compressed + ", uncompressedKeyHash=" + uncompressedKeyHash + ", compressedKeyHash=" + compressedKeyHash + ", uncompressedKeyHashBase58=" + uncompressedKeyHashBase58 + ", compressedKeyHashBase58=" + compressedKeyHashBase58 + ", secretKey=" + secretKey + '}';
+    }
+    
 }
