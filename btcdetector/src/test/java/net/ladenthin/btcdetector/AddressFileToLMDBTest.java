@@ -51,6 +51,8 @@ public class AddressFileToLMDBTest extends LMDBBase {
 
         // assert
         try {
+            assertThat(persistence.count(), is(equalTo(6L)));
+            
             Coin[] amounts = new Coin[TestAddressesFiles.NUMBER_OF_ADRESSES];
             String[] base58Adresses = addressesFiles.getTestAddresses().getAsBase58StringList().toArray(new String[0]);
             
@@ -77,6 +79,8 @@ public class AddressFileToLMDBTest extends LMDBBase {
 
         // assert
         try {
+            assertThat(persistence.count(), is(equalTo(9L)));
+            
             String[] hash160s = {
                 new StaticDogecoinP2PKHAddress().publicKeyHash,
                 new StaticDashP2PKHAddress().publicKeyHash,

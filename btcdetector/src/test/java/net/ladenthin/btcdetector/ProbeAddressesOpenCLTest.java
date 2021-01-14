@@ -483,6 +483,9 @@ public class ProbeAddressesOpenCLTest {
         OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
         PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
         createKeys.freeResult();
+        
+        openCLContext.release();
+        
         {
             // do a warmup for the jvm, afterwards we can compare the speed of hash / hash fast
             System.out.println("WARMUP ... ");
@@ -493,9 +496,7 @@ public class ProbeAddressesOpenCLTest {
         hashPublicKeys(publicKeys, souts);
         hashPublicKeysFast(publicKeys, souts);
         
-        
         assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, souts, keyUtility);
-        openCLContext.release();
     }
 
     private static void assertPublicKeyBytesCalculatedCorrect(PublicKeyBytes[] publicKeys, BigInteger secretBase, final boolean souts, KeyUtility keyUtility) {

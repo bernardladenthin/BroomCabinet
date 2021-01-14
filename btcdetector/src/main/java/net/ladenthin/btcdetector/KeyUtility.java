@@ -40,6 +40,7 @@ public class KeyUtility {
     public final ByteBufferUtility byteBufferUtility;
 
     public static final int MAX_NUM_BITS = 256;
+    public static final int MAX_NUM_BITS_IN_BYTES = MAX_NUM_BITS / 8;
 
     public KeyUtility(NetworkParameters networkParameters, ByteBufferUtility byteBufferUtility) {
         this.networkParameters = networkParameters;

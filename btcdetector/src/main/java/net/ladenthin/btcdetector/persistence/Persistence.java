@@ -31,6 +31,7 @@ public interface Persistence {
 
     void init();
     void close();
+    long count();
     Coin getAmount(ByteBuffer hash160);
     boolean containsAddress(ByteBuffer hash160);
 

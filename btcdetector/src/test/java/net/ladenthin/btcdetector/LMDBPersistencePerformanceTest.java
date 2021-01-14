@@ -42,7 +42,7 @@ public class LMDBPersistencePerformanceTest {
     private final static int ARRAY_SIZE = 1024*8;
     private final static BigInteger PRIVATE_KEY = BigInteger.valueOf(1337);
     private final static int CONSUMER_THREADS = 32;
-    private final static int TEST_TIME_IN_SECONDS = 2;
+    private final static int TEST_TIME_IN_SECONDS = 4;
     /**
      * Deactivate to get proper performance results for the LMDB (round about 10506 k keys / second).
      * Set to active to test all OpenCL results if they are correct (round about 200 k keys / second).
@@ -53,7 +53,7 @@ public class LMDBPersistencePerformanceTest {
     private final static int PRODUCER_THREADS = KEYS_QUEUE_SIZE;
     
     @Test
-    public void runProber_testAddressGiven_hitExpected() throws IOException, InterruptedException, IllegalArgumentException, NoSuchFieldException, IllegalAccessException {
+    public void runProber_performanceTest() throws IOException, InterruptedException, IllegalArgumentException, NoSuchFieldException, IllegalAccessException {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
@@ -86,6 +86,9 @@ public class LMDBPersistencePerformanceTest {
         consumerJava.startStatisticsTimer();
         
         Thread.sleep(TEST_TIME_IN_SECONDS * 1000);
+        // shut down
+        shouldRun.set(false);
+        consumerJava.timer.cancel();
     }
 
     private void createProducerThreads(ThreadPoolExecutor threadPoolExecutor, AtomicBoolean shouldRun, ConsumerJava consumerJava, PublicKeyBytes[] publicKeyByteses) {
@@ -103,8 +106,7 @@ public class LMDBPersistencePerformanceTest {
     }
 
     private PublicKeyBytes[] createPublicKeyBytesArray() {
-        ECKey ecKey = ECKey.fromPrivate(PRIVATE_KEY, false);
-        PublicKeyBytes publicKeyBytes = new PublicKeyBytes(ecKey.getPrivKey(), ecKey.getPubKey());
+        PublicKeyBytes publicKeyBytes = PublicKeyBytes.fromPrivate(PRIVATE_KEY);
         PublicKeyBytes[] publicKeyByteses = new PublicKeyBytes[ARRAY_SIZE];
         for (int i = 0; i < publicKeyByteses.length; i++) {
             publicKeyByteses[i] = publicKeyBytes;

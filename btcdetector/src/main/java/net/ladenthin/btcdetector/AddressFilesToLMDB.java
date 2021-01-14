@@ -82,6 +82,9 @@ public class AddressFilesToLMDB implements Runnable {
             for (String error : readStatistic.errors) {
                 logger.info("Error in line: " + error);
             }
+            
+            long count = persistence.count();
+            logger.info("LMDB contains " + count + " unique entries.");
 
         } catch (IOException e) {
             throw new RuntimeException(e);

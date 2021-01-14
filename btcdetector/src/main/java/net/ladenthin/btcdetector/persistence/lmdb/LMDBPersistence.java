@@ -230,4 +230,17 @@ public class LMDBPersistence implements Persistence {
     public Stat getStats() {
         return env.stat();
     }
+
+    @Override
+    public long count() {
+        long count = 0;
+        try (Txn<ByteBuffer> txn = env.txnRead()) {
+            try (CursorIterable<ByteBuffer> iterable = lmdb_h160ToAmount.iterate(txn, KeyRange.all())) {
+                for (final CursorIterable.KeyVal<ByteBuffer> kv : iterable) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
 }

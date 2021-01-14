@@ -146,10 +146,9 @@ public class ConsumerJavaTest {
         List<String> arguments = logCaptor.getAllValues();
 
         ECKey key = new TestAddresses42(1, compressed).getECKeys().get(0);
-        ECKey keyUncompressed = ECKey.fromPrivate(key.getPrivKey(), false);
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), new ByteBufferUtility(false));
         
-        PublicKeyBytes publicKeyBytes = new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey());
+        PublicKeyBytes publicKeyBytes = PublicKeyBytes.fromPrivate(key.getPrivKey());
         
         // to prevent any exception in further hit message creation and a possible missing hit message, log the secret alone first that a recovery is possible
         String hitMessageSecretKey = ConsumerJava.HIT_SAFE_PREFIX + "publicKeyBytes.getSecretKey(): " + key.getPrivKey();
@@ -265,9 +264,7 @@ public class ConsumerJavaTest {
         Logger logger = mock(Logger.class);
         consumerJava.setLogger(logger);
 
-        ECKey ecKey = ECKey.fromPrivate(BigInteger.valueOf(1337), false);
-        
-        PublicKeyBytes invalidPublicKeyBytes = new PublicKeyBytes(ecKey.getPrivKey(),ecKey.getPubKey());
+        PublicKeyBytes invalidPublicKeyBytes = PublicKeyBytes.fromPrivate(BigInteger.valueOf(1337));
         // invalidate compressed or uncompressed
         if (compressed) {
             invalidPublicKeyBytes.getCompressed()[7] = 0;
@@ -333,8 +330,7 @@ public class ConsumerJavaTest {
         consumerJava.setLogger(logger);
 
         // https://privatekeys.pw/key/0000000000000000000000000000000000000000000000000000000000000049
-        ECKey ecKey = ECKey.fromPrivate(BigInteger.valueOf(73), false);
-        PublicKeyBytes publicKeyBytes = new PublicKeyBytes(ecKey.getPrivKey(),ecKey.getPubKey());
+        PublicKeyBytes publicKeyBytes = PublicKeyBytes.fromPrivate(BigInteger.valueOf(73));
         PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[]{publicKeyBytes};
         
         consumerJava.consumeKeys(publicKeyBytesArray);

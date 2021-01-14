@@ -81,7 +81,7 @@ public class OpenClTask {
     }
 
     public int getSrcSizeInBytes() {
-        return PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH;
+        return KeyUtility.MAX_NUM_BITS_IN_BYTES;
     }
 
     public int getDstSizeInBytes() {
