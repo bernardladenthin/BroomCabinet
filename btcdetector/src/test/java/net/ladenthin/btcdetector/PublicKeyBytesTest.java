@@ -22,6 +22,7 @@ import org.junit.Test;
 
 import java.io.IOException;
 import net.ladenthin.btcdetector.staticaddresses.TestAddresses42;
+import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.NetworkParameters;
@@ -60,5 +61,15 @@ public class PublicKeyBytesTest {
         assertThat(publicKeyBytesGivenCompressed.getCompressedKeyHash(), is(equalTo(keyCompressed.getPubKeyHash())));
         assertThat(publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility), is(equalTo(LegacyAddress.fromPubKeyHash(networkParameters, keyCompressed.getPubKeyHash()).toBase58())));
         assertThat(publicKeyBytesGivenCompressed.getCompressedKeyHashAsBase58(keyUtility), is(equalTo(LegacyAddress.fromPubKeyHash(networkParameters, keyCompressed.getPubKeyHash()).toBase58())));
+    }
+    
+    @Test
+    public void maxPrivateKeyAsHexString_isEqualToConstant() throws IOException, InterruptedException {
+        // arrange
+        String maxPrivateKeyAsHexString = Hex.encodeHexString(KeyUtility.bigIntegerToBytes(PublicKeyBytes.MAX_PRIVATE_KEY));
+        // act
+        
+        // assert
+        assertThat(maxPrivateKeyAsHexString.toLowerCase(), is(equalTo("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141".toLowerCase())));
     }
 }

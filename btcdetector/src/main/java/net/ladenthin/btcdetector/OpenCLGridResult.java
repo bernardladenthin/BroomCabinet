@@ -20,7 +20,6 @@ package net.ladenthin.btcdetector;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import net.ladenthin.btcdetector.configuration.CProducer;
 
 public class OpenCLGridResult {
 
@@ -76,18 +75,18 @@ public class OpenCLGridResult {
         byte[] uncompressed = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
         uncompressed[0] = PublicKeyBytes.PARITY_UNCOMPRESSED;
         
-        int keyOffsetInByteBuffer = PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH*keyNumber;
+        int keyOffsetInByteBuffer = PublicKeyBytes.TWO_COORDINATES_NUM_BYTES*keyNumber;
         
         // read ByteBuffer
-        byte[] yx = new byte[PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH];
-        for (int i = 0; i < PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH; i++) {
+        byte[] yx = new byte[PublicKeyBytes.TWO_COORDINATES_NUM_BYTES];
+        for (int i = 0; i < PublicKeyBytes.TWO_COORDINATES_NUM_BYTES; i++) {
             yx[yx.length-1-i] = b.get(keyOffsetInByteBuffer+i);
         }
         
         // copy x
-        System.arraycopy(yx, PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH, uncompressed, PublicKeyBytes.PARITY_BYTES_LENGTH, PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH);
+        System.arraycopy(yx, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES, uncompressed, PublicKeyBytes.PARITY_BYTES_LENGTH, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
         // copy y
-        System.arraycopy(yx, 0, uncompressed, PublicKeyBytes.PARITY_BYTES_LENGTH+PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH, PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH);
+        System.arraycopy(yx, 0, uncompressed, PublicKeyBytes.PARITY_BYTES_LENGTH+PublicKeyBytes.ONE_COORDINATE_NUM_BYTES, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
         
         if (false) {
             assertValidResult(uncompressed);

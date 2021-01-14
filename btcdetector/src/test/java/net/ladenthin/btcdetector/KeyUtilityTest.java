@@ -28,7 +28,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.params.MainNetParams;
-import org.bouncycastle.util.encoders.Hex;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.*;
@@ -37,9 +36,6 @@ public class KeyUtilityTest {
 
     private final StaticKey staticKey = new StaticKey();
     
-    
-    public static final BigInteger MAX_PRIVATE_KEY = new BigInteger("2").pow(KeyUtility.MAX_NUM_BITS).subtract(BigInteger.ONE);
-
     @Before
     public void init() throws IOException {
     }
@@ -140,7 +136,7 @@ public class KeyUtilityTest {
     @Test
     public void createSecret() throws IOException {
         // act
-        BigInteger secret = new KeyUtility(null, new ByteBufferUtility(false)).createSecret(KeyUtility.MAX_NUM_BITS, new Random(42));
+        BigInteger secret = new KeyUtility(null, new ByteBufferUtility(false)).createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, new Random(42));
 
         // assert
         assertThat(secret.toString(), is(not(equalTo(""))));
@@ -185,7 +181,7 @@ public class KeyUtilityTest {
     @Test
     public void bigIntegerToBytes_maxPrivateKeyGiven_returnWithoutLeadingZeros() throws IOException {
         // arrange
-        BigInteger key = MAX_PRIVATE_KEY;
+        BigInteger key = PublicKeyBytes.MAX_TECHNICALLY_PRIVATE_KEY;
         byte[] maxPrivateKey = key.toByteArray();
         assertThat(maxPrivateKey.length, is(equalTo(33)));
 

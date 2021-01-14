@@ -19,7 +19,6 @@
 package net.ladenthin.btcdetector.configuration;
 
 import java.math.BigInteger;
-import net.ladenthin.btcdetector.KeyUtility;
 import net.ladenthin.btcdetector.PublicKeyBytes;
 
 public class CProducer {
@@ -34,14 +33,12 @@ public class CProducer {
     /**
      * (2<sup>{@code maxNumBits}</sup> - 1) can be set to a lower value to improve a search on specific ranges (e.g. the puzzle transaction https://privatekeys.pw/puzzles/bitcoin-puzzle-tx ).
      * {@code 1} can't be tested because {@link ECKey#fromPrivate} throws an {@link IllegalArgumentException}.
-     * Range: {@code 2} (inclusive) to {@link #MAX_GRID_NUM_BITS} (inclusive).
+     * Range: {@code 2} (inclusive) to {@link PublicKeyBytes#PRIVATE_KEY_MAX_NUM_BITS} (inclusive).
      */
-    public int privateKeyMaxNumBits = KeyUtility.MAX_NUM_BITS;
+    public int privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
     
     /**
-     * Range: {@code 1} (inclusive) to
-     * {@link #MAX_GRID_NUM_BITS}
-     * (inclusive).
+     * Range: {@code 1} (inclusive) to {@link #MAX_GRID_NUM_BITS} (inclusive).
      */
     public int gridNumBits = 8;
 
@@ -63,7 +60,7 @@ public class CProducer {
     public void assertGridNumBitsCorrect() {
         {
             // ensure the constant MAX_GRID_NUM_BITS is set correct
-            int maximumWorkSize = (int)(Integer.MAX_VALUE / PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH);
+            int maximumWorkSize = (int)(Integer.MAX_VALUE / PublicKeyBytes.TWO_COORDINATES_NUM_BYTES);
             // https://stackoverflow.com/questions/5242533/fast-way-to-find-exponent-of-nearest-superior-power-of-2
             int numBitsMaximum = maximumWorkSize == 0 ? 0 : 32 - Integer.numberOfLeadingZeros(maximumWorkSize - 1);
 

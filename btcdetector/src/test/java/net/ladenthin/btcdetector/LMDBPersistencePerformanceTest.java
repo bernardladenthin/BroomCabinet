@@ -29,7 +29,6 @@ import net.ladenthin.btcdetector.configuration.CConsumerJava;
 import net.ladenthin.btcdetector.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.btcdetector.staticaddresses.TestAddressesFiles;
 import net.ladenthin.btcdetector.staticaddresses.TestAddressesLMDB;
-import org.bitcoinj.core.ECKey;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;

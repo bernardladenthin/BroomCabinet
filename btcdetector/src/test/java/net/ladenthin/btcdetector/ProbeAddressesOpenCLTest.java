@@ -26,11 +26,8 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URL;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.junit.Before;
 import org.junit.Rule;
@@ -44,7 +41,6 @@ import java.util.Random;
 import net.ladenthin.btcdetector.configuration.CProducer;
 import net.ladenthin.btcdetector.configuration.CProducerOpenCL;
 import net.ladenthin.btcdetector.staticaddresses.TestAddresses42;
-import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.params.MainNetParams;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -449,7 +445,7 @@ public class ProbeAddressesOpenCLTest {
         openCLContext.init();
         
         OpenClTask openClTask = openCLContext.getOpenClTask();
-        openClTask.setSrcPrivateKeyChunk(KeyUtilityTest.MAX_PRIVATE_KEY);
+        openClTask.setSrcPrivateKeyChunk(PublicKeyBytes.MAX_TECHNICALLY_PRIVATE_KEY);
         
         openCLContext.release();
     }
@@ -476,7 +472,7 @@ public class ProbeAddressesOpenCLTest {
         openCLContext.init();
         
         Random sr = new SecureRandom();
-        BigInteger secretKeyBase = keyUtility.createSecret(KeyUtility.MAX_NUM_BITS, sr);
+        BigInteger secretKeyBase = keyUtility.createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, sr);
         
         BigInteger secretBase = producerOpenCL.killBits(secretKeyBase);
         
@@ -608,6 +604,7 @@ public class ProbeAddressesOpenCLTest {
     /**
      * Read the inner bytes in reverse order. Remove padding bytes to return a clean byte array. Only for x with padding
      */
+    @Deprecated
     private static final byte[] getPublicKeyFromByteBuffer(ByteBuffer b, int keyOffset) {
         int paddingBytes = 3;
         int publicKeyByteLength = PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array * BYTES_FOR_INT;
@@ -631,13 +628,17 @@ public class ProbeAddressesOpenCLTest {
         return publicKey;
     }
     
+    @Deprecated
     private static void dumpIntArray(String name, int[] intArray) {
         for (int i = 0; i < intArray.length; i++) {
             System.out.println(name + "["+i+"]: " + Integer.toHexString(intArray[i]));
         }
     }
     
-    // from https://java-browser.yawk.at/org.bouncycastle/bcprov-jdk15/1.46/org/bouncycastle/math/ec/WNafMultiplier.java
+    /**
+     * from https://java-browser.yawk.at/org.bouncycastle/bcprov-jdk15/1.46/org/bouncycastle/math/ec/WNafMultiplier.java
+     */
+    @Deprecated
     private static byte[] windowNaf(byte width, BigInteger k)
     {
         // The window NAF is at most 1 element longer than the binary

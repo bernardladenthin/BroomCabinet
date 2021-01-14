@@ -29,27 +29,42 @@ import org.bouncycastle.crypto.digests.RIPEMD160Digest;
 public class PublicKeyBytes {
     
     /**
-     * Use {@link com.​google.​common.​hash.Hashing} and {@link org.bouncycastle.crypto.digests.RIPEMD160Digest} instead {@link org.bitcoinj.core.Utils#sha256hash160(byte[])}.
+     * Use {@link com.​google.​common.​hash.Hashing} and
+     * {@link org.bouncycastle.crypto.digests.RIPEMD160Digest} instead
+     * {@link org.bitcoinj.core.Utils#sha256hash160(byte[])}.
      */
     public static final boolean USE_SHA256_RIPEMD160_FAST = true;
 
-    public static final int ONE_COORDINATE_BYTE_LENGTH = 32;
-    public static final int TWO_COORDINATES_BYTES_LENGTH = ONE_COORDINATE_BYTE_LENGTH * 2;
-    public static final int PARITY_BYTES_LENGTH = 1;
-    
-    public static final int LAST_Y_COORDINATE_BYTE_INDEX = PublicKeyBytes.PARITY_BYTES_LENGTH+PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH-1;
-    
+    public static final BigInteger MAX_TECHNICALLY_PRIVATE_KEY = BigInteger.valueOf(2).pow(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS).subtract(BigInteger.ONE);
+
     /**
-     * The first byte (parity) is 4 to indicate a public key with x and y coordinate (uncompressed).
+     * Specifically, any 256-bit number between {@code 0x1} and {@code 0xFFFF FFFF FFFF FFFF FFFF FFFF FFFF FFFE BAAE DCE6 AF48 A03B BFD2 5E8C D036 4141} is a valid
+     * private key.
+     */
+    public static final BigInteger MAX_PRIVATE_KEY = new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141", 16);
+
+    public static final int PRIVATE_KEY_MAX_NUM_BITS = 256;
+    public static final int BITS_PER_BYTE = 8;
+    public static final int PRIVATE_KEY_MAX_NUM_BYTES = PRIVATE_KEY_MAX_NUM_BITS / BITS_PER_BYTE;
+
+    public static final int ONE_COORDINATE_NUM_BYTES = 32;
+    public static final int TWO_COORDINATES_NUM_BYTES = ONE_COORDINATE_NUM_BYTES * 2;
+    public static final int PARITY_BYTES_LENGTH = 1;
+
+    public static final int LAST_Y_COORDINATE_BYTE_INDEX = PublicKeyBytes.PARITY_BYTES_LENGTH + PublicKeyBytes.TWO_COORDINATES_NUM_BYTES - 1;
+
+    /**
+     * The first byte (parity) is 4 to indicate a public key with x and y
+     * coordinate (uncompressed).
      */
     public static final int PARITY_UNCOMPRESSED = 4;
     public static final int PARITY_COMPRESSED_EVEN = 2;
     public static final int PARITY_COMPRESSED_ODD = 3;
-    
+
     public static final int HASH160_SIZE = 20;
     
-    public final static int PUBLIC_KEY_UNCOMPRESSED_BYTES = PARITY_BYTES_LENGTH + TWO_COORDINATES_BYTES_LENGTH;
-    public final static int PUBLIC_KEY_COMPRESSED_BYTES = PARITY_BYTES_LENGTH + ONE_COORDINATE_BYTE_LENGTH;
+    public final static int PUBLIC_KEY_UNCOMPRESSED_BYTES = PARITY_BYTES_LENGTH + TWO_COORDINATES_NUM_BYTES;
+    public final static int PUBLIC_KEY_COMPRESSED_BYTES = PARITY_BYTES_LENGTH + ONE_COORDINATE_NUM_BYTES;
 
     private final byte[] uncompressed;
     private final byte[] compressed;
@@ -124,7 +139,7 @@ public class PublicKeyBytes {
         byte[] compressed = new byte[PUBLIC_KEY_COMPRESSED_BYTES];
         
         // copy x
-        System.arraycopy(uncompressed, PARITY_BYTES_LENGTH, compressed, PublicKeyBytes.PARITY_BYTES_LENGTH, PublicKeyBytes.ONE_COORDINATE_BYTE_LENGTH);
+        System.arraycopy(uncompressed, PARITY_BYTES_LENGTH, compressed, PublicKeyBytes.PARITY_BYTES_LENGTH, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
         
         boolean even = uncompressed[LAST_Y_COORDINATE_BYTE_INDEX] % 2 == 0;
         

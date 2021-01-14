@@ -32,7 +32,7 @@ public interface Producer extends Runnable {
      * Create multiple keys for a specific bit length using {@link Random} and
      * push them to the {@link Consumer}.
      * 
-     * Specifically, any 256-bit number between 0x1 and 0xFFFF FFFF FFFF FFFF FFFF FFFF FFFF FFFE BAAE DCE6 AF48 A03B BFD2 5E8C D036 4141 is a valid private key.
+     * Specifically, any 256-bit number between {@code 0x1} and {@link PublicKeyBytes#MAX_PRIVATE_KEY} is a valid private key.
      */
     void produceKeys();
     

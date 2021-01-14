@@ -39,9 +39,6 @@ public class KeyUtility {
     public final NetworkParameters networkParameters;
     public final ByteBufferUtility byteBufferUtility;
 
-    public static final int MAX_NUM_BITS = 256;
-    public static final int MAX_NUM_BITS_IN_BYTES = MAX_NUM_BITS / 8;
-
     public KeyUtility(NetworkParameters networkParameters, ByteBufferUtility byteBufferUtility) {
         this.networkParameters = networkParameters;
         this.byteBufferUtility = byteBufferUtility;
@@ -79,7 +76,6 @@ public class KeyUtility {
         String privateKeyAsWiF = key.getPrivateKeyAsWiF(networkParameters);
 
         byte[] hash160 = key.getPubKeyHash();
-        ByteBuffer hash160AsByteBuffer = byteBufferUtility.byteArrayToByteBuffer(hash160);
         String publicKeyHash160Hex = Hex.toHexString(hash160);
         String publicKeyHash160Base58 = new KeyUtility(networkParameters, byteBufferUtility).toBase58(hash160);
 
@@ -119,7 +115,8 @@ public class KeyUtility {
      * @param b
      * @return 
      */
-    public static int[] privateKeyIntsFromByteArray(byte[] b) {
+    @Deprecated
+    private static int[] privateKeyIntsFromByteArray(byte[] b) {
         int[] intArray = new int[8];
         byteArrayToIntArray(b, 0, intArray, 7);
         byteArrayToIntArray(b, 4, intArray, 6);
@@ -132,7 +129,8 @@ public class KeyUtility {
         return intArray;
     }
 
-    public static byte[] publicKeyByteArrayFromIntArray(int[] i) {
+    @Deprecated
+    private static byte[] publicKeyByteArrayFromIntArray(int[] i) {
         // we need: 1 + 32 bytes
         byte[] b = new byte[33];
         // extraxt the last int and move to the right position, only one byte is needed
@@ -151,21 +149,24 @@ public class KeyUtility {
         return b;
     }
 
-    public static int byteArrayToInt(byte[] b) {
+    @Deprecated
+    private static int byteArrayToInt(byte[] b) {
         return b[3] & 0xFF
                 | (b[2] & 0xFF) << 8
                 | (b[1] & 0xFF) << 16
                 | (b[0] & 0xFF) << 24;
     }
 
-    public static int byteArrayToInt(byte[] b, int offsetByteArray) {
+    @Deprecated
+    private static int byteArrayToInt(byte[] b, int offsetByteArray) {
         return b[3 + offsetByteArray] & 0xFF
                 | (b[2 + offsetByteArray] & 0xFF) << 8
                 | (b[1 + offsetByteArray] & 0xFF) << 16
                 | (b[0 + offsetByteArray] & 0xFF) << 24;
     }
 
-    public static void byteArrayToIntArray(byte[] b, int offsetByteArray, int[] i, int offsetIntArray) {
+    @Deprecated
+    private static void byteArrayToIntArray(byte[] b, int offsetByteArray, int[] i, int offsetIntArray) {
         int newInt = b[3 + offsetByteArray] & 0xFF
                 | (b[2 + offsetByteArray] & 0xFF) << 8
                 | (b[1 + offsetByteArray] & 0xFF) << 16
@@ -173,7 +174,8 @@ public class KeyUtility {
         i[offsetIntArray] = newInt;
     }
 
-    public static byte[] intToByteArray(int a) {
+    @Deprecated
+    private static byte[] intToByteArray(int a) {
         return new byte[]{
             (byte) ((a >> 24) & 0xFF),
             (byte) ((a >> 16) & 0xFF),
@@ -182,16 +184,16 @@ public class KeyUtility {
         };
     }
 
-    public static void intToByteArray(int a, byte[] b, int offset) {
-
+    @Deprecated
+    private static void intToByteArray(int a, byte[] b, int offset) {
         b[0 + offset] = (byte) ((a >> 24) & 0xFF);
         b[1 + offset] = (byte) ((a >> 16) & 0xFF);
         b[2 + offset] = (byte) ((a >> 8) & 0xFF);
         b[3 + offset] = (byte) (a & 0xFF);
-
     }
 
-    public static void swapIntBytes(byte[] bytes) {
+    @Deprecated
+    private static void swapIntBytes(byte[] bytes) {
         assert bytes.length % 4 == 0;
         for (int i = 0; i < bytes.length; i += 4) {
             // swap 0 and 3

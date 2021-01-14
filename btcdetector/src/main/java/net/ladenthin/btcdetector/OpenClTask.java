@@ -53,8 +53,6 @@ public class OpenClTask {
     private static final boolean USE_HOST_PTR = false;
 
     private final static boolean USE_XOR_SWAP = false;
-
-    public static final int BITS_PER_BYTE = 8;
     
     private final CProducer cProducer;
 
@@ -69,23 +67,24 @@ public class OpenClTask {
         this.context = context;
         this.cProducer = cProducer;
 
-        srcByteBuffer = ByteBuffer.allocateDirect(getSrcSizeInBytes());
+        int srcSizeInBytes = getSrcSizeInBytes();
+        srcByteBuffer = ByteBuffer.allocateDirect(srcSizeInBytes);
         srcPointer = Pointer.to(srcByteBuffer);
         srcMem = clCreateBuffer(
                 context,
-                CL_MEM_READ_ONLY,
-                getSrcSizeInBytes(),
+                CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
+                srcSizeInBytes,
                 srcPointer,
                 null
         );
     }
 
     public int getSrcSizeInBytes() {
-        return KeyUtility.MAX_NUM_BITS_IN_BYTES;
+        return PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES;
     }
 
     public int getDstSizeInBytes() {
-        return PublicKeyBytes.TWO_COORDINATES_BYTES_LENGTH * cProducer.getWorkSize();
+        return PublicKeyBytes.TWO_COORDINATES_NUM_BYTES * cProducer.getWorkSize();
     }
 
     public void setSrcPrivateKeyChunk(BigInteger privateKeyBase) {

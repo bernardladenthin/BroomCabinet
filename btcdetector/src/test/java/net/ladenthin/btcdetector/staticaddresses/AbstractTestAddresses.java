@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Random;
 import net.ladenthin.btcdetector.ByteBufferUtility;
 import net.ladenthin.btcdetector.KeyUtility;
+import net.ladenthin.btcdetector.PublicKeyBytes;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.LegacyAddress;
@@ -39,7 +40,7 @@ public abstract class AbstractTestAddresses implements TestAddresses {
     public AbstractTestAddresses(int randomSeed, int numberOfAddresses, boolean compressed) {
         Random random = new Random(randomSeed);
         for (int i = 0; i < numberOfAddresses; i++) {
-            BigInteger secret = new KeyUtility(null, new ByteBufferUtility(false)).createSecret(KeyUtility.MAX_NUM_BITS, random);
+            BigInteger secret = new KeyUtility(null, new ByteBufferUtility(false)).createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, random);
             ECKey ecKey = ECKey.fromPrivate(secret, compressed);
             ecKeys.add(ecKey);
         }
