@@ -20,16 +20,11 @@ package net.ladenthin.btcdetector;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.btcdetector.configuration.CProducerOpenCL;
-import org.apache.commons.codec.binary.Hex;
 
 public class ProducerOpenCL extends AbstractProducer {
 
@@ -64,7 +59,7 @@ public class ProducerOpenCL extends AbstractProducer {
                 return;
             }
 
-            final BigInteger secretBase = createSecretBase(producerOpenCL, secret);
+            final BigInteger secretBase = createSecretBase(producerOpenCL, secret, producerOpenCL.logSecretBase);
 
             waitTillFreeThreadsInPool();
             OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
@@ -88,7 +83,7 @@ public class ProducerOpenCL extends AbstractProducer {
     private void waitTillFreeThreadsInPool() throws InterruptedException {
         while(getFreeThreads() < 1) {
             Thread.sleep(producerOpenCL.delayBlockedReader);
-            logger.trace("No possible free threads to read OpenCL results. May increase maxResultReaderThreads.");
+            getLogger().trace("No possible free threads to read OpenCL results. May increase maxResultReaderThreads.");
         }
     }
 

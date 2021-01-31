@@ -53,7 +53,7 @@ public class ConsumerJava implements Consumer {
     public static final String VANITY_HIT_PREFIX = "vanity pattern match: ";
     public static final String HIT_SAFE_PREFIX = "hit: safe log: ";
 
-    protected Logger logger = LoggerFactory.getLogger(this.getClass());
+    private Logger logger = LoggerFactory.getLogger(this.getClass());
 
     protected final NetworkParameters networkParameters = MainNetParams.get();
     protected final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));

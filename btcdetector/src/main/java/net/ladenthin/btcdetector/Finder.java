@@ -26,18 +26,17 @@ import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
 import net.ladenthin.btcdetector.configuration.CProducerJava;
 import net.ladenthin.btcdetector.configuration.CProducerOpenCL;
-import net.ladenthin.btcdetector.configuration.CSniffing;
+import net.ladenthin.btcdetector.configuration.CFinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Sniffer {
+public class Finder {
 
     protected Logger logger = LoggerFactory.getLogger(this.getClass());
 
-    private final CSniffing sniffing;
+    private final CFinder finder;
 
     protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
     
@@ -46,8 +45,8 @@ public class Sniffer {
 
     private ConsumerJava consumerJava;
 
-    public Sniffer(CSniffing sniffing) {
-        this.sniffing = sniffing;
+    public Finder(CFinder finder) {
+        this.finder = finder;
     }
 
     public void startRunner() {
@@ -55,8 +54,8 @@ public class Sniffer {
 
         addSchutdownHook();
 
-        if (sniffing.consumerJava != null) {
-            consumerJava = new ConsumerJava(sniffing.consumerJava, shouldRun);
+        if (finder.consumerJava != null) {
+            consumerJava = new ConsumerJava(finder.consumerJava, shouldRun);
             consumerJava.initLMDB();
             consumerJava.startConsumer();
             consumerJava.startStatisticsTimer();
@@ -70,8 +69,8 @@ public class Sniffer {
             throw new RuntimeException(e);
         }
 
-        if (sniffing.producerJava != null) {
-            for (CProducerJava cProducerJava : sniffing.producerJava) {
+        if (finder.producerJava != null) {
+            for (CProducerJava cProducerJava : finder.producerJava) {
                 cProducerJava.assertGridNumBitsCorrect();
                 ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, consumerJava, consumerJava.keyUtility, random);
                 javaProducers.add(producerJava);
@@ -80,8 +79,8 @@ public class Sniffer {
             }
         }
 
-        if (sniffing.producerOpenCL != null) {
-            for (CProducerOpenCL cProducerOpenCL : sniffing.producerOpenCL) {
+        if (finder.producerOpenCL != null) {
+            for (CProducerOpenCL cProducerOpenCL : finder.producerOpenCL) {
                 cProducerOpenCL.assertGridNumBitsCorrect();
                 ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, shouldRun, consumerJava, consumerJava.keyUtility, random);
                 openCLProducers.add(producerOpenCL);

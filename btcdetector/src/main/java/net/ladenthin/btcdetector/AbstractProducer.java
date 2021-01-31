@@ -30,7 +30,7 @@ public abstract class AbstractProducer implements Producer {
     
     private final static int SLEEP_WAIT_TILL_RUNNING = 10;
 
-    protected final static Logger logger = LoggerFactory.getLogger(AbstractProducer.class);
+    private Logger logger = LoggerFactory.getLogger(this.getClass());
     
     protected final AtomicBoolean running = new AtomicBoolean(false);
     protected final AtomicBoolean shouldRun;
@@ -77,11 +77,15 @@ public abstract class AbstractProducer implements Producer {
         }
     }
 
-    public static BigInteger createSecretBase(CProducer cProducer, BigInteger secret) {
+    public BigInteger createSecretBase(CProducer cProducer, BigInteger secret, boolean logSecretBase) {
         BigInteger secretBase = cProducer.killBits(secret);
         
+        if(logSecretBase) {
+            logger.info("secretBase: " + org.bouncycastle.util.encoders.Hex.toHexString(secretBase.toByteArray()) + "/" + cProducer.gridNumBits);
+        }
+            
         if (logger.isTraceEnabled()) {
-            logger.trace("secret: " + secret);
+            logger.trace("secret BigInteger: " + secret);
             logger.trace("secret as byte array: " + Hex.encodeHexString(secret.toByteArray()));
             logger.trace("killBits: " + Hex.encodeHexString(cProducer.getKillBits().toByteArray()));
             logger.trace("secretBase: " + secretBase);
@@ -97,6 +101,14 @@ public abstract class AbstractProducer implements Producer {
             return secretBase.add(BigInteger.valueOf(keyNumber));
         }
         return secretBase.or(BigInteger.valueOf(keyNumber));
+    }
+    
+    Logger getLogger() {
+        return logger;
+    }
+    
+    void setLogger(Logger logger) {
+        this.logger = logger;
     }
     
 }

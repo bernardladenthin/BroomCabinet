@@ -29,7 +29,7 @@ import java.io.IOException;
 import net.ladenthin.btcdetector.AddressFilesToLMDB;
 import net.ladenthin.btcdetector.LMDBToAddressFile;
 import net.ladenthin.btcdetector.OpenCLInfo;
-import net.ladenthin.btcdetector.Sniffer;
+import net.ladenthin.btcdetector.Finder;
 
 // VM option: -Dorg.slf4j.simpleLogger.defaultLogLevel=trace
 public class Main implements Runnable {
@@ -69,9 +69,9 @@ public class Main implements Runnable {
     public void run() {
         logger.info(configuration.command.name());
         switch (configuration.command) {
-            case Sniffing:
-                Sniffer sniffer = new Sniffer(configuration.sniffing);
-                sniffer.startRunner();
+            case Find:
+                Finder finder = new Finder(configuration.finder);
+                finder.startRunner();
                 break;
             case LMDBToAddressFile:
                 LMDBToAddressFile lmdbToAddressFile = new LMDBToAddressFile(configuration.lmdbToAddressFile);

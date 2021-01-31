@@ -41,6 +41,11 @@ public class CProducer {
      * Range: {@code 1} (inclusive) to {@link #MAX_GRID_NUM_BITS} (inclusive).
      */
     public int gridNumBits = 8;
+    
+    /**
+     * Enable the log output for the secret address.
+     */
+    public boolean logSecretBase;
 
     public int getWorkSize() {
         return 1 << gridNumBits;

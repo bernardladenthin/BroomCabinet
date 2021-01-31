@@ -19,5 +19,5 @@
 package net.ladenthin.btcdetector.configuration;
 
 public enum CCommand {
-    Sniffing, LMDBToAddressFile, AddressFilesToLMDB, OpenCLInfo
+    Find, LMDBToAddressFile, AddressFilesToLMDB, OpenCLInfo
 }

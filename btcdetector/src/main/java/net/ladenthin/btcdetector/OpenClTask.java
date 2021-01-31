@@ -20,9 +20,7 @@ package net.ladenthin.btcdetector;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import net.ladenthin.btcdetector.configuration.CProducer;
-import org.apache.commons.codec.binary.Hex;
 import static org.jocl.CL.CL_MEM_READ_ONLY;
 import static org.jocl.CL.CL_MEM_USE_HOST_PTR;
 import static org.jocl.CL.CL_MEM_WRITE_ONLY;

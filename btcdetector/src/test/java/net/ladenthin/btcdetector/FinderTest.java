@@ -23,9 +23,9 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
-import net.ladenthin.btcdetector.configuration.CSniffing;
+import net.ladenthin.btcdetector.configuration.CFinder;
 
-public class SnifferTest {
+public class FinderTest {
 
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
@@ -34,9 +34,9 @@ public class SnifferTest {
     @Test
     public void addSchutdownHook_noExceptionThrown() throws IOException {
         
-        CSniffing cSniffing = new CSniffing();
-        Sniffer sniffer = new Sniffer(cSniffing);
-        sniffer.addSchutdownHook();
+        CFinder cFinder = new CFinder();
+        Finder finder = new Finder(cFinder);
+        finder.addSchutdownHook();
     }
 
 }

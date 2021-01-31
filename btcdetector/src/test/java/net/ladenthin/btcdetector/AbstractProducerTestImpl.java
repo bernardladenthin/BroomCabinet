@@ -16,14 +16,30 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector.configuration;
+package net.ladenthin.btcdetector;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-public class CSniffing {
+public class AbstractProducerTestImpl extends AbstractProducer {
 
-    public CConsumerJava consumerJava;
-    public List<CProducerJava> producerJava = new ArrayList<>();
-    public List<CProducerOpenCL> producerOpenCL = new ArrayList<>();
+    public AbstractProducerTestImpl(AtomicBoolean shouldRun, Consumer consumer, KeyUtility keyUtility, Random random) {
+        super(shouldRun, consumer, keyUtility, random);
+    }
+
+    @Override
+    public void initProducers() {
+        
+    }
+
+    @Override
+    public void produceKeys() {
+        
+    }
+
+    @Override
+    public void releaseProducers() {
+        
+    }
+    
 }

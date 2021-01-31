@@ -18,7 +18,6 @@
 // @formatter:on
 package net.ladenthin.btcdetector;
 
-import org.bitcoinj.core.ECKey;
 import java.math.BigInteger;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -46,7 +45,7 @@ public class ProducerJava extends AbstractProducer {
                 return;
             }
             
-            final BigInteger secretBase = createSecretBase(producerJava, secret);
+            final BigInteger secretBase = createSecretBase(producerJava, secret, producerJava.logSecretBase);
             
             PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[producerJava.getWorkSize()];
             for (int i = 0; i < publicKeyBytesArray.length; i++) {

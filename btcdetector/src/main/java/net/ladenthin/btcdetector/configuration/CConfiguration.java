@@ -23,5 +23,5 @@ public class CConfiguration {
     
     public CLMDBToAddressFile lmdbToAddressFile;
     public CAddressFilesToLMDB addressFilesToLMDB;
-    public CSniffing sniffing;
+    public CFinder finder;
 }

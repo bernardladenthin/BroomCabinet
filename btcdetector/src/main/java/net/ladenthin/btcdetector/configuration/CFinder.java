@@ -18,17 +18,12 @@
 // @formatter:on
 package net.ladenthin.btcdetector.configuration;
 
-public enum CAddressFileOutputFormat {
-    /**
-     * The hash160 will be written encoded in hex without the amount. Optimal to view with a viewer with a fixed width (e.g. HxD).
-     */
-    HexHash,
-    /**
-     * The addresses will be written with a fixed width and without the amount. Optimal to view with a viewer with a fixed width (e.g. HxD).
-     */
-    FixedWidthBase58BitcoinAddress,
-    /**
-     * The addresses will be written with amount.
-     */
-    DynamicWidthBase58BitcoinAddressWithAmount
+import java.util.ArrayList;
+import java.util.List;
+
+public class CFinder {
+
+    public CConsumerJava consumerJava;
+    public List<CProducerJava> producerJava = new ArrayList<>();
+    public List<CProducerOpenCL> producerOpenCL = new ArrayList<>();
 }
