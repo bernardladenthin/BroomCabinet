@@ -20,8 +20,11 @@ package net.ladenthin.btcdetector;
 
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import net.ladenthin.btcdetector.configuration.CAddressFilesToLMDB;
+import net.ladenthin.btcdetector.configuration.CLMDBConfigurationWrite;
 import net.ladenthin.btcdetector.persistence.Persistence;
 import net.ladenthin.btcdetector.staticaddresses.StaticAddressesFiles;
 import net.ladenthin.btcdetector.staticaddresses.*;
@@ -40,6 +43,20 @@ public class AddressFileToLMDBTest extends LMDBBase {
 
     @Before
     public void init() throws IOException {
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void addressFilesToLMDB_addressFileDoesNotExists_throwsIllegalArgumentException() throws IOException {
+        // arrange, act
+        CAddressFilesToLMDB addressFilesToLMDBConfigurationWrite = new CAddressFilesToLMDB();
+        
+        addressFilesToLMDBConfigurationWrite.addressesFiles.add("thisFileDoesNotExists.txt");
+        addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite = new CLMDBConfigurationWrite();
+        File lmdbFolder = folder.newFolder("lmdb");
+        String lmdbFolderPath = lmdbFolder.getAbsolutePath();
+        addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite.lmdbDirectory = lmdbFolderPath;
+        AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(addressFilesToLMDBConfigurationWrite);
+        addressFilesToLMDB.run();
     }
 
     @Test

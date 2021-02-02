@@ -58,6 +58,15 @@ public class AddressFilesToLMDB implements Runnable {
         persistence = new LMDBPersistence(addressFilesToLMDB.lmdbConfigurationWrite, persistenceUtils);
         persistence.init();
         try {
+            logger.info("check if all configured address files exists");
+            for (String addressesFilePath : addressFilesToLMDB.addressesFiles) {
+                File addressesFile = new File(addressesFilePath);
+                if (!addressesFile.exists()) {
+                    throw new IllegalArgumentException("The address file does not exists: " + addressesFile.getAbsolutePath());
+                }
+                logger.info("address files exists: " + addressesFile.getAbsolutePath());
+            }
+            
             logger.info("writeAllAmounts ...");
             for (String addressesFilePath : addressFilesToLMDB.addressesFiles) {
                 File addressesFile = new File(addressesFilePath);
