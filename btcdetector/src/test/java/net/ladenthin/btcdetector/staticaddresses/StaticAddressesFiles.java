@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import org.bitcoinj.core.Coin;
 import org.junit.rules.TemporaryFolder;
@@ -40,24 +39,35 @@ public class StaticAddressesFiles implements AddressesFiles {
     public List<String> createAddressesFiles(TemporaryFolder folder, boolean addInvalidAddresses) throws IOException {
         File one = folder.newFile(ADDRESS_FILE_ONE);
 
-        Files.write(one.toPath(), Arrays.asList(
-                new StaticBitcoinCashP2MSAddress().publicAddress,
-                new StaticBitcoinCashP2MSXAddress().publicAddress,
-                new StaticBitcoinCashP2PKHAddress().publicAddress,
-                new StaticBitcoinCashP2SHAddress().publicAddress,
-                new StaticBitcoinP2MSAddress().publicAddress,
-                new StaticBitcoinP2WPKHAddress().publicAddress,
-                new StaticBitcoinP2WSHAddress().publicAddress,
-                new StaticDashP2PKHAddress().publicAddress,
-                new StaticDashP2SHAddress().publicAddress,
-                new StaticDogecoinP2PKHAddress().publicAddress,
-                new StaticDogecoinP2SHAddress().publicAddress,
-                new StaticDogecoinP2SHXAddress().publicAddress,
-                new StaticLitecoinP2PKHAddress().publicAddress,
-                new StaticLitecoinP2SHAddress().publicAddress
-        ));
+        Files.write(one.toPath(), getAllAddresses());
         List<String> addresses = new ArrayList<>();
         addresses.add(one.getAbsolutePath());
+        return addresses;
+    }
+    
+    public List<String> getSupportedAddresses() {
+        List<String> addresses = new ArrayList<>();
+        for (StaticP2PKHAddress address : StaticP2PKHAddress.values()) {
+            addresses.add(address.getPublicAddress());
+        }
+        for (StaticP2SHAddress address : StaticP2SHAddress.values()) {
+            addresses.add(address.getPublicAddress());
+        }
+        return addresses;
+    }
+    
+    public List<String> getUnsupportedAddresses() {
+        List<String> addresses = new ArrayList<>();
+        for (StaticUnsupportedAddress address : StaticUnsupportedAddress.values()) {
+            addresses.add(address.getPublicAddress());
+        }
+        return addresses;
+    }
+    
+    public List<String> getAllAddresses() {
+        List<String> addresses = new ArrayList<>();
+        addresses.addAll(getSupportedAddresses());
+        addresses.addAll(getUnsupportedAddresses());
         return addresses;
     }
 

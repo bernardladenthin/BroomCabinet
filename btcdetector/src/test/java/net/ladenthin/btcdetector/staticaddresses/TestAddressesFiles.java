@@ -78,7 +78,7 @@ public class TestAddressesFiles implements AddressesFiles {
                 uncompressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(uc.getIndexAsBase58String(2)+",1");
                 uncompressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(uc.getIndexAsBase58String(3)+",1");
                 uncompressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(uc.getIndexAsBase58String(4)+",1");
-                uncompressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(new StaticBitcoinP2WPKHAddress().publicKeyHashBase58+",1");
+                uncompressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsBase58()+",1");
             }
             {
                 compressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(co.getIndexAsBase58String(0)+",5000000000");
@@ -86,7 +86,7 @@ public class TestAddressesFiles implements AddressesFiles {
                 compressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(co.getIndexAsBase58String(2)+",1");
                 compressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(co.getIndexAsBase58String(3)+",1");
                 compressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(co.getIndexAsBase58String(4)+",1");
-                compressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(new StaticBitcoinP2WPKHAddress().publicKeyHashBase58+",1");
+                compressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount.add(StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsBase58()+",1");
             }
             {
                 uncompressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(uc.getIndexAsBase58String(0)+",1");
@@ -94,7 +94,7 @@ public class TestAddressesFiles implements AddressesFiles {
                 uncompressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(uc.getIndexAsBase58String(2)+",1");
                 uncompressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(uc.getIndexAsBase58String(3)+",1");
                 uncompressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(uc.getIndexAsBase58String(4)+",1");
-                uncompressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(new StaticBitcoinP2WPKHAddress().publicKeyHashBase58+",1");
+                uncompressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsBase58()+",1");
             }
             {
                 compressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(co.getIndexAsBase58String(0)+",1");
@@ -102,7 +102,7 @@ public class TestAddressesFiles implements AddressesFiles {
                 compressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(co.getIndexAsBase58String(2)+",1");
                 compressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(co.getIndexAsBase58String(3)+",1");
                 compressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(co.getIndexAsBase58String(4)+",1");
-                compressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(new StaticBitcoinP2WPKHAddress().publicKeyHashBase58 +",1");
+                compressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount.add(StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsBase58() +",1");
             }
         }
         {
@@ -113,7 +113,7 @@ public class TestAddressesFiles implements AddressesFiles {
                 uncompressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(uc.getIndexAsBase58String(2));
                 uncompressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(uc.getIndexAsBase58String(3));
                 uncompressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(uc.getIndexAsBase58String(4));
-                uncompressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(new StaticBitcoinP2WPKHAddress().publicKeyHashBase58);
+                uncompressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsBase58());
             }
             {
                 compressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(co.getIndexAsBase58String(0));
@@ -121,7 +121,7 @@ public class TestAddressesFiles implements AddressesFiles {
                 compressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(co.getIndexAsBase58String(2));
                 compressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(co.getIndexAsBase58String(3));
                 compressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(co.getIndexAsBase58String(4));
-                compressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(new StaticBitcoinP2WPKHAddress().publicKeyHashBase58);
+                compressedTestAddressesAsFixedWidthBase58BitcoinAddress.add(StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsBase58());
             }
             {
                 uncompressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(uc.getIndexAsBase58String(0));
@@ -129,7 +129,7 @@ public class TestAddressesFiles implements AddressesFiles {
                 uncompressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(uc.getIndexAsBase58String(2));
                 uncompressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(uc.getIndexAsBase58String(3));
                 uncompressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(uc.getIndexAsBase58String(4));
-                uncompressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(new StaticBitcoinP2WPKHAddress().publicKeyHashBase58);
+                uncompressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsBase58());
             }
             {
                 compressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(co.getIndexAsBase58String(0));
@@ -137,7 +137,7 @@ public class TestAddressesFiles implements AddressesFiles {
                 compressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(co.getIndexAsBase58String(2));
                 compressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(co.getIndexAsBase58String(3));
                 compressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(co.getIndexAsBase58String(4));
-                compressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(new StaticBitcoinP2WPKHAddress().publicKeyHashBase58);
+                compressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress.add(StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsBase58());
             }
         }
         {
@@ -148,7 +148,7 @@ public class TestAddressesFiles implements AddressesFiles {
                 uncompressedTestAddressesAsHexHash.add(uc.getIndexAsHash160HexEncoded(2));
                 uncompressedTestAddressesAsHexHash.add(uc.getIndexAsHash160HexEncoded(3));
                 uncompressedTestAddressesAsHexHash.add(uc.getIndexAsHash160HexEncoded(4));
-                uncompressedTestAddressesAsHexHash.add(new StaticBitcoinP2WPKHAddress().publicKeyHash);
+                uncompressedTestAddressesAsHexHash.add(StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsHex());
             }
             {
                 compressedTestAddressesAsHexHash.add(co.getIndexAsHash160HexEncoded(0));
@@ -156,7 +156,7 @@ public class TestAddressesFiles implements AddressesFiles {
                 compressedTestAddressesAsHexHash.add(co.getIndexAsHash160HexEncoded(2));
                 compressedTestAddressesAsHexHash.add(co.getIndexAsHash160HexEncoded(3));
                 compressedTestAddressesAsHexHash.add(co.getIndexAsHash160HexEncoded(4));
-                compressedTestAddressesAsHexHash.add(new StaticBitcoinP2WPKHAddress().publicKeyHash);
+                compressedTestAddressesAsHexHash.add(StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsHex());
             }
             {
                 uncompressedTestAddressesWithStaticAmountAsHexHash.add(uc.getIndexAsHash160HexEncoded(0));
@@ -164,7 +164,7 @@ public class TestAddressesFiles implements AddressesFiles {
                 uncompressedTestAddressesWithStaticAmountAsHexHash.add(uc.getIndexAsHash160HexEncoded(2));
                 uncompressedTestAddressesWithStaticAmountAsHexHash.add(uc.getIndexAsHash160HexEncoded(3));
                 uncompressedTestAddressesWithStaticAmountAsHexHash.add(uc.getIndexAsHash160HexEncoded(4));
-                uncompressedTestAddressesWithStaticAmountAsHexHash.add(new StaticBitcoinP2WPKHAddress().publicKeyHash);
+                uncompressedTestAddressesWithStaticAmountAsHexHash.add(StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsHex());
             }
             {
                 compressedTestAddressesWithStaticAmountAsHexHash.add(co.getIndexAsHash160HexEncoded(0));
@@ -172,7 +172,7 @@ public class TestAddressesFiles implements AddressesFiles {
                 compressedTestAddressesWithStaticAmountAsHexHash.add(co.getIndexAsHash160HexEncoded(2));
                 compressedTestAddressesWithStaticAmountAsHexHash.add(co.getIndexAsHash160HexEncoded(3));
                 compressedTestAddressesWithStaticAmountAsHexHash.add(co.getIndexAsHash160HexEncoded(4));
-                compressedTestAddressesWithStaticAmountAsHexHash.add(new StaticBitcoinP2WPKHAddress().publicKeyHash);
+                compressedTestAddressesWithStaticAmountAsHexHash.add(StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsHex());
             }
         }
     }
@@ -197,7 +197,7 @@ public class TestAddressesFiles implements AddressesFiles {
         {
             listThree.add("# Test");
             listThree.add("1WrOngAddressFormat");
-            listThree.add(new StaticBitcoinP2WPKHAddress().publicAddress);
+            listThree.add(StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicAddress());
             listThree.add(testAddresses.getIndexAsBase58String(4));
 
             if (addInvalidAddresses) {

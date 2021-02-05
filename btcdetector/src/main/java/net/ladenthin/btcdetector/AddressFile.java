@@ -19,13 +19,11 @@
 package net.ladenthin.btcdetector;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.Scanner;
+import java.io.RandomAccessFile;
 import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import org.bitcoinj.core.NetworkParameters;
-import org.lmdbjava.Env;
 import org.lmdbjava.LmdbException;
 
 public class AddressFile {
@@ -41,18 +39,23 @@ public class AddressFile {
         keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(true));
     }
 
-    public void readFromFile(@Nonnull File file, ReadStatistic readStatistic, @Nonnull Consumer<AddressToCoin> addressConsumer) throws IOException {
-        try (Scanner sc = new Scanner(new FileInputStream(file))) {
-
+    public void readFromFile(@Nonnull File file, ReadStatistic readStatistic, @Nonnull Consumer<AddressToCoin> addressConsumer, @Nonnull Consumer<String> unsupportedConsumer) throws IOException {
+        try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
             AddressTxtLine addressTxtLine = new AddressTxtLine();
-            while (sc.hasNextLine()) {
-                String line = sc.nextLine();
+            for(;;) {
+                String line = raf.readLine();
+                if (line == null) {
+                    return;
+                }
+                readStatistic.currentFileProgress = ((double)(Math.max(raf.getFilePointer(),1)) / (double)raf.length()) * 100.0d;
+                
                 try {
                     AddressToCoin addressToCoin = addressTxtLine.fromLine(line, keyUtility);
                     if (addressToCoin != null) {
                         addressConsumer.accept(addressToCoin);
                         readStatistic.successful++;
                     } else {
+                        unsupportedConsumer.accept(line);
                         readStatistic.unsupported++;
                     }
                 } catch(LmdbException e) {
@@ -64,7 +67,6 @@ public class AddressFile {
                     readStatistic.errors.add(line);
                 }
             }
-            sc.close();
         }
     }
 }

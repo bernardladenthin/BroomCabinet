@@ -91,26 +91,15 @@ public class AddressFileToLMDBTest extends LMDBBase {
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_STATIC_AMOUNT, location = CommonDataProvider.class)
     public void addressFilesToLMDB_createLMDBWithStaticAddresses_containingStaticHashes(boolean useStaticAmount) throws IOException {
         // arrange, act
-        AddressesFiles testAddresses = new StaticAddressesFiles();
-        Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddresses, false);
+        StaticAddressesFiles staticAddressesFiles = new StaticAddressesFiles();
+        Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, staticAddressesFiles, false);
 
         // assert
         try {
-            assertThat(persistence.count(), is(equalTo(9L)));
+            assertThat(persistence.count(), is(equalTo((long)staticAddressesFiles.getSupportedAddresses().size())));
             
-            String[] hash160s = {
-                new StaticDogecoinP2PKHAddress().publicKeyHash,
-                new StaticDashP2PKHAddress().publicKeyHash,
-                new StaticBitcoinP2WPKHAddress().publicKeyHash,
-                new StaticLitecoinP2PKHAddress().publicKeyHash,
-                new StaticBitcoinCashP2PKHAddress().publicKeyHash
-            };
-
-            for (int i = 0; i < hash160s.length; i++) {
-                String hash160 = hash160s[i];
-
-                ByteBuffer hash160AsByteBuffer = keyUtility.byteBufferUtility.getByteBufferFromHex(hash160);
-
+            for (StaticP2PKHAddress staticTestAddress : StaticP2PKHAddress.values()) {
+                ByteBuffer hash160AsByteBuffer = staticTestAddress.getPublicKeyHashAsByteBuffer();
                 boolean contains = persistence.containsAddress(hash160AsByteBuffer);
                 assertThat(contains, is(equalTo(Boolean.TRUE)));
             }

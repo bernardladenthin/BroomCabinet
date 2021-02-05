@@ -20,6 +20,9 @@ package net.ladenthin.btcdetector;
 
 import com.tngtech.java.junit.dataprovider.DataProvider;
 import net.ladenthin.btcdetector.configuration.CProducerOpenCL;
+import net.ladenthin.btcdetector.staticaddresses.StaticP2PKHAddress;
+import net.ladenthin.btcdetector.staticaddresses.StaticP2SHAddress;
+import net.ladenthin.btcdetector.staticaddresses.StaticUnsupportedAddress;
 
 public class CommonDataProvider {
 
@@ -209,5 +212,43 @@ public class CommonDataProvider {
             // large key with odd number, 21 bit num grid
             {"00d456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeff", 21, "00d456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000", "secretBase: 00d456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000/21", "secret BigInteger: 375168379408231402782670922269509069226925318059052594399906494889018056447", "secret as byte array: 00d456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeff", "killBits: 1fffff", "secretBase: 375168379408231402782670922269509069226925318059052594399906494889016164352", "secretBase as byte array: 00d456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000"},
         };
+    }
+    
+    /**
+     * For {@link #staticP2PKHAddresses()}.
+     */
+    public final static String DATA_PROVIDER_STATIC_P2PKH_ADDRESSES = "staticP2PKHAddresses";
+
+    @DataProvider
+    public static Object[][] staticP2PKHAddresses() {
+        return transformFlatToObjectArrayArray(StaticP2PKHAddress.values());
+    }
+    
+    /**
+     * For {@link #staticP2SHAddresses()}.
+     */
+    public final static String DATA_PROVIDER_STATIC_P2SH_ADDRESSES = "staticP2SHAddresses";
+
+    @DataProvider
+    public static Object[][] staticP2SHAddresses() {
+        return transformFlatToObjectArrayArray(StaticP2SHAddress.values());
+    }
+    
+    /**
+     * For {@link #staticUnsupportedAddresses()}.
+     */
+    public final static String DATA_PROVIDER_STATIC_UNSUPPORTED_ADDRESSES = "staticUnsupportedAddresses";
+
+    @DataProvider
+    public static Object[][] staticUnsupportedAddresses() {
+        return transformFlatToObjectArrayArray(StaticUnsupportedAddress.values());
+    }
+    
+    private static Object[][] transformFlatToObjectArrayArray(Object[] object) {
+        Object[][] objectArray = new Object[object.length][1];
+        for (int i = 0; i < objectArray.length; i++) {
+            objectArray[i][0] = object[i];
+        }
+        return objectArray;
     }
 }

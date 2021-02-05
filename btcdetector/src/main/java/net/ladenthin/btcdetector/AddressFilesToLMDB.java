@@ -45,6 +45,8 @@ public class AddressFilesToLMDB implements Runnable {
     private final AtomicLong addressCounter = new AtomicLong();
 
     private final ReadStatistic readStatistic = new ReadStatistic();
+    
+    private final static long PROGRESS_LOG = 100_000;
 
     public AddressFilesToLMDB(CAddressFilesToLMDB addressFilesToLMDB) {
         this.addressFilesToLMDB = addressFilesToLMDB;
@@ -72,18 +74,27 @@ public class AddressFilesToLMDB implements Runnable {
                 File addressesFile = new File(addressesFilePath);
                 AddressFile addressFile = new AddressFile(networkParameters);
                 logger.info("process " + addressesFilePath);
-                addressFile.readFromFile(addressesFile, readStatistic, addressToCoin -> {
+                
+                addressFile.readFromFile(
+                    addressesFile,
+                    readStatistic,
+                    addressToCoin -> {
+                        ByteBuffer hash160 = addressToCoin.getHash160();
+                        persistence.putNewAmount(hash160, addressToCoin.getCoin());
+                        addressCounter.incrementAndGet();
 
-                    ByteBuffer hash160 = addressToCoin.getHash160();
-                    persistence.putNewAmount(hash160, addressToCoin.getCoin());
-                    addressCounter.incrementAndGet();
-
-                    if (addressCounter.get() % 1_000_000 == 0) {
-                        logProgress();
+                        if (addressCounter.get() % PROGRESS_LOG == 0) {
+                            logProgress();
+                        }
+                    },
+                    unsupported -> {
+                        if (readStatistic.unsupported % PROGRESS_LOG == 0) {
+                            logProgress();
+                        }
                     }
-                });
+                );
                 logProgress();
-                logger.info("finished: " + addressesFilePath + " : " + readStatistic);
+                logger.info("finished: " + addressesFilePath);
             }
             logProgress();
             logger.info("writeAllAmounts done");
@@ -103,7 +114,7 @@ public class AddressFilesToLMDB implements Runnable {
     }
 
     private void logProgress() {
-        logger.info("Progress: " + addressCounter.get() + " addresses. Unsupported: " + readStatistic.unsupported + " Errors: " + readStatistic.errors.size());
+        logger.info("Progress: " + addressCounter.get() + " addresses. Unsupported: " + readStatistic.unsupported + ". Errors: " + readStatistic.errors.size() + ". Current File progress: " + String.format("%.2f", readStatistic.currentFileProgress) + "%.");
     }
 
     private void createNetworkParameter() {
