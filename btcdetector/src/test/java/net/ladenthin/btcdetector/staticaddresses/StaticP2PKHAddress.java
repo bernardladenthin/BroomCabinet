@@ -40,6 +40,10 @@ public enum StaticP2PKHAddress {
      */
     BitcoinGold("GUGsnYNyGYDe4GT2iQKLDjKFPpd4KBXMQB", "726975f819dc2043a0350257e92560e59d2e48ae"),
     /**
+     * https://privatekeys.pw/bitcoin-testnet/address/miner8VH6WPrsQ1Fxqb7MPgJEoFYX2RCkS
+     */
+    BitcoinTestnet("miner8VH6WPrsQ1Fxqb7MPgJEoFYX2RCkS", "23e077ffac6f109795a82021dc1698bd9ce40119"),
+    /**
      * https://privatekeys.pw/bitcoin/address/bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq
      */
     BitcoinSegregatedWitness("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq", "e8df018c7e326cc253faac7e46cdc51e68542c42"),
@@ -74,7 +78,11 @@ public enum StaticP2PKHAddress {
     /**
      * https://bitinfocharts.com/de/vertcoin/address/VfukW89WKT9h3YjHZdSAAuGNVGELY31wyj
      */
-    Vertcoin("VfukW89WKT9h3YjHZdSAAuGNVGELY31wyj", "40daff13d20e5c9fdbf17badda0a8a2df6c83f06");
+    Vertcoin("VfukW89WKT9h3YjHZdSAAuGNVGELY31wyj", "40daff13d20e5c9fdbf17badda0a8a2df6c83f06"),
+    /**
+     * https://privatekeys.pw/zcash/address/t1VShHAhsQc5RVndQLyM1ZbQXLHKd35GkG1
+     */
+    Zcash("t1VShHAhsQc5RVndQLyM1ZbQXLHKd35GkG1", "7eeb8313a6c3829217d83a28acb0433a3d6a2bb0");
     
     private final String publicAddress;
     private final String publicKeyHash;

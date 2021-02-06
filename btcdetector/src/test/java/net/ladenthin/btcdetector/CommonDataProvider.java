@@ -151,6 +151,54 @@ public class CommonDataProvider {
     }
     
     /**
+     * For {@link #correctBase58()}.
+     * A correct base58 format should be parsed anyway.
+     */
+    public final static String DATA_PROVIDER_CORRECT_BASE_58 = "correctBase58";
+
+    @DataProvider
+    public static Object[][] correctBase58() {
+        return new Object[][]{
+            {"1","0000000000000000000000000000000000000000"},
+            {"15T","0102000000000000000000000000000000000000"},
+            {"Ldp","0203000000000000000000000000000000000000"},
+            {"7bWpTW","0203040500000000000000000000000000000000"},
+            {"t3JZcvsuaXE6ygokL4XUiZSTrQBUoLyYfwu","0000000000000000000000000000000000000000"},
+        };
+    }
+    
+    /**
+     * For {@link #srcPos()}.
+     */
+    public final static String DATA_PROVIDER_SRC_POS = "srcPos";
+
+    @DataProvider
+    public static Object[][] srcPos() {
+        return new Object[][]{
+            {1},
+            {2},
+            {3},
+            {4},
+            {5},
+            {6},
+            {7},
+            {8},
+            {9},
+            {10},
+            {11},
+            {12},
+            {13},
+            {14},
+            {15},
+            {16},
+            {17},
+            {18},
+            {19},
+            {20},
+        };
+    }
+    
+    /**
      * For {@link #bitcoinAddressesInvalidBase58()}.
      * A invalid base58 format can't be read.
      */

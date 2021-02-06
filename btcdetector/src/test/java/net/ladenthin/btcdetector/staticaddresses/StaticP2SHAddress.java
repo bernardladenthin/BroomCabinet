@@ -28,6 +28,12 @@ import org.bouncycastle.util.encoders.Hex;
 public enum StaticP2SHAddress {
 
     /**
+     * https://bitcoin.stackexchange.com/questions/62781/litecoin-constants-and-prefixes
+     * https://privatekeys.pw/litecoin/address/M8T1B2Z97gVdvmfkQcAtYbEepune1tzGua
+     * https://privatekeys.pw/bitcoin/address/3MSvaVbVFFLML86rt5eqgA9SvW23upaXdY
+     */
+    BitcoinAndLitecoinDeprecated("3MSvaVbVFFLML86rt5eqgA9SvW23upaXdY", "d8b83ad7bf8795b9ff61464fcf06f156c28e3e1f"),
+    /**
      * https://privatekeys.pw/dogecoin/address/A8c3xNz2mqsDLFwv5KL5fpH12QEwDaoTXo
      */
     Dogecoin("A8c3xNz2mqsDLFwv5KL5fpH12QEwDaoTXo", "b15b9098e14dc3c48b4f0a6ac548c66771d30f54"),
@@ -42,7 +48,11 @@ public enum StaticP2SHAddress {
     /**
      * https://privatekeys.pw/litecoin/address/M8T1B2Z97gVdvmfkQcAtYbEepune1tzGua
      */
-    Litecoin("M8T1B2Z97gVdvmfkQcAtYbEepune1tzGua", "0605bfbd71b78f7e9fc815fe9cc90aaeb1d9a728");
+    Litecoin("M8T1B2Z97gVdvmfkQcAtYbEepune1tzGua", "0605bfbd71b78f7e9fc815fe9cc90aaeb1d9a728"),
+    /**
+     * https://privatekeys.pw/zcash/address/t3JcMe1E5UkFsUtVb7k17eJwXX5FYUewMBy
+     */
+    Zcash("t3JcMe1E5UkFsUtVb7k17eJwXX5FYUewMBy", "00847bd140242bd1c9c19024bfe00a4acefbbb85");
 
     private final String publicAddress;
     private final String scriptHash;

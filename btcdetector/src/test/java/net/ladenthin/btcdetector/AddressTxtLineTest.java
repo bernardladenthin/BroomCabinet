@@ -23,7 +23,10 @@ import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.IOException;
 import net.ladenthin.btcdetector.staticaddresses.*;
 import net.ladenthin.btcdetector.staticaddresses.StaticKey;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.core.AddressFormatException;
+import org.bitcoinj.core.Base58;
 import org.bitcoinj.core.Coin;
 import org.junit.Before;
 import org.junit.Test;
@@ -209,4 +212,28 @@ public class AddressTxtLineTest {
         new AddressTxtLine().fromLine(base58, keyUtility);
     }
 
+    @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_CORRECT_BASE_58, location = CommonDataProvider.class)
+    public void fromLine_correctBase58_hash160equals(String base58, String expectedHash160) throws IOException, DecoderException {
+        // act
+        AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
+
+        // assert
+        String hash160AsHex = keyUtility.byteBufferUtility.getHexFromByteBuffer(addressToCoin.getHash160());
+        assertThat(hash160AsHex, is(equalTo(expectedHash160)));
+    }
+
+    @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_SRC_POS, location = CommonDataProvider.class)
+    public void fromLine_correctBase58UseHigherSrcPos_copiedPartial(int srcPos) throws IOException, DecoderException {
+        // act
+        String encoded = Base58.encode(Hex.decodeHex("1f" + "ffffffffffffffffffffffffffffffffffffffff"));
+
+        byte[] hash160 = new AddressTxtLine().getHash160fromBase58AddressUnchecked(encoded, srcPos);
+
+        // assert
+        String hash160AsHex = org.bouncycastle.util.encoders.Hex.toHexString(hash160);
+        int expectedLastIndex = 40 - 1 - 2 * srcPos + 2;
+        assertThat(hash160AsHex.lastIndexOf("f"), is(equalTo(expectedLastIndex)));
+    }
 }
