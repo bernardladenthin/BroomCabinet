@@ -18,6 +18,8 @@
 // @formatter:on
 package net.ladenthin.btcdetector.configuration;
 
+import org.bitcoinj.core.Coin;
+
 public class CLMDBConfigurationWrite extends CLMDBConfigurationReadOnly {
 
     /**
@@ -34,8 +36,9 @@ public class CLMDBConfigurationWrite extends CLMDBConfigurationReadOnly {
 
     /**
      * Only used if {@link #useStaticAmount} is {@code true}.
+     * {@link Coin#ZERO} allows a smaller database.
      */
-    public long staticAmount = 1;
+    public long staticAmount = Coin.ZERO.value;
 
     /**
      * Use the static amount {@link #staticAmount} instead the imported amount

@@ -18,14 +18,25 @@
 // @formatter:on
 package net.ladenthin.btcdetector.staticaddresses;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 import org.bitcoinj.core.ECKey;
 
 public interface TestAddresses {
+    
+    public int getNumberOfAddresses();
     
     List<ECKey> getECKeys();
     
     String getAsBase58Strings();
     
     List<String> getAsBase58StringList();
+    
+    public String getIndexAsBase58String(int index);
+
+    public String getIndexAsHash160HexEncoded(int index);
+    
+    public byte[] getIndexAsHash160(int index);
+    
+    public ByteBuffer getIndexAsHash160ByteBuffer(int index);
 }

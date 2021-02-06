@@ -108,6 +108,20 @@ public class CommonDataProvider {
     }
     
     /**
+     * For {@link #addressSeperator()}.
+     */
+    public final static String DATA_PROVIDER_ADDRESS_SEPARATOR = "addressSeperator";
+
+    @DataProvider
+    public static Object[][] addressSeperator() {
+        return new Object[][]{
+            {AddressTxtLine.COMMA},
+            {AddressTxtLine.SEMICOLON},
+            {AddressTxtLine.TAB_SPLIT}
+        };
+    }
+    
+    /**
      * For {@link #bitcoinInvalidP2WPKHAddresses()}.
      */
     public final static String DATA_PROVIDER_BITCOIN_INVALID_P2WPKH_ADDRESSES = "bitcoinInvalidP2WPKHAddresses";

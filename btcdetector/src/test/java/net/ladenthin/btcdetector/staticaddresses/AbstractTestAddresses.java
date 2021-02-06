@@ -19,6 +19,7 @@
 package net.ladenthin.btcdetector.staticaddresses;
 
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -45,18 +46,38 @@ public abstract class AbstractTestAddresses implements TestAddresses {
             ecKeys.add(ecKey);
         }
     }
+    
+    @Override
+    public int getNumberOfAddresses() {
+        return ecKeys.size();
+    }
 
     @Override
     public List<ECKey> getECKeys() {
         return ecKeys;
     }
 
+    @Override
     public String getIndexAsBase58String(int index) {
         return LegacyAddress.fromKey(networkParameters, getECKeys().get(index)).toBase58();
     }
 
+    @Override
     public String getIndexAsHash160HexEncoded(int index) {
         return Hex.encodeHexString(LegacyAddress.fromKey(networkParameters, getECKeys().get(index)).getHash());
+    }
+    
+    @Override
+    public byte[] getIndexAsHash160(int index) {
+        return LegacyAddress.fromKey(networkParameters, getECKeys().get(index)).getHash();
+    }
+    
+    @Override
+    public ByteBuffer getIndexAsHash160ByteBuffer(int index) {
+        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
+        byte[] hash160 = getIndexAsHash160(index);
+        ByteBuffer byteBuffer = byteBufferUtility.byteArrayToByteBuffer(hash160);
+        return byteBuffer;
     }
 
     @Override

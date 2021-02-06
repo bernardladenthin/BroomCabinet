@@ -137,6 +137,9 @@ public class LMDBPersistence implements Persistence {
 
             Coin valueInDB = Coin.ZERO;
             if (byteBuffer != null) {
+                if (byteBuffer.capacity() == 0) {
+                    return Coin.ZERO;
+                }
                 valueInDB = Coin.valueOf(byteBuffer.getLong());
             }
             return valueInDB;
@@ -169,7 +172,7 @@ public class LMDBPersistence implements Persistence {
                                 line = String.format("%-34s", address.toBase58()) + System.lineSeparator();
                                 break;
                             case DynamicWidthBase58BitcoinAddressWithAmount:
-                                line = address.toBase58() + AddressTxtLine.SEPARATOR + kv.val().getLong() + System.lineSeparator();
+                                line = address.toBase58() + AddressTxtLine.COMMA + kv.val().getLong() + System.lineSeparator();
                                 break;
                             default:
                                 throw new IllegalArgumentException("Unknown addressFileOutputFormat: " + addressFileOutputFormat);

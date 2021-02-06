@@ -40,8 +40,10 @@ public class AddressTxtLine {
 
     public static final String IGNORE_LINE_PREFIX = "#";
     public static final String ADDRESS_HEADER = "address";
-    public static final String SEPARATOR = ",";
+    public static final String COMMA = ",";
+    public static final String SEMICOLON = ";";
     public static final String TAB_SPLIT = "\t";
+    public static final String OR = "|";
 
     /**
      * If no coins can be found in the line {@link #DEFAULT_COIN} is used.
@@ -52,7 +54,7 @@ public class AddressTxtLine {
      */
     @Nullable
     public AddressToCoin fromLine(String line, KeyUtility keyUtility) {
-        String[] lineSplitted = line.split(SEPARATOR + "|" + TAB_SPLIT);
+        String[] lineSplitted = line.split(COMMA + OR + SEMICOLON + OR + TAB_SPLIT);
         String address = lineSplitted[0];
         Coin amount = getCoinIfPossible(lineSplitted, DEFAULT_COIN);
         address = address.trim();

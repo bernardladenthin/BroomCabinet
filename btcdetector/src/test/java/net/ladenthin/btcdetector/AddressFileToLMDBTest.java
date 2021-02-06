@@ -74,7 +74,9 @@ public class AddressFileToLMDBTest extends LMDBBase {
             String[] base58Adresses = addressesFiles.getTestAddresses().getAsBase58StringList().toArray(new String[0]);
             
             for (int i = 0; i < amounts.length; i++) {
-                ByteBuffer hash160 = keyUtility.addressToByteBuffer(LegacyAddress.fromBase58(networkParameters, base58Adresses[i]));
+                String base58Adresse = base58Adresses[i];
+                LegacyAddress fromBase58 = LegacyAddress.fromBase58(networkParameters, base58Adresse);
+                ByteBuffer hash160 = keyUtility.addressToByteBuffer(fromBase58);
                 amounts[i] = persistence.getAmount(hash160);
                 if (useStaticAmount) {
                     assertThat(amounts[i], is(equalTo(Coin.SATOSHI)));
@@ -101,6 +103,36 @@ public class AddressFileToLMDBTest extends LMDBBase {
             for (StaticP2PKHAddress staticTestAddress : StaticP2PKHAddress.values()) {
                 ByteBuffer hash160AsByteBuffer = staticTestAddress.getPublicKeyHashAsByteBuffer();
                 boolean contains = persistence.containsAddress(hash160AsByteBuffer);
+                assertThat(contains, is(equalTo(Boolean.TRUE)));
+            }
+        } finally {
+            persistence.close();
+        }
+    }
+
+    /**
+     * I got in the past the exception:
+     * {@link java.nio.BufferUnderflowException} because zero values are stored with {@code byteBuffer.capacity() == 0}.
+     */
+    @Test
+    public void addressFilesToLMDB_addressWithAmountOfZero_noExceptionThrown() throws IOException {
+        // arrange, act
+        AddressesFileSpecialUsecases addressesFileSpecialUsecases = new AddressesFileSpecialUsecases();
+        //TestAddressesFiles testAddressesFiles = new TestAddressesFiles(true);
+        Persistence persistence = createAndFillAndOpenLMDB(false, addressesFileSpecialUsecases, false);
+
+        // assert
+        try {
+            assertThat(persistence.count(), is(equalTo((long)addressesFileSpecialUsecases.getAllAddresses().size())));
+            
+            TestAddresses testAddresses = addressesFileSpecialUsecases.getTestAddresses();
+            
+            for (int i = 0; i < testAddresses.getNumberOfAddresses(); i++) {
+                ByteBuffer hash160 = testAddresses.getIndexAsHash160ByteBuffer(i);
+                Coin amount = persistence.getAmount(hash160);
+                assertThat(amount, is(equalTo(Coin.ZERO)));
+                
+                boolean contains = persistence.containsAddress(hash160);
                 assertThat(contains, is(equalTo(Boolean.TRUE)));
             }
         } finally {

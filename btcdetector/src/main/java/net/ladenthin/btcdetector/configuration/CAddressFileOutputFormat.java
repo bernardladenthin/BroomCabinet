@@ -28,7 +28,7 @@ public enum CAddressFileOutputFormat {
      */
     FixedWidthBase58BitcoinAddress,
     /**
-     * The addresses will be written with amount.
+     * The addresses will be written with amount. Separated with a {@link net.ladenthin.btcdetector.AddressTxtLine#COMMA}.
      */
     DynamicWidthBase58BitcoinAddressWithAmount
 }
