@@ -25,7 +25,7 @@ public class CLMDBConfigurationWrite extends CLMDBConfigurationReadOnly {
     /**
      * LMDB site in MiB (e.g. 1024).
      */
-    public int mapSizeInMiB = 1;
+    public int initialMapSizeInMiB = 1;
 
     /**
      * Enable if empty hash160s should be deleted. Empty means zero satoshis. It
@@ -45,4 +45,11 @@ public class CLMDBConfigurationWrite extends CLMDBConfigurationReadOnly {
      * to obscure amount and allow higher database compression.
      */
     public boolean useStaticAmount = true;
+    
+    public boolean increaseMapAutomatically = true;
+    
+    /**
+     * LMDB site increase in MiB (e.g. 1024). Attention: If the value is too low, the increase for a full db was not enough and a {@link org.lmdbjava.Env.MapFullException} will be thrown.
+     */
+    public long increaseSizeInMiB = 8;
 }

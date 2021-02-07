@@ -25,6 +25,68 @@ import net.ladenthin.btcdetector.staticaddresses.StaticP2SHAddress;
 import net.ladenthin.btcdetector.staticaddresses.StaticUnsupportedAddress;
 
 public class CommonDataProvider {
+    
+    /**
+     * For {@link #lmdbAmounts()}.
+     */
+    public final static String DATA_PROVIDER_LMDB_AMOUNTS = "lmdbAmounts";
+
+    @DataProvider
+    public static Object[][] lmdbAmounts() {
+        long randomAmount = 13371337L;
+        return new Object[][]{
+            // use static amount
+            {true, -1337L, randomAmount, -1337L},
+            {true, -7L,    randomAmount, -7L},
+            {true, -6L,    randomAmount, -6L},
+            {true, -5L,    randomAmount, -5L},
+            {true, -4L,    randomAmount, -4L},
+            {true, -3L,    randomAmount, -3L},
+            {true, -2L,    randomAmount, -2L},
+            {true, -1L,    randomAmount, -1L},
+            {true, 0L,     randomAmount, 0L},
+            {true, 1L,     randomAmount, 1L},
+            {true, 2L,     randomAmount, 2L},
+            {true, 3L,     randomAmount, 3L},
+            {true, 4L,     randomAmount, 4L},
+            {true, 5L,     randomAmount, 5L},
+            {true, 6L,     randomAmount, 6L},
+            {true, 7L,     randomAmount, 7L},
+            {true, 1337L,  randomAmount, 1337L},
+            // not use static amount
+            {false, -1337L, randomAmount, randomAmount},
+            {false, -7L,    randomAmount, randomAmount},
+            {false, -6L,    randomAmount, randomAmount},
+            {false, -5L,    randomAmount, randomAmount},
+            {false, -4L,    randomAmount, randomAmount},
+            {false, -3L,    randomAmount, randomAmount},
+            {false, -2L,    randomAmount, randomAmount},
+            {false, -1L,    randomAmount, randomAmount},
+            {false, 0L,     randomAmount, randomAmount},
+            {false, 1L,     randomAmount, randomAmount},
+            {false, 2L,     randomAmount, randomAmount},
+            {false, 3L,     randomAmount, randomAmount},
+            {false, 4L,     randomAmount, randomAmount},
+            {false, 5L,     randomAmount, randomAmount},
+            {false, 6L,     randomAmount, randomAmount},
+            {false, 7L,     randomAmount, randomAmount},
+            {false, 1337L,  randomAmount, randomAmount},
+        };
+    }
+
+    /**
+     * For {@link #lmdbIncreaseSize()}.
+     */
+    public final static String DATA_PROVIDER_LMDB_INCREASE_SIZE = "lmdbIncreaseSize";
+
+    @DataProvider
+    public static Object[][] lmdbIncreaseSize() {
+        return new Object[][]{
+            {1024L},
+            {2048L},
+            {4096L}
+        };
+    }
 
     /**
      * For {@link #bitSizesLowerThan25()}.

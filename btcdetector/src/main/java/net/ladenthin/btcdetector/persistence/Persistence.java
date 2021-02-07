@@ -55,4 +55,8 @@ public interface Persistence {
     Coin getAllAmountsFromAddresses(List<ByteBuffer> hash160s);
     
     String getStatsAsString();
+    
+    long getDatabaseSize();
+    
+    void increaseDatabaseSize(long toIncrease);
 }

@@ -48,6 +48,7 @@ import org.lmdbjava.ByteBufferProxy;
 
 import static org.lmdbjava.DbiFlags.MDB_CREATE;
 import static org.lmdbjava.Env.create;
+import org.lmdbjava.EnvInfo;
 
 public class LMDBPersistence implements Persistence {
 
@@ -74,6 +75,10 @@ public class LMDBPersistence implements Persistence {
         this.persistenceUtils = persistenceUtils;
         this.keyUtility = new KeyUtility(persistenceUtils.networkParameters, new ByteBufferUtility(true));
     }
+    
+    public static long mibToByte(long mib) {
+        return mib * 1_024L * 1_024L;
+    }
 
     @Override
     public void init() {
@@ -89,7 +94,7 @@ public class LMDBPersistence implements Persistence {
 
             env = create(bufferProxy)
                     // LMDB also needs to know how large our DB might be. Over-estimating is OK.
-                    .setMapSize(lmdbConfigurationWrite.mapSizeInMiB * 1_024L * 1_024L)
+                    .setMapSize(mibToByte(lmdbConfigurationWrite.initialMapSizeInMiB))
                     // LMDB also needs to know how many DBs (Dbi) we want to store in this Env.
                     .setMaxDbs(DB_COUNT)
                     // Now let's open the Env. The same path can be concurrently opened and
@@ -135,14 +140,19 @@ public class LMDBPersistence implements Persistence {
             ByteBuffer byteBuffer = lmdb_h160ToAmount.get(txn, hash160);
             txn.close();
 
-            Coin valueInDB = Coin.ZERO;
-            if (byteBuffer != null) {
-                if (byteBuffer.capacity() == 0) {
-                    return Coin.ZERO;
-                }
-                valueInDB = Coin.valueOf(byteBuffer.getLong());
+            return getCoinFromByteBuffer(byteBuffer);
+        }
+    }
+    
+    private Coin getCoinFromByteBuffer(ByteBuffer byteBuffer) {
+        if (byteBuffer != null) {
+            if (byteBuffer.capacity() == 0) {
+                return Coin.ZERO;
+            } else {
+                return Coin.valueOf(byteBuffer.getLong());
             }
-            return valueInDB;
+        } else {
+            return Coin.ZERO;
         }
     }
 
@@ -172,7 +182,9 @@ public class LMDBPersistence implements Persistence {
                                 line = String.format("%-34s", address.toBase58()) + System.lineSeparator();
                                 break;
                             case DynamicWidthBase58BitcoinAddressWithAmount:
-                                line = address.toBase58() + AddressTxtLine.COMMA + kv.val().getLong() + System.lineSeparator();
+                                ByteBuffer value = kv.val();
+                                Coin coin = getCoinFromByteBuffer(value);
+                                line = address.toBase58() + AddressTxtLine.COMMA + coin.getValue() + System.lineSeparator();
                                 break;
                             default:
                                 throw new IllegalArgumentException("Unknown addressFileOutputFormat: " + addressFileOutputFormat);
@@ -202,14 +214,40 @@ public class LMDBPersistence implements Persistence {
 
     @Override
     public void putNewAmount(ByteBuffer hash160, Coin amount) {
+        putNewAmountWithAutoIncrease(hash160, amount);
+    }
+    
+    /**
+     * If an {@link org.lmdbjava.Env.MapFullException} was thrown during a put. The map might be increased if configured.
+     * The increase value needs to be high enough. Otherwise the next put fails nevertheless.
+     */
+    private void putNewAmountWithAutoIncrease(ByteBuffer hash160, Coin amount) {
+        try {
+            putNewAmountUnsafe(hash160, amount);
+        } catch (org.lmdbjava.Env.MapFullException e) {
+            if (lmdbConfigurationWrite.increaseMapAutomatically == true) {
+                increaseDatabaseSize(mibToByte(lmdbConfigurationWrite.increaseSizeInMiB));
+                /**
+                 * It is possible that the exception will be thrown again, in this case increaseSizeInMiB should be changed and it's a configuration issue.
+                 * See {@link CLMDBConfigurationWrite#increaseSizeInMiB}.
+                 */
+                putNewAmountUnsafe(hash160, amount);
+            } else {
+                throw e;
+            }
+        }
+    }
+    
+    private void putNewAmountUnsafe(ByteBuffer hash160, Coin amount) {
         try (Txn<ByteBuffer> txn = env.txnWrite()) {
             if (lmdbConfigurationWrite.deleteEmptyAddresses && amount.isZero()) {
                 lmdb_h160ToAmount.delete(txn, hash160);
             } else {
+                long amountAsLong = amount.longValue();
                 if (lmdbConfigurationWrite.useStaticAmount) {
-                    amount = Coin.SATOSHI;
+                    amountAsLong = lmdbConfigurationWrite.staticAmount;
                 }
-                lmdb_h160ToAmount.put(txn, hash160, persistenceUtils.longToByteBufferDirect(amount.longValue()));
+                lmdb_h160ToAmount.put(txn, hash160, persistenceUtils.longToByteBufferDirect(amountAsLong));
             }
             txn.commit();
             txn.close();
@@ -245,5 +283,17 @@ public class LMDBPersistence implements Persistence {
             }
         }
         return count;
+    }
+    
+    @Override
+    public long getDatabaseSize() {
+        EnvInfo info = env.info();
+        return info.mapSize;
+    }
+    
+    @Override
+    public void increaseDatabaseSize(long toIncrease) {
+        long newSize = getDatabaseSize() + toIncrease;
+        env.setMapSize(newSize);
     }
 }

@@ -79,7 +79,7 @@ public class AddressFileToLMDBTest extends LMDBBase {
                 ByteBuffer hash160 = keyUtility.addressToByteBuffer(fromBase58);
                 amounts[i] = persistence.getAmount(hash160);
                 if (useStaticAmount) {
-                    assertThat(amounts[i], is(equalTo(Coin.SATOSHI)));
+                    assertThat(amounts[i], is(equalTo(Coin.ZERO)));
                 } else {
                     assertThat(amounts[i], is(equalTo(TestAddressesFiles.AMOUNTS[i])));
                 }

@@ -36,6 +36,7 @@ public class TestAddressesLMDB {
         addressFilesToLMDBConfigurationWrite.addressesFiles.addAll(files);
         addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite = new CLMDBConfigurationWrite();
         addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite.useStaticAmount = useStaticAmount;
+        addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite.staticAmount = 0L;
         File lmdbFolder = folder.newFolder("lmdb");
         String lmdbFolderPath = lmdbFolder.getAbsolutePath();
         addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite.lmdbDirectory = lmdbFolderPath;
