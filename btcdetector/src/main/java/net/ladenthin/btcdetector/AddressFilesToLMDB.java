@@ -58,7 +58,13 @@ public class AddressFilesToLMDB implements Runnable {
 
         PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
         persistence = new LMDBPersistence(addressFilesToLMDB.lmdbConfigurationWrite, persistenceUtils);
+        logger.info("Init lmdb ...");
         persistence.init();
+        logger.info("Init done.");
+        logger.info("logLMDBEntries, this may take a lot of time ...");
+        logLMDBEntries();
+        logger.info("logLMDBEntries done.");
+        
         try {
             logger.info("check if all configured address files exists");
             for (String addressesFilePath : addressFilesToLMDB.addressesFiles) {
@@ -103,14 +109,18 @@ public class AddressFilesToLMDB implements Runnable {
                 logger.info("Error in line: " + error);
             }
             
-            long count = persistence.count();
-            logger.info("LMDB contains " + count + " unique entries.");
+            logLMDBEntries();
 
         } catch (IOException e) {
             throw new RuntimeException(e);
         } finally {
             persistence.close();
         }
+    }
+
+    private void logLMDBEntries() {
+        long count = persistence.count();
+        logger.info("LMDB contains " + count + " unique entries.");
     }
 
     private void logProgress() {
