@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Random;
+import javafx.util.converter.ByteStringConverter;
 import net.ladenthin.btcdetector.configuration.CLMDBConfigurationWrite;
 import net.ladenthin.btcdetector.persistence.PersistenceUtils;
 import net.ladenthin.btcdetector.persistence.lmdb.LMDBPersistence;
@@ -39,7 +40,6 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.*;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
-import static net.ladenthin.btcdetector.persistence.lmdb.LMDBPersistence.mibToByte;
 
 @RunWith(DataProviderRunner.class)
 public class LMDBPersistenceTest {
@@ -113,7 +113,7 @@ public class LMDBPersistenceTest {
         long databaseSize = lmdbPersistence.getDatabaseSize();
         
         // assert
-        assertThat(databaseSize, is(equalTo(mibToByte(1L))));
+        assertThat(databaseSize, is(equalTo(new ByteConversion().mibToBytes(1L))));
     }
     
     @Test
@@ -135,7 +135,7 @@ public class LMDBPersistenceTest {
         long databaseSize = lmdbPersistence.getDatabaseSize();
         
         // assert
-        assertThat(databaseSize, is(equalTo(mibToByte(1L))));
+        assertThat(databaseSize, is(equalTo(new ByteConversion().mibToBytes(1L))));
     }
     // </editor-fold>
 
@@ -158,7 +158,7 @@ public class LMDBPersistenceTest {
         
         // assert
         long databaseSize = lmdbPersistence.getDatabaseSize();
-        assertThat(databaseSize, is(equalTo(mibToByte(1L)+increaseSize)));
+        assertThat(databaseSize, is(equalTo(new ByteConversion().mibToBytes(1L)+increaseSize)));
     }
     
     @Test
@@ -182,7 +182,7 @@ public class LMDBPersistenceTest {
         
         // assert
         long databaseSize = lmdbPersistence.getDatabaseSize();
-        assertThat(databaseSize, is(equalTo(mibToByte(1L)+increaseSize)));
+        assertThat(databaseSize, is(equalTo(new ByteConversion().mibToBytes(1L)+increaseSize)));
     }
     // </editor-fold>
     
@@ -202,9 +202,9 @@ public class LMDBPersistenceTest {
         lmdbPersistence.init();
         
         // pre assert
-        assertThat(lmdbPersistence.getDatabaseSize(), is(equalTo(mibToByte(1L))));
-        assertThat(lmdbPersistence.getIncreasedCounter(), is(equalTo(mibToByte(0L))));
-        assertThat(lmdbPersistence.getIncreasedSum(), is(equalTo(mibToByte(0L))));
+        assertThat(lmdbPersistence.getDatabaseSize(), is(equalTo(new ByteConversion().mibToBytes(1L))));
+        assertThat(lmdbPersistence.getIncreasedCounter(), is(equalTo(new ByteConversion().mibToBytes(0L))));
+        assertThat(lmdbPersistence.getIncreasedSum(), is(equalTo(new ByteConversion().mibToBytes(0L))));
         
         // act, assert
         fillWithRandomKeys(TOO_MUCH_KEYS_FOR_1MiB, lmdbPersistence);
@@ -225,17 +225,17 @@ public class LMDBPersistenceTest {
         lmdbPersistence.init();
 
         // pre assert
-        assertThat(lmdbPersistence.getDatabaseSize(), is(equalTo(mibToByte(1L))));
-        assertThat(lmdbPersistence.getIncreasedCounter(), is(equalTo(mibToByte(0L))));
-        assertThat(lmdbPersistence.getIncreasedSum(), is(equalTo(mibToByte(0L))));
+        assertThat(lmdbPersistence.getDatabaseSize(), is(equalTo(new ByteConversion().mibToBytes(1L))));
+        assertThat(lmdbPersistence.getIncreasedCounter(), is(equalTo(new ByteConversion().mibToBytes(0L))));
+        assertThat(lmdbPersistence.getIncreasedSum(), is(equalTo(new ByteConversion().mibToBytes(0L))));
 
         // act
         fillWithRandomKeys(TOO_MUCH_KEYS_FOR_1MiB, lmdbPersistence);
 
         // post assert
-        assertThat(lmdbPersistence.getDatabaseSize(), is(equalTo(mibToByte(1L) + (mibToByte(cLMDBConfigurationWrite.increaseSizeInMiB)) * TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES)));
+        assertThat(lmdbPersistence.getDatabaseSize(), is(equalTo(new ByteConversion().mibToBytes(1L) + (new ByteConversion().mibToBytes(cLMDBConfigurationWrite.increaseSizeInMiB)) * TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES)));
         assertThat(lmdbPersistence.getIncreasedCounter(), is(equalTo((long) TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES)));
-        assertThat(lmdbPersistence.getIncreasedSum(), is(equalTo(mibToByte(cLMDBConfigurationWrite.increaseSizeInMiB * TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES))));
+        assertThat(lmdbPersistence.getIncreasedSum(), is(equalTo(new ByteConversion().mibToBytes(cLMDBConfigurationWrite.increaseSizeInMiB * TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES))));
     }
     // </editor-fold>
     

@@ -27,6 +27,35 @@ import net.ladenthin.btcdetector.staticaddresses.StaticUnsupportedAddress;
 public class CommonDataProvider {
     
     /**
+     * For {@link #bytesToMib()}.
+     */
+    public final static String DATA_PROVIDER_BYTES_TO_MIB = "bytesToMib";
+
+    @DataProvider
+    public static Object[][] bytesToMib() {
+        return new Object[][]{
+            {1L, 0.00000095367431640625d},
+            {1024L * 1024L, 1.0d},
+            {1024L * 1024L, 1.0d},
+            {1024L * 1024L * 10, 10.0d},
+        };
+    }
+    
+    /**
+     * For {@link #mibToBytes()}.
+     */
+    public final static String DATA_PROVIDER_MIB_TO_BYTES = "mibToBytes";
+
+    @DataProvider
+    public static Object[][] mibToBytes() {
+        return new Object[][]{
+            {1L, 1024L*1024L},
+            {2L, 1024L*1024L *2L},
+            {1024L, 1024L*1024L * 1024L},
+        };
+    }
+    
+    /**
      * For {@link #lmdbAmounts()}.
      */
     public final static String DATA_PROVIDER_LMDB_AMOUNTS = "lmdbAmounts";

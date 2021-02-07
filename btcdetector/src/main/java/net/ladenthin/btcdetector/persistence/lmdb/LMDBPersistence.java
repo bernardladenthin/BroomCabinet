@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import net.ladenthin.btcdetector.AddressTxtLine;
 import net.ladenthin.btcdetector.ByteBufferUtility;
+import net.ladenthin.btcdetector.ByteConversion;
 import net.ladenthin.btcdetector.KeyUtility;
 import net.ladenthin.btcdetector.configuration.CAddressFileOutputFormat;
 import net.ladenthin.btcdetector.configuration.CLMDBConfigurationReadOnly;
@@ -78,10 +79,6 @@ public class LMDBPersistence implements Persistence {
         this.keyUtility = new KeyUtility(persistenceUtils.networkParameters, new ByteBufferUtility(true));
     }
     
-    public static long mibToByte(long mib) {
-        return mib * 1_024L * 1_024L;
-    }
-
     @Override
     public void init() {
         if (lmdbConfigurationWrite != null) {
@@ -95,7 +92,7 @@ public class LMDBPersistence implements Persistence {
 
             env = create(bufferProxy)
                     // LMDB also needs to know how large our DB might be. Over-estimating is OK.
-                    .setMapSize(mibToByte(lmdbConfigurationWrite.initialMapSizeInMiB))
+                    .setMapSize(new ByteConversion().mibToBytes(lmdbConfigurationWrite.initialMapSizeInMiB))
                     // LMDB also needs to know how many DBs (Dbi) we want to store in this Env.
                     .setMaxDbs(DB_COUNT)
                     // Now let's open the Env. The same path can be concurrently opened and
@@ -227,7 +224,7 @@ public class LMDBPersistence implements Persistence {
             putNewAmountUnsafe(hash160, amount);
         } catch (org.lmdbjava.Env.MapFullException e) {
             if (lmdbConfigurationWrite.increaseMapAutomatically == true) {
-                increaseDatabaseSize(mibToByte(lmdbConfigurationWrite.increaseSizeInMiB));
+                increaseDatabaseSize(new ByteConversion().mibToBytes(lmdbConfigurationWrite.increaseSizeInMiB));
                 /**
                  * It is possible that the exception will be thrown again, in this case increaseSizeInMiB should be changed and it's a configuration issue.
                  * See {@link CLMDBConfigurationWrite#increaseSizeInMiB}.

@@ -60,6 +60,15 @@ public interface Persistence {
     
     void increaseDatabaseSize(long toIncrease);
     
+    /**
+     * Counter of increase.
+     * @return 
+     */
     long getIncreasedCounter();
+    
+    /**
+     * The sum of increase in bytes.
+     * @return 
+     */
     long getIncreasedSum();
 }
