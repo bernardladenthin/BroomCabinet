@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Random;
-import javafx.util.converter.ByteStringConverter;
 import net.ladenthin.btcdetector.configuration.CLMDBConfigurationWrite;
 import net.ladenthin.btcdetector.persistence.PersistenceUtils;
 import net.ladenthin.btcdetector.persistence.lmdb.LMDBPersistence;
