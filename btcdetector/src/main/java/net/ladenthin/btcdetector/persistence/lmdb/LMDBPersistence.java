@@ -61,6 +61,8 @@ public class LMDBPersistence implements Persistence {
     private final KeyUtility keyUtility;
     private Env<ByteBuffer> env;
     private Dbi<ByteBuffer> lmdb_h160ToAmount;
+    private long increasedCounter = 0;
+    private long increasedSum = 0;
 
     public LMDBPersistence(CLMDBConfigurationWrite lmdbConfigurationWrite, PersistenceUtils persistenceUtils) {
         this.lmdbConfigurationReadOnly = null;
@@ -82,7 +84,6 @@ public class LMDBPersistence implements Persistence {
 
     @Override
     public void init() {
-
         if (lmdbConfigurationWrite != null) {
             // -Xmx10G -XX:MaxDirectMemorySize=5G
             // We always need an Env. An Env owns a physical on-disk storage file. One
@@ -284,16 +285,28 @@ public class LMDBPersistence implements Persistence {
         }
         return count;
     }
-    
+
     @Override
     public long getDatabaseSize() {
         EnvInfo info = env.info();
         return info.mapSize;
     }
-    
+
     @Override
     public void increaseDatabaseSize(long toIncrease) {
+        increasedCounter++;
+        increasedSum += toIncrease;
         long newSize = getDatabaseSize() + toIncrease;
         env.setMapSize(newSize);
+    }
+
+    @Override
+    public long getIncreasedCounter() {
+        return increasedCounter;
+    }
+
+    @Override
+    public long getIncreasedSum() {
+        return increasedSum;
     }
 }

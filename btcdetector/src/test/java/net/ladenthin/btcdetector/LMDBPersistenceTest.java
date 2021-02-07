@@ -203,33 +203,39 @@ public class LMDBPersistenceTest {
         
         // pre assert
         assertThat(lmdbPersistence.getDatabaseSize(), is(equalTo(mibToByte(1L))));
+        assertThat(lmdbPersistence.getIncreasedCounter(), is(equalTo(mibToByte(0L))));
+        assertThat(lmdbPersistence.getIncreasedSum(), is(equalTo(mibToByte(0L))));
         
         // act, assert
         fillWithRandomKeys(TOO_MUCH_KEYS_FOR_1MiB, lmdbPersistence);
     }
-    
+
     @Test
     public void putNewAmount_initialLMDBSetTo1MiB_fillWithTooMuchValues_increaseDatabaseSizeAndNoExceptionThrown() throws IOException {
         // arrange
         File lmdbFolder = folder.newFolder("lmdb");
-        
+
         CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
         cLMDBConfigurationWrite.initialMapSizeInMiB = 1;
         cLMDBConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
         cLMDBConfigurationWrite.increaseMapAutomatically = true;
         cLMDBConfigurationWrite.increaseSizeInMiB = 1;
-        
+
         LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils);
         lmdbPersistence.init();
-        
+
         // pre assert
         assertThat(lmdbPersistence.getDatabaseSize(), is(equalTo(mibToByte(1L))));
-        
+        assertThat(lmdbPersistence.getIncreasedCounter(), is(equalTo(mibToByte(0L))));
+        assertThat(lmdbPersistence.getIncreasedSum(), is(equalTo(mibToByte(0L))));
+
         // act
         fillWithRandomKeys(TOO_MUCH_KEYS_FOR_1MiB, lmdbPersistence);
-        
+
         // post assert
-        assertThat(lmdbPersistence.getDatabaseSize(), is(equalTo(mibToByte(1L)+(mibToByte(cLMDBConfigurationWrite.increaseSizeInMiB))*TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES)));
+        assertThat(lmdbPersistence.getDatabaseSize(), is(equalTo(mibToByte(1L) + (mibToByte(cLMDBConfigurationWrite.increaseSizeInMiB)) * TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES)));
+        assertThat(lmdbPersistence.getIncreasedCounter(), is(equalTo((long) TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES)));
+        assertThat(lmdbPersistence.getIncreasedSum(), is(equalTo(mibToByte(cLMDBConfigurationWrite.increaseSizeInMiB * TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES))));
     }
     // </editor-fold>
     

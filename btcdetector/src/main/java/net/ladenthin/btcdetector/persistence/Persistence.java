@@ -59,4 +59,7 @@ public interface Persistence {
     long getDatabaseSize();
     
     void increaseDatabaseSize(long toIncrease);
+    
+    long getIncreasedCounter();
+    long getIncreasedSum();
 }
