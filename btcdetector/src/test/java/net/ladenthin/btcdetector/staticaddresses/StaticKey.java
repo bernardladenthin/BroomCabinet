@@ -16,11 +16,11 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector.staticaddresses;
+package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import net.ladenthin.btcdetector.ByteBufferUtility;
+import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 
 /**
  * Static strings from a random generated address https://www.bitaddress.org

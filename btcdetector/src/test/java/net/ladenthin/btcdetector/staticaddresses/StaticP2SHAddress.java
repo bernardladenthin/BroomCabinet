@@ -16,11 +16,11 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector.staticaddresses;
+package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 
 import java.nio.ByteBuffer;
-import net.ladenthin.btcdetector.ByteBufferUtility;
-import net.ladenthin.btcdetector.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
+import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.params.MainNetParams;
 import org.bouncycastle.util.encoders.Hex;

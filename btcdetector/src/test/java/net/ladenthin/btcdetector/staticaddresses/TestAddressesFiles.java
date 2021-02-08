@@ -16,7 +16,7 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector.staticaddresses;
+package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 
 import java.io.File;
 import java.io.IOException;
@@ -26,9 +26,9 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import static net.ladenthin.btcdetector.AddressTxtLine.COMMA;
-import static net.ladenthin.btcdetector.AddressTxtLine.SEMICOLON;
-import static net.ladenthin.btcdetector.AddressTxtLine.TAB_SPLIT;
+import static net.ladenthin.bitcoinaddressfinder.AddressTxtLine.COMMA;
+import static net.ladenthin.bitcoinaddressfinder.AddressTxtLine.SEMICOLON;
+import static net.ladenthin.bitcoinaddressfinder.AddressTxtLine.TAB_SPLIT;
 import org.bitcoinj.core.Coin;
 import org.junit.rules.TemporaryFolder;
 

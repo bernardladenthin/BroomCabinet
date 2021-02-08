@@ -16,7 +16,7 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector;
+package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;

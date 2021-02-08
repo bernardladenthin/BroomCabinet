@@ -16,7 +16,7 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector;
+package net.ladenthin.bitcoinaddressfinder;
 
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
@@ -29,7 +29,7 @@ import java.math.BigInteger;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
-import net.ladenthin.btcdetector.configuration.CProducer;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.core.NetworkParameters;

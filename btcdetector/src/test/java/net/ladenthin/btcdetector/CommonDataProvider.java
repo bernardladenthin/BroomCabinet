@@ -16,13 +16,13 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector;
+package net.ladenthin.bitcoinaddressfinder;
 
 import com.tngtech.java.junit.dataprovider.DataProvider;
-import net.ladenthin.btcdetector.configuration.CProducerOpenCL;
-import net.ladenthin.btcdetector.staticaddresses.StaticP2PKHAddress;
-import net.ladenthin.btcdetector.staticaddresses.StaticP2SHAddress;
-import net.ladenthin.btcdetector.staticaddresses.StaticUnsupportedAddress;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticP2PKHAddress;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticP2SHAddress;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticUnsupportedAddress;
 
 public class CommonDataProvider {
     

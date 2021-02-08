@@ -16,13 +16,13 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector;
+package net.ladenthin.bitcoinaddressfinder;
 
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.IOException;
-import net.ladenthin.btcdetector.staticaddresses.*;
-import net.ladenthin.btcdetector.staticaddresses.StaticKey;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.*;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.core.AddressFormatException;

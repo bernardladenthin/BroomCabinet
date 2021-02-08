@@ -16,14 +16,14 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector;
+package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Random;
-import net.ladenthin.btcdetector.staticaddresses.StaticKey;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
 import org.junit.Before;
 import org.junit.Test;
 import org.bitcoinj.core.ECKey;

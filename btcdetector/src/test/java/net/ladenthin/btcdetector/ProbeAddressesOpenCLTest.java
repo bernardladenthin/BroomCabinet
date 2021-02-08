@@ -16,7 +16,7 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector;
+package net.ladenthin.bitcoinaddressfinder;
 
 import com.google.common.io.Resources;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
@@ -38,9 +38,9 @@ import static org.jocl.CL.*;
 
 import java.util.Arrays;
 import java.util.Random;
-import net.ladenthin.btcdetector.configuration.CProducer;
-import net.ladenthin.btcdetector.configuration.CProducerOpenCL;
-import net.ladenthin.btcdetector.staticaddresses.TestAddresses42;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.params.MainNetParams;
 import static org.hamcrest.MatcherAssert.assertThat;

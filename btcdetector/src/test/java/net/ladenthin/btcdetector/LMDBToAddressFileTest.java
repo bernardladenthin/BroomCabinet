@@ -16,7 +16,7 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector;
+package net.ladenthin.bitcoinaddressfinder;
 
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
@@ -25,9 +25,9 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import net.ladenthin.btcdetector.configuration.CAddressFileOutputFormat;
-import net.ladenthin.btcdetector.persistence.Persistence;
-import net.ladenthin.btcdetector.staticaddresses.TestAddressesFiles;
+import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFileOutputFormat;
+import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import org.apache.commons.io.FileUtils;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;

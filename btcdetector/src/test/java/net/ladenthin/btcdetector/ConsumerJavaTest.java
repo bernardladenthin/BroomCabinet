@@ -16,7 +16,7 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector;
+package net.ladenthin.bitcoinaddressfinder;
 
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
@@ -31,13 +31,13 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
-import net.ladenthin.btcdetector.configuration.CConsumerJava;
-import net.ladenthin.btcdetector.configuration.CLMDBConfigurationReadOnly;
-import net.ladenthin.btcdetector.configuration.CProducerJava;
-import net.ladenthin.btcdetector.staticaddresses.TestAddresses1337;
-import net.ladenthin.btcdetector.staticaddresses.TestAddresses42;
-import net.ladenthin.btcdetector.staticaddresses.TestAddressesFiles;
-import net.ladenthin.btcdetector.staticaddresses.TestAddressesLMDB;
+import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
+import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses1337;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.core.ECKey;

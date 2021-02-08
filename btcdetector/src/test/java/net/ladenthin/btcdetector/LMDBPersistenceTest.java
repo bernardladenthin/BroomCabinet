@@ -16,7 +16,7 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector;
+package net.ladenthin.bitcoinaddressfinder;
 
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
@@ -25,9 +25,9 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Random;
-import net.ladenthin.btcdetector.configuration.CLMDBConfigurationWrite;
-import net.ladenthin.btcdetector.persistence.PersistenceUtils;
-import net.ladenthin.btcdetector.persistence.lmdb.LMDBPersistence;
+import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
+import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
+import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.NetworkParameters;

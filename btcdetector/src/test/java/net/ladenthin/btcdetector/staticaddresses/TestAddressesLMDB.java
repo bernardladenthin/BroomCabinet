@@ -16,14 +16,14 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector.staticaddresses;
+package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
-import net.ladenthin.btcdetector.AddressFilesToLMDB;
-import net.ladenthin.btcdetector.configuration.CAddressFilesToLMDB;
-import net.ladenthin.btcdetector.configuration.CLMDBConfigurationWrite;
+import net.ladenthin.bitcoinaddressfinder.AddressFilesToLMDB;
+import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
+import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
 import org.junit.rules.TemporaryFolder;
 
 public class TestAddressesLMDB {

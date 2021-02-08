@@ -16,19 +16,19 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector;
+package net.ladenthin.bitcoinaddressfinder;
 
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import net.ladenthin.btcdetector.configuration.CAddressFilesToLMDB;
-import net.ladenthin.btcdetector.configuration.CLMDBConfigurationWrite;
-import net.ladenthin.btcdetector.persistence.Persistence;
-import net.ladenthin.btcdetector.staticaddresses.StaticAddressesFiles;
-import net.ladenthin.btcdetector.staticaddresses.*;
-import net.ladenthin.btcdetector.staticaddresses.TestAddressesFiles;
+import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
+import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
+import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticAddressesFiles;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.*;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.LegacyAddress;
 import org.junit.Before;

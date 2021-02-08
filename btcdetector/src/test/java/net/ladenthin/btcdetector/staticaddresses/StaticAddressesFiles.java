@@ -16,7 +16,7 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector.staticaddresses;
+package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 
 import java.io.File;
 import java.io.IOException;

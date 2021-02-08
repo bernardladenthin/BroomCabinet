@@ -16,7 +16,7 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector;
+package net.ladenthin.bitcoinaddressfinder;
 
 import ch.qos.logback.classic.Level;
 import java.io.File;
@@ -25,10 +25,10 @@ import java.math.BigInteger;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
-import net.ladenthin.btcdetector.configuration.CConsumerJava;
-import net.ladenthin.btcdetector.configuration.CLMDBConfigurationReadOnly;
-import net.ladenthin.btcdetector.staticaddresses.TestAddressesFiles;
-import net.ladenthin.btcdetector.staticaddresses.TestAddressesLMDB;
+import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
+import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;

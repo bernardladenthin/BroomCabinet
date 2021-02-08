@@ -16,7 +16,7 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector;
+package net.ladenthin.bitcoinaddressfinder;
 
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;

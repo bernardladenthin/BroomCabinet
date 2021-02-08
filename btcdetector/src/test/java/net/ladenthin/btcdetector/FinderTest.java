@@ -16,14 +16,14 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector;
+package net.ladenthin.bitcoinaddressfinder;
 
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
-import net.ladenthin.btcdetector.configuration.CFinder;
+import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 
 public class FinderTest {
 

@@ -16,10 +16,10 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector.staticaddresses;
+package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 
 import java.nio.ByteBuffer;
-import net.ladenthin.btcdetector.ByteBufferUtility;
+import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 
 /**
  * https://bitinfocharts.com/de/reddcoin/address/RdLmuVt2ByWxXhiqhKSk4aV9UPLj6Lu3HL

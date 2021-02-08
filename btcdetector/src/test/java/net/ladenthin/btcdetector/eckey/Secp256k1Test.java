@@ -1,4 +1,4 @@
-package net.ladenthin.btcdetector.eckey;
+package net.ladenthin.bitcoinaddressfinder.eckey;
 
 import org.junit.Test;
 
@@ -8,9 +8,9 @@ import java.security.PrivateKey;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
-import static net.ladenthin.btcdetector.eckey.Secp256k1.getPublicKey;
-import static net.ladenthin.btcdetector.eckey.Secp256k1.byteArrayToHexString;
-import static net.ladenthin.btcdetector.eckey.Secp256k1.hexStringToByteArray;
+import static net.ladenthin.bitcoinaddressfinder.eckey.Secp256k1.getPublicKey;
+import static net.ladenthin.bitcoinaddressfinder.eckey.Secp256k1.byteArrayToHexString;
+import static net.ladenthin.bitcoinaddressfinder.eckey.Secp256k1.hexStringToByteArray;
 import org.bitcoinj.core.ECKey;
 import org.bouncycastle.jce.ECNamedCurveTable;
 import org.bouncycastle.jce.spec.ECNamedCurveParameterSpec;

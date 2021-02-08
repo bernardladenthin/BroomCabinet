@@ -16,7 +16,7 @@
  *
  */
 // @formatter:on
-package net.ladenthin.btcdetector.staticaddresses;
+package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 
 import java.io.File;
 import java.io.IOException;
@@ -25,9 +25,9 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.rules.TemporaryFolder;
 
-import static net.ladenthin.btcdetector.AddressTxtLine.COMMA;
-import static net.ladenthin.btcdetector.AddressTxtLine.SEMICOLON;
-import static net.ladenthin.btcdetector.AddressTxtLine.TAB_SPLIT;
+import static net.ladenthin.bitcoinaddressfinder.AddressTxtLine.COMMA;
+import static net.ladenthin.bitcoinaddressfinder.AddressTxtLine.SEMICOLON;
+import static net.ladenthin.bitcoinaddressfinder.AddressTxtLine.TAB_SPLIT;
 
 public class AddressesFileSpecialUsecases implements AddressesFiles {
 
@@ -52,7 +52,7 @@ public class AddressesFileSpecialUsecases implements AddressesFiles {
     }
     
     /**
-     * See {@link net.ladenthin.btcdetector.AddressFileToLMDBTest#addressFilesToLMDB_addressWithAmountOfZero_noExceptionThrown} why {@code 0} is necessary.
+     * See {@link net.ladenthin.bitcoinaddressfinder.AddressFileToLMDBTest#addressFilesToLMDB_addressWithAmountOfZero_noExceptionThrown} why {@code 0} is necessary.
      */
     public List<String> getAllAddresses() {
         List<String> addresses = new ArrayList<>();
