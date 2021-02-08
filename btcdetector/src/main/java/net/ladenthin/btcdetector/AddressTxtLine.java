@@ -20,6 +20,7 @@ package net.ladenthin.btcdetector;
 
 import com.github.kiulian.converter.AddressConverter;
 import java.nio.ByteBuffer;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.bitcoinj.core.AddressFormatException;
 import org.bitcoinj.core.Base58;
@@ -44,6 +45,7 @@ public class AddressTxtLine {
     public static final String SEMICOLON = ";";
     public static final String TAB_SPLIT = "\t";
     public static final String OR = "|";
+    public static final Pattern SPLIT_REGEX = Pattern.compile(COMMA + OR + SEMICOLON + OR + TAB_SPLIT, 0);
     
     private final static int VERSION_BYTES_REGULAR = 1;
     private final static int VERSION_BYTES_ZCASH = 2;
@@ -57,7 +59,7 @@ public class AddressTxtLine {
      */
     @Nullable
     public AddressToCoin fromLine(String line, KeyUtility keyUtility) {
-        String[] lineSplitted = line.split(COMMA + OR + SEMICOLON + OR + TAB_SPLIT);
+        String[] lineSplitted = SPLIT_REGEX.split(line);
         String address = lineSplitted[0];
         Coin amount = getCoinIfPossible(lineSplitted, DEFAULT_COIN);
         address = address.trim();
