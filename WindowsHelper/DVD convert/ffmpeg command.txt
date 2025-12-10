@@ -1,0 +1,1 @@
+ffmpeg -i "concat:VTS_02_1.VOB|VTS_02_2.VOB|VTS_02_3.VOB|VTS_02_4.VOB|VTS_02_5.VOB" -c:v libx264 -preset slow -crf 20 -c:a aac -b:a 160k -vf format=yuv420p -movflags +faststart video-out.mp4
