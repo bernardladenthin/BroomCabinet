@@ -33,10 +33,23 @@ implementation must return `0`.
 | `19.27.0.0` (latest 19.x) | `2` | no |
 | `21.21.0.0` (latest 21.x) | `2` | no |
 
-The divergence reproduces on every 19.x and 21.x release tested. The `oracle.jdbc.rowset` package
-was removed entirely in the 23.x driver line (Oracle Database 23ai), so this report concerns the
-maintained 19.x and 21.x lines. The same class ships in the equivalent `ojdbc11` builds and is
-expected to behave identically; verified here on `ojdbc8`.
+The divergence reproduces on every 19.x and 21.x release tested.
+
+**Availability timeline** (verified against the actual jars on Maven Central):
+
+- **Deprecated since 12.2.** Oracle's JDBC Developer's Guide ("Changes in This Release", 12.2)
+  deprecated the `oracle.jdbc.rowset` package and recommends the standard JDK rowset instead.
+- **Present and buggy through the 19.x and 21.x lines** — `oracle.jdbc.rowset.OracleCachedRowSet`
+  is in `ojdbc8` `19.27.0.0` and `21.21.0.0` and exhibits the bug.
+- **Physically absent from the 23.x driver jars** — the entire `oracle/jdbc/rowset/` package is gone
+  from `ojdbc8` `23.2.0.0`, `23.9.0.25.07`, and `23.26.2.0.0`, and from `ojdbc11`/`ojdbc17`
+  `23.26.2.0.0` (confirmed by listing the jar contents). Oracle's lifecycle docs label the package
+  "desupported in 26ai".
+- **Documentation-lag caveat:** the 23ai/26ai JDBC Developer's Guide still *describes* the package,
+  so a documentation-based search may conclude it "still ships" — but the binaries do not contain it.
+
+This report therefore concerns the maintained 19.x and 21.x lines. The class is `ojdbc8` here; the
+equivalent `ojdbc11`/`ojdbc17` builds carry the same code and are expected to behave identically.
 
 ## Environment
 
@@ -207,9 +220,37 @@ without error. This is why the reproducer uses a live H2 `ResultSet` rather than
 `RowSetMetaDataImpl` source. Mentioned only to save reviewers the detour — the primary issue is the
 `getRow()` divergence above.
 
+## Prior art / related reports
+
+A public search (Oracle MOS snippets, Oracle Communities, Stack Overflow, GitHub, blogs) found
+**no report describing this exact symptom** (`getRow()` returning the row count after the last row)
+and **no Oracle bug ID** for it. Supporting findings:
+
+- **Independent confirmation of the root cause in public decompiled source.** Third-party decompiled
+  mirrors of much older drivers contain a byte-for-byte identical `getRow()`:
+  `github.com/caot/ojdbc6-11.2.0.2.0.src` (ojdbc6 11.2.0.2.0 — `getRow()` is
+  `if (presentRow > rowCount) return rowCount; return presentRow;`) and
+  `github.com/wenshao/OracleDriver10_2_0_2` (10.2.0.2, same body). The defect is therefore
+  long-standing and stable across ~10.2 → 21.x — not a recent regression. (These are unofficial
+  decompilations, but mutually consistent and identical to the `21.21.0.0` decompilation above.)
+- **The correct guard already exists in the same class.** That same decompiled source validates the
+  cursor elsewhere with `if (presentRow < 1 || presentRow > rowCount)` — i.e. exactly the suggested
+  fix — so `getRow()` simply fails to reuse the bounds check the class already has.
+- **Closest Oracle-acknowledged artifact:** My Oracle Support Doc **2741145.1**,
+  "Java.sql.SQLException: Result Set After Last Row" (JDBC 12.2.0.0.0–19.7; reproduced on `ojdbc8`
+  19.3/19.6, not 11.2; DB 19.8). It documents an after-last result-set defect that regressed into the
+  19.x line — a plausible downstream symptom of this root cause — but is framed as a thrown exception,
+  not as `getRow()`'s return value, and exposes no public bug number (login-gated).
+- **Sibling classes:** `OracleWebRowSet`, `OracleFilteredRowSet`, and `OracleJoinRowSet` extend
+  `OracleCachedRowSet` and inherit the same `getRow()`, so they share the defect. `OracleJDBCRowSet`
+  is a thin wrapper that delegates to a live `ResultSet` and is not affected the same way.
+
 ## Caveats
 
 - The Oracle snippets are **decompiled bytecode** of a closed-source driver, specific to
-  `21.21.0.0` (behavior identical on `19.27.0.0` by observation). Decompiler field names
-  (`presentRow`, `rowCount`) may differ from Oracle's source identifiers, but the control flow is
-  faithful and matches the observed output (`presentRow = rowCount + 1 = 3 > 2 → returns 2`).
+  `21.21.0.0` (behavior identical on `19.27.0.0` by observation). The control flow is faithful and
+  matches the observed output (`presentRow = rowCount + 1 = 3 > 2 → returns 2`).
+- The field names `presentRow`/`rowCount` are corroborated by the independent public decompiled
+  mirrors above, so they are likely Oracle's actual identifiers rather than decompiler artifacts.
+- The deprecation (12.2) and "desupported in 26ai" labels come from Oracle's documentation; the
+  jar-content facts (present in 19.x/21.x, absent in 23.x) were verified directly on Maven Central.

@@ -35,15 +35,22 @@ guards the valid `1..N` range and falls through to `0` for any non-row position.
 
 ## Driver-version availability (read this first)
 
-The `oracle.jdbc.rowset` package (including `OracleCachedRowSet`) exists **only in the 19.x and
-21.x `ojdbc8` lines** — both still actively maintained (latest checked: `19.27.0.0` and
-`21.21.0.0`, Dec 2025). Oracle **removed the entire package in the 23.x line** (Oracle Database
-23ai driver), so:
+The `oracle.jdbc.rowset` package (including `OracleCachedRowSet`) was **deprecated since ojdbc 12.2**
+but still ships — and still exhibits the bug — in the **19.x and 21.x `ojdbc8` lines** (latest
+checked: `19.27.0.0` and `21.21.0.0`, Dec 2025). Oracle **removed the entire package from the 23.x
+driver jars**, verified on Maven Central: the `oracle/jdbc/rowset/` package is absent from `ojdbc8`
+`23.2.0.0`, `23.9.0.25.07`, and `23.26.2.0.0`, and from `ojdbc11`/`ojdbc17` `23.26.2.0.0`. (Oracle's
+lifecycle docs label the package "desupported in 26ai" and the 23ai/26ai JDBC Developer's Guide still
+*describes* it — a documentation lag; the binaries no longer contain it.) So:
 
 - This project **builds and reproduces the bug against 19.x / 21.x.**
 - It **does not compile against any 23.x version** — `oracle.jdbc.rowset` no longer exists there.
 
 The default `ojdbc.version` is therefore `21.21.0.0`, the newest release that still ships the class.
+
+The defect is long-standing: independent public decompiled mirrors of ojdbc6 `11.2.0.2.0` and the
+`10.2.0.2` driver contain a byte-identical `getRow()`, and no public report or Oracle bug ID names the
+exact symptom. See [`BUG.md`](BUG.md) → "Prior art / related reports".
 
 ## Environment
 
@@ -117,7 +124,7 @@ mvn -Dojdbc.version=<version> compile exec:java     # printed trace
 |---|---|---|---|
 | `19.27.0.0` | yes | **2** | no |
 | `21.21.0.0` (default) | yes | **2** | no |
-| `23.2.0.0` … `23.26.2.0.0` | **no — package removed** | n/a (does not compile) | n/a |
+| `23.2.0.0` … `23.26.2.0.0` | **no — package removed** (verified on Maven Central) | n/a (does not compile) | n/a |
 
 Every 19.x / 21.x release checked reproduces the divergence. The JUnit test
 `oracleImpl_afterLast_divergesFromSpec` is a deliberate **tripwire**: it asserts the current
