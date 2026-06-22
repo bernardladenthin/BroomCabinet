@@ -32,6 +32,8 @@ import javax.sql.rowset.CachedRowSet;
  * (see {@link java.sql.ResultSet#getRow()}) requires {@code 0} when there is no current row,
  * which the reference implementation honours, while {@code OracleCachedRowSet} returns the
  * total row count instead.</p>
+ *
+ * <p>See {@code BUG.md} for the decompiled root cause and a copy-paste-ready bug report.</p>
  */
 public final class Main {
 
@@ -110,6 +112,8 @@ public final class Main {
             System.out.println("DIVERGENCE CONFIRMED: OracleCachedRowSet.getRow() returned " + oracleAfterLast
                     + " after afterLast(); the JDBC spec (java.sql.ResultSet#getRow) requires "
                     + EXPECTED_AFTER_LAST_GET_ROW + ".");
+            System.out.println("Mechanism: OracleCachedRowSet.getRow() returns rowCount when presentRow > rowCount "
+                    + "(the afterLast position) instead of 0. See BUG.md for the decompiled analysis.");
         } else {
             System.out.println("No divergence on this driver version: OracleCachedRowSet.getRow() returned "
                     + EXPECTED_AFTER_LAST_GET_ROW + " as required.");

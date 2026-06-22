@@ -25,9 +25,11 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.util.Properties;
 
 import javax.sql.rowset.CachedRowSet;
+import javax.sql.rowset.RowSetMetaDataImpl;
 import javax.sql.rowset.RowSetProvider;
 
 import oracle.jdbc.rowset.OracleCachedRowSet;
@@ -42,6 +44,10 @@ import oracle.jdbc.rowset.OracleCachedRowSet;
  * provides a real {@link ResultSet} to call {@link CachedRowSet#populate(ResultSet)} with;
  * <strong>no live Oracle database is required</strong> because the divergence lives in the
  * disconnected rowset's own cursor logic, not in the data source or the SQL dialect.</p>
+ *
+ * <p>Root cause (decompiled): Oracle's {@code getRow()} returns {@code rowCount} when
+ * {@code presentRow > rowCount} (the {@code afterLast()} position) instead of {@code 0}. See
+ * {@code BUG.md} in this project for the full analysis and a copy-paste-ready bug report.</p>
  */
 public final class DemoRowSets {
 
@@ -115,6 +121,50 @@ public final class DemoRowSets {
         CachedRowSet crs = new OracleCachedRowSet();
         populateFromH2(crs);
         return crs;
+    }
+
+    /**
+     * Creates an empty (unpopulated) {@link OracleCachedRowSet}. Useful for tests that drive
+     * {@link CachedRowSet#populate(ResultSet)} themselves and want to keep Oracle types out of
+     * the test's own imports.
+     *
+     * @return a new, empty {@link OracleCachedRowSet}
+     * @throws SQLException if the rowset cannot be created
+     */
+    public static CachedRowSet newOracleCachedRowSet() throws SQLException {
+        return new OracleCachedRowSet();
+    }
+
+    /**
+     * Builds a fully in-memory (disconnected) {@value #ROW_COUNT}-row {@link ResultSet} using only
+     * the JDK rowset API &mdash; with no JDBC {@link Connection}/{@link Statement} behind it.
+     *
+     * <p>This documents a related gotcha: {@link OracleCachedRowSet#populate(ResultSet)} cannot
+     * consume such a source. During {@code populateInit} it calls
+     * {@code getStatement().getMaxFieldSize()}, so a source whose {@link ResultSet#getStatement()}
+     * is {@code null} makes {@code populate()} throw {@link NullPointerException}. The JDK reference
+     * implementation populates from the very same source without error &mdash; which is why the demo
+     * and the primary tests feed both rowsets from a live H2 {@link ResultSet} instead.</p>
+     *
+     * @return a disconnected, scrollable {@link CachedRowSet}, cursor positioned before the first row
+     * @throws SQLException if the source rowset cannot be built
+     */
+    public static CachedRowSet disconnectedTwoRowSource() throws SQLException {
+        RowSetMetaDataImpl metaData = new RowSetMetaDataImpl();
+        metaData.setColumnCount(1);
+        metaData.setColumnName(1, "COL_A");
+        metaData.setColumnType(1, Types.VARCHAR);
+
+        CachedRowSet source = RowSetProvider.newFactory().createCachedRowSet();
+        source.setMetaData(metaData);
+        for (int row = 1; row <= ROW_COUNT; row++) {
+            source.moveToInsertRow();
+            source.updateString(1, "value" + row);
+            source.insertRow();
+        }
+        source.moveToCurrentRow();
+        source.beforeFirst();
+        return source;
     }
 
     /**

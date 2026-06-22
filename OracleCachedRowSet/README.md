@@ -24,6 +24,15 @@ Code that restores or reasons about a cursor position using `getRow()` after ite
 of a rowset silently behaves differently on Oracle's implementation than on the JDK reference (and
 other implementations). Relying on `getRow()` at `afterLast()` therefore breaks portability.
 
+## Root cause (short version)
+
+Oracle's `getRow()` (decompiled) is `if (presentRow > rowCount) return rowCount; return presentRow;`.
+At `afterLast()` the cursor field `presentRow == rowCount + 1`, so it clamps to `rowCount` instead of
+returning `0`; `beforeFirst()` (`presentRow == 0`) is correct only incidentally. The JDK reference
+guards the valid `1..N` range and falls through to `0` for any non-row position.
+
+**Full decompiled analysis and a copy-paste-ready bug report: [`BUG.md`](BUG.md).**
+
 ## Driver-version availability (read this first)
 
 The `oracle.jdbc.rowset` package (including `OracleCachedRowSet`) exists **only in the 19.x and
@@ -126,6 +135,11 @@ returning `0` — telling you exactly where the behavior changed.
 - If `OracleCachedRowSet` throws an NLS/i18n error at runtime, add
   `com.oracle.database.nls:orai18n` (matching version) — basic `populate`/`getRow` need only
   `ojdbc8` (verified with `21.21.0.0` and `19.27.0.0`).
+- `OracleCachedRowSet.populate(ResultSet)` needs a source backed by a live `Statement`. A
+  disconnected/hand-built `CachedRowSet` source makes `populate()` throw `NullPointerException`
+  (`populateInit` → `getStatement().getMaxFieldSize()`); the JDK reference impl accepts it. This is
+  why a live H2 `ResultSet` is used. The test `oracleImpl_populateFromDisconnectedSource_throwsNpe`
+  pins this; see `BUG.md` → "Additional note".
 - If the divergence ever fails to reproduce from the H2 source (not expected — it is cursor logic),
   swap in a real Oracle source via Testcontainers `org.testcontainers:oracle-free`; H2 remains the
   primary, dependency-light path here.
