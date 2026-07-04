@@ -1,5 +1,7 @@
 # Bug report: `OracleCachedRowSet.getRow()` returns the row count after `afterLast()`
 
+**Reported at:** <https://github.com/oracle/ojdbc-extensions/issues/272>
+
 Copy-paste-ready report (e.g. for <https://github.com/oracle/ojdbc-extensions>, Stack Overflow tag
 `ojdbc`, or My Oracle Support). The runnable reproducer lives in this folder; see `README.md` to
 build and run it.

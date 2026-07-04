@@ -133,6 +133,8 @@ returning `0` — telling you exactly where the behavior changed.
 
 ## Where to report
 
+**Reported:** <https://github.com/oracle/ojdbc-extensions/issues/272>
+
 - Public Oracle JDBC issues: <https://github.com/oracle/ojdbc-extensions>
 - Stack Overflow with the `ojdbc` tag (the Oracle JDBC team monitors it)
 - My Oracle Support (Service Request) — requires an Oracle support contract
