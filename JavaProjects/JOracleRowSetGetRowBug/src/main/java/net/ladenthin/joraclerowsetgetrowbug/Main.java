@@ -16,7 +16,7 @@
  *
  */
 // @formatter:on
-package net.ladenthin.oraclecachedrowset;
+package net.ladenthin.joraclerowsetgetrowbug;
 
 import java.sql.SQLException;
 

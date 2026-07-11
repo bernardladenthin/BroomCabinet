@@ -16,7 +16,7 @@
  *
  */
 // @formatter:on
-package net.ladenthin.oraclecachedrowset;
+package net.ladenthin.joraclerowsetgetrowbug;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -69,7 +69,7 @@ public final class DemoRowSets {
     public static final int ROW_COUNT = 2;
 
     /** Classpath location of the Maven-filtered build properties. */
-    private static final String BUILD_PROPERTIES = "/net/ladenthin/oraclecachedrowset/build.properties";
+    private static final String BUILD_PROPERTIES = "/net/ladenthin/joraclerowsetgetrowbug/build.properties";
 
     private DemoRowSets() {
         // utility class

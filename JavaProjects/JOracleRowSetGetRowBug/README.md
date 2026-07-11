@@ -72,7 +72,7 @@ the only variable is the `CachedRowSet` implementation.
 mvn clean package
 
 # Run the demonstration
-java -jar target/oraclecachedrowset-1.0.0-SNAPSHOT-jar-with-dependencies.jar
+java -jar target/joraclerowsetgetrowbug-1.0.0-SNAPSHOT-jar-with-dependencies.jar
 ```
 
 Convenience runner (no fat-jar rebuild), handy for the version walk below:
