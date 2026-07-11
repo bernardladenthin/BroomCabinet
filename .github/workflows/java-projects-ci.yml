@@ -1,0 +1,87 @@
+name: JavaProjects CI
+
+on:
+  push:
+    branches: [ master, main ]
+    paths:
+      - 'JavaProjects/**'
+      - '.github/workflows/java-projects-ci.yml'
+  pull_request:
+    paths:
+      - 'JavaProjects/**'
+      - '.github/workflows/java-projects-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  # Discover every JavaProjects/<name>/ directory that has its own pom.xml.
+  # Each module is a fully independent Maven project (no parent reactor), so
+  # adding/renaming/removing one here needs no workflow edit - the matrix
+  # below is generated dynamically from what's actually on disk.
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      projects: ${{ steps.set-matrix.outputs.projects }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: set-matrix
+        run: |
+          projects=$(find JavaProjects -mindepth 2 -maxdepth 2 -name pom.xml \
+            | sed -E 's#^JavaProjects/([^/]+)/pom\.xml$#\1#' \
+            | sort \
+            | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "Discovered projects: $projects"
+          if [ "$projects" = "[]" ]; then
+            echo "::error::No JavaProjects/*/pom.xml found - discovery is broken or the tree is empty."
+            exit 1
+          fi
+          echo "projects=$projects" >> "$GITHUB_OUTPUT"
+
+  build-and-test:
+    name: build-and-test (${{ matrix.project }})
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJson(needs.discover.outputs.projects) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: JavaProjects/${{ matrix.project }}/pom.xml
+
+      - name: Build and test ${{ matrix.project }}
+        working-directory: JavaProjects/${{ matrix.project }}
+        run: mvn --batch-mode --no-transfer-progress clean verify
+
+      - name: Upload surefire reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports-${{ matrix.project }}
+          path: JavaProjects/${{ matrix.project }}/target/surefire-reports/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # Single required status check for branch protection - green only if every
+  # discovered project's build-and-test job succeeded (fail-fast: false above
+  # means a failing project doesn't cancel the others, so this job is what
+  # actually gates the branch).
+  all-green:
+    name: All JavaProjects builds passed
+    needs: build-and-test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check matrix result
+        run: |
+          if [ "${{ needs.build-and-test.result }}" != "success" ]; then
+            echo "::error::At least one JavaProjects module failed to build/test."
+            exit 1
+          fi
+          echo "All JavaProjects modules built and tested successfully."

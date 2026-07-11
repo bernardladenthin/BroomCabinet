@@ -1,0 +1,151 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>net.ladenthin</groupId>
+    <artifactId>joraclerowsetgetrowbug</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <prerequisites>
+        <maven>3.9.11</maven>
+    </prerequisites>
+    <packaging>jar</packaging>
+
+    <name>JOracleRowSetGetRowBug</name>
+    <description>Minimal reproducer: OracleCachedRowSet.getRow() returns the row count after afterLast() instead of 0.</description>
+    <url>https://github.com/bernardladenthin/BroomCabinet</url>
+    <inceptionYear>2026</inceptionYear>
+
+    <licenses>
+        <license>
+            <name>The Apache Software License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+            <comments>A business-friendly OSS license</comments>
+        </license>
+    </licenses>
+
+    <scm>
+        <connection>scm:git:https://github.com/bernardladenthin/BroomCabinet</connection>
+        <developerConnection>scm:git:https://github.com/bernardladenthin/BroomCabinet</developerConnection>
+        <url>https://github.com/bernardladenthin/BroomCabinet</url>
+    </scm>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!--
+            The Oracle JDBC driver version under test. This is the single knob for the
+            "version walk": override it on the command line to test another release, e.g.
+                mvn -Dojdbc.version=19.27.0.0 compile exec:java
+
+            IMPORTANT: the oracle.jdbc.rowset package (including OracleCachedRowSet) exists
+            only in the 19.x and 21.x ojdbc8 lines. Oracle REMOVED the entire package in the
+            23.x line (Oracle Database 23ai driver), so this project does not compile against
+            any 23.x version. The default below is the latest 21.x release that still ships the
+            class (21.x is an actively maintained LTS line). Use a 19.x/21.x version here; see
+            README.md for the boundary.
+        -->
+        <ojdbc.version>21.21.0.0</ojdbc.version>
+
+        <!--
+            H2 only provides a neutral in-memory source ResultSet for populate(); it has
+            nothing to do with the bug. 2.2.224 is the last Java-8-compatible line
+            (H2 2.3.x and newer require Java 11).
+        -->
+        <h2.version>2.2.224</h2.version>
+
+        <junit.version>4.13.2</junit.version>
+    </properties>
+
+    <dependencies>
+        <!-- Oracle JDBC driver: supplies oracle.jdbc.rowset.OracleCachedRowSet. -->
+        <dependency>
+            <groupId>com.oracle.database.jdbc</groupId>
+            <artifactId>ojdbc8</artifactId>
+            <version>${ojdbc.version}</version>
+        </dependency>
+
+        <!-- In-memory database used only to build a real java.sql.ResultSet to populate() from. -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <version>${h2.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <!-- Filter build.properties so the tested ojdbc.version is baked into the artifact. -->
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.14.1</version>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                    <encoding>UTF-8</encoding>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.5.0</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>net.ladenthin.joraclerowsetgetrowbug.Main</mainClass>
+                            <packageName>net.ladenthin.joraclerowsetgetrowbug</packageName>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.8.0</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>net.ladenthin.joraclerowsetgetrowbug.Main</mainClass>
+                        </manifest>
+                    </archive>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
+                </configuration>
+                <!-- Build the runnable fat jar as part of `mvn package`. -->
+                <executions>
+                    <execution>
+                        <id>make-assembly</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Convenience runner for the version walk: `mvn -Dojdbc.version=<v> compile exec:java`. -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <configuration>
+                    <mainClass>net.ladenthin.joraclerowsetgetrowbug.Main</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
