@@ -2,16 +2,16 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>net.ladenthin.dtdnsupdater</groupId>
-    <artifactId>dtdnsupdater</artifactId>
+    <groupId>net.ladenthin</groupId>
+    <artifactId>jdtdnsupdater</artifactId>
     <version>1.0.0</version>
     <prerequisites>
         <maven>3.9.11</maven>
     </prerequisites>
     <packaging>jar</packaging>
 
-    <name>dtdnsupdater</name>
-    <description>dtdnsupdater</description>
+    <name>JDtDnsUpdater</name>
+    <description>JDtDnsUpdater</description>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
@@ -38,8 +38,8 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>net.ladenthin.dtdnsupdater.Main</mainClass>
-                            <packageName>net.ladenthin.dtdnsupdater</packageName>
+                            <mainClass>net.ladenthin.jdtdnsupdater.Main</mainClass>
+                            <packageName>net.ladenthin.jdtdnsupdater</packageName>
                         </manifest>
                     </archive>
                 </configuration>
@@ -52,7 +52,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>net.ladenthin.dtdnsupdater.Main</mainClass>
+                            <mainClass>net.ladenthin.jdtdnsupdater.Main</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>

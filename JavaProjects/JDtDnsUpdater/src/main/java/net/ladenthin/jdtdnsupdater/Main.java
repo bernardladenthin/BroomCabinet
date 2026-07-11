@@ -1,4 +1,4 @@
-package net.ladenthin.dtdnsupdater;
+package net.ladenthin.jdtdnsupdater;
 
 import java.io.BufferedReader;
 import java.io.IOException;
