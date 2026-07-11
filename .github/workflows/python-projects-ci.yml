@@ -1,0 +1,88 @@
+name: PythonProjects CI
+
+on:
+  push:
+    branches: [ master, main ]
+    paths:
+      - 'PythonProjects/**'
+      - '.github/workflows/python-projects-ci.yml'
+  pull_request:
+    paths:
+      - 'PythonProjects/**'
+      - '.github/workflows/python-projects-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  # Discover every PythonProjects/<name>/ directory that has at least one
+  # *.py file. Mirrors JavaProjects CI's discover job: adding/renaming/
+  # removing a project needs no workflow edit.
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      projects: ${{ steps.set-matrix.outputs.projects }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: set-matrix
+        run: |
+          projects=$(find PythonProjects -mindepth 2 -maxdepth 2 -name '*.py' \
+            | sed -E 's#^PythonProjects/([^/]+)/.*\.py$#\1#' \
+            | sort -u \
+            | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "Discovered projects: $projects"
+          if [ "$projects" = "[]" ]; then
+            echo "::error::No PythonProjects/*/*.py found - discovery is broken or the tree is empty."
+            exit 1
+          fi
+          echo "projects=$projects" >> "$GITHUB_OUTPUT"
+
+  lint-and-smoke-test:
+    name: lint-and-smoke-test (${{ matrix.project }})
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJson(needs.discover.outputs.projects) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Lint
+        working-directory: PythonProjects/${{ matrix.project }}
+        run: ruff check .
+
+      # Every script here is a standalone CLI with no required runtime
+      # dependency for argument parsing itself (Pillow etc. are imported
+      # lazily, only when an action actually runs) - so `--help` alone
+      # fully exercises argparse construction (including all subparsers)
+      # without needing anything from requirements.txt installed.
+      - name: Smoke test (--help)
+        working-directory: PythonProjects/${{ matrix.project }}
+        run: |
+          for f in *.py; do
+            echo "=== $f --help ==="
+            python3 "$f" --help
+          done
+
+  # Single required status check for branch protection - green only if
+  # every discovered project's lint-and-smoke-test job succeeded.
+  all-green:
+    name: All PythonProjects checks passed
+    needs: lint-and-smoke-test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check matrix result
+        run: |
+          if [ "${{ needs.lint-and-smoke-test.result }}" != "success" ]; then
+            echo "::error::At least one PythonProjects module failed lint or smoke test."
+            exit 1
+          fi
+          echo "All PythonProjects modules passed."
