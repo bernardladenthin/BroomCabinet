@@ -8,6 +8,8 @@ Replaces two hardcoded assumptions from the original script:
     so no OS-specific process listing is needed at all.
   - It shelled out to a hardcoded `C:\\Program Files\\Java\\jdk-9.0.1\\bin\\jcmd.exe`.
     The jcmd executable is now resolved via --jcmd-path or PATH.
+
+Defaults to a dry-run preview; pass --execute to actually run GC.run.
 """
 
 import argparse
@@ -49,10 +51,9 @@ def parse_args(argv):
         "(e.g. 'javaw' to match only Windows GUI Java apps). Default: match every JVM.",
     )
     parser.add_argument(
-        "-n",
-        "--dry-run",
+        "--execute",
         action="store_true",
-        help="List matching JVMs without actually running GC.run.",
+        help="Actually run GC.run. Without this flag: list matching JVMs without acting (the default).",
     )
     return parser.parse_args(argv)
 
@@ -72,11 +73,11 @@ def main(argv=None):
         return 0
 
     for pid, description in jvms:
-        if args.dry_run:
-            print(f"[dry-run] would run GC.run on pid {pid} ({description})")
-        else:
+        if args.execute:
             print(f"Running GC.run on pid {pid} ({description})")
             run_gc(args.jcmd_path, pid)
+        else:
+            print(f"[dry-run] would run GC.run on pid {pid} ({description})")
 
     return 0
 

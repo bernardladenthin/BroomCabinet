@@ -9,6 +9,9 @@ never gets overdrawn, while always keeping --minimum-free-power headroom.
 Requirements: NVIDIA GPU with nvidia-smi on PATH, a Shelly device with an EM
 power meter reachable over the local network. No external Python packages -
 uses urllib from the standard library instead of the third-party `requests`.
+
+Defaults to computing and printing the new power limit only; pass --execute
+to actually apply it via nvidia-smi.
 """
 
 import argparse
@@ -72,7 +75,7 @@ def get_device_status_local(shelly_ip, timeout):
 
 
 def check_device_status(args):
-    """Check device status and apply a new GPU power limit if needed (or preview it under --dry-run)."""
+    """Check device status and apply a new GPU power limit if needed (preview only unless --execute)."""
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"\n[{current_time}] Checking power status...")
 
@@ -99,11 +102,16 @@ def check_device_status(args):
 
     if new_power_limit == current_power_limit:
         print("No change required.")
-    elif args.dry_run:
+    elif not args.execute:
         print(f"[dry-run] would apply new power limit: {new_power_limit} W")
     else:
         print(f"Applying new power limit: {new_power_limit} W")
-        subprocess.run(["nvidia-smi", "-i", args.device_id, "-pl", str(new_power_limit)])
+        try:
+            subprocess.run(["nvidia-smi", "-i", args.device_id, "-pl", str(new_power_limit)], check=True)
+        except FileNotFoundError:
+            print("ERROR: 'nvidia-smi' not found on PATH - is it installed?")
+        except subprocess.CalledProcessError as e:
+            print(f"ERROR: nvidia-smi exited with status {e.returncode}")
 
 
 def parse_args(argv):
@@ -117,7 +125,7 @@ def parse_args(argv):
     parser.add_argument("--sleep-time", type=float, default=2, help="Seconds between checks when looping (default: 2).")
     parser.add_argument("--http-timeout", type=float, default=5, help="Shelly HTTP request timeout, seconds (default: 5).")
     parser.add_argument("--once", action="store_true", help="Check (and maybe adjust) once, then exit, instead of looping forever.")
-    parser.add_argument("-n", "--dry-run", action="store_true", help="Compute the new power limit but don't actually apply it via nvidia-smi.")
+    parser.add_argument("--execute", action="store_true", help="Actually apply the new power limit via nvidia-smi. Without this flag: compute and print it only (the default).")
     return parser.parse_args(argv)
 
 

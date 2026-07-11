@@ -8,6 +8,9 @@ Two subcommands, mirroring the two scripts this replaces:
 
 https://video.stackexchange.com/questions/7903/how-to-losslessly-encode-a-jpg-image-sequence-to-a-video-in-ffmpeg
 https://trac.ffmpeg.org/wiki/Encode/H.264
+
+Both subcommands default to a dry-run preview; pass --execute to actually
+copy files / run ffmpeg.
 """
 
 import argparse
@@ -28,12 +31,12 @@ def cmd_sequence(args):
     for number, name in enumerate(names):
         dest_name = f"{args.prefix}{number:0{args.zfill}d}{args.ext}"
         dest_path = os.path.join(args.dest, dest_name)
-        if args.dry_run:
-            print(f"[dry-run] would copy {name} -> {dest_path}")
-        else:
+        if args.execute:
             shutil.copy2(name, dest_path)
+        else:
+            print(f"[dry-run] would copy {name} -> {dest_path}")
 
-    verb = "Would copy" if args.dry_run else "Copied"
+    verb = "Copied" if args.execute else "Would copy"
     print(f"{verb} {len(names)} file(s) into {args.dest}")
     return 0
 
@@ -49,10 +52,17 @@ def cmd_encode(args):
         "-preset", args.preset,
         args.output,
     ]
-    prefix = "[dry-run] would run: " if args.dry_run else "Running: "
+    prefix = "Running: " if args.execute else "[dry-run] would run: "
     print(prefix + " ".join(cmd))
-    if not args.dry_run:
-        subprocess.run(cmd, check=True)
+    if args.execute:
+        try:
+            subprocess.run(cmd, check=True)
+        except FileNotFoundError:
+            print(f"ERROR: '{args.ffmpeg}' not found on PATH - is ffmpeg installed?")
+            return 1
+        except subprocess.CalledProcessError as e:
+            print(f"ERROR: ffmpeg exited with status {e.returncode}")
+            return e.returncode
     return 0
 
 
@@ -66,7 +76,7 @@ def build_parser():
     p_seq.add_argument("--prefix", default="image-", help="Output filename prefix (default: image-).")
     p_seq.add_argument("--zfill", type=int, default=9, help="Zero-padded digit width (default: 9).")
     p_seq.add_argument("--ext", default=".jpg", help="Output extension (default: .jpg).")
-    p_seq.add_argument("-n", "--dry-run", action="store_true", help="Preview without copying.")
+    p_seq.add_argument("--execute", action="store_true", help="Actually copy. Without this flag: dry-run preview only.")
     p_seq.set_defaults(func=cmd_sequence)
 
     p_enc = sub.add_parser("encode", help="Encode a sequenced image directory into a video via ffmpeg.")
@@ -79,7 +89,7 @@ def build_parser():
     p_enc.add_argument("--codec", default="libx264", help="Video codec (default: libx264).")
     p_enc.add_argument("--preset", default="veryslow", help="Encoder preset (default: veryslow).")
     p_enc.add_argument("--output", default="output.mp4", help="Output video file (default: output.mp4).")
-    p_enc.add_argument("-n", "--dry-run", action="store_true", help="Print the ffmpeg command without running it.")
+    p_enc.add_argument("--execute", action="store_true", help="Actually run ffmpeg. Without this flag: print the command only.")
     p_enc.set_defaults(func=cmd_encode)
 
     return parser

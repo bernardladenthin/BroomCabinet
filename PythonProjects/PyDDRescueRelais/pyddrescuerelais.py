@@ -11,6 +11,10 @@ time, so interrupting it repeatedly is safe - it never loses prior progress.
 --source/--dest/--logfile have NO defaults on purpose: this drives ddrescue
 directly against raw block devices, and a wrong device here can irreversibly
 destroy data. You must specify them explicitly every time.
+
+Defaults to a dry-run preview and asks nothing else; pass --execute to
+actually touch the relay and run ddrescue (which then also asks for an
+interactive 'yes' confirmation, skippable with --yes).
 """
 
 import argparse
@@ -49,7 +53,7 @@ def build_ddrescue_cmd(args):
 def run_cycle(args, cycle_num):
     print(f"\n--- cycle {cycle_num} ---")
 
-    if args.dry_run:
+    if not args.execute:
         print(f"[dry-run] would run: {' '.join(build_ddrescue_cmd(args))}")
         print(f"[dry-run] would let it run {args.rescue_run_seconds}s, then send SIGINT")
         print(f"[dry-run] would wait {args.post_interrupt_seconds}s")
@@ -103,8 +107,8 @@ def parse_args(argv):
     parser.add_argument("--relay-off-seconds", type=float, default=1, help="How long to keep the relay off (default: 1).")
     parser.add_argument("--relay-on-seconds", type=float, default=3, help="Wait after turning the relay back on, before the next cycle (default: 3).")
     parser.add_argument("--passes", type=int, default=None, help="Stop after this many cycles (default: run forever, like the original).")
-    parser.add_argument("--yes", action="store_true", help="Skip the confirmation prompt.")
-    parser.add_argument("-n", "--dry-run", action="store_true", help="Print what each cycle would do without touching the relay or running ddrescue.")
+    parser.add_argument("--yes", action="store_true", help="Skip the confirmation prompt (only relevant together with --execute).")
+    parser.add_argument("--execute", action="store_true", help="Actually touch the relay and run ddrescue. Without this flag: dry-run preview only (the default), no prompt.")
     parser.add_argument("extra_ddrescue_args", nargs=argparse.REMAINDER, help="Extra args passed through to ddrescue verbatim (must come last).")
     return parser.parse_args(argv)
 
@@ -112,7 +116,7 @@ def parse_args(argv):
 def main(argv=None):
     args = parse_args(argv if argv is not None else sys.argv[1:])
 
-    if not args.dry_run and not confirm(args):
+    if args.execute and not confirm(args):
         print("Aborted.")
         return 1
 
