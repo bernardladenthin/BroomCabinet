@@ -1,1 +1,0 @@
-java -jar c:\jdtdnsupdater-1.0.0.jar
