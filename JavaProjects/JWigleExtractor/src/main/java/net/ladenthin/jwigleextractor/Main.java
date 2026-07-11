@@ -1,4 +1,4 @@
-package net.ladenthin.wigleextract;
+package net.ladenthin.jwigleextractor;
 
 import com.google.gson.Gson;
 

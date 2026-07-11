@@ -2,16 +2,16 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>net.ladenthin.wigleextract</groupId>
-    <artifactId>wigleextract</artifactId>
+    <groupId>net.ladenthin</groupId>
+    <artifactId>jwigleextractor</artifactId>
     <version>1.0.0</version>
     <prerequisites>
         <maven>3.9.11</maven>
     </prerequisites>
     <packaging>jar</packaging>
 
-    <name>wigleextract</name>
-    <description>wigleextract</description>
+    <name>JWigleExtractor</name>
+    <description>JWigleExtractor</description>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
@@ -38,8 +38,8 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>net.ladenthin.wigleextract.Main</mainClass>
-                            <packageName>net.ladenthin.wigleextract</packageName>
+                            <mainClass>net.ladenthin.jwigleextractor.Main</mainClass>
+                            <packageName>net.ladenthin.jwigleextractor</packageName>
                         </manifest>
                     </archive>
                 </configuration>
@@ -52,7 +52,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>net.ladenthin.wigleextract.Main</mainClass>
+                            <mainClass>net.ladenthin.jwigleextractor.Main</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>
