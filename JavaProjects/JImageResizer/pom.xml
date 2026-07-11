@@ -2,16 +2,16 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>net.ladenthin.imageresize</groupId>
-    <artifactId>imageresize</artifactId>
+    <groupId>net.ladenthin</groupId>
+    <artifactId>jimageresizer</artifactId>
     <version>1.0.0</version>
     <prerequisites>
         <maven>3.9.11</maven>
     </prerequisites>
     <packaging>jar</packaging>
 
-    <name>imageresize</name>
-    <description>imageresize</description>
+    <name>JImageResizer</name>
+    <description>JImageResizer</description>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
@@ -38,8 +38,8 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>net.ladenthin.imageresize.BigAndSmall</mainClass>
-                            <packageName>net.ladenthin.imageresize</packageName>
+                            <mainClass>net.ladenthin.jimageresizer.BigAndSmall</mainClass>
+                            <packageName>net.ladenthin.jimageresizer</packageName>
                         </manifest>
                     </archive>
                 </configuration>
@@ -52,7 +52,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>net.ladenthin.imageresize.BigAndSmall</mainClass>
+                            <mainClass>net.ladenthin.jimageresizer.BigAndSmall</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>

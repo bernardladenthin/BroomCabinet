@@ -1,4 +1,4 @@
-package net.ladenthin.imageresize;
+package net.ladenthin.jimageresizer;
 
 import java.awt.*;
 import java.io.File;

@@ -1,4 +1,4 @@
-package net.ladenthin.imageresize;
+package net.ladenthin.jimageresizer;
 
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
