@@ -14,7 +14,7 @@
     <description>JScreenStreamer</description>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <javafx.version>23</javafx.version>
+        <javafx.version>24.0.2</javafx.version>
         <javafx.platform>win</javafx.platform> <!-- or linux, mac -->
     </properties>
 
@@ -74,12 +74,12 @@
         <dependency>
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
-            <version>3.51.1.0</version>
+            <version>3.53.2.0</version>
         </dependency>
         <dependency>
             <groupId>at.yawk.lz4</groupId>
             <artifactId>lz4-java</artifactId>
-            <version>1.10.1</version>
+            <version>1.11.1</version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
