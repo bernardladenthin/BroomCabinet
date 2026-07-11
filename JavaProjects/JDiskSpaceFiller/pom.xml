@@ -2,16 +2,16 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>net.ladenthin.hddfiller</groupId>
-    <artifactId>hddfiller</artifactId>
+    <groupId>net.ladenthin</groupId>
+    <artifactId>jdiskspacefiller</artifactId>
     <version>1.0.0</version>
     <prerequisites>
         <maven>3.9.11</maven>
     </prerequisites>
     <packaging>jar</packaging>
 
-    <name>hddfiller</name>
-    <description>hddfiller</description>
+    <name>JDiskSpaceFiller</name>
+    <description>JDiskSpaceFiller</description>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
@@ -38,8 +38,8 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>net.ladenthin.hddfiller.Main</mainClass>
-                            <packageName>net.ladenthin.hddfiller</packageName>
+                            <mainClass>net.ladenthin.jdiskspacefiller.Main</mainClass>
+                            <packageName>net.ladenthin.jdiskspacefiller</packageName>
                         </manifest>
                     </archive>
                 </configuration>
@@ -52,7 +52,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>net.ladenthin.hddfiller.Main</mainClass>
+                            <mainClass>net.ladenthin.jdiskspacefiller.Main</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>

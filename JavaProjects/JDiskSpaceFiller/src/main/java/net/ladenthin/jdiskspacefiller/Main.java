@@ -1,4 +1,4 @@
-package net.ladenthin.hddfiller;
+package net.ladenthin.jdiskspacefiller;
 
 import java.io.*;
 import java.util.Arrays;
@@ -15,7 +15,7 @@ public class Main {
         long sizeOfFile = getSizeInKbOfString(argv[0]);
         int numberOfFile = Integer.parseInt(argv[1]);
 
-        File parent = new File("hddFiller");
+        File parent = new File("JDiskSpaceFiller");
         parent.mkdirs();
 
         for (int i = 0; i < numberOfFile; i++) {
