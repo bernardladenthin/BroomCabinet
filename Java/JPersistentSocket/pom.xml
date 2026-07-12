@@ -1,0 +1,67 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>net.ladenthin</groupId>
+    <artifactId>jpersistentsocket</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <prerequisites>
+        <maven>3.9.11</maven>
+    </prerequisites>
+    <packaging>jar</packaging>
+
+    <name>JPersistentSocket</name>
+    <description>Partial prototype of a persistent, auto-reconnecting TCP socket with framed message blocks (id + data + acknowledgements) buffered through a StreamBuffer. Reconnect loop, block framing and the outbound path are implemented; the heartbeat and inbound paths are still stubs.</description>
+    <url>https://github.com/bernardladenthin/BroomCabinet</url>
+    <inceptionYear>2014</inceptionYear>
+
+    <licenses>
+        <license>
+            <name>The Apache Software License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+            <comments>A business-friendly OSS license</comments>
+        </license>
+    </licenses>
+
+    <scm>
+        <connection>scm:git:https://github.com/bernardladenthin/BroomCabinet</connection>
+        <developerConnection>scm:git:https://github.com/bernardladenthin/BroomCabinet</developerConnection>
+        <url>https://github.com/bernardladenthin/BroomCabinet</url>
+    </scm>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>17</maven.compiler.release>
+        <junit.version>4.13.2</junit.version>
+        <streambuffer.version>1.2.0</streambuffer.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>net.ladenthin</groupId>
+            <artifactId>streambuffer</artifactId>
+            <version>${streambuffer.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.14.1</version>
+                <configuration>
+                    <release>17</release>
+                    <encoding>UTF-8</encoding>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
