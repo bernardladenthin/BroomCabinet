@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Cube-Box Duplex (CBD)
 
 Ein **experimenteller**, quanten-orientierter symmetrischer Vorwärts-Chiffre mit

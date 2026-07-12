@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2020 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # PyWebcamRecorder
 
 Periodically screenshots a single element on a webcam page and saves each frame

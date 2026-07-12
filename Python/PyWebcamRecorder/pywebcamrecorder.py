@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+
+# SPDX-FileCopyrightText: 2020 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Periodically screenshot a single element on a webcam page (time-lapse capture).
 
 Opens a page in Chrome via Selenium, locates one DOM element (e.g. the video

@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # JPersistentSocket
 
 A partial prototype (originally 2014) of a **persistent, auto-reconnecting TCP

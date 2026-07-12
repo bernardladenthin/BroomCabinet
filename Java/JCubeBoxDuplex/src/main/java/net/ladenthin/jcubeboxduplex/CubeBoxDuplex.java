@@ -1,10 +1,12 @@
+// SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+//
+// SPDX-License-Identifier: Apache-2.0
+
 /*
  * Cube-Box Duplex (CBD) — experimental symmetric forward-only cipher.
  *
  * EXPERIMENTAL / EDUCATIONAL. This construction has NOT undergone public
  * cryptanalysis. Do not use it to protect real data. See SPEC.md.
- *
- * Copyright 2026 Bernard Ladenthin — Apache License 2.0.
  */
 package net.ladenthin.jcubeboxduplex;
 

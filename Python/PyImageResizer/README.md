@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2020 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # PyImageResizer
 
 A small image-processing toolkit with three subcommands. Every subcommand

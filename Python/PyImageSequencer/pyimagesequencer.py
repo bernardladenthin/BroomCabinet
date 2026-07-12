@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+
+# SPDX-FileCopyrightText: 2020 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Turn a directory tree of images into a sequentially numbered copy, then
 optionally encode that sequence into a video with ffmpeg.
 

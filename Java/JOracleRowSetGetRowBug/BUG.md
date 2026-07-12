@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Bug report: `OracleCachedRowSet.getRow()` returns the row count after `afterLast()`
 
 **Reported at:** <https://github.com/oracle/ojdbc-extensions/issues/272>

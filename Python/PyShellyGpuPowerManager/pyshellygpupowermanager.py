@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+
+# SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Dynamically throttle a local NVIDIA GPU's power limit to keep a minimum
 power reserve on a circuit monitored by a Shelly smart-plug/EM device.
 

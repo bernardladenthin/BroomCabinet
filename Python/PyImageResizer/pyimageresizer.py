@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+
+# SPDX-FileCopyrightText: 2020 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Small image-processing toolkit: resize, normalize extensions, prune non-images.
 
 Three subcommands, consolidating the four scripts this replaces:

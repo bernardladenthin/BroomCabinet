@@ -1,6 +1,9 @@
+// SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+//
+// SPDX-License-Identifier: Apache-2.0
+
 /*
  * Cube-Box Duplex (CBD) — self-test / demo runner.
- * Copyright 2026 Bernard Ladenthin — Apache License 2.0.
  */
 package net.ladenthin.jcubeboxduplex;
 

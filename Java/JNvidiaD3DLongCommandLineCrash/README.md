@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2017 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # JNvidiaD3DLongCommandLineCrash
 
 A minimal Java reproducer and crash analysis for a **hard process termination
