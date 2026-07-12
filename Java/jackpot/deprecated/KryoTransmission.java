@@ -1,20 +1,9 @@
-/**
- * Copyright 2013 Fraunhofer FOKUS
- * 
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * 
- *    http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- * 
- */
-package de.fraunhofer.fokus.jackpot.transceiver;
+// SPDX-FileCopyrightText: 2013-2014 Fraunhofer FOKUS
+// SPDX-FileCopyrightText: 2013-2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+//
+// SPDX-License-Identifier: Apache-2.0
+
+package net.ladenthin.jackpot.transceiver;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -26,8 +15,8 @@ import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 
-import de.fraunhofer.fokus.jackpot.configuration.SettingsGZIP;
-import de.fraunhofer.fokus.jackpot.message.TMessage;
+import net.ladenthin.jackpot.configuration.SettingsGZIP;
+import net.ladenthin.jackpot.message.TMessage;
 
 /**
  * Kryo implementation of a transmission.

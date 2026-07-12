@@ -1,9 +1,15 @@
+<!--
+SPDX-FileCopyrightText: 2013-2014 Fraunhofer FOKUS
+SPDX-FileCopyrightText: 2013-2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>de.fraunhofer.fokus.jackpot</groupId>
+    <groupId>net.ladenthin</groupId>
     <artifactId>jackpot</artifactId>
-    <version>1.99.7</version>
+    <version>1.99.8-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>jackpot</name>
     <description>Transmit Java objects via a stream (e.g. a socket).</description>
@@ -131,10 +137,9 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.2</version>
+                <version>3.13.0</version>
                 <configuration>
-                    <source>1.7</source>
-                    <target>1.7</target>
+                    <release>8</release>
                     <encoding>UTF-8</encoding>
                 </configuration>
             </plugin>
@@ -145,7 +150,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <packageName>de.fraunhofer.fokus.jackpot</packageName>
+                            <packageName>net.ladenthin.jackpot</packageName>
                         </manifest>
                     </archive>
                 </configuration>
