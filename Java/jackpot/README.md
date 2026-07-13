@@ -269,6 +269,9 @@ Ports are validated to `[0, 65535]`.
   Java 8).
 * Windows named pipes and the `noInAvailable` error flag are legacy paths without automated
   test coverage.
+* The message id range does not wrap around: when `lastMessageId` is reached the transceiver
+  surfaces errors instead of reusing ids (historical versions wrapped; the default full
+  `long` range is practically inexhaustible, custom small ranges are not).
 * A FIFO open can block indefinitely if the peer never opens its end (POSIX semantics); the
   socket transports bound everything with timeouts.
 

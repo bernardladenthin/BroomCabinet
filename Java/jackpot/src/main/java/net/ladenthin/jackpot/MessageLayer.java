@@ -47,13 +47,6 @@ public class MessageLayer<T> implements ParallelMessageTransmitter<T>, Runnable,
 
     private final Thread thread;
 
-    // private final Deque<Long> receivedMesages = new ArrayDeque<>();
-
-    /**
-     * The {@link SequentialMessageSorter} instance.
-     */
-    // private final SequentialMessageSorter<T> interceptor;
-
     private final SerializeLayer<T> serializeLayer;
 
     /**
@@ -74,13 +67,6 @@ public class MessageLayer<T> implements ParallelMessageTransmitter<T>, Runnable,
         connectionLayer = new ConnectionLayer<>(cTransceiverSession, transceiver, errorLayer, this);
         serializeLayer  = new SerializeLayer<>(cTransceiverSession, this, errorLayer, this);
 
-        /*
-        interceptor = new SequentialMessageSorter<>(
-            messageToTransceiver,
-            cTransceiverSession.getTransceiverConfiguration().messageIdLong
-        );
-        */
-
         thread = new Thread(this,
             "jackpot-MessageLayer-" + cTransceiverSession.transceiverId);
         thread.start();
@@ -94,11 +80,6 @@ public class MessageLayer<T> implements ParallelMessageTransmitter<T>, Runnable,
     @ParentEnsureSynchronized //OK
     @ParentEnsureFairProcessingSequence //OK
     public void transmitMessage(final T message) {
-        /*
-        lastTSend.set(
-            tm.information.systemMillis = System.currentTimeMillis()
-        );
-        */
         /**
          * Redirect to the {@link net.ladenthin.jackpot.SerializeLayer}
          */
@@ -141,14 +122,6 @@ public class MessageLayer<T> implements ParallelMessageTransmitter<T>, Runnable,
     @Override
     @ConcurrentMethod
     public void receiveMessage(T tm) {
-        // TODO:
-        // lastTReceived.set(System.currentTimeMillis());
-        /*
-        synchronized (receivedMesages) {
-            receivedMesages.add(tm.information.messageIdLong);
-        }
-        interceptor.transmitMessage(tm);
-        */
         transceiver.receiveMessage(tm);
     }
 
