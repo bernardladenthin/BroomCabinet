@@ -126,10 +126,20 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
             boolean hasToConnect = false;
             try {
                 writeLock.lock();
-                ensureDataOutputStreamConnected();
-                bm.toDataOutput(dos);
-                dos.flush();
-                Transceiver.debugLog("ConnectionLayer.writeBoxedSendableByteMessage(final BinaryMessage bm): written to stream");
+                /**
+                 * The stream reference is checked INSIDE the lock (connect() swaps the
+                 * streams only while holding it) — but connect() itself must never be called
+                 * while holding this lock: a thread blocking on the assignLock while owning
+                 * a stream lock deadlocks against the connecting thread, which holds the
+                 * assignLock and acquires the stream locks.
+                 */
+                if (dos == null) {
+                    hasToConnect = true;
+                } else {
+                    bm.toDataOutput(dos);
+                    dos.flush();
+                    Transceiver.debugLog("ConnectionLayer.writeBoxedSendableByteMessage(final BinaryMessage bm): written to stream");
+                }
             } catch (IOException e) {
                 //unlock first, so the assignStream can assign a new stream.
                 Transceiver.debugLog("ConnectionLayer.writeBoxedSendableByteMessage(final BinaryMessage bm): EXCEPTION during write to stream");
@@ -165,10 +175,20 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
             boolean hasToConnect = false;
             try {
                 readLock.lock();
-                Transceiver.debugLog("ConnectionLayer.readBoxedByteMessage(): now BinaryMessage.readFromDataInput(dis);");
-                bm = BinaryMessage.fromDataInputJava8(dis);
-                Transceiver.debugLog("ConnectionLayer.readBoxedByteMessage(): FINISHED BinaryMessage.readFromDataInput(dis);");
-                break;
+                /**
+                 * The stream reference is checked INSIDE the lock (connect() swaps the
+                 * streams only while holding it) — see the matching comment in
+                 * {@link #writeBoxedSendableByteMessage} for why connect() must never be
+                 * called while a stream lock is held.
+                 */
+                if (dis == null) {
+                    hasToConnect = true;
+                } else {
+                    Transceiver.debugLog("ConnectionLayer.readBoxedByteMessage(): now BinaryMessage.readFromDataInput(dis);");
+                    bm = BinaryMessage.fromDataInputJava8(dis);
+                    Transceiver.debugLog("ConnectionLayer.readBoxedByteMessage(): FINISHED BinaryMessage.readFromDataInput(dis);");
+                    break;
+                }
             } catch (IOException e) {
                 Transceiver.debugLog("ConnectionLayer.readBoxedByteMessage(): EXCEPTION");
                 //unlock first, so the assignStream can assign a new stream.
@@ -312,6 +332,13 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
             }
         } else {
             try {
+                /**
+                 * Close the old streams BEFORE acquiring the stream locks: another thread
+                 * may sit in a blocking stream read/write while holding its lock — closing
+                 * unblocks it with an IOException so it releases the lock this thread is
+                 * about to take (the same mechanism the shutdown path uses).
+                 */
+                enforceDisconnect();
                 writeLock.lock();
                 readLock.lock();
                 //reassign streams
@@ -428,14 +455,6 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
         }
     }
 
-    private final void ensureDataOutputStreamConnected() throws NoConnectionPossible {
-        Transceiver.debugLog("BLDEBUG: ConnectionLayer.ensureDataOutputStreamConnected");
-        if (dos == null) {
-            Transceiver.debugLog("BLDEBUG: ConnectionLayer.ensureDataOutputStreamConnected: dos == null; connect");
-            connect();
-        }
-    }
-
     @Override
     public final void run() {
         try{
@@ -445,20 +464,23 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
                     return;
                 }
 
-                try {
-                    readLock.lock();
-                    //FIXME: bis sometimes null, verify this connect
-                    ensureDataInputStreamConnected();
-                    BinaryMessage bm = readBinaryMessage();
-                    /**
-                     * The message content can now be processed. The {@link ReadLayer}
-                     * enqueues the acknowledgement once the message is actually processed
-                     * (or discarded as a duplicate).
-                     */
-                    readLayer.receiveMessage(bm);
-                } finally {
-                    readLock.unlock();
-                }
+                /**
+                 * Deliberately NOT holding the readLock around this block: readBinaryMessage
+                 * locks it internally for the actual stream read and releases it before it
+                 * reconnects. Holding it here across the reconnect path deadlocked against a
+                 * concurrently reconnecting writer (this thread: owns readLock, blocks on
+                 * assignLock — writer: owns assignLock, blocks on readLock). Torn-down
+                 * streams are handled by the null checks inside the locked read/write
+                 * sections.
+                 */
+                ensureDataInputStreamConnected();
+                BinaryMessage bm = readBinaryMessage();
+                /**
+                 * The message content can now be processed. The {@link ReadLayer}
+                 * enqueues the acknowledgement once the message is actually processed
+                 * (or discarded as a duplicate).
+                 */
+                readLayer.receiveMessage(bm);
             }
         } catch (NoConnectionPossible e) {
             /**
