@@ -7,6 +7,7 @@ package net.ladenthin.jackpot;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -22,6 +23,7 @@ import net.ladenthin.jackpot.serializer.SerializeRunnable;
 import net.ladenthin.jackpot.serializer.SerializerFactory;
 import net.ladenthin.jackpot.util.BinaryMessage;
 import net.ladenthin.jackpot.util.ConcurrentMethod;
+import net.ladenthin.jackpot.util.NamedJackpotThreadFactory;
 import net.ladenthin.jackpot.util.ParentEnsureFairProcessingSequence;
 import net.ladenthin.jackpot.util.ParentEnsureSynchronized;
 import java.util.ConcurrentModificationException;
@@ -46,12 +48,29 @@ public class SerializeLayer<T> implements ParallelMessageTransmitter<T>, Shutdow
     /**
      * The {@link ExecutorService}.
      */
-    private final ExecutorService serializeExecutor = Executors.newCachedThreadPool();
+    private final ExecutorService serializeExecutor = Executors.newCachedThreadPool(
+        new NamedJackpotThreadFactory("jackpot-SerializeLayer-pool"));
 
     /**
-     * The {@link Future} serializations.
+     * A submitted serialization: the pre-allocated wire message id together with its
+     * {@link Future} result. The id is needed to repair the wire sequence when the
+     * serialization fails (see {@link SerializeLayer#run()}).
      */
-    private final Deque<Future<BinaryMessage>> serializeFutures = new ArrayDeque<>();
+    private static final class PendingSerialization {
+
+        private final long id;
+        private final Future<BinaryMessage> future;
+
+        private PendingSerialization(final long id, final Future<BinaryMessage> future) {
+            this.id = id;
+            this.future = future;
+        }
+    }
+
+    /**
+     * The {@link Future} serializations with their pre-allocated wire message ids.
+     */
+    private final Deque<PendingSerialization> serializeFutures = new ArrayDeque<>();
 
     /**
      * The boolean flag to shutdown the {@link #run()} method.
@@ -72,17 +91,35 @@ public class SerializeLayer<T> implements ParallelMessageTransmitter<T>, Shutdow
     private final MessageIdGenerator messageIdGenerator;
     private final Thread thread;
 
+    /**
+     * Sender-side backpressure: a message that fails BEFORE it reaches the wire (failed
+     * serialization, oversized payload) will never be acknowledged, so its send permit is
+     * released here.
+     */
+    private final FlowControl flowControl;
+
+    /**
+     * Completes/fails the {@link Transceiver#send} futures. A sent message's future is
+     * registered here under its pre-allocated wire id; a message that fails before the wire
+     * is failed here as well.
+     */
+    private final SendCompletionTracker sendCompletionTracker;
+
     public SerializeLayer(final CTransceiverSession cTransceiverSession,
         final MessageIdGenerator messageIdGenerator, final ErrorLayer errorLayer,
-        final MessageLayer<T> messageLayer
+        final MessageLayer<T> messageLayer, final FlowControl flowControl,
+        final SendCompletionTracker sendCompletionTracker
     ) {
         this.cTransceiverSession = cTransceiverSession;
         this.messageIdGenerator = messageIdGenerator;
         this.errorLayer = errorLayer;
         this.messageLayer = messageLayer;
+        this.flowControl = flowControl;
+        this.sendCompletionTracker = sendCompletionTracker;
 
         serializerFactory = new SerializerFactoryImpl<>(cTransceiverSession);
-        thread = new Thread(this);
+        thread = new Thread(this,
+            "jackpot-SerializeLayer-" + cTransceiverSession.transceiverId);
         thread.start();
     }
 
@@ -91,18 +128,41 @@ public class SerializeLayer<T> implements ParallelMessageTransmitter<T>, Shutdow
     @ParentEnsureSynchronized //OK
     @ParentEnsureFairProcessingSequence //OK
     public void transmitMessage(final T message) {
+        transmitMessage(message, null);
+    }
+
+    /**
+     * Transmit a message, optionally tracking its acknowledgement (the
+     * {@link Transceiver#send} path).
+     *
+     * @param message the message to send
+     * @param acknowledged completed when the peer acknowledges the message; {@code null}
+     * for the fire-and-forget {@link Transceiver#update} path
+     */
+    @ConcurrentMethod
+    @ParentEnsureSynchronized
+    @ParentEnsureFairProcessingSequence
+    public void transmitMessage(final T message, final CompletableFuture<Void> acknowledged) {
+        /**
+         * The wire message id is allocated here, before the serialization runs, to preserve
+         * the submission order on the wire.
+         */
+        final long messageId = messageIdGenerator.getNextId();
+
+        sendCompletionTracker.register(messageId, acknowledged);
+
         /**
          * Create a new {@link net.ladenthin.jackpot.serializer.SerializeRunnable} to serialize the message.
          */
         final SerializeRunnable<T> task =
-            new SerializeRunnable<>(serializerFactory, messageIdGenerator.getNextId(), message,
+            new SerializeRunnable<>(serializerFactory, messageId, message,
                 cTransceiverSession.transceiverConfiguration.settingsCompression);
 
         /**
          * Submit the task to the executor service and add the future to the queue.
          */
         synchronized (serializeFutures) {
-            serializeFutures.add(serializeExecutor.submit(task));
+            serializeFutures.add(new PendingSerialization(messageId, serializeExecutor.submit(task)));
         }
 
         /**
@@ -131,7 +191,7 @@ public class SerializeLayer<T> implements ParallelMessageTransmitter<T>, Shutdow
                 /**
                  * A task should be finished in future.
                  */
-                final Future<BinaryMessage> task;
+                final PendingSerialization task;
                 synchronized (serializeFutures) {
                     /**
                      * Get the first task from the queue. This task serialized always the first message (FIFO).
@@ -139,24 +199,74 @@ public class SerializeLayer<T> implements ParallelMessageTransmitter<T>, Shutdow
                     task = serializeFutures.pollFirst();
                 }
 
-                /**
-                 * Waits if necessary for the serialization to complete, and then pass its result to the
-                 * {@link messageLayer}. The call of the method {@link #MessageLayer.transmitMessage(BinaryMessage bm)}
-                 * will be sequential only.
-                 */
-                messageLayer.transmitMessage(task.get());
+                try {
+                    /**
+                     * Waits if necessary for the serialization to complete, and then pass its result to the
+                     * {@link messageLayer}. The call of the method {@link #MessageLayer.transmitMessage(BinaryMessage bm)}
+                     * will be sequential only.
+                     */
+                    final BinaryMessage boxed = task.future.get();
+
+                    /**
+                     * Sender-side payload bound: an oversized message would be rejected by
+                     * the receiver's frame guard, and the resend mechanism would then retry
+                     * it forever. Reject it here instead — like a failed serialization, the
+                     * already-allocated wire id is filled with a heartbeat so the sequence
+                     * stays consecutive, and the failure is surfaced.
+                     */
+                    final int maxPayloadLength =
+                        cTransceiverSession.transceiverConfiguration.maxPayloadLength;
+                    if (boxed.getPayloadLength() > maxPayloadLength) {
+                        messageLayer.transmitMessage(BinaryMessage.createHeartbeat(task.id));
+                        final IllegalArgumentException oversized = new IllegalArgumentException(
+                            "serialized message exceeds maxPayloadLength " + maxPayloadLength
+                                + ": " + boxed.getPayloadLength() + " bytes");
+                        errorLayer.notifyException(oversized);
+                        // the message will never be acknowledged — free its send permit
+                        // and fail its send future
+                        flowControl.release();
+                        sendCompletionTracker.fail(task.id, oversized);
+                        continue;
+                    }
+
+                    messageLayer.transmitMessage(boxed);
+                } catch (ExecutionException e) {
+                    /**
+                     * The wire message id was allocated before the serialization ran, so a
+                     * failed serialization leaves a hole in the strictly consecutive id
+                     * sequence. The receiver processes messages in id order and would wait
+                     * for the missing id forever — no later message would ever come through.
+                     * Fill the hole with a heartbeat carrying the failed id so the stream
+                     * stays consecutive, then surface the failure to the error observers.
+                     */
+                    messageLayer.transmitMessage(BinaryMessage.createHeartbeat(task.id));
+
+                    // the message will never be acknowledged — free its send permit
+                    // and fail its send future
+                    flowControl.release();
+                    sendCompletionTracker.fail(task.id, e.getCause() != null ? e.getCause() : e);
+
+                    Throwable cause = e.getCause();
+                    if (cause instanceof ConcurrentModificationException) {
+                        ConcurrentModificationException cmeWrap = new ConcurrentModificationException(
+                            "Message to serialize was modified while serialization was in process. " +
+                            "Make sure your Messages are either immutable or not changed after giving them to the tranceiver!",
+                            cause
+                        );
+                        errorLayer.notifyException(cmeWrap);
+                    } else {
+                        errorLayer.notifyException(e);
+                    }
+                }
             } catch (InterruptedException e) {
                 errorLayer.notifyException(e);
-            } catch (ExecutionException e) {
-                Throwable cause = e.getCause();
-                if (cause instanceof ConcurrentModificationException) {
-                    ConcurrentModificationException cmeWrap = new ConcurrentModificationException(
-                        "Message to serialize was modified while serialization was in process. " + 
-                        "Make sure your Messages are either immutable or not changed after giving them to the tranceiver!", 
-                        cause
-                    );
-                    errorLayer.notifyException(cmeWrap);
-                } else {
+            } catch (RuntimeException e) {
+                /**
+                 * An unexpected RuntimeException must never kill the loop thread — a dead
+                 * serialize loop silently stops all outbound traffic. Surface it and keep
+                 * the loop alive.
+                 */
+                if (!shutdown.get()) {
                     errorLayer.notifyException(e);
                 }
             }
@@ -169,6 +279,11 @@ public class SerializeLayer<T> implements ParallelMessageTransmitter<T>, Shutdow
     public void shutdownRunnable() {
         shutdown.set(true);
         doRun.release();
+        /**
+         * Stop the pool threads as well — idle cached threads would otherwise keep the JVM
+         * alive for their keep-alive time (non-daemon threads).
+         */
+        serializeExecutor.shutdown();
     }
 
 }

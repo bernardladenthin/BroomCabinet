@@ -26,12 +26,12 @@ public final class SettingsCompression implements Serializable {
     /**
      * List of {@link ConditionGZIP} to compress a byte array.
      */
-    public ImmutableList<ConditionGZIP> gzipConditions;
+    public final ImmutableList<ConditionGZIP> gzipConditions;
 
     /**
      * List of {@link ConditionLZ4} to compress a byte array.
      */
-    public ImmutableList<ConditionLZ4> lz4Conditions;
+    public final ImmutableList<ConditionLZ4> lz4Conditions;
 
     /**
      * Global flag to enable or disable the gzip compression.
@@ -87,6 +87,16 @@ public final class SettingsCompression implements Serializable {
         if (enableLZ4 == true && lz4Conditions == null) {
             throw new InvalidParameterException(
                 "illegal parameter combination: enableLZ4 and null pointer for lz4Conditions");
+        }
+
+        /**
+         * A buffer size below one would make the GZIP decompression loop in
+         * {@link net.ladenthin.jackpot.util.BinaryMessage#unbox} spin forever: reading into a
+         * zero-length buffer returns 0 and never -1.
+         */
+        if (gzipBufferSize < 1) {
+            throw new InvalidParameterException(
+                "illegal parameter: gzipBufferSize must be at least 1 but was " + gzipBufferSize);
         }
     }
 

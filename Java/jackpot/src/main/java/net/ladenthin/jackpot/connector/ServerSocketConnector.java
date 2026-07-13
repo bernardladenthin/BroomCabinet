@@ -8,6 +8,7 @@ package net.ladenthin.jackpot.connector;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 
@@ -44,12 +45,26 @@ public class ServerSocketConnector implements Connector {
             socket.close();
         }
         socket = null;
+        /**
+         * The listening socket must be closed as well: a shutdown would otherwise leave the
+         * port bound forever, and it unblocks a thread waiting in accept().
+         */
+        if (serverSocket != null) {
+            serverSocket.close();
+        }
+        serverSocket = null;
     }
 
     @Override
     public void connect() throws IOException {
         close();
-        serverSocket = new ServerSocket(configuration.port);
+        serverSocket = new ServerSocket();
+        /**
+         * Without reuseAddress a reconnect right after a close can fail with
+         * "Address already in use" while the previous socket lingers in TIME_WAIT.
+         */
+        serverSocket.setReuseAddress(true);
+        serverSocket.bind(new InetSocketAddress(configuration.port));
         serverSocket.setSoTimeout(configuration.soTimeout);
         socket = serverSocket.accept();
     }

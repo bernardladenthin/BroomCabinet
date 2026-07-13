@@ -22,14 +22,22 @@ public class DeserializerRunnable<T> implements Callable<T> {
 
     private final SettingsCompression settingsCompression;
 
+    /**
+     * Upper bound for the decompressed payload (see
+     * {@link net.ladenthin.jackpot.configuration.CTransceiver#maxPayloadLength}). Unit: [bytes].
+     */
+    private final int maxUncompressedLength;
+
     public DeserializerRunnable(
         final DeserializerFactory<T> deserializerFactory,
         final BinaryMessage bm,
-        final SettingsCompression settingsCompression
+        final SettingsCompression settingsCompression,
+        final int maxUncompressedLength
     ) {
         this.deserializerFactory = deserializerFactory;
         this.bm = bm;
         this.settingsCompression = settingsCompression;
+        this.maxUncompressedLength = maxUncompressedLength;
     }
 
     /**
@@ -38,7 +46,7 @@ public class DeserializerRunnable<T> implements Callable<T> {
      */
     @Override
     public T call() throws Exception {
-        byte[] bytes = bm.unbox(settingsCompression);
+        byte[] bytes = bm.unbox(settingsCompression, maxUncompressedLength);
         Deserializer<T> deserializer = deserializerFactory.getDeserializer(bytes);
         return deserializer.deserialize();
     }

@@ -53,6 +53,47 @@ public class CTransceiver implements Serializable {
     public CMessageIdLong messageIdLong;
 
     /**
+     * The default {@link #maxPayloadLength}. Unit: [bytes].
+     */
+    public static final int DEFAULT_MAX_PAYLOAD_LENGTH = 64 * 1024 * 1024;
+
+    /**
+     * Upper bound for a single message payload, enforced on BOTH sides: the sender rejects
+     * oversized serialized messages (surfaced as a
+     * {@link net.ladenthin.jackpot.message.TError}; the wire sequence stays intact), and the
+     * receiver rejects frames claiming more — a corrupt or malicious length would otherwise
+     * allocate gigabytes and kill the reader with an OutOfMemoryError. Both sides of a
+     * connection should configure the same value. Unit: [bytes].
+     */
+    public int maxPayloadLength = DEFAULT_MAX_PAYLOAD_LENGTH;
+
+    /**
+     * The default {@link #maxPendingMessages}.
+     */
+    public static final int DEFAULT_MAX_PENDING_MESSAGES = 10000;
+
+    /**
+     * The default {@link #sendTimeout}. Unit: [ms].
+     */
+    public static final long DEFAULT_SEND_TIMEOUT = 30000;
+
+    /**
+     * Sender-side backpressure: the maximum number of application messages accepted for
+     * sending but not yet acknowledged by the other side. When the bound is reached,
+     * {@link net.ladenthin.jackpot.Transceiver#update} blocks until capacity frees (a pending
+     * message is acknowledged) or {@link #sendTimeout} elapses. {@code 0} disables the bound
+     * (the historical unbounded behaviour). Shutdown commands are never subject to
+     * backpressure.
+     */
+    public int maxPendingMessages = DEFAULT_MAX_PENDING_MESSAGES;
+
+    /**
+     * How long a blocked send waits for capacity before it is rejected with an
+     * {@link IllegalStateException}; {@code <= 0} waits indefinitely. Unit: [ms].
+     */
+    public long sendTimeout = DEFAULT_SEND_TIMEOUT;
+
+    /**
      * Complete constructor, this contains all possible configuration options.
      * @param serialization
      * @param deserialization

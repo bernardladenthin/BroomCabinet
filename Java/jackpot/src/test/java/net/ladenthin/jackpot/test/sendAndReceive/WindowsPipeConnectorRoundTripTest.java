@@ -7,10 +7,10 @@ package net.ladenthin.jackpot.test.sendAndReceive;
 
 import com.google.gson.reflect.TypeToken;
 import net.ladenthin.jackpot.configuration.*;
-import org.junit.Ignore;
+import org.junit.jupiter.api.Disabled;
 
-@Ignore
-public class TestWindowsPipe extends TestConnector {
+@Disabled("Needs the Windows kernel32 named-pipe API; only runnable on a Windows host.")
+public class WindowsPipeConnectorRoundTripTest extends AbstractConnectorRoundTripTest {
 
     @Override
     final CTransceiverSession getServerTransceiver() {

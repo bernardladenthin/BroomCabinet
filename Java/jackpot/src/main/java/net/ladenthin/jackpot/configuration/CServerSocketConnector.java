@@ -31,19 +31,16 @@ public class CServerSocketConnector implements Serializable {
      * @param port The port number.
      */
     public CServerSocketConnector(final int port) {
-        if (port < 0 || port >= 65535) {
-            throw new IllegalArgumentException();
-        }
-        this.port = port;
-        this.soTimeout = 20000;
+        this(port, 20000);
     }
 
     /**
-     * 
+     *
      * @param port The port number.
      * @param soTimeout The SO_TIMEOUT with the specified timeout. Unit: [ms].
      */
     public CServerSocketConnector(final int port, final int soTimeout) {
+        PortValidation.validate(port);
         this.port = port;
         this.soTimeout = soTimeout;
     }

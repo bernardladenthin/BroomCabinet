@@ -14,10 +14,11 @@ import net.ladenthin.jackpot.messageprocessing.SequentialBinaryMessageTransmitte
 import net.ladenthin.jackpot.util.*;
 
 import java.io.*;
-import java.util.ArrayDeque;
-import java.util.Deque;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
 public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
@@ -36,24 +37,6 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
      * The {@link CTransceiverSession}.
      */
     private final CTransceiverSession transceiverSession;
-
-    /**
-     * A {@link Deque} of messages, which are written to the other side.
-     * The order of the ids is very important.
-     */
-    protected final Deque<Long> writtenMessages = new ArrayDeque<>();
-    
-    /**
-     * A {@link Deque} of messages, which are received acknowledged from the other side.
-     * The order of the ids is very important.
-     */
-    protected final Deque<Long> acknowledgedMesages = new ArrayDeque<>();
-    
-    /**
-     * A {@link Deque} of messages, which are received from the other side.
-     * The order of the ids is very important.
-     */
-    protected final Deque<Long> receivedMesages = new ArrayDeque<>();
 
     /**
      * The buffered stream for input.
@@ -111,7 +94,9 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
         final CTransceiverSession cTransceiverSession,
         final Transceiver transceiver,
         final ErrorLayer errorLayer,
-        final MessageIdGenerator messageIdGenerator
+        final MessageIdGenerator messageIdGenerator,
+        final FlowControl flowControl,
+        final SendCompletionTracker sendCompletionTracker
     ) {
         this.transceiverSession = cTransceiverSession;
         this.transceiver = transceiver;
@@ -122,10 +107,11 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
 
         connector = connectorFactory.getConnector();
 
-        writeLayer = new WriteLayer(errorLayer, this);
+        writeLayer = new WriteLayer(errorLayer, this, flowControl, sendCompletionTracker);
         readLayer = new ReadLayer<>(cTransceiverSession, this, errorLayer, transceiver);
 
-        this.thread = new Thread(this);
+        this.thread = new Thread(this,
+            "jackpot-ConnectionLayer-" + cTransceiverSession.transceiverId);
         thread.start();
 
     }
@@ -138,25 +124,23 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
      */
     public final void writeBoxedSendableByteMessage(final BinaryMessage bm) throws NoConnectionPossible {
         Transceiver.debugLog("ConnectionLayer.writeBoxedSendableByteMessage(final BinaryMessage bm)");
-        /**
-         * First of all clean successfull messages and resend lost messages.
-         * (Durch den Timer wird diese Funktion zu minimalen Zeitpunkten aufgerufen, idealer weise aber öfter).
-         */
-        cleanAndCheckMessages();
         for (;;) {
             boolean hasToConnect = false;
             try {
                 writeLock.lock();
-                /*
-                 * It must be ensured that the message can be inserted into
-                 * writtenMessages immediately after writing the message.
+                /**
+                 * The stream reference is checked INSIDE the lock (connect() swaps the
+                 * streams only while holding it) — but connect() itself must never be called
+                 * while holding this lock: a thread blocking on the assignLock while owning
+                 * a stream lock deadlocks against the connecting thread, which holds the
+                 * assignLock and acquires the stream locks.
                  */
-                synchronized (writtenMessages) {
-                    ensureDataOutputStreamConnected();
+                if (dos == null) {
+                    hasToConnect = true;
+                } else {
                     bm.toDataOutput(dos);
                     dos.flush();
                     Transceiver.debugLog("ConnectionLayer.writeBoxedSendableByteMessage(final BinaryMessage bm): written to stream");
-                    writtenMessages.add(bm.getId());
                 }
             } catch (IOException e) {
                 //unlock first, so the assignStream can assign a new stream.
@@ -167,6 +151,13 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
             }
 
             if (hasToConnect) {
+                /**
+                 * A failed write during shutdown is expected (the streams were closed on
+                 * purpose) — exit instead of trying to reconnect.
+                 */
+                if (shutdown.get()) {
+                    throw new NoConnectionPossible();
+                }
                 connect();
                 continue;
             }
@@ -186,10 +177,21 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
             boolean hasToConnect = false;
             try {
                 readLock.lock();
-                Transceiver.debugLog("ConnectionLayer.readBoxedByteMessage(): now BinaryMessage.readFromDataInput(dis);");
-                bm = BinaryMessage.fromDataInputJava8(dis);
-                Transceiver.debugLog("ConnectionLayer.readBoxedByteMessage(): FINISHED BinaryMessage.readFromDataInput(dis);");
-                break;
+                /**
+                 * The stream reference is checked INSIDE the lock (connect() swaps the
+                 * streams only while holding it) — see the matching comment in
+                 * {@link #writeBoxedSendableByteMessage} for why connect() must never be
+                 * called while a stream lock is held.
+                 */
+                if (dis == null) {
+                    hasToConnect = true;
+                } else {
+                    Transceiver.debugLog("ConnectionLayer.readBoxedByteMessage(): now BinaryMessage.readFromDataInput(dis);");
+                    bm = BinaryMessage.fromDataInputJava8(dis,
+                        transceiverSession.transceiverConfiguration.maxPayloadLength);
+                    Transceiver.debugLog("ConnectionLayer.readBoxedByteMessage(): FINISHED BinaryMessage.readFromDataInput(dis);");
+                    break;
+                }
             } catch (IOException e) {
                 Transceiver.debugLog("ConnectionLayer.readBoxedByteMessage(): EXCEPTION");
                 //unlock first, so the assignStream can assign a new stream.
@@ -199,6 +201,13 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
             }
 
             if (hasToConnect) {
+                /**
+                 * A failed read during shutdown is expected (the streams were closed on
+                 * purpose) — exit instead of trying to reconnect.
+                 */
+                if (shutdown.get()) {
+                    throw new NoConnectionPossible();
+                }
                 connect();
                 continue;
             }
@@ -260,7 +269,7 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
         final long startTime = System.currentTimeMillis();
         final long endTime = startTime + maximumConnectionTime;
 
-        while(System.currentTimeMillis() <= endTime) {
+        while(System.currentTimeMillis() <= endTime && !shutdown.get()) {
             try {
                 connector.connect();
 
@@ -284,6 +293,13 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
 
                 return;
             } catch (IOException e) {
+                /**
+                 * During shutdown a failing connect attempt is expected (the connector was
+                 * closed on purpose) — leave immediately instead of sleeping and retrying.
+                 */
+                if (shutdown.get()) {
+                    break;
+                }
                 try {
                     Thread.sleep(millis);
                 } catch (InterruptedException ie) {
@@ -319,6 +335,13 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
             }
         } else {
             try {
+                /**
+                 * Close the old streams BEFORE acquiring the stream locks: another thread
+                 * may sit in a blocking stream read/write while holding its lock — closing
+                 * unblocks it with an IOException so it releases the lock this thread is
+                 * about to take (the same mechanism the shutdown path uses).
+                 */
+                enforceDisconnect();
                 writeLock.lock();
                 readLock.lock();
                 //reassign streams
@@ -334,38 +357,121 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
         }
     }
     
-    public final void cleanAndCheckMessages() {
-        synchronized (writtenMessages) {
-            synchronized (acknowledgedMesages) {
-                while(
-                       !acknowledgedMesages.isEmpty()
-                    && !writtenMessages.isEmpty()
-                ) {
-                    final long ackId = acknowledgedMesages.getFirst();
-                    final long writtenId = writtenMessages.pollFirst();
-                    if(ackId == writtenId) {
-                        acknowledgedMesages.remove();
-                    } else {
-                        //out of order; instant resent the missing id
-                        writeLayer.resendId(writtenId);
-                    }
-                }
+    /**
+     * Ids of received messages that still have to be acknowledged to the other side. Filled by
+     * the {@link ReadLayer}, drained by the {@link WriteLayer} into acknowledgement messages.
+     */
+    private final List<Long> pendingAcknowledgements = new ArrayList<>();
+
+    /**
+     * Timestamp of the last {@link WriteLayer#heartbeatSignal()} nudge caused by a newly
+     * enqueued acknowledgement. Unit: [ms since epoch].
+     */
+    private final AtomicLong lastAcknowledgementNudge = new AtomicLong();
+
+    /**
+     * When the last message was successfully read from the other side; the liveness signal
+     * for the {@link Heartbeat#connectionTimeout} enforcement. Initialized to the
+     * construction time so a fresh connection gets the full timeout before it can expire.
+     * Unit: [ms since epoch].
+     */
+    private volatile long lastReadActivity = System.currentTimeMillis();
+
+    /**
+     * Whether the expired error was already surfaced for the current silence period, so it
+     * fires once per period instead of on every check tick.
+     */
+    private final AtomicBoolean expiredNotified = new AtomicBoolean(false);
+
+    /**
+     * Surfaces a {@link net.ladenthin.jackpot.message.TError} with the {@code expired} flag
+     * when nothing was received for longer than {@link Heartbeat#connectionTimeout} — the
+     * other side is transport-alive but dead (or the transport lost messages silently).
+     * Driven by the {@link WriteLayer} loop, which is ticked by the heartbeat timer.
+     */
+    public final void checkConnectionExpired() {
+        if (shutdown.get()) {
+            return;
+        }
+        final long silentMillis = System.currentTimeMillis() - lastReadActivity;
+        if (silentMillis > transceiverSession.transceiverConfiguration.heartbeat.connectionTimeout) {
+            if (expiredNotified.compareAndSet(false, true)) {
+                errorLayer.notifyExpired();
             }
         }
     }
-    
-    public final void addAcknowledgedMesages(List<Long> messages) {
-        synchronized (acknowledgedMesages) {
-            acknowledgedMesages.addAll(messages);
+
+    /**
+     * Enqueue the id of a received message for acknowledgement to the other side.
+     * Nudges the {@link WriteLayer} at most once per
+     * {@link net.ladenthin.jackpot.configuration.Heartbeat#heartbeatCheckInterval}, so the
+     * mutual acknowledgement-of-acknowledgement exchange stays rate-limited instead of
+     * ping-ponging at network speed.
+     *
+     * @param id the received message id
+     */
+    public final void enqueueAcknowledgement(final long id) {
+        synchronized (pendingAcknowledgements) {
+            pendingAcknowledgements.add(id);
         }
+        final long now = System.currentTimeMillis();
+        final long lastNudge = lastAcknowledgementNudge.get();
+        final long nudgeInterval = transceiverSession.transceiverConfiguration.heartbeat.heartbeatCheckInterval;
+        if (now - lastNudge >= nudgeInterval && lastAcknowledgementNudge.compareAndSet(lastNudge, now)) {
+            writeLayer.heartbeatSignal();
+        }
+    }
+
+    /**
+     * Drain all pending acknowledgements.
+     *
+     * @return the drained ids (possibly empty, never null)
+     */
+    public final List<Long> drainPendingAcknowledgements() {
+        synchronized (pendingAcknowledgements) {
+            if (pendingAcknowledgements.isEmpty()) {
+                return Collections.emptyList();
+            }
+            final List<Long> drained = new ArrayList<>(pendingAcknowledgements);
+            pendingAcknowledgements.clear();
+            return drained;
+        }
+    }
+
+    /**
+     * Apply acknowledgements received from the other side: every acknowledged message is
+     * released from the retained (resend) buffer.
+     *
+     * @param ids the acknowledged message ids
+     */
+    public final void applyAcknowledgements(final List<Long> ids) {
+        for (final long id : ids) {
+            writeLayer.deleteId(id);
+        }
+    }
+
+    /**
+     * The number of written messages not acknowledged by the other side yet.
+     *
+     * @return the count of retained (unacknowledged) messages
+     */
+    public final long getUnacknowledgedMessageCount() {
+        return writeLayer.getUnacknowledgedMessageCount();
     }
 
     @Override
     @ConcurrentMethod
     public final void shutdownRunnable() {
+        shutdown.set(true);
         writeLayer.shutdownRunnable();
         readLayer.shutdownRunnable();
-        shutdown.set(true);
+        /**
+         * Close the streams and the connector so the reader thread, which is typically
+         * blocked in a stream read, gets an IOException and can observe the shutdown flag.
+         * Without this the reader stays blocked forever on a non-daemon thread and the JVM
+         * cannot exit.
+         */
+        enforceDisconnect();
     }
 
     @Override
@@ -384,14 +490,6 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
         }
     }
 
-    private final void ensureDataOutputStreamConnected() throws NoConnectionPossible {
-        Transceiver.debugLog("BLDEBUG: ConnectionLayer.ensureDataOutputStreamConnected");
-        if (dos == null) {
-            Transceiver.debugLog("BLDEBUG: ConnectionLayer.ensureDataOutputStreamConnected: dos == null; connect");
-            connect();
-        }
-    }
-
     @Override
     public final void run() {
         try{
@@ -401,27 +499,48 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
                     return;
                 }
 
+                /**
+                 * Deliberately NOT holding the readLock around this block: readBinaryMessage
+                 * locks it internally for the actual stream read and releases it before it
+                 * reconnects. Holding it here across the reconnect path deadlocked against a
+                 * concurrently reconnecting writer (this thread: owns readLock, blocks on
+                 * assignLock — writer: owns assignLock, blocks on readLock). Torn-down
+                 * streams are handled by the null checks inside the locked read/write
+                 * sections.
+                 */
                 try {
-                    readLock.lock();
-                    //FIXME: bis sometimes null, verify this connect
                     ensureDataInputStreamConnected();
                     BinaryMessage bm = readBinaryMessage();
                     /**
-                     * After a message has been read, the ID must be added immediately.
+                     * Liveness: a successfully read message proves the other side is alive.
                      */
-                    synchronized (receivedMesages) {
-                        receivedMesages.add(bm.getId());
-                    }
+                    lastReadActivity = System.currentTimeMillis();
+                    expiredNotified.set(false);
                     /**
-                     * The message content can now be processed.
+                     * The message content can now be processed. The {@link ReadLayer}
+                     * enqueues the acknowledgement once the message is actually processed
+                     * (or discarded as a duplicate).
                      */
                     readLayer.receiveMessage(bm);
-                } finally {
-                    readLock.unlock();
+                } catch (RuntimeException e) {
+                    /**
+                     * An unexpected RuntimeException must never kill the reader thread — a
+                     * dead reader silently stops all inbound traffic. Surface it and keep
+                     * reading.
+                     */
+                    if (!shutdown.get()) {
+                        errorLayer.notifyException(e);
+                    }
                 }
             }
         } catch (NoConnectionPossible e) {
-            errorLayer.notifyNoConnectionPossible();
+            /**
+             * During shutdown the failed connection is expected (the streams were closed on
+             * purpose) and must not be reported as an error.
+             */
+            if (!shutdown.get()) {
+                errorLayer.notifyNoConnectionPossible();
+            }
         }
     }
 
