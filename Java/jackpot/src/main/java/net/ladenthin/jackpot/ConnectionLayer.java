@@ -95,7 +95,8 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
         final Transceiver transceiver,
         final ErrorLayer errorLayer,
         final MessageIdGenerator messageIdGenerator,
-        final FlowControl flowControl
+        final FlowControl flowControl,
+        final SendCompletionTracker sendCompletionTracker
     ) {
         this.transceiverSession = cTransceiverSession;
         this.transceiver = transceiver;
@@ -106,7 +107,7 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
 
         connector = connectorFactory.getConnector();
 
-        writeLayer = new WriteLayer(errorLayer, this, flowControl);
+        writeLayer = new WriteLayer(errorLayer, this, flowControl, sendCompletionTracker);
         readLayer = new ReadLayer<>(cTransceiverSession, this, errorLayer, transceiver);
 
         this.thread = new Thread(this,

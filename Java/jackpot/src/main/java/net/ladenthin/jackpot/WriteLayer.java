@@ -80,11 +80,18 @@ public final class WriteLayer implements Runnable, WriteManagement, ShutdownRunn
      */
     private final FlowControl flowControl;
 
+    /**
+     * Completes the {@link Transceiver#send} futures: the acknowledgement processed in
+     * {@link #deleteId(long)} is exactly the moment a tracked send is fulfilled.
+     */
+    private final SendCompletionTracker sendCompletionTracker;
+
     public WriteLayer(final ErrorLayer errorLayer, final ConnectionLayer<?> connectionLayer,
-        final FlowControl flowControl) {
+        final FlowControl flowControl, final SendCompletionTracker sendCompletionTracker) {
         this.errorLayer = errorLayer;
         this.connectionLayer = connectionLayer;
         this.flowControl = flowControl;
+        this.sendCompletionTracker = sendCompletionTracker;
         heartbeat = connectionLayer.getTransceiverSession().transceiverConfiguration.heartbeat;
         currentWritingLock = new CurrentWritingLock(errorLayer);
         this.timer = new Timer(
@@ -318,6 +325,11 @@ public final class WriteLayer implements Runnable, WriteManagement, ShutdownRunn
          */
         if (removed != null && removed.message.isStateMessage()) {
             flowControl.release();
+            /**
+             * Complete the message's {@link Transceiver#send} future (no-op for the
+             * fire-and-forget update path — only tracked ids are registered).
+             */
+            sendCompletionTracker.complete(id);
         }
     }
 

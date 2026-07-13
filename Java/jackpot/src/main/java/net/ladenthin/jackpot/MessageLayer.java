@@ -64,6 +64,13 @@ public class MessageLayer<T> implements ParallelMessageTransmitter<T>, Runnable,
      */
     private final FlowControl flowControl;
 
+    /**
+     * Completes the {@link Transceiver#send} futures: registered per sent message in the
+     * {@link SerializeLayer}, completed on acknowledgement in the {@link WriteLayer},
+     * failed on pre-wire failures and on shutdown.
+     */
+    private final SendCompletionTracker sendCompletionTracker = new SendCompletionTracker();
+
     public MessageLayer(final CTransceiverSession cTransceiverSession,
         final Transceiver<T> transceiver) {
         this.cTransceiverSession = cTransceiverSession;
@@ -76,8 +83,10 @@ public class MessageLayer<T> implements ParallelMessageTransmitter<T>, Runnable,
 
         // provide error logging facilities for lower layers
         ErrorLayer errorLayer = new ErrorLayer(transceiver);
-        connectionLayer = new ConnectionLayer<>(cTransceiverSession, transceiver, errorLayer, this, flowControl);
-        serializeLayer  = new SerializeLayer<>(cTransceiverSession, this, errorLayer, this, flowControl);
+        connectionLayer = new ConnectionLayer<>(cTransceiverSession, transceiver, errorLayer,
+            this, flowControl, sendCompletionTracker);
+        serializeLayer  = new SerializeLayer<>(cTransceiverSession, this, errorLayer, this,
+            flowControl, sendCompletionTracker);
 
         thread = new Thread(this,
             "jackpot-MessageLayer-" + cTransceiverSession.transceiverId);
@@ -122,6 +131,18 @@ public class MessageLayer<T> implements ParallelMessageTransmitter<T>, Runnable,
         flowControl.acquire();
     }
 
+    /**
+     * Transmit an application message whose acknowledgement completes the given future
+     * (the {@link Transceiver#send} path). <b>This method should only be called from the
+     * {@link Transceiver}.</b>
+     *
+     * @param message the message to send
+     * @param acknowledged completed when the peer acknowledges the message
+     */
+    void transmitMessage(final T message, final java.util.concurrent.CompletableFuture<Void> acknowledged) {
+        serializeLayer.transmitMessage(message, acknowledged);
+    }
+
     @Override
     @ConcurrentMethod
     public void handleCommand(final TCommand command) {
@@ -132,6 +153,11 @@ public class MessageLayer<T> implements ParallelMessageTransmitter<T>, Runnable,
              * blocked on a shut-down transceiver.
              */
             flowControl.shutdown();
+            /**
+             * Fail every pending {@link Transceiver#send} future — a pending
+             * acknowledgement can never arrive anymore.
+             */
+            sendCompletionTracker.shutdown();
             /**
              * The {@link SerializeLayer} is not owned by the {@link ConnectionLayer}, so it
              * must be shut down here as well — otherwise its loop thread waits on its

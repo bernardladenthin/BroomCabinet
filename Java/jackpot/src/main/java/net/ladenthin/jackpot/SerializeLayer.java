@@ -7,6 +7,7 @@ package net.ladenthin.jackpot;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -97,15 +98,24 @@ public class SerializeLayer<T> implements ParallelMessageTransmitter<T>, Shutdow
      */
     private final FlowControl flowControl;
 
+    /**
+     * Completes/fails the {@link Transceiver#send} futures. A sent message's future is
+     * registered here under its pre-allocated wire id; a message that fails before the wire
+     * is failed here as well.
+     */
+    private final SendCompletionTracker sendCompletionTracker;
+
     public SerializeLayer(final CTransceiverSession cTransceiverSession,
         final MessageIdGenerator messageIdGenerator, final ErrorLayer errorLayer,
-        final MessageLayer<T> messageLayer, final FlowControl flowControl
+        final MessageLayer<T> messageLayer, final FlowControl flowControl,
+        final SendCompletionTracker sendCompletionTracker
     ) {
         this.cTransceiverSession = cTransceiverSession;
         this.messageIdGenerator = messageIdGenerator;
         this.errorLayer = errorLayer;
         this.messageLayer = messageLayer;
         this.flowControl = flowControl;
+        this.sendCompletionTracker = sendCompletionTracker;
 
         serializerFactory = new SerializerFactoryImpl<>(cTransceiverSession);
         thread = new Thread(this,
@@ -118,11 +128,28 @@ public class SerializeLayer<T> implements ParallelMessageTransmitter<T>, Shutdow
     @ParentEnsureSynchronized //OK
     @ParentEnsureFairProcessingSequence //OK
     public void transmitMessage(final T message) {
+        transmitMessage(message, null);
+    }
+
+    /**
+     * Transmit a message, optionally tracking its acknowledgement (the
+     * {@link Transceiver#send} path).
+     *
+     * @param message the message to send
+     * @param acknowledged completed when the peer acknowledges the message; {@code null}
+     * for the fire-and-forget {@link Transceiver#update} path
+     */
+    @ConcurrentMethod
+    @ParentEnsureSynchronized
+    @ParentEnsureFairProcessingSequence
+    public void transmitMessage(final T message, final CompletableFuture<Void> acknowledged) {
         /**
          * The wire message id is allocated here, before the serialization runs, to preserve
          * the submission order on the wire.
          */
         final long messageId = messageIdGenerator.getNextId();
+
+        sendCompletionTracker.register(messageId, acknowledged);
 
         /**
          * Create a new {@link net.ladenthin.jackpot.serializer.SerializeRunnable} to serialize the message.
@@ -191,11 +218,14 @@ public class SerializeLayer<T> implements ParallelMessageTransmitter<T>, Shutdow
                         cTransceiverSession.transceiverConfiguration.maxPayloadLength;
                     if (boxed.getPayloadLength() > maxPayloadLength) {
                         messageLayer.transmitMessage(BinaryMessage.createHeartbeat(task.id));
-                        errorLayer.notifyException(new IllegalArgumentException(
+                        final IllegalArgumentException oversized = new IllegalArgumentException(
                             "serialized message exceeds maxPayloadLength " + maxPayloadLength
-                                + ": " + boxed.getPayloadLength() + " bytes"));
+                                + ": " + boxed.getPayloadLength() + " bytes");
+                        errorLayer.notifyException(oversized);
                         // the message will never be acknowledged — free its send permit
+                        // and fail its send future
                         flowControl.release();
+                        sendCompletionTracker.fail(task.id, oversized);
                         continue;
                     }
 
@@ -212,7 +242,9 @@ public class SerializeLayer<T> implements ParallelMessageTransmitter<T>, Shutdow
                     messageLayer.transmitMessage(BinaryMessage.createHeartbeat(task.id));
 
                     // the message will never be acknowledged — free its send permit
+                    // and fail its send future
                     flowControl.release();
+                    sendCompletionTracker.fail(task.id, e.getCause() != null ? e.getCause() : e);
 
                     Throwable cause = e.getCause();
                     if (cause instanceof ConcurrentModificationException) {

@@ -73,6 +73,33 @@ server.update(null, shutdown);
 Note the `Transceiver` constructor starts connecting immediately; construct the server side
 first (its connector listens), then the client.
 
+### Modern API (listener + futures)
+
+`java.util.Observable`/`Observer` are deprecated since Java 9. The `Transceiver` also offers
+a typed, Java-8-compatible API — both styles work side by side on the same instance:
+
+```java
+// --- receive: typed listener, message-only listeners are a lambda ---
+client.addListener(new TransceiverListener<ChatMessage>() {
+    @Override public void onMessage(ChatMessage m) { System.out.println(m.text); }
+    @Override public void onError(TError e)        { System.err.println(e); }  // optional (default: ignored)
+});
+
+// --- send: the future completes when the peer ACKNOWLEDGED the message ---
+CompletableFuture<Void> acknowledged = client.send(new ChatMessage("hello"));
+acknowledged.get(30, TimeUnit.SECONDS);   // or thenRun(...), whenComplete(...), ...
+
+// --- shutdown, no hand-built TCommand ---
+client.shutdown();
+server.shutdown();
+```
+
+`send` completes the future exceptionally when the message can never be acknowledged
+(failed serialization, oversized payload, shutdown while pending). It is subject to the same
+backpressure as `update` (may block; `IllegalStateException` after `sendTimeout`). A
+`RuntimeException` thrown by a listener is swallowed: it neither kills the delivering
+library thread nor starves the other listeners.
+
 ---
 
 ## Feature overview
@@ -90,7 +117,8 @@ first (its connector listens), then the client.
 | Transports | TCP sockets (client/server), POSIX named pipes (FIFOs, Linux/Unix), Windows named pipes (kernel32 via JNA) |
 | Error reporting | All failures surface as `TError` notifications to the observers (serialization failures, reconnect exhaustion, expiration) |
 | Observability | `Transceiver.getUnacknowledgedMessageCount()` — near zero on a healthy connection; all library threads are named `jackpot-…` |
-| Shutdown | A `TCommand` with `shutdown = true` terminates every library thread and closes the connector |
+| Modern API | `addListener(TransceiverListener)` for typed callbacks and `send(T)` returning a `CompletableFuture<Void>` completed on acknowledgement — alongside the legacy `Observable`/`Observer` facade |
+| Shutdown | `Transceiver.shutdown()` (or a `TCommand` with `shutdown = true`) terminates every library thread, closes the connector and fails all pending `send` futures |
 
 ---
 
@@ -257,8 +285,12 @@ Ports are validated to `[0, 65535]`.
 * **Mutability:** do not mutate a message after handing it to the transceiver — serialization
   runs in parallel; a concurrent mutation surfaces as a `TError` (the wire stream itself
   stays intact).
-* **Threads:** delivery callbacks (`Observer.update`) run on library threads; keep them fast
-  and never block them on the transceiver itself.
+* **Threads:** delivery callbacks (`Observer.update`, `TransceiverListener`) run on library
+  threads; keep them fast and never block them on the transceiver itself.
+* **Send futures:** the `CompletableFuture` returned by `send` completes normally exactly
+  when the peer's acknowledgement arrives; exceptionally when the message failed before the
+  wire or the transceiver shut down with the message still pending. It never completes
+  merely because bytes were written.
 * **Memory:** the sender retains messages until acknowledged (`getUnacknowledgedMessageCount()`
   should hover near zero); the receiver buffers ahead-of-time arrivals until the gap closes.
 * **Backpressure:** `update()` with an application message may *block* once
@@ -276,8 +308,8 @@ Ports are validated to `[0, 65535]`.
   backpressure bound limits how far ahead it can run in practice. Individual message SIZE is
   bounded by `maxPayloadLength` on both sides.
 * No TLS/authentication — run over trusted networks or tunnel.
-* `java.util.Observable` is deprecated since Java 9 (the API still works; the library targets
-  Java 8).
+* `java.util.Observable` is deprecated since Java 9 (the facade still works; the library
+  targets Java 8) — new code should prefer `addListener`/`send` (see "Modern API").
 * Windows named pipes and the `noInAvailable` error flag are legacy paths without automated
   test coverage.
 * The message id range does not wrap around: when `lastMessageId` is reached the transceiver
@@ -298,7 +330,8 @@ mvn package      # JAR
 The JaCoCo coverage report lands in `target/site/jacoco/index.html`.
 
 The integration tests bind localhost TCP ports 12345, 23456, 24680, 24681, 25000, 25001,
-26000, 26001, 27000, 27001, 34567, 45678, 56789, 61234 and create FIFOs under `target/`. The Unix pipe
+26000, 26001, 27000, 27001, 28000, 28001, 34567, 45678, 56789, 61234 and create FIFOs under
+`target/`. The Unix pipe
 round trip runs on Linux only; the Windows pipe round trip is disabled (needs a Windows
 host). Highlights of the integration suite: 100-message ordered bursts (uni- and
 bidirectional), a connection kill-and-restore through a TCP proxy proving loss recovery,
@@ -312,5 +345,7 @@ Written 2013–2014 at Fraunhofer FOKUS (VSimRTI team) and continued by Bernard 
 half-built and inactive), several pipeline hangs were fixed (serialization-failure id holes,
 stale-duplicate wedges, a reconnect lock-ordering deadlock, shutdown thread leaks), the FIFO
 transport's open-order deadlock was fixed, dead-connection detection was implemented, and the
-test suite was rebuilt on JUnit Jupiter (140+ tests including live socket and FIFO round
-trips), and sender-side backpressure was added.
+test suite was rebuilt on JUnit Jupiter (150+ tests including live socket and FIFO round
+trips), sender-side backpressure was added, and a modern typed API
+(`TransceiverListener` + `send` returning a `CompletableFuture`) was added alongside the
+legacy `Observable` facade.

@@ -62,9 +62,12 @@ public class OrderedBurstRoundTripTest {
     private static final long CONNECT_SETTLE_MILLIS = 1000;
 
     /**
-     * Upper bound to wait for a full burst to arrive. Unit: [ms].
+     * Upper bound to wait for a full burst to arrive. Generous on purpose: on a loaded
+     * machine a message lost around a socket hiccup is only recovered by the resend sweep
+     * (default {@code Heartbeat.resendInterval} 10 s), so the budget must comfortably cover
+     * more than one resend cycle — otherwise the test flakes at 99/100. Unit: [ms].
      */
-    private static final long DELIVERY_TIMEOUT_MILLIS = 30000;
+    private static final long DELIVERY_TIMEOUT_MILLIS = 60000;
 
     /**
      * Poll interval. Unit: [ms].
@@ -214,7 +217,7 @@ public class OrderedBurstRoundTripTest {
 
     // <editor-fold defaultstate="collapsed" desc="burst ordering">
     @Test
-    @Timeout(90)
+    @Timeout(150)
     public void update_burstOfMessagesSent_allArriveInSubmissionOrder() throws InterruptedException {
         // arrange
         startServerAndClient();
@@ -230,7 +233,7 @@ public class OrderedBurstRoundTripTest {
     }
 
     @Test
-    @Timeout(90)
+    @Timeout(150)
     public void update_simultaneousBurstsInBothDirections_bothArriveCompleteAndInOrder() throws InterruptedException {
         // arrange
         startServerAndClient();
