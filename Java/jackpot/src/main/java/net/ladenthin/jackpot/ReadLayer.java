@@ -79,7 +79,8 @@ public final class ReadLayer<T> implements ShutdownRunnable, Runnable {
             transceiver
         );
 
-        this.thread = new Thread(this);
+        this.thread = new Thread(this,
+            "jackpot-ReadLayer-" + cTransceiverSession.transceiverId);
         thread.start();
     }
 

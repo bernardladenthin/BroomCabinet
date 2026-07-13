@@ -22,6 +22,7 @@ import net.ladenthin.jackpot.serializer.DeserializerFactory;
 import net.ladenthin.jackpot.serializer.SerializerFactory;
 import net.ladenthin.jackpot.util.BinaryMessage;
 import net.ladenthin.jackpot.util.ConcurrentMethod;
+import net.ladenthin.jackpot.util.NamedJackpotThreadFactory;
 
 public class DeserializeLayer<T> implements Runnable, ShutdownRunnable {
 
@@ -33,7 +34,8 @@ public class DeserializeLayer<T> implements Runnable, ShutdownRunnable {
     /**
      * The {@link ExecutorService}.
      */
-    private final ExecutorService deserializerExecutor = Executors.newCachedThreadPool();
+    private final ExecutorService deserializerExecutor = Executors.newCachedThreadPool(
+        new NamedJackpotThreadFactory("jackpot-DeserializeLayer-pool"));
 
     protected final Deque<Future<T>> deserializerFutures = new ArrayDeque<>();
 
@@ -67,7 +69,8 @@ public class DeserializeLayer<T> implements Runnable, ShutdownRunnable {
         this.errorLayer = errorLayer;
         this.receiver = receiver;
         this.deserializerFactory = new DeserializerFactoryImpl<>(cTransceiverSession);
-        this.thread = new Thread(this);
+        this.thread = new Thread(this,
+            "jackpot-DeserializeLayer-" + cTransceiverSession.transceiverId);
         thread.start();
     }
     
@@ -144,6 +147,11 @@ public class DeserializeLayer<T> implements Runnable, ShutdownRunnable {
     public void shutdownRunnable() {
         shutdown.set(true);
         doRun.release();
+        /**
+         * Stop the pool threads as well — idle cached threads would otherwise keep the JVM
+         * alive for their keep-alive time (non-daemon threads).
+         */
+        deserializerExecutor.shutdown();
     }
 
 }

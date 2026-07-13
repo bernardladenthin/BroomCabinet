@@ -46,7 +46,7 @@ public final class WriteLayer implements Runnable, WriteManagement, ShutdownRunn
         doRun.release();
     }
     
-    private final Timer timer = new Timer();
+    private final Timer timer;
     private final HeartbeatTask heartbeatTask = new HeartbeatTask(this);
 
     public WriteLayer(final ErrorLayer errorLayer, final ConnectionLayer<?> connectionLayer) {
@@ -54,7 +54,10 @@ public final class WriteLayer implements Runnable, WriteManagement, ShutdownRunn
         this.connectionLayer = connectionLayer;
         heartbeat = connectionLayer.getTransceiverSession().transceiverConfiguration.heartbeat;
         currentWritingLock = new CurrentWritingLock(errorLayer);
-        this.thread = new Thread(this);
+        this.timer = new Timer(
+            "jackpot-WriteLayer-Timer-" + connectionLayer.getTransceiverSession().transceiverId);
+        this.thread = new Thread(this,
+            "jackpot-WriteLayer-" + connectionLayer.getTransceiverSession().transceiverId);
         thread.start();
 
         //TODO: fix the times
@@ -143,7 +146,14 @@ public final class WriteLayer implements Runnable, WriteManagement, ShutdownRunn
                 }
 
             } catch (InterruptedException | NoConnectionPossible e) {
-                errorLayer.notifyException(e);
+                /**
+                 * During shutdown a failed write is expected (the streams were closed on
+                 * purpose) and must not be reported; the loop continues and terminates on
+                 * the shutdown permit.
+                 */
+                if (!shutdown.get()) {
+                    errorLayer.notifyException(e);
+                }
             }
         }
     }

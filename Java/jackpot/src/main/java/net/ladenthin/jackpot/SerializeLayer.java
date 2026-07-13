@@ -22,6 +22,7 @@ import net.ladenthin.jackpot.serializer.SerializeRunnable;
 import net.ladenthin.jackpot.serializer.SerializerFactory;
 import net.ladenthin.jackpot.util.BinaryMessage;
 import net.ladenthin.jackpot.util.ConcurrentMethod;
+import net.ladenthin.jackpot.util.NamedJackpotThreadFactory;
 import net.ladenthin.jackpot.util.ParentEnsureFairProcessingSequence;
 import net.ladenthin.jackpot.util.ParentEnsureSynchronized;
 import java.util.ConcurrentModificationException;
@@ -46,7 +47,8 @@ public class SerializeLayer<T> implements ParallelMessageTransmitter<T>, Shutdow
     /**
      * The {@link ExecutorService}.
      */
-    private final ExecutorService serializeExecutor = Executors.newCachedThreadPool();
+    private final ExecutorService serializeExecutor = Executors.newCachedThreadPool(
+        new NamedJackpotThreadFactory("jackpot-SerializeLayer-pool"));
 
     /**
      * A submitted serialization: the pre-allocated wire message id together with its
@@ -98,7 +100,8 @@ public class SerializeLayer<T> implements ParallelMessageTransmitter<T>, Shutdow
         this.messageLayer = messageLayer;
 
         serializerFactory = new SerializerFactoryImpl<>(cTransceiverSession);
-        thread = new Thread(this);
+        thread = new Thread(this,
+            "jackpot-SerializeLayer-" + cTransceiverSession.transceiverId);
         thread.start();
     }
 
@@ -203,6 +206,11 @@ public class SerializeLayer<T> implements ParallelMessageTransmitter<T>, Shutdow
     public void shutdownRunnable() {
         shutdown.set(true);
         doRun.release();
+        /**
+         * Stop the pool threads as well — idle cached threads would otherwise keep the JVM
+         * alive for their keep-alive time (non-daemon threads).
+         */
+        serializeExecutor.shutdown();
     }
 
 }

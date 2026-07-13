@@ -81,7 +81,8 @@ public class MessageLayer<T> implements ParallelMessageTransmitter<T>, Runnable,
         );
         */
 
-        thread = new Thread(this);
+        thread = new Thread(this,
+            "jackpot-MessageLayer-" + cTransceiverSession.transceiverId);
         thread.start();
     }
 
@@ -124,6 +125,12 @@ public class MessageLayer<T> implements ParallelMessageTransmitter<T>, Runnable,
     public void handleCommand(final TCommand command) {
         if (command.shutdown) {
             shutdown.set(true);
+            /**
+             * The {@link SerializeLayer} is not owned by the {@link ConnectionLayer}, so it
+             * must be shut down here as well — otherwise its loop thread waits on its
+             * semaphore forever.
+             */
+            serializeLayer.shutdownRunnable();
             connectionLayer.shutdownRunnable();
         }
     }

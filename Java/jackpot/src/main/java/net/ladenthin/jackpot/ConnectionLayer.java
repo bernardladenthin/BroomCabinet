@@ -125,7 +125,8 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
         writeLayer = new WriteLayer(errorLayer, this);
         readLayer = new ReadLayer<>(cTransceiverSession, this, errorLayer, transceiver);
 
-        this.thread = new Thread(this);
+        this.thread = new Thread(this,
+            "jackpot-ConnectionLayer-" + cTransceiverSession.transceiverId);
         thread.start();
 
     }
@@ -167,6 +168,13 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
             }
 
             if (hasToConnect) {
+                /**
+                 * A failed write during shutdown is expected (the streams were closed on
+                 * purpose) — exit instead of trying to reconnect.
+                 */
+                if (shutdown.get()) {
+                    throw new NoConnectionPossible();
+                }
                 connect();
                 continue;
             }
@@ -199,6 +207,13 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
             }
 
             if (hasToConnect) {
+                /**
+                 * A failed read during shutdown is expected (the streams were closed on
+                 * purpose) — exit instead of trying to reconnect.
+                 */
+                if (shutdown.get()) {
+                    throw new NoConnectionPossible();
+                }
                 connect();
                 continue;
             }
@@ -260,7 +275,7 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
         final long startTime = System.currentTimeMillis();
         final long endTime = startTime + maximumConnectionTime;
 
-        while(System.currentTimeMillis() <= endTime) {
+        while(System.currentTimeMillis() <= endTime && !shutdown.get()) {
             try {
                 connector.connect();
 
@@ -284,6 +299,13 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
 
                 return;
             } catch (IOException e) {
+                /**
+                 * During shutdown a failing connect attempt is expected (the connector was
+                 * closed on purpose) — leave immediately instead of sleeping and retrying.
+                 */
+                if (shutdown.get()) {
+                    break;
+                }
                 try {
                     Thread.sleep(millis);
                 } catch (InterruptedException ie) {
@@ -363,9 +385,16 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
     @Override
     @ConcurrentMethod
     public final void shutdownRunnable() {
+        shutdown.set(true);
         writeLayer.shutdownRunnable();
         readLayer.shutdownRunnable();
-        shutdown.set(true);
+        /**
+         * Close the streams and the connector so the reader thread, which is typically
+         * blocked in a stream read, gets an IOException and can observe the shutdown flag.
+         * Without this the reader stays blocked forever on a non-daemon thread and the JVM
+         * cannot exit.
+         */
+        enforceDisconnect();
     }
 
     @Override
@@ -421,7 +450,13 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
                 }
             }
         } catch (NoConnectionPossible e) {
-            errorLayer.notifyNoConnectionPossible();
+            /**
+             * During shutdown the failed connection is expected (the streams were closed on
+             * purpose) and must not be reported as an error.
+             */
+            if (!shutdown.get()) {
+                errorLayer.notifyNoConnectionPossible();
+            }
         }
     }
 
