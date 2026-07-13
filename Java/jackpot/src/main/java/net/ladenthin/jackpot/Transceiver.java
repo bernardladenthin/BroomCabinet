@@ -107,4 +107,15 @@ public class Transceiver<T> extends Observable implements Observer, SequentialMe
         notifyObservers(error);
     }
 
+    /**
+     * The number of transmitted messages the other side has not acknowledged yet. Every
+     * message is retained until its acknowledgement arrives (and resent if it does not), so
+     * a healthy connection keeps this value near zero.
+     *
+     * @return the count of retained (unacknowledged) messages
+     */
+    public long getUnacknowledgedMessageCount() {
+        return messageLayer.getUnacknowledgedMessageCount();
+    }
+
 }

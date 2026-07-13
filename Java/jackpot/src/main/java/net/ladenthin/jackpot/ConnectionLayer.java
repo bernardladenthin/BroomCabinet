@@ -14,10 +14,11 @@ import net.ladenthin.jackpot.messageprocessing.SequentialBinaryMessageTransmitte
 import net.ladenthin.jackpot.util.*;
 
 import java.io.*;
-import java.util.ArrayDeque;
-import java.util.Deque;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
 public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
@@ -36,24 +37,6 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
      * The {@link CTransceiverSession}.
      */
     private final CTransceiverSession transceiverSession;
-
-    /**
-     * A {@link Deque} of messages, which are written to the other side.
-     * The order of the ids is very important.
-     */
-    protected final Deque<Long> writtenMessages = new ArrayDeque<>();
-    
-    /**
-     * A {@link Deque} of messages, which are received acknowledged from the other side.
-     * The order of the ids is very important.
-     */
-    protected final Deque<Long> acknowledgedMesages = new ArrayDeque<>();
-    
-    /**
-     * A {@link Deque} of messages, which are received from the other side.
-     * The order of the ids is very important.
-     */
-    protected final Deque<Long> receivedMesages = new ArrayDeque<>();
 
     /**
      * The buffered stream for input.
@@ -139,26 +122,14 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
      */
     public final void writeBoxedSendableByteMessage(final BinaryMessage bm) throws NoConnectionPossible {
         Transceiver.debugLog("ConnectionLayer.writeBoxedSendableByteMessage(final BinaryMessage bm)");
-        /**
-         * First of all clean successfull messages and resend lost messages.
-         * (Durch den Timer wird diese Funktion zu minimalen Zeitpunkten aufgerufen, idealer weise aber öfter).
-         */
-        cleanAndCheckMessages();
         for (;;) {
             boolean hasToConnect = false;
             try {
                 writeLock.lock();
-                /*
-                 * It must be ensured that the message can be inserted into
-                 * writtenMessages immediately after writing the message.
-                 */
-                synchronized (writtenMessages) {
-                    ensureDataOutputStreamConnected();
-                    bm.toDataOutput(dos);
-                    dos.flush();
-                    Transceiver.debugLog("ConnectionLayer.writeBoxedSendableByteMessage(final BinaryMessage bm): written to stream");
-                    writtenMessages.add(bm.getId());
-                }
+                ensureDataOutputStreamConnected();
+                bm.toDataOutput(dos);
+                dos.flush();
+                Transceiver.debugLog("ConnectionLayer.writeBoxedSendableByteMessage(final BinaryMessage bm): written to stream");
             } catch (IOException e) {
                 //unlock first, so the assignStream can assign a new stream.
                 Transceiver.debugLog("ConnectionLayer.writeBoxedSendableByteMessage(final BinaryMessage bm): EXCEPTION during write to stream");
@@ -356,30 +327,74 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
         }
     }
     
-    public final void cleanAndCheckMessages() {
-        synchronized (writtenMessages) {
-            synchronized (acknowledgedMesages) {
-                while(
-                       !acknowledgedMesages.isEmpty()
-                    && !writtenMessages.isEmpty()
-                ) {
-                    final long ackId = acknowledgedMesages.getFirst();
-                    final long writtenId = writtenMessages.pollFirst();
-                    if(ackId == writtenId) {
-                        acknowledgedMesages.remove();
-                    } else {
-                        //out of order; instant resent the missing id
-                        writeLayer.resendId(writtenId);
-                    }
-                }
-            }
+    /**
+     * Ids of received messages that still have to be acknowledged to the other side. Filled by
+     * the {@link ReadLayer}, drained by the {@link WriteLayer} into acknowledgement messages.
+     */
+    private final List<Long> pendingAcknowledgements = new ArrayList<>();
+
+    /**
+     * Timestamp of the last {@link WriteLayer#heartbeatSignal()} nudge caused by a newly
+     * enqueued acknowledgement. Unit: [ms since epoch].
+     */
+    private final AtomicLong lastAcknowledgementNudge = new AtomicLong();
+
+    /**
+     * Enqueue the id of a received message for acknowledgement to the other side.
+     * Nudges the {@link WriteLayer} at most once per
+     * {@link net.ladenthin.jackpot.configuration.Heartbeat#heartbeatCheckInterval}, so the
+     * mutual acknowledgement-of-acknowledgement exchange stays rate-limited instead of
+     * ping-ponging at network speed.
+     *
+     * @param id the received message id
+     */
+    public final void enqueueAcknowledgement(final long id) {
+        synchronized (pendingAcknowledgements) {
+            pendingAcknowledgements.add(id);
+        }
+        final long now = System.currentTimeMillis();
+        final long lastNudge = lastAcknowledgementNudge.get();
+        final long nudgeInterval = transceiverSession.transceiverConfiguration.heartbeat.heartbeatCheckInterval;
+        if (now - lastNudge >= nudgeInterval && lastAcknowledgementNudge.compareAndSet(lastNudge, now)) {
+            writeLayer.heartbeatSignal();
         }
     }
-    
-    public final void addAcknowledgedMesages(List<Long> messages) {
-        synchronized (acknowledgedMesages) {
-            acknowledgedMesages.addAll(messages);
+
+    /**
+     * Drain all pending acknowledgements.
+     *
+     * @return the drained ids (possibly empty, never null)
+     */
+    public final List<Long> drainPendingAcknowledgements() {
+        synchronized (pendingAcknowledgements) {
+            if (pendingAcknowledgements.isEmpty()) {
+                return Collections.emptyList();
+            }
+            final List<Long> drained = new ArrayList<>(pendingAcknowledgements);
+            pendingAcknowledgements.clear();
+            return drained;
         }
+    }
+
+    /**
+     * Apply acknowledgements received from the other side: every acknowledged message is
+     * released from the retained (resend) buffer.
+     *
+     * @param ids the acknowledged message ids
+     */
+    public final void applyAcknowledgements(final List<Long> ids) {
+        for (final long id : ids) {
+            writeLayer.deleteId(id);
+        }
+    }
+
+    /**
+     * The number of written messages not acknowledged by the other side yet.
+     *
+     * @return the count of retained (unacknowledged) messages
+     */
+    public final long getUnacknowledgedMessageCount() {
+        return writeLayer.getUnacknowledgedMessageCount();
     }
 
     @Override
@@ -436,13 +451,9 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
                     ensureDataInputStreamConnected();
                     BinaryMessage bm = readBinaryMessage();
                     /**
-                     * After a message has been read, the ID must be added immediately.
-                     */
-                    synchronized (receivedMesages) {
-                        receivedMesages.add(bm.getId());
-                    }
-                    /**
-                     * The message content can now be processed.
+                     * The message content can now be processed. The {@link ReadLayer}
+                     * enqueues the acknowledgement once the message is actually processed
+                     * (or discarded as a duplicate).
                      */
                     readLayer.receiveMessage(bm);
                 } finally {

@@ -7,9 +7,18 @@ package net.ladenthin.jackpot.test.layer;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
 
 import com.google.gson.reflect.TypeToken;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
+import java.util.Arrays;
+import java.util.List;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +36,7 @@ import net.ladenthin.jackpot.configuration.CTransceiverSession;
 import net.ladenthin.jackpot.configuration.ConnectionType;
 import net.ladenthin.jackpot.message.TError;
 import net.ladenthin.jackpot.messageprocessing.ParallelErrorInformant;
+import net.ladenthin.jackpot.test.Common;
 import net.ladenthin.jackpot.test.sendAndReceive.SimpleMessage;
 import net.ladenthin.jackpot.util.BinaryMessage;
 
@@ -58,6 +68,8 @@ public class ReadLayerTest {
     private static final long POLL_INTERVAL_MILLIS = 10;
 
     private ReadLayer<SimpleMessage> readLayer;
+    private ConnectionLayer<SimpleMessage> connectionLayer;
+    private Transceiver<SimpleMessage> transceiver;
 
     /**
      * Records errors instead of throwing, so a background-thread failure surfaces as a test
@@ -85,10 +97,10 @@ public class ReadLayerTest {
             }
         });
 
-        @SuppressWarnings("unchecked")
-        final Transceiver<SimpleMessage> transceiver = mock(Transceiver.class);
+        transceiver = mock(Transceiver.class);
+        connectionLayer = mock(ConnectionLayer.class);
 
-        readLayer = new ReadLayer<>(session, mock(ConnectionLayer.class), errorLayer, transceiver);
+        readLayer = new ReadLayer<>(session, connectionLayer, errorLayer, transceiver);
     }
 
     @AfterEach
@@ -197,6 +209,94 @@ public class ReadLayerTest {
 
         // assert: all three regular messages must be processed
         assertThat(waitForHeartbeatCount(3), is(equalTo(3L)));
+    }
+    // </editor-fold>
+
+    /**
+     * Serializes the given message the same way the ObjectOutputStream serializer does, so a
+     * message-state {@link BinaryMessage} can be fed through the real deserialization path.
+     */
+    private byte[] serialize(SimpleMessage message) throws IOException {
+        try (ByteArrayOutputStream bos = new ByteArrayOutputStream();
+             ObjectOutputStream out = new ObjectOutputStream(bos)) {
+            out.writeObject(message);
+            out.flush();
+            return bos.toByteArray();
+        }
+    }
+
+    // <editor-fold defaultstate="collapsed" desc="acknowledgement behaviour">
+    @Test
+    @Timeout(30)
+    public void receiveMessage_heartbeatProcessed_acknowledgementEnqueued() throws InterruptedException {
+        // arrange
+        final BinaryMessage heartbeat = BinaryMessage.createHeartbeat(FIRST_EXPECTED_ID);
+
+        // act
+        readLayer.receiveMessage(heartbeat);
+
+        // assert: every processed message must be acknowledged to the other side, otherwise
+        // the sender retains (and eventually resends) it forever
+        verify(connectionLayer, timeout(WAIT_TIMEOUT_MILLIS)).enqueueAcknowledgement(FIRST_EXPECTED_ID);
+    }
+
+    @Test
+    @Timeout(30)
+    public void receiveMessage_payloadMessageProcessed_deliveredAndAcknowledgementEnqueued() throws Exception {
+        // arrange
+        final SimpleMessage payload = new SimpleMessage(Common.simpleByteArray);
+        final BinaryMessage bm = BinaryMessage.box(
+            FIRST_EXPECTED_ID, serialize(payload), Common.simpleSettingsCompression);
+
+        // act
+        readLayer.receiveMessage(bm);
+
+        // assert: the payload reaches the application and is acknowledged
+        verify(transceiver, timeout(WAIT_TIMEOUT_MILLIS)).receiveMessage(eq(payload));
+        verify(connectionLayer, timeout(WAIT_TIMEOUT_MILLIS)).enqueueAcknowledgement(FIRST_EXPECTED_ID);
+    }
+
+    @Test
+    @Timeout(30)
+    public void receiveMessage_acknowledgedMessageProcessed_acknowledgementsAppliedAndAcknowledged() throws InterruptedException {
+        // arrange
+        final List<Long> acknowledgedIds = Arrays.asList(5L, 6L);
+        final BinaryMessage acknowledgement =
+            BinaryMessage.createAcknowledged(FIRST_EXPECTED_ID, acknowledgedIds);
+
+        // act
+        readLayer.receiveMessage(acknowledgement);
+
+        // assert: the carried ids release retained messages, and the acknowledgement message
+        // itself is acknowledged (it occupies a sequence id like every other message)
+        verify(connectionLayer, timeout(WAIT_TIMEOUT_MILLIS)).applyAcknowledgements(eq(acknowledgedIds));
+        verify(connectionLayer, timeout(WAIT_TIMEOUT_MILLIS)).enqueueAcknowledgement(FIRST_EXPECTED_ID);
+    }
+
+    /**
+     * When a stale duplicate is discarded, its acknowledgement must be enqueued AGAIN: the
+     * duplicate means the sender resent because the first acknowledgement never arrived
+     * (e.g. lost during a reconnect) — without the re-acknowledgement the sender would retain
+     * and resend the message forever.
+     */
+    @Test
+    @Timeout(30)
+    public void receiveMessage_staleDuplicateDiscarded_acknowledgementEnqueuedAgain() throws InterruptedException {
+        // arrange
+        final BinaryMessage first = BinaryMessage.createHeartbeat(FIRST_EXPECTED_ID);
+        final BinaryMessage duplicateOfFirst = BinaryMessage.createHeartbeat(FIRST_EXPECTED_ID);
+
+        readLayer.receiveMessage(first);
+
+        // pre-assert
+        assertThat(waitForHeartbeatCount(1), is(equalTo(1L)));
+
+        // act: the stale duplicate arrives (sender resent because it lacks our acknowledgement)
+        readLayer.receiveMessage(duplicateOfFirst);
+
+        // assert: the id is acknowledged a second time
+        verify(connectionLayer, timeout(WAIT_TIMEOUT_MILLIS).times(2))
+            .enqueueAcknowledgement(FIRST_EXPECTED_ID);
     }
     // </editor-fold>
 }

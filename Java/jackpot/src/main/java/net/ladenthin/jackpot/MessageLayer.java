@@ -157,6 +157,15 @@ public class MessageLayer<T> implements ParallelMessageTransmitter<T>, Runnable,
         // TODO Auto-generated method stub
     }
 
+    /**
+     * The number of written messages not acknowledged by the other side yet.
+     *
+     * @return the count of retained (unacknowledged) messages
+     */
+    public long getUnacknowledgedMessageCount() {
+        return connectionLayer.getUnacknowledgedMessageCount();
+    }
+
     // TODO: This method should not be there
     @Override
     public long getNextId() {

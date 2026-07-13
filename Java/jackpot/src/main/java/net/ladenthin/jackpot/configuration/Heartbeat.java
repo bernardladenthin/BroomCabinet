@@ -53,4 +53,21 @@ public class Heartbeat implements Serializable {
      */
     public final long heartbeatCheckInterval = (long) (heartbeatInterval / 10);
 
+    /**
+     * Time after which a written but not yet acknowledged message is resent. Must be
+     * comfortably larger than a round trip plus the acknowledgement latency (acknowledgements
+     * are batched and sent at most every {@link #heartbeatCheckInterval}). Unit: [ms].
+     */
+    public final long resendInterval;
+
+    public Heartbeat() {
+        this.resendInterval = heartbeatInterval;
+    }
+
+    /**
+     * @param resendInterval see {@link #resendInterval}; every other setting keeps its default
+     */
+    public Heartbeat(final long resendInterval) {
+        this.resendInterval = resendInterval;
+    }
 }

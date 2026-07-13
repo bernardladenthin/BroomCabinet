@@ -127,6 +127,13 @@ public final class ReadLayer<T> implements ShutdownRunnable, Runnable {
                     synchronized (receivedMessages) {
                         receivedMessages.remove(bm);
                     }
+                    /**
+                     * Acknowledge the duplicate AGAIN: the other side resent it because our
+                     * first acknowledgement never arrived (e.g. lost during a reconnect) —
+                     * without the re-acknowledgement it would retain and resend the message
+                     * forever.
+                     */
+                    connectionLayer.enqueueAcknowledgement(bm.getId());
                     continue;
                 }
 
@@ -151,14 +158,19 @@ public final class ReadLayer<T> implements ShutdownRunnable, Runnable {
                     heartbeatReceivedLastTimestamp.set(System.currentTimeMillis());
                     heartbeatReceivedCount.incrementAndGet();
                 } else if (bm.isStateAcknowledged()) {
-                    connectionLayer.addAcknowledgedMesages(bm.getAcknowledged());
+                    connectionLayer.applyAcknowledgements(bm.getAcknowledged());
                 } else if (bm.isStateMessage()) {
                     deserializeLayer.dataAvailable(bm);
                 } else {
                     throw new IllegalStateException();
                 }
-                
-                connectionLayer.cleanAndCheckMessages();
+
+                /**
+                 * Acknowledge every processed message (payloads, heartbeats and
+                 * acknowledgement messages alike — each occupies a sequence id): the other
+                 * side retains and eventually resends everything unacknowledged.
+                 */
+                connectionLayer.enqueueAcknowledgement(bm.getId());
             } catch (InterruptedException e) {
                 errorLayer.notifyException(e);
             }
