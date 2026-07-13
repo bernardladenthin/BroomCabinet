@@ -31,6 +31,7 @@ import org.mockito.stubbing.Answer;
 
 import net.ladenthin.jackpot.ConnectionLayer;
 import net.ladenthin.jackpot.ErrorLayer;
+import net.ladenthin.jackpot.FlowControl;
 import net.ladenthin.jackpot.WriteLayer;
 import net.ladenthin.jackpot.configuration.CClientSocketConnector;
 import net.ladenthin.jackpot.configuration.CConnector;
@@ -134,7 +135,7 @@ public class WriteLayerTest {
             }
         });
 
-        writeLayer = new WriteLayer(errorLayer, connectionLayer);
+        writeLayer = new WriteLayer(errorLayer, connectionLayer, new FlowControl(0, 0));
     }
 
     @AfterEach

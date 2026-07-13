@@ -56,16 +56,28 @@ public class MessageLayer<T> implements ParallelMessageTransmitter<T>, Runnable,
 
     private final AtomicLong nextMessageId;
 
+    /**
+     * Sender-side backpressure shared by the whole outbound pipeline: acquired per
+     * application message in {@link #acquireSendPermit()}, released when the message is
+     * acknowledged ({@link WriteLayer}) or failed before reaching the wire
+     * ({@link SerializeLayer}).
+     */
+    private final FlowControl flowControl;
+
     public MessageLayer(final CTransceiverSession cTransceiverSession,
         final Transceiver<T> transceiver) {
         this.cTransceiverSession = cTransceiverSession;
         this.nextMessageId = new AtomicLong(cTransceiverSession.initialMessageId);
         this.transceiver = transceiver;
 
+        this.flowControl = new FlowControl(
+            cTransceiverSession.transceiverConfiguration.maxPendingMessages,
+            cTransceiverSession.transceiverConfiguration.sendTimeout);
+
         // provide error logging facilities for lower layers
         ErrorLayer errorLayer = new ErrorLayer(transceiver);
-        connectionLayer = new ConnectionLayer<>(cTransceiverSession, transceiver, errorLayer, this);
-        serializeLayer  = new SerializeLayer<>(cTransceiverSession, this, errorLayer, this);
+        connectionLayer = new ConnectionLayer<>(cTransceiverSession, transceiver, errorLayer, this, flowControl);
+        serializeLayer  = new SerializeLayer<>(cTransceiverSession, this, errorLayer, this, flowControl);
 
         thread = new Thread(this,
             "jackpot-MessageLayer-" + cTransceiverSession.transceiverId);
@@ -101,11 +113,25 @@ public class MessageLayer<T> implements ParallelMessageTransmitter<T>, Runnable,
         connectionLayer.transmitMessage(bm);
     }
 
+    /**
+     * Acquire send capacity for one application message (sender-side backpressure). Called by
+     * the {@link Transceiver} BEFORE its update lock, so a blocked sender never blocks
+     * commands (e.g. shutdown) or other observers.
+     */
+    void acquireSendPermit() {
+        flowControl.acquire();
+    }
+
     @Override
     @ConcurrentMethod
     public void handleCommand(final TCommand command) {
         if (command.shutdown) {
             shutdown.set(true);
+            /**
+             * Wake every sender blocked on backpressure — no application thread may stay
+             * blocked on a shut-down transceiver.
+             */
+            flowControl.shutdown();
             /**
              * The {@link SerializeLayer} is not owned by the {@link ConnectionLayer}, so it
              * must be shut down here as well — otherwise its loop thread waits on its

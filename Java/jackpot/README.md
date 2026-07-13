@@ -86,6 +86,7 @@ first (its connector listens), then the client.
 | Keepalive | Heartbeat messages when the connection is idle (`Heartbeat.heartbeatInterval`) |
 | Dead-connection detection | If nothing is received for `Heartbeat.connectionTimeout`, a `TError` with `expired = true` is surfaced (once per silence period) |
 | Reconnect | A failed read/write transparently reconnects (up to 30 s, 5 s between attempts) and resumes; messages written into the dead connection are resent |
+| Backpressure | At most `maxPendingMessages` unacknowledged application messages in flight; further `update()` calls block until capacity frees, and fail with `IllegalStateException` after `sendTimeout` (shutdown and commands are exempt) |
 | Transports | TCP sockets (client/server), POSIX named pipes (FIFOs, Linux/Unix), Windows named pipes (kernel32 via JNA) |
 | Error reporting | All failures surface as `TError` notifications to the observers (serialization failures, reconnect exhaustion, expiration) |
 | Observability | `Transceiver.getUnacknowledgedMessageCount()` — near zero on a healthy connection; all library threads are named `jackpot-…` |
@@ -203,6 +204,8 @@ The full constructor lets you set:
 | `heartbeat` | see below | `new Heartbeat()` |
 | `messageIdLong` | id range `begin`/`end`; both sides must configure the same `begin` | full `long` range |
 | `maxPayloadLength` | upper bound per message payload, enforced on both sides (sender rejects with a `TError`, receiver rejects oversized/corrupt frames and decompression bombs before allocating) | 64 MiB |
+| `maxPendingMessages` | sender-side backpressure: max unacknowledged application messages in flight; `update()` blocks when the bound is reached (`0` = unbounded) | 10000 |
+| `sendTimeout` | how long a backpressure-blocked `update()` waits before failing with `IllegalStateException` (`0` = wait forever) | 30000 ms |
 
 ### `Heartbeat`
 
@@ -258,14 +261,20 @@ Ports are validated to `[0, 65535]`.
   and never block them on the transceiver itself.
 * **Memory:** the sender retains messages until acknowledged (`getUnacknowledgedMessageCount()`
   should hover near zero); the receiver buffers ahead-of-time arrivals until the gap closes.
+* **Backpressure:** `update()` with an application message may *block* once
+  `maxPendingMessages` unacknowledged messages are in flight, and throws
+  `IllegalStateException` after `sendTimeout` if no capacity frees up (a dead or slow peer).
+  Commands (`TCommand`) are never subject to backpressure, and a shutdown wakes every
+  blocked sender without an exception.
 
 ## Known limitations
 
 * One connection per `Transceiver`; both directions of one logical link need matching
   configurations (same serialization, same `messageIdLong.begin`).
-* The receiver's ahead-of-time buffer and the sender's retain buffer are unbounded in message
-  COUNT; a very bursty peer can grow them (bounded in practice by the resend/ack cycle).
-  Individual message SIZE is bounded by `maxPayloadLength` on both sides.
+* The sender's retain buffer is bounded by `maxPendingMessages` (backpressure); the
+  receiver's ahead-of-time buffer is still unbounded in message COUNT, but the peer's
+  backpressure bound limits how far ahead it can run in practice. Individual message SIZE is
+  bounded by `maxPayloadLength` on both sides.
 * No TLS/authentication — run over trusted networks or tunnel.
 * `java.util.Observable` is deprecated since Java 9 (the API still works; the library targets
   Java 8).
@@ -289,12 +298,12 @@ mvn package      # JAR
 The JaCoCo coverage report lands in `target/site/jacoco/index.html`.
 
 The integration tests bind localhost TCP ports 12345, 23456, 24680, 24681, 25000, 25001,
-26000, 26001, 34567, 45678, 56789, 61234 and create FIFOs under `target/`. The Unix pipe
+26000, 26001, 27000, 27001, 34567, 45678, 56789, 61234 and create FIFOs under `target/`. The Unix pipe
 round trip runs on Linux only; the Windows pipe round trip is disabled (needs a Windows
 host). Highlights of the integration suite: 100-message ordered bursts (uni- and
 bidirectional), a connection kill-and-restore through a TCP proxy proving loss recovery,
-serialization-failure recovery, silent-peer expiration, shutdown thread termination, and
-GZIP/Gson end-to-end round trips.
+serialization-failure recovery, silent-peer expiration, shutdown thread termination,
+backpressure against a silent peer, and GZIP/Gson end-to-end round trips.
 
 ## History
 
@@ -303,5 +312,5 @@ Written 2013–2014 at Fraunhofer FOKUS (VSimRTI team) and continued by Bernard 
 half-built and inactive), several pipeline hangs were fixed (serialization-failure id holes,
 stale-duplicate wedges, a reconnect lock-ordering deadlock, shutdown thread leaks), the FIFO
 transport's open-order deadlock was fixed, dead-connection detection was implemented, and the
-test suite was rebuilt on JUnit Jupiter (120+ tests including live socket and FIFO round
-trips).
+test suite was rebuilt on JUnit Jupiter (140+ tests including live socket and FIFO round
+trips), and sender-side backpressure was added.

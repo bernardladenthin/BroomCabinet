@@ -79,21 +79,33 @@ public class Transceiver<T> extends Observable implements Observer, SequentialMe
         if (arg == null) {
             throw new IllegalArgumentException("the message to send must not be null");
         }
-        try {
-            updateLock.lock();
-            if (cTransceiverSession.messageClass.isAssignableFrom(arg.getClass())) {
+        if (cTransceiverSession.messageClass.isAssignableFrom(arg.getClass())) {
+            /**
+             * Sender-side backpressure, acquired BEFORE the update lock: a sender blocked on
+             * a full pipeline must never hold the lock, otherwise commands (e.g. shutdown)
+             * and other senders could not get through. Commands below are deliberately not
+             * subject to backpressure.
+             */
+            messageLayer.acquireSendPermit();
+            try {
+                updateLock.lock();
                 Transceiver.debugLog("cTransceiverSession.getMessageClass().isAssignableFrom(arg.getClass())");
                 /**
                  * Redirect to the {@link net.ladenthin.jackpot.MessageLayer}
                  */
                 messageLayer.transmitMessage((T) arg);
-            } else if (arg instanceof TCommand) {
-                messageLayer.handleCommand((TCommand) arg);
-            } else {
-                throw new IllegalArgumentException("unknown object: " + arg.getClass());
+            } finally {
+                updateLock.unlock();
             }
-        } finally {
-            updateLock.unlock();
+        } else if (arg instanceof TCommand) {
+            try {
+                updateLock.lock();
+                messageLayer.handleCommand((TCommand) arg);
+            } finally {
+                updateLock.unlock();
+            }
+        } else {
+            throw new IllegalArgumentException("unknown object: " + arg.getClass());
         }
     }
 

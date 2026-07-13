@@ -74,9 +74,17 @@ public final class WriteLayer implements Runnable, WriteManagement, ShutdownRunn
     private final Timer timer;
     private final HeartbeatTask heartbeatTask = new HeartbeatTask(this);
 
-    public WriteLayer(final ErrorLayer errorLayer, final ConnectionLayer<?> connectionLayer) {
+    /**
+     * Sender-side backpressure: the send permit of an application message is released here
+     * once its acknowledgement arrives (see {@link #deleteId(long)}).
+     */
+    private final FlowControl flowControl;
+
+    public WriteLayer(final ErrorLayer errorLayer, final ConnectionLayer<?> connectionLayer,
+        final FlowControl flowControl) {
         this.errorLayer = errorLayer;
         this.connectionLayer = connectionLayer;
+        this.flowControl = flowControl;
         heartbeat = connectionLayer.getTransceiverSession().transceiverConfiguration.heartbeat;
         currentWritingLock = new CurrentWritingLock(errorLayer);
         this.timer = new Timer(
@@ -293,13 +301,23 @@ public final class WriteLayer implements Runnable, WriteManagement, ShutdownRunn
     @Override
     public void deleteId(long id) {
         currentWritingLock.blockUntilCurrentWriting(id);
+        final UnacknowledgedMessage removed;
         synchronized (written) {
             /**
              * Tolerant remove: an acknowledgement may arrive more than once for the same id
              * (the receiver re-acknowledges discarded duplicates in case the first
              * acknowledgement was lost), so an absent id is a valid no-op.
              */
-            written.remove(id);
+            removed = written.remove(id);
+        }
+        /**
+         * Sender-side backpressure: the acknowledgement completes the life cycle of an
+         * application message, so its send permit is freed here. Heartbeats and
+         * acknowledgement messages never acquired a permit and must not release one; the
+         * tolerant no-op above (duplicate acknowledgement) must not release either.
+         */
+        if (removed != null && removed.message.isStateMessage()) {
+            flowControl.release();
         }
     }
 

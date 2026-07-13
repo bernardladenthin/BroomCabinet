@@ -90,14 +90,22 @@ public class SerializeLayer<T> implements ParallelMessageTransmitter<T>, Shutdow
     private final MessageIdGenerator messageIdGenerator;
     private final Thread thread;
 
+    /**
+     * Sender-side backpressure: a message that fails BEFORE it reaches the wire (failed
+     * serialization, oversized payload) will never be acknowledged, so its send permit is
+     * released here.
+     */
+    private final FlowControl flowControl;
+
     public SerializeLayer(final CTransceiverSession cTransceiverSession,
         final MessageIdGenerator messageIdGenerator, final ErrorLayer errorLayer,
-        final MessageLayer<T> messageLayer
+        final MessageLayer<T> messageLayer, final FlowControl flowControl
     ) {
         this.cTransceiverSession = cTransceiverSession;
         this.messageIdGenerator = messageIdGenerator;
         this.errorLayer = errorLayer;
         this.messageLayer = messageLayer;
+        this.flowControl = flowControl;
 
         serializerFactory = new SerializerFactoryImpl<>(cTransceiverSession);
         thread = new Thread(this,
@@ -186,6 +194,8 @@ public class SerializeLayer<T> implements ParallelMessageTransmitter<T>, Shutdow
                         errorLayer.notifyException(new IllegalArgumentException(
                             "serialized message exceeds maxPayloadLength " + maxPayloadLength
                                 + ": " + boxed.getPayloadLength() + " bytes"));
+                        // the message will never be acknowledged — free its send permit
+                        flowControl.release();
                         continue;
                     }
 
@@ -200,6 +210,9 @@ public class SerializeLayer<T> implements ParallelMessageTransmitter<T>, Shutdow
                      * stays consecutive, then surface the failure to the error observers.
                      */
                     messageLayer.transmitMessage(BinaryMessage.createHeartbeat(task.id));
+
+                    // the message will never be acknowledged — free its send permit
+                    flowControl.release();
 
                     Throwable cause = e.getCause();
                     if (cause instanceof ConcurrentModificationException) {
