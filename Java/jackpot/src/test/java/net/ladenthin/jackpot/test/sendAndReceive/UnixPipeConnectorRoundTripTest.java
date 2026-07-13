@@ -7,10 +7,10 @@ package net.ladenthin.jackpot.test.sendAndReceive;
 
 import com.google.gson.reflect.TypeToken;
 import net.ladenthin.jackpot.configuration.*;
-import org.junit.Ignore;
+import org.junit.jupiter.api.Disabled;
 
-@Ignore
-public class TestUnixPipe extends TestConnector {
+@Disabled("Needs mkfifo named pipes on the host; not runnable in a generic CI environment.")
+public class UnixPipeConnectorRoundTripTest extends AbstractConnectorRoundTripTest {
 
     @Override
     final CTransceiverSession getServerTransceiver() {

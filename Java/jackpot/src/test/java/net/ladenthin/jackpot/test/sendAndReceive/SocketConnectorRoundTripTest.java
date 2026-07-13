@@ -8,7 +8,7 @@ package net.ladenthin.jackpot.test.sendAndReceive;
 import com.google.gson.reflect.TypeToken;
 import net.ladenthin.jackpot.configuration.*;
 
-public class TestSocket extends TestConnector {
+public class SocketConnectorRoundTripTest extends AbstractConnectorRoundTripTest {
 
     private final static String host = "localhost";
     private final static int port = 12345;

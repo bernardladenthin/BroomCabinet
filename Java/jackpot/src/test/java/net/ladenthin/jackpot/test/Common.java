@@ -16,12 +16,12 @@ import net.ladenthin.jackpot.configuration.CompressCondition;
 import net.ladenthin.jackpot.configuration.ConditionGZIP;
 import net.ladenthin.jackpot.configuration.ConditionLZ4;
 import net.ladenthin.jackpot.configuration.SettingsCompression;
-import net.ladenthin.jackpot.test.binaryMessage.TestBinaryMessage;
+import net.ladenthin.jackpot.test.binaryMessage.BinaryMessageTest;
 import net.ladenthin.jackpot.test.sendAndReceive.SimpleMessage;
 
 public class Common {
 
-    public final static byte[] simpleByteArray = TestBinaryMessage.class.getCanonicalName().getBytes();
+    public final static byte[] simpleByteArray = BinaryMessageTest.class.getCanonicalName().getBytes();
     public final static SimpleMessage simpleMessage = new SimpleMessage(simpleByteArray);
     public final static String errorNotTheSame = "Message is not the same.";
     public final static String errorNotGZIPUsed = "GZIP is not used.";

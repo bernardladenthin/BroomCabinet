@@ -5,20 +5,32 @@
 
 package net.ladenthin.jackpot.test.sendAndReceive;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.sameInstance;
+
+import java.util.Observable;
+import java.util.Observer;
+import java.util.Stack;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
 import net.ladenthin.jackpot.Transceiver;
 import net.ladenthin.jackpot.configuration.CTransceiverSession;
 import net.ladenthin.jackpot.message.TCommand;
 import net.ladenthin.jackpot.message.TError;
-import org.junit.Test;
 
-import java.util.*;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-public abstract class TestConnector extends Observable implements Observer {
+/**
+ * Abstract round-trip test: a server and a client {@link Transceiver} are connected through
+ * the connector supplied by the concrete subclass, one message is fired at both sides, and
+ * both sides must receive a deserialized copy.
+ */
+public abstract class AbstractConnectorRoundTripTest extends Observable implements Observer {
 
     abstract CTransceiverSession getServerTransceiver();
     abstract CTransceiverSession getClientTransceiver();
@@ -26,7 +38,8 @@ public abstract class TestConnector extends Observable implements Observer {
     private volatile Transceiver<SimpleMessage> serverTransceiver;
     private volatile Transceiver<SimpleMessage> clientTransceiver;
     private final Semaphore createClientAndServer = new Semaphore(0);
-    private final static SimpleMessage testMessage = new SimpleMessage(TestSocket.class.getCanonicalName().getBytes());
+    private final static SimpleMessage testMessage =
+        new SimpleMessage(AbstractConnectorRoundTripTest.class.getCanonicalName().getBytes());
 
     private final Stack<SimpleMessage> receivedMessages = new Stack<>();
 
@@ -38,7 +51,21 @@ public abstract class TestConnector extends Observable implements Observer {
      * trip typically finishes in well under a second).
      */
     private static final long MESSAGE_WAIT_TIMEOUT_MILLIS = 5000;
+
+    /**
+     * Poll interval for {@link #awaitMessages(int)}. Unit: [ms].
+     */
     private static final long MESSAGE_POLL_INTERVAL_MILLIS = 50;
+
+    /**
+     * Time budget for the server to open its connector before the client connects. Unit: [ms].
+     */
+    private static final long SERVER_STARTUP_MILLIS = 3000;
+
+    /**
+     * Time budget for the client and server transceivers to finish connecting. Unit: [ms].
+     */
+    private static final long CONNECT_SETTLE_MILLIS = 1000;
 
     /**
      * Polls {@link #receivedMessages} instead of sleeping a fixed duration, so a healthy run
@@ -88,36 +115,26 @@ public abstract class TestConnector extends Observable implements Observer {
     }
 
     @Test
-    public void roundTrip() {
+    @Timeout(60)
+    public void roundTrip_messageFiredAtBothSides_bothSidesReceiveDistinctCopies() throws InterruptedException {
+        // arrange
         newServerTransceiver();
 
-        //give the server a few seconds to initialize the connectors
-        try {
-            Thread.sleep(3000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+        // give the server a few seconds to initialize the connectors
+        Thread.sleep(SERVER_STARTUP_MILLIS);
 
         newClientTransceiver();
 
-        try {
-            boolean successful = createClientAndServer.tryAcquire(2, 3, TimeUnit.SECONDS);
-            if (!successful) {
-                throw new RuntimeException("Timeout. Wait too long to start up threads.");
-            }
-            if (exception != null) {
-                throw new RuntimeException(exception);
-            }
-        } catch (InterruptedException e1) {
-            e1.printStackTrace();
+        final boolean successful = createClientAndServer.tryAcquire(2, 3, TimeUnit.SECONDS);
+        if (!successful) {
+            throw new RuntimeException("Timeout. Wait too long to start up threads.");
+        }
+        if (exception != null) {
+            throw new RuntimeException(exception);
         }
 
-        //give the server and client a few seconds to connect
-        try {
-            Thread.sleep(1000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+        // give the server and client a few seconds to connect
+        Thread.sleep(CONNECT_SETTLE_MILLIS);
 
         serverTransceiver.addObserver(this);
         clientTransceiver.addObserver(this);
@@ -129,21 +146,20 @@ public abstract class TestConnector extends Observable implements Observer {
         // otherwise the server/client worker threads and their sockets are leaked into
         // whichever test runs next in this fork (Surefire reuses the forked JVM by default).
         try {
+            // act
             fireMessage();
-            try {
-                awaitMessages(2);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+            awaitMessages(2);
 
             if (exception != null) {
                 throw new RuntimeException(exception);
             }
 
-            assertEquals("Did not receive exactly two messages (server echo + client echo).",
-                2, receivedMessages.size());
+            // assert
+            assertThat("Did not receive exactly two messages (server echo + client echo).",
+                receivedMessages, hasSize(2));
             for (SimpleMessage sm : receivedMessages) {
-                assertTrue("Test message is the same as the received", sm != testMessage);
+                assertThat("The received message must be a deserialized copy, not the sent instance",
+                    sm, is(not(sameInstance(testMessage))));
             }
         } finally {
             receivedMessages.clear();
@@ -156,11 +172,11 @@ public abstract class TestConnector extends Observable implements Observer {
 
     @Override
     public synchronized void update(Observable o, Object arg) {
-        if(arg instanceof SimpleMessage) {
-            SimpleMessage sm = (SimpleMessage)arg;
+        if (arg instanceof SimpleMessage) {
+            SimpleMessage sm = (SimpleMessage) arg;
             receivedMessages.add(sm);
-        } else if(arg instanceof TError) {
-            TError te = (TError)arg;
+        } else if (arg instanceof TError) {
+            TError te = (TError) arg;
             throw new RuntimeException(te.toString());
         }
     }

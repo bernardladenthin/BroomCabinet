@@ -108,31 +108,39 @@ public final class WriteLayer implements Runnable, WriteManagement, ShutdownRunn
                  */
                 currentWritingLock.setLock(message.getId());
 
-                Transceiver.debugLog("WriteLayer.run().now going to streamWriter");
-
                 /**
-                 * Write the message to the stream now. At this point only one critical error should occur, the
-                 * streamWriter is not be able to create a stable stream to write the message successfully.
-                 * If the message could not be written a NoConnectionPossible will be fired.
+                 * The {@link currentWritingLock} must be released even when the write throws
+                 * (e.g. {@link NoConnectionPossible}). A leaked lock would let a later
+                 * {@link #resendId(long)}/{@link #deleteId(long)} for the same id spin in
+                 * {@link CurrentWritingLock#blockUntilCurrentWriting(long)} forever.
                  */
-                connectionLayer.writeBoxedSendableByteMessage(message);
+                try {
+                    Transceiver.debugLog("WriteLayer.run().now going to streamWriter");
 
-                lastMessageSent = System.currentTimeMillis();
+                    /**
+                     * Write the message to the stream now. At this point only one critical error should occur, the
+                     * streamWriter is not be able to create a stable stream to write the message successfully.
+                     * If the message could not be written a NoConnectionPossible will be fired.
+                     */
+                    connectionLayer.writeBoxedSendableByteMessage(message);
 
-                /**
-                 * Add the probably written message to the written map.
-                 * The message was written to the buffer of the stream.
-                 * At this point the message was written successfully to
-                 * a stream, but we do not know if it were received.
-                 */
-                synchronized (written) {
-                    written.put(message.getId(), message);
+                    lastMessageSent = System.currentTimeMillis();
+
+                    /**
+                     * Add the probably written message to the written map.
+                     * The message was written to the buffer of the stream.
+                     * At this point the message was written successfully to
+                     * a stream, but we do not know if it were received.
+                     */
+                    synchronized (written) {
+                        written.put(message.getId(), message);
+                    }
+                } finally {
+                    /**
+                     * Release the {@link currentWritingLock}.
+                     */
+                    currentWritingLock.releaseLock();
                 }
-
-                /**
-                 * Release the {@link currentWritingLock}.
-                 */
-                currentWritingLock.releaseLock();
 
             } catch (InterruptedException | NoConnectionPossible e) {
                 errorLayer.notifyException(e);

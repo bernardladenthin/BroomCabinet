@@ -101,12 +101,34 @@ public final class ReadLayer<T> implements ShutdownRunnable, Runnable {
                 
                 final BinaryMessage bm;
                 synchronized (receivedMessages) {
+                    /**
+                     * A permit without a pending message (e.g. after a discarded duplicate)
+                     * must not crash the loop with a NoSuchElementException — a dead loop
+                     * thread would silently wedge the whole receive pipeline.
+                     */
+                    if (receivedMessages.isEmpty()) {
+                        continue;
+                    }
                     bm = receivedMessages.first();
                 }
-                
+
                 // security check
                 Objects.requireNonNull(bm);
-                
+
+                /**
+                 * A message older than the next expected id is an already-processed duplicate
+                 * (e.g. delivered again by a resend after a reconnect). It must be discarded:
+                 * as the lowest element of the sorted set it would otherwise be returned by
+                 * first() forever, no later message could ever match the expected id and the
+                 * receive pipeline would hang permanently.
+                 */
+                if (bm.getId() < nextMessageId.get()) {
+                    synchronized (receivedMessages) {
+                        receivedMessages.remove(bm);
+                    }
+                    continue;
+                }
+
                 // compare the first (lowest) element to the expected messageId
                 if (bm.getId() != nextMessageId.get()) {
                     // do not lose this permit, add the value to the counter
@@ -143,10 +165,18 @@ public final class ReadLayer<T> implements ShutdownRunnable, Runnable {
     }
     
     public final void receiveMessage(BinaryMessage bm) {
+        final boolean added;
         synchronized (receivedMessages) {
-            receivedMessages.add(bm);
+            added = receivedMessages.add(bm);
         }
-        doRun.release();
+        /**
+         * A duplicate id is not added to the sorted set (compareTo is id-based). Releasing a
+         * permit for it anyway would leave the loop with more permits than messages, so the
+         * permit is released only for an actually-added message.
+         */
+        if (added) {
+            doRun.release();
+        }
     }
 
     public final long getHeartbeatReceivedLastTimestamp() {

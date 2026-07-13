@@ -49,9 +49,25 @@ public class SerializeLayer<T> implements ParallelMessageTransmitter<T>, Shutdow
     private final ExecutorService serializeExecutor = Executors.newCachedThreadPool();
 
     /**
-     * The {@link Future} serializations.
+     * A submitted serialization: the pre-allocated wire message id together with its
+     * {@link Future} result. The id is needed to repair the wire sequence when the
+     * serialization fails (see {@link SerializeLayer#run()}).
      */
-    private final Deque<Future<BinaryMessage>> serializeFutures = new ArrayDeque<>();
+    private static final class PendingSerialization {
+
+        private final long id;
+        private final Future<BinaryMessage> future;
+
+        private PendingSerialization(final long id, final Future<BinaryMessage> future) {
+            this.id = id;
+            this.future = future;
+        }
+    }
+
+    /**
+     * The {@link Future} serializations with their pre-allocated wire message ids.
+     */
+    private final Deque<PendingSerialization> serializeFutures = new ArrayDeque<>();
 
     /**
      * The boolean flag to shutdown the {@link #run()} method.
@@ -92,17 +108,23 @@ public class SerializeLayer<T> implements ParallelMessageTransmitter<T>, Shutdow
     @ParentEnsureFairProcessingSequence //OK
     public void transmitMessage(final T message) {
         /**
+         * The wire message id is allocated here, before the serialization runs, to preserve
+         * the submission order on the wire.
+         */
+        final long messageId = messageIdGenerator.getNextId();
+
+        /**
          * Create a new {@link net.ladenthin.jackpot.serializer.SerializeRunnable} to serialize the message.
          */
         final SerializeRunnable<T> task =
-            new SerializeRunnable<>(serializerFactory, messageIdGenerator.getNextId(), message,
+            new SerializeRunnable<>(serializerFactory, messageId, message,
                 cTransceiverSession.transceiverConfiguration.settingsCompression);
 
         /**
          * Submit the task to the executor service and add the future to the queue.
          */
         synchronized (serializeFutures) {
-            serializeFutures.add(serializeExecutor.submit(task));
+            serializeFutures.add(new PendingSerialization(messageId, serializeExecutor.submit(task)));
         }
 
         /**
@@ -131,7 +153,7 @@ public class SerializeLayer<T> implements ParallelMessageTransmitter<T>, Shutdow
                 /**
                  * A task should be finished in future.
                  */
-                final Future<BinaryMessage> task;
+                final PendingSerialization task;
                 synchronized (serializeFutures) {
                     /**
                      * Get the first task from the queue. This task serialized always the first message (FIFO).
@@ -139,26 +161,38 @@ public class SerializeLayer<T> implements ParallelMessageTransmitter<T>, Shutdow
                     task = serializeFutures.pollFirst();
                 }
 
-                /**
-                 * Waits if necessary for the serialization to complete, and then pass its result to the
-                 * {@link messageLayer}. The call of the method {@link #MessageLayer.transmitMessage(BinaryMessage bm)}
-                 * will be sequential only.
-                 */
-                messageLayer.transmitMessage(task.get());
+                try {
+                    /**
+                     * Waits if necessary for the serialization to complete, and then pass its result to the
+                     * {@link messageLayer}. The call of the method {@link #MessageLayer.transmitMessage(BinaryMessage bm)}
+                     * will be sequential only.
+                     */
+                    messageLayer.transmitMessage(task.future.get());
+                } catch (ExecutionException e) {
+                    /**
+                     * The wire message id was allocated before the serialization ran, so a
+                     * failed serialization leaves a hole in the strictly consecutive id
+                     * sequence. The receiver processes messages in id order and would wait
+                     * for the missing id forever — no later message would ever come through.
+                     * Fill the hole with a heartbeat carrying the failed id so the stream
+                     * stays consecutive, then surface the failure to the error observers.
+                     */
+                    messageLayer.transmitMessage(BinaryMessage.createHeartbeat(task.id));
+
+                    Throwable cause = e.getCause();
+                    if (cause instanceof ConcurrentModificationException) {
+                        ConcurrentModificationException cmeWrap = new ConcurrentModificationException(
+                            "Message to serialize was modified while serialization was in process. " +
+                            "Make sure your Messages are either immutable or not changed after giving them to the tranceiver!",
+                            cause
+                        );
+                        errorLayer.notifyException(cmeWrap);
+                    } else {
+                        errorLayer.notifyException(e);
+                    }
+                }
             } catch (InterruptedException e) {
                 errorLayer.notifyException(e);
-            } catch (ExecutionException e) {
-                Throwable cause = e.getCause();
-                if (cause instanceof ConcurrentModificationException) {
-                    ConcurrentModificationException cmeWrap = new ConcurrentModificationException(
-                        "Message to serialize was modified while serialization was in process. " + 
-                        "Make sure your Messages are either immutable or not changed after giving them to the tranceiver!", 
-                        cause
-                    );
-                    errorLayer.notifyException(cmeWrap);
-                } else {
-                    errorLayer.notifyException(e);
-                }
             }
 
         }
