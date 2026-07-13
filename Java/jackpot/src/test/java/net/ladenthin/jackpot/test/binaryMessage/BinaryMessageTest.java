@@ -149,6 +149,46 @@ public class BinaryMessageTest {
     }
 
     @Test
+    public void fromDataInputJava8_gzipCompressedEmptyMessage_unboxesToEmptyArray() throws IOException {
+        // arrange: force compression even for a zero-length payload (the shared alwaysTrue
+        // fixture matches only length >= 1, so empty payloads skip compression there)
+        final BinaryMessage bm = BinaryMessage.box(
+            1L,
+            new byte[0],
+            Common.gzipEvenWhenEmptySettingsCompression
+        );
+
+        // pre-assert
+        assertThat(Common.errorNotGZIPUsed, bm.isGzipUsed(), is(true));
+
+        // act
+        final BinaryMessage recreated = recreate(bm);
+
+        // assert
+        assertArrayEquals(new byte[0], recreated.unbox(Common.gzipEvenWhenEmptySettingsCompression));
+    }
+
+    @Test
+    public void fromDataInputJava8_lz4CompressedEmptyMessage_unboxesToEmptyArray() throws IOException {
+        // arrange: force compression even for a zero-length payload (the shared alwaysTrue
+        // fixture matches only length >= 1, so empty payloads skip compression there)
+        final BinaryMessage bm = BinaryMessage.box(
+            1L,
+            new byte[0],
+            Common.lz4EvenWhenEmptySettingsCompression
+        );
+
+        // pre-assert
+        assertThat(Common.errorNotLZ4Used, bm.isLz4Used(), is(true));
+
+        // act
+        final BinaryMessage recreated = recreate(bm);
+
+        // assert
+        assertArrayEquals(new byte[0], recreated.unbox(Common.lz4EvenWhenEmptySettingsCompression));
+    }
+
+    @Test
     public void fromDataInputJava8_extremeIdsWritten_recreatedEqualsOriginal() throws IOException {
         // arrange
         final BinaryMessage minimum = BinaryMessage.createHeartbeat(Long.MIN_VALUE);

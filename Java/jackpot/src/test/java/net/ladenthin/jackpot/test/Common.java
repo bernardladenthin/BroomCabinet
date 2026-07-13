@@ -82,7 +82,8 @@ public class Common {
         false,
         true,
         2048,
-        null
+        // a decompressor is required to unbox received LZ4 messages
+        CLZ4Decompressor.safeFastDecompressor
     );
 
     /**
@@ -117,6 +118,46 @@ public class Common {
         true,
         2048,
         CLZ4Decompressor.unsafeFastDecompressor
+    );
+
+    /**
+     * Matches every length including zero, unconditionally — forces compression even for an
+     * empty payload.
+     */
+    public final static CompressCondition matchEvenEmptyCompressCondition = new CompressCondition(BooleanCondition.greaterEqual, 0, false);
+
+    /**
+     * GZIP enabled and applied to every payload, including empty ones.
+     */
+    public final static SettingsCompression gzipEvenWhenEmptySettingsCompression = new SettingsCompression(
+        Arrays.asList(
+            new ConditionGZIP(
+                Deflater.BEST_SPEED,
+                Common.matchEvenEmptyCompressCondition
+            )
+        ),
+        null,
+        true,
+        false,
+        2048,
+        null
+    );
+
+    /**
+     * LZ4 enabled and applied to every payload, including empty ones.
+     */
+    public final static SettingsCompression lz4EvenWhenEmptySettingsCompression = new SettingsCompression(
+        null,
+        Arrays.asList(
+            new ConditionLZ4(
+                CLZ4Compressor.unsafeFastCompressor,
+                Common.matchEvenEmptyCompressCondition
+            )
+        ),
+        false,
+        true,
+        2048,
+        CLZ4Decompressor.safeFastDecompressor
     );
 
     /**

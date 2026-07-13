@@ -32,26 +32,22 @@ public class CClientSocketConnector implements Serializable {
     public final int soTimeout;
 
     /**
-     * 
+     *
      * @param host The host.
      * @param port The port number.
      */
     public CClientSocketConnector(final String host, final int port) {
-        if (port < 0 || port >= 65535) {
-            throw new IllegalArgumentException();
-        }
-        this.host = host;
-        this.port = port;
-        this.soTimeout = 20000;
+        this(host, port, 20000);
     }
 
     /**
-     * 
+     *
      * @param host The host.
      * @param port The port number.
      * @param soTimeout The SO_TIMEOUT with the specified timeout. Unit: [ms].
      */
     public CClientSocketConnector(final String host, final int port, final int soTimeout) {
+        PortValidation.validate(port);
         this.host = host;
         this.port = port;
         this.soTimeout = soTimeout;

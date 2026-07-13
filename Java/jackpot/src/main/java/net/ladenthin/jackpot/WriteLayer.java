@@ -113,6 +113,13 @@ public final class WriteLayer implements Runnable, WriteManagement, ShutdownRunn
                     timer.cancel();
                     return;
                 }
+
+                /**
+                 * Dead-connection detection, driven by the heartbeat timer ticks that keep
+                 * this loop running even when idle.
+                 */
+                connectionLayer.checkConnectionExpired();
+
                 final BinaryMessage message;
 
                 /**

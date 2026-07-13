@@ -20,7 +20,7 @@ public class UnixNamedPipeClientConnector extends UnixNamedPipeConnector {
 
     @Override
     public void connect() throws IOException {
-        connect(configuration.requestPipe, configuration.responsePipe);
+        connect(configuration.requestPipe, configuration.responsePipe, /* openInputFirst: the client side opens write-first */ false);
     }
 
 }

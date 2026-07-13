@@ -22,14 +22,16 @@ public class CTransceiverSession {
 
     /**
      * This value indicates a message never send/received. The first message has the id
-     * <code>initialMessageId+1</code>.
+     * <code>initialMessageId+1</code>. Taken from the configured {@link CMessageIdLong#begin}
+     * (default: {@link Long#MIN_VALUE}).
      */
-    public final long initialMessageId = Long.MIN_VALUE;
+    public final long initialMessageId;
 
     /**
-     * The last message has the id <code>lastMessageId-1</code>.
+     * The last message has the id <code>lastMessageId-1</code>. Taken from the configured
+     * {@link CMessageIdLong#end} (default: {@link Long#MAX_VALUE}).
      */
-    public final long lastMessageId = Long.MAX_VALUE;
+    public final long lastMessageId;
 
     /**
      * The type of the transmitted message.
@@ -60,5 +62,17 @@ public class CTransceiverSession {
         this.messageType = messageType;
         this.messageClass = messageClass;
         this.transceiverConfiguration = transceiverConfiguration;
+
+        /**
+         * Respect the configured message id range (historically it was hardcoded and the
+         * {@link CMessageIdLong} configuration was silently ignored).
+         */
+        if (transceiverConfiguration != null && transceiverConfiguration.messageIdLong != null) {
+            this.initialMessageId = transceiverConfiguration.messageIdLong.begin;
+            this.lastMessageId = transceiverConfiguration.messageIdLong.end;
+        } else {
+            this.initialMessageId = Long.MIN_VALUE;
+            this.lastMessageId = Long.MAX_VALUE;
+        }
     }
 }

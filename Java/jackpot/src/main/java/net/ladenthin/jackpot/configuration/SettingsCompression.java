@@ -88,6 +88,16 @@ public final class SettingsCompression implements Serializable {
             throw new InvalidParameterException(
                 "illegal parameter combination: enableLZ4 and null pointer for lz4Conditions");
         }
+
+        /**
+         * A buffer size below one would make the GZIP decompression loop in
+         * {@link net.ladenthin.jackpot.util.BinaryMessage#unbox} spin forever: reading into a
+         * zero-length buffer returns 0 and never -1.
+         */
+        if (gzipBufferSize < 1) {
+            throw new InvalidParameterException(
+                "illegal parameter: gzipBufferSize must be at least 1 but was " + gzipBufferSize);
+        }
     }
 
     public SettingsCompression() {

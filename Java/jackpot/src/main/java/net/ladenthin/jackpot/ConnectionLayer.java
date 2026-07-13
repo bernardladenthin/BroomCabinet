@@ -367,6 +367,38 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
     private final AtomicLong lastAcknowledgementNudge = new AtomicLong();
 
     /**
+     * When the last message was successfully read from the other side; the liveness signal
+     * for the {@link Heartbeat#connectionTimeout} enforcement. Initialized to the
+     * construction time so a fresh connection gets the full timeout before it can expire.
+     * Unit: [ms since epoch].
+     */
+    private volatile long lastReadActivity = System.currentTimeMillis();
+
+    /**
+     * Whether the expired error was already surfaced for the current silence period, so it
+     * fires once per period instead of on every check tick.
+     */
+    private final AtomicBoolean expiredNotified = new AtomicBoolean(false);
+
+    /**
+     * Surfaces a {@link net.ladenthin.jackpot.message.TError} with the {@code expired} flag
+     * when nothing was received for longer than {@link Heartbeat#connectionTimeout} — the
+     * other side is transport-alive but dead (or the transport lost messages silently).
+     * Driven by the {@link WriteLayer} loop, which is ticked by the heartbeat timer.
+     */
+    public final void checkConnectionExpired() {
+        if (shutdown.get()) {
+            return;
+        }
+        final long silentMillis = System.currentTimeMillis() - lastReadActivity;
+        if (silentMillis > transceiverSession.transceiverConfiguration.heartbeat.connectionTimeout) {
+            if (expiredNotified.compareAndSet(false, true)) {
+                errorLayer.notifyExpired();
+            }
+        }
+    }
+
+    /**
      * Enqueue the id of a received message for acknowledgement to the other side.
      * Nudges the {@link WriteLayer} at most once per
      * {@link net.ladenthin.jackpot.configuration.Heartbeat#heartbeatCheckInterval}, so the
@@ -475,6 +507,11 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
                  */
                 ensureDataInputStreamConnected();
                 BinaryMessage bm = readBinaryMessage();
+                /**
+                 * Liveness: a successfully read message proves the other side is alive.
+                 */
+                lastReadActivity = System.currentTimeMillis();
+                expiredNotified.set(false);
                 /**
                  * The message content can now be processed. The {@link ReadLayer}
                  * enqueues the acknowledgement once the message is actually processed

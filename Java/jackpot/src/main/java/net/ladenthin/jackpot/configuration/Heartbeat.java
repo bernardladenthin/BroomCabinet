@@ -28,30 +28,36 @@ public class Heartbeat implements Serializable {
 //    public final int sleepNanos = 10000;
 
     /**
-     * Connection timeout. If the transceiver reach this time without any received message, it
-     * ended. If the timeout reached and no heartbeat from the other side arrived, the process kill
-     * themself to prevent a never ending loop. Unit: [ms].
+     * The default {@link #connectionTimeout}. Unit: [ms].
      */
-    public final int connectionTimeout = 20000;
+    public static final int DEFAULT_CONNECTION_TIMEOUT = 20000;
+
+    /**
+     * Connection timeout. If the transceiver reaches this time without any received message,
+     * the connection is considered dead and a {@link net.ladenthin.jackpot.message.TError}
+     * with the {@code expired} flag set is surfaced to the observers (once per silence
+     * period). Unit: [ms].
+     */
+    public final int connectionTimeout;
 
     /**
      * The value should always be less than {@link #connectionTimeout}. Calculation example: The
      * maximum time to wait for a transmission is <code>20000 ms</code>. Sending a heartbeat one
      * millisecond before could be dangerous. We don't know the additional latency. For safety
      * reasons we use the half time. If we do not send any message within this time, the
-     * transmission fire a heartbeat to keep the connection alive. Unit: [ms]. Current value: 10000.
+     * transmission fire a heartbeat to keep the connection alive. Unit: [ms]. Default: 10000.
      */
-    public final long heartbeatInterval = (long) (connectionTimeout / 2);
+    public final long heartbeatInterval;
 
     /**
      * Delay before task is to be executed. Unit: [ms].
      */
-    public final long heartbeatStartDelay = heartbeatInterval;
+    public final long heartbeatStartDelay;
 
     /**
      * Time between heartbeat checks. Unit: [ms].
      */
-    public final long heartbeatCheckInterval = (long) (heartbeatInterval / 10);
+    public final long heartbeatCheckInterval;
 
     /**
      * Time after which a written but not yet acknowledged message is resent. Must be
@@ -61,13 +67,26 @@ public class Heartbeat implements Serializable {
     public final long resendInterval;
 
     public Heartbeat() {
-        this.resendInterval = heartbeatInterval;
+        this(DEFAULT_CONNECTION_TIMEOUT / 2, DEFAULT_CONNECTION_TIMEOUT);
     }
 
     /**
      * @param resendInterval see {@link #resendInterval}; every other setting keeps its default
      */
     public Heartbeat(final long resendInterval) {
+        this(resendInterval, DEFAULT_CONNECTION_TIMEOUT);
+    }
+
+    /**
+     * @param resendInterval see {@link #resendInterval}
+     * @param connectionTimeout see {@link #connectionTimeout}; the heartbeat intervals are
+     * derived from it (interval = half, check interval = a twentieth, at least 1 ms)
+     */
+    public Heartbeat(final long resendInterval, final int connectionTimeout) {
+        this.connectionTimeout = connectionTimeout;
+        this.heartbeatInterval = connectionTimeout / 2;
+        this.heartbeatStartDelay = heartbeatInterval;
+        this.heartbeatCheckInterval = Math.max(1, heartbeatInterval / 10);
         this.resendInterval = resendInterval;
     }
 }

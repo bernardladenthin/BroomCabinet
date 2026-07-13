@@ -77,6 +77,25 @@ public class SettingsCompressionTest {
         assertThrows(InvalidParameterException.class, () -> new SettingsCompression(
             null, null, false, true, GZIP_BUFFER_SIZE, CLZ4Decompressor.safeFastDecompressor));
     }
+
+    /**
+     * A buffer size below one would make {@link net.ladenthin.jackpot.util.BinaryMessage#unbox}
+     * loop forever on a GZIP-compressed message ({@code GZIPInputStream.read} with a
+     * zero-length buffer returns 0, never -1), so it must be rejected at configuration time.
+     */
+    @Test
+    public void constructor_gzipBufferSizeZero_throwsException() {
+        // act, assert
+        assertThrows(InvalidParameterException.class, () -> new SettingsCompression(
+            null, null, false, false, 0, null));
+    }
+
+    @Test
+    public void constructor_gzipBufferSizeNegative_throwsException() {
+        // act, assert
+        assertThrows(InvalidParameterException.class, () -> new SettingsCompression(
+            null, null, false, false, -1, null));
+    }
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="valid configurations">
