@@ -11,6 +11,7 @@ import java.util.zip.Deflater;
 
 import net.ladenthin.jackpot.configuration.BooleanCondition;
 import net.ladenthin.jackpot.configuration.CLZ4Compressor;
+import net.ladenthin.jackpot.configuration.CLZ4Decompressor;
 import net.ladenthin.jackpot.configuration.CompressCondition;
 import net.ladenthin.jackpot.configuration.ConditionGZIP;
 import net.ladenthin.jackpot.configuration.ConditionLZ4;
@@ -25,8 +26,27 @@ public class Common {
     public final static String errorNotTheSame = "Message is not the same.";
     public final static String errorNotGZIPUsed = "GZIP is not used.";
     public final static String errorNotLZ4Used = "LZ4 is not used.";
+    public final static String errorGZIPUsed = "GZIP is used but should not have been.";
+    public final static String errorLZ4Used = "LZ4 is used but should not have been.";
     public final static SettingsCompression simpleSettingsCompression = new SettingsCompression();
     public final static CompressCondition alwaysTrueCompressCondition = new CompressCondition(BooleanCondition.greaterEqual, 1, false);
+
+    /**
+     * Matches every non-negative length but only accepts the compression result
+     * if it is actually smaller than the input (see {@code useOnlyIfCompressedLower}).
+     */
+    public final static CompressCondition compressedMustBeLowerCompressCondition = new CompressCondition(BooleanCondition.greaterEqual, 0, true);
+
+    /**
+     * Never matches (length can never equal a value this large), so compression must never trigger.
+     */
+    public final static CompressCondition neverMatchingCompressCondition = new CompressCondition(BooleanCondition.equal, Integer.MAX_VALUE, false);
+
+    /**
+     * A payload short enough that GZIP/LZ4 container overhead makes the "compressed" output
+     * larger than the input, exercising the {@code useOnlyIfCompressedLower} fallback.
+     */
+    public final static byte[] tinyByteArray = new byte[] {42};
 
     public final static List<ConditionGZIP> alwaysTrueGZIPCondition = Arrays.asList(
         new ConditionGZIP(
@@ -59,6 +79,74 @@ public class Common {
     public final static SettingsCompression alwaysLZ4SettingsCompression = new SettingsCompression(
         null,
         Common.alwaysTrueLZ4Condition,
+        false,
+        true,
+        2048,
+        null
+    );
+
+    /**
+     * GZIP enabled, condition always matches, but only used if the result is actually smaller.
+     */
+    public final static SettingsCompression gzipRequireSmallerSettingsCompression = new SettingsCompression(
+        Arrays.asList(
+            new ConditionGZIP(
+                Deflater.BEST_SPEED,
+                Common.compressedMustBeLowerCompressCondition
+            )
+        ),
+        null,
+        true,
+        false,
+        2048,
+        null
+    );
+
+    /**
+     * LZ4 enabled, condition always matches, but only used if the result is actually smaller.
+     */
+    public final static SettingsCompression lz4RequireSmallerSettingsCompression = new SettingsCompression(
+        null,
+        Arrays.asList(
+            new ConditionLZ4(
+                CLZ4Compressor.unsafeFastCompressor,
+                Common.compressedMustBeLowerCompressCondition
+            )
+        ),
+        false,
+        true,
+        2048,
+        CLZ4Decompressor.unsafeFastDecompressor
+    );
+
+    /**
+     * GZIP enabled but the condition never matches, so compression must be skipped entirely.
+     */
+    public final static SettingsCompression gzipNeverMatchSettingsCompression = new SettingsCompression(
+        Arrays.asList(
+            new ConditionGZIP(
+                Deflater.BEST_SPEED,
+                Common.neverMatchingCompressCondition
+            )
+        ),
+        null,
+        true,
+        false,
+        2048,
+        null
+    );
+
+    /**
+     * LZ4 enabled but the condition never matches, so compression must be skipped entirely.
+     */
+    public final static SettingsCompression lz4NeverMatchSettingsCompression = new SettingsCompression(
+        null,
+        Arrays.asList(
+            new ConditionLZ4(
+                CLZ4Compressor.unsafeFastCompressor,
+                Common.neverMatchingCompressCondition
+            )
+        ),
         false,
         true,
         2048,
