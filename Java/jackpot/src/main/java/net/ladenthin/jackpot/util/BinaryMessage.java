@@ -277,6 +277,14 @@ public final class BinaryMessage implements Comparable<BinaryMessage>,
             return createHeartbeat(id);
         } else if (bmf.isAcknowledged()) {
             final int size = dIn.readInt();
+            /**
+             * A corrupt frame must fail with an IOException so the reader takes its
+             * reconnect path — a RuntimeException (here: IllegalArgumentException from a
+             * negative ArrayList capacity) would kill the reader thread instead.
+             */
+            if (size < 0) {
+                throw new IOException("corrupt frame: negative acknowledged count " + size);
+            }
             List<Long> acknowledged = new ArrayList<>(size);
             for (int i = 0; i < size; ++i) {
                 acknowledged.add(dIn.readLong());
@@ -290,6 +298,14 @@ public final class BinaryMessage implements Comparable<BinaryMessage>,
             Transceiver.debugLog("uncompressedSize : " + uncompressedSize);
             final int msgLength = dIn.readInt();
             Transceiver.debugLog("msgLength : " + msgLength);
+            /**
+             * See above: corrupt sizes must surface as IOException (a negative array size
+             * would otherwise raise a NegativeArraySizeException and kill the reader).
+             */
+            if (uncompressedSize < 0 || msgLength < 0) {
+                throw new IOException("corrupt frame: negative size (uncompressedSize="
+                    + uncompressedSize + ", msgLength=" + msgLength + ")");
+            }
             final byte[] msg = new byte[msgLength];
             dIn.readFully(msg);
             Transceiver.debugLog("din.readFully(msg); finished");

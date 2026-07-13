@@ -26,12 +26,12 @@ public final class SettingsCompression implements Serializable {
     /**
      * List of {@link ConditionGZIP} to compress a byte array.
      */
-    public ImmutableList<ConditionGZIP> gzipConditions;
+    public final ImmutableList<ConditionGZIP> gzipConditions;
 
     /**
      * List of {@link ConditionLZ4} to compress a byte array.
      */
-    public ImmutableList<ConditionLZ4> lz4Conditions;
+    public final ImmutableList<ConditionLZ4> lz4Conditions;
 
     /**
      * Global flag to enable or disable the gzip compression.

@@ -72,6 +72,13 @@ public class Transceiver<T> extends Observable implements Observer, SequentialMe
     @Override
     @ConcurrentMethod
     public void update(final Observable o, final Object arg) {
+        /**
+         * Fail fast with a clear message: without the guard a null argument surfaced as an
+         * accidental NullPointerException from arg.getClass().
+         */
+        if (arg == null) {
+            throw new IllegalArgumentException("the message to send must not be null");
+        }
         try {
             updateLock.lock();
             if (cTransceiverSession.messageClass.isAssignableFrom(arg.getClass())) {

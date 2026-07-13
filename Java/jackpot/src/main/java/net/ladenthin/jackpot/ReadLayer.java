@@ -173,6 +173,15 @@ public final class ReadLayer<T> implements ShutdownRunnable, Runnable {
                 connectionLayer.enqueueAcknowledgement(bm.getId());
             } catch (InterruptedException e) {
                 errorLayer.notifyException(e);
+            } catch (RuntimeException e) {
+                /**
+                 * An unexpected RuntimeException must never kill the loop thread — a dead
+                 * sequencing loop wedges the whole receive pipeline silently. Surface it and
+                 * keep the loop alive.
+                 */
+                if (!shutdown.get()) {
+                    errorLayer.notifyException(e);
+                }
             }
         }
     }

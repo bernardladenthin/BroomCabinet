@@ -200,6 +200,96 @@ public class BinaryMessageTest {
     }
     // </editor-fold>
 
+    // <editor-fold defaultstate="collapsed" desc="corrupt frame rejection">
+    /**
+     * Writes a raw frame header (flags + id) followed by the given ints, mimicking a corrupt
+     * or malicious wire frame.
+     */
+    private DataInputStream rawFrame(int flags, long id, int... ints) throws IOException {
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        final DataOutputStream dOut = new DataOutputStream(baos);
+        dOut.writeInt(flags);
+        dOut.writeLong(id);
+        for (final int i : ints) {
+            dOut.writeInt(i);
+        }
+        return new DataInputStream(new ByteArrayInputStream(baos.toByteArray()));
+    }
+
+    /**
+     * The frame flag bit marking an acknowledgement message (see BinaryMessageFlags).
+     */
+    private static final int FLAG_ACKNOWLEDGED = 8;
+
+    /**
+     * A corrupt frame must be rejected with an {@link IOException} — which routes the reader
+     * into its reconnect path — and never with a {@link RuntimeException}, which would kill
+     * the reader thread (a NegativeArraySizeException did exactly that before this guard).
+     */
+    @Test
+    public void fromDataInputJava8_negativePayloadLength_throwsIOException() throws IOException {
+        // arrange: message-state frame with uncompressedSize 10 and payload length -5
+        final DataInputStream dIn = rawFrame(0, 1L, 10, -5);
+
+        // act, assert
+        assertThrows(IOException.class, () -> BinaryMessage.fromDataInputJava8(dIn));
+    }
+
+    @Test
+    public void fromDataInputJava8_negativeUncompressedSize_throwsIOException() throws IOException {
+        // arrange: message-state frame with uncompressedSize -1, payload length 4 and the
+        // matching 4 payload bytes (one int) — so only the negative size can be rejected,
+        // not a truncated stream
+        final DataInputStream dIn = rawFrame(0, 1L, -1, 4, 0x0BADF00D);
+
+        // act, assert
+        assertThrows(IOException.class, () -> BinaryMessage.fromDataInputJava8(dIn));
+    }
+
+    @Test
+    public void fromDataInputJava8_negativeAcknowledgedCount_throwsIOException() throws IOException {
+        // arrange: acknowledged-state frame with count -1
+        final DataInputStream dIn = rawFrame(FLAG_ACKNOWLEDGED, 1L, -1);
+
+        // act, assert
+        assertThrows(IOException.class, () -> BinaryMessage.fromDataInputJava8(dIn));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="large payload">
+    @Test
+    public void fromDataInputJava8_oneMebibytePayload_roundTripsCorrectly() throws IOException {
+        // arrange: a deterministic 1 MiB payload
+        final byte[] payload = new byte[1024 * 1024];
+        for (int i = 0; i < payload.length; i++) {
+            payload[i] = (byte) (i * 31);
+        }
+        final BinaryMessage bm = BinaryMessage.box(1L, payload, Common.simpleSettingsCompression);
+
+        // act
+        final BinaryMessage recreated = recreate(bm);
+
+        // assert
+        assertArrayEquals(payload, recreated.unbox(Common.simpleSettingsCompression));
+    }
+
+    @Test
+    public void fromDataInputJava8_oneMebibytePayloadGzipCompressed_roundTripsCorrectly() throws IOException {
+        // arrange: a repetitive 1 MiB payload that compresses well
+        final byte[] payload = new byte[1024 * 1024];
+        final BinaryMessage bm = BinaryMessage.box(1L, payload, Common.alwaysGZIPSettingsCompression);
+
+        // pre-assert
+        assertThat(Common.errorNotGZIPUsed, bm.isGzipUsed(), is(true));
+
+        // act
+        final BinaryMessage recreated = recreate(bm);
+
+        // assert
+        assertArrayEquals(payload, recreated.unbox(Common.alwaysGZIPSettingsCompression));
+    }
+    // </editor-fold>
+
     // <editor-fold defaultstate="collapsed" desc="box compression selection">
     @Test
     public void box_gzipConditionDoesNotMatch_gzipNotUsedAndContentPreserved() throws IOException {

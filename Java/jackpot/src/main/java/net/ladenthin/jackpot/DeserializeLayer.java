@@ -137,8 +137,17 @@ public class DeserializeLayer<T> implements Runnable, ShutdownRunnable {
                 receiver.receiveMessage(tm);
             } catch (InterruptedException | ExecutionException e) {
                 errorLayer.notifyException(e);
+            } catch (RuntimeException e) {
+                /**
+                 * An unexpected RuntimeException must never kill the loop thread — a dead
+                 * deserialize loop silently stops all inbound delivery. Surface it and keep
+                 * the loop alive.
+                 */
+                if (!shutdown.get()) {
+                    errorLayer.notifyException(e);
+                }
             }
-            
+
         }
     }
 

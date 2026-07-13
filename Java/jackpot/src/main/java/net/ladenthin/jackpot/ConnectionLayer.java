@@ -505,19 +505,30 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
                  * streams are handled by the null checks inside the locked read/write
                  * sections.
                  */
-                ensureDataInputStreamConnected();
-                BinaryMessage bm = readBinaryMessage();
-                /**
-                 * Liveness: a successfully read message proves the other side is alive.
-                 */
-                lastReadActivity = System.currentTimeMillis();
-                expiredNotified.set(false);
-                /**
-                 * The message content can now be processed. The {@link ReadLayer}
-                 * enqueues the acknowledgement once the message is actually processed
-                 * (or discarded as a duplicate).
-                 */
-                readLayer.receiveMessage(bm);
+                try {
+                    ensureDataInputStreamConnected();
+                    BinaryMessage bm = readBinaryMessage();
+                    /**
+                     * Liveness: a successfully read message proves the other side is alive.
+                     */
+                    lastReadActivity = System.currentTimeMillis();
+                    expiredNotified.set(false);
+                    /**
+                     * The message content can now be processed. The {@link ReadLayer}
+                     * enqueues the acknowledgement once the message is actually processed
+                     * (or discarded as a duplicate).
+                     */
+                    readLayer.receiveMessage(bm);
+                } catch (RuntimeException e) {
+                    /**
+                     * An unexpected RuntimeException must never kill the reader thread — a
+                     * dead reader silently stops all inbound traffic. Surface it and keep
+                     * reading.
+                     */
+                    if (!shutdown.get()) {
+                        errorLayer.notifyException(e);
+                    }
+                }
             }
         } catch (NoConnectionPossible e) {
             /**

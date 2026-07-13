@@ -184,6 +184,30 @@ public class ReadLayerTest {
     }
 
     /**
+     * A duplicate of a message that is still BUFFERED (not yet processed, waiting for its
+     * predecessor) must not corrupt the permit bookkeeping: the sorted set rejects the
+     * duplicate, so no permit may be released for it — a surplus permit historically ended
+     * in a NoSuchElementException that killed the loop thread.
+     */
+    @Test
+    @Timeout(30)
+    public void receiveMessage_duplicateOfBufferedMessageArrives_allMessagesStillProcessed() throws InterruptedException {
+        // arrange
+        final BinaryMessage second = BinaryMessage.createHeartbeat(FIRST_EXPECTED_ID + 1);
+        final BinaryMessage duplicateOfSecond = BinaryMessage.createHeartbeat(FIRST_EXPECTED_ID + 1);
+        final BinaryMessage first = BinaryMessage.createHeartbeat(FIRST_EXPECTED_ID);
+
+        // act: the second message arrives early (buffered), then its duplicate, then the
+        // first message closes the gap
+        readLayer.receiveMessage(second);
+        readLayer.receiveMessage(duplicateOfSecond);
+        readLayer.receiveMessage(first);
+
+        // assert: both distinct messages are processed exactly once
+        assertThat(waitForHeartbeatCount(2), is(equalTo(2L)));
+    }
+
+    /**
      * Same wedge as above, but the stale duplicate arrives while a newer message is already
      * buffered — the discard must unblock the buffered message too.
      */

@@ -209,6 +209,15 @@ public final class WriteLayer implements Runnable, WriteManagement, ShutdownRunn
                 if (!shutdown.get()) {
                     errorLayer.notifyException(e);
                 }
+            } catch (RuntimeException e) {
+                /**
+                 * An unexpected RuntimeException (e.g. message id range exhaustion in the id
+                 * generator) must never kill the loop thread — a dead writer hangs the whole
+                 * transceiver silently. Surface it and keep the loop alive.
+                 */
+                if (!shutdown.get()) {
+                    errorLayer.notifyException(e);
+                }
             }
         }
     }

@@ -250,6 +250,53 @@ public class WriteLayerTest {
     }
     // </editor-fold>
 
+    // <editor-fold defaultstate="collapsed" desc="loop robustness">
+    /**
+     * A {@link RuntimeException} inside the write loop (e.g. message id range exhaustion in
+     * the id generator, which throws a RuntimeException) must be surfaced as an error and
+     * must NOT kill the loop thread — a dead writer thread hangs the whole transceiver
+     * silently.
+     */
+    @Test
+    @Timeout(30)
+    public void run_idGeneratorThrowsOnce_errorSurfacedAndLoopKeepsWorking() throws Exception {
+        // arrange: the generator fails exactly once (on the heartbeat the first idle tick
+        // creates), afterwards it works again
+        final java.util.concurrent.atomic.AtomicBoolean thrown = new java.util.concurrent.atomic.AtomicBoolean(false);
+        when(connectionLayer.getMessageIdGenerator()).thenReturn(new MessageIdGenerator() {
+            private final AtomicLong counter = new AtomicLong();
+
+            @Override
+            public long getNextId() {
+                if (thrown.compareAndSet(false, true)) {
+                    throw new RuntimeException("getLastMessageId reached.");
+                }
+                return counter.incrementAndGet();
+            }
+        });
+
+        // act: the first idle tick creates a heartbeat -> the generator throws
+        writeLayer.heartbeatSignal();
+        final long errorDeadline = System.currentTimeMillis() + WAIT_TIMEOUT_MILLIS;
+        while (lastError == null && System.currentTimeMillis() < errorDeadline) {
+            Thread.sleep(POLL_INTERVAL_MILLIS);
+        }
+
+        // pre-assert: the failure is surfaced, not swallowed
+        assertThat("The id generator failure was never surfaced as an error.",
+            lastError, is(notNullValue()));
+
+        // act: the loop must still be alive and process further messages
+        final BinaryMessage payload = BinaryMessage.box(
+            PAYLOAD_ID, Common.simpleByteArray, Common.simpleSettingsCompression);
+        writeLayer.transmitMessage(payload);
+
+        // assert
+        assertThat("The write loop died after the RuntimeException — later messages are never written.",
+            waitForWriteCount(PAYLOAD_ID, 1), is(greaterThanOrEqualTo(1)));
+    }
+    // </editor-fold>
+
     // <editor-fold defaultstate="collapsed" desc="acknowledgement sending">
     @Test
     @Timeout(30)
