@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Webcam capture
 
 Captures a still image from a USB webcam with [`fswebcam`](https://github.com/fsphil/fswebcam)

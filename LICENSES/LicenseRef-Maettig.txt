@@ -1,0 +1,9 @@
+LicenseRef-Maettig
+
+Original terms as stated by the author in the source file
+(php-performance-benchmarks.php by Thiemo Maettig, http://maettig.com/):
+
+    "You are free to use the source for whatever you want.
+     Giving credits to me (Thiemo Maettig, http://maettig.com/) would be nice."
+
+    (c) 2008 Thiemo Maettig - created in September 2008, updated in February 2016.

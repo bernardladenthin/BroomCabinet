@@ -1,8 +1,12 @@
 <?php
+// SPDX-FileCopyrightText: 2010 Alessandro Torrisi, Code24 BV
+//
+// SPDX-License-Identifier: CC-BY-3.0
+
 /*
 ##########################################################################
 #                      PHP Benchmark Performance Script                  #
-#                         © 2010 Code24 BV                               # 
+#                         Â© 2010 Code24 BV                               # 
 #                                                                        #
 #  Author      : Alessandro Torrisi                                      #
 #  Company     : Code24 BV, The Netherlands                              #

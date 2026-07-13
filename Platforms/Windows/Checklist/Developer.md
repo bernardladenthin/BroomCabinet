@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2017 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Developer
 ## Auslagerungsdatei
 Je nach Programmen und RAM deaktivieren f�r h�here Performance und SSD schonen.

@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Raspberry Pi
 
 Projects and notes for the Raspberry Pi.

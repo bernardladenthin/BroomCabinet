@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Topics
 
 Cross-platform topics, clustered by subject. Each topic is a folder with its own

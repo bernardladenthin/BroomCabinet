@@ -1,3 +1,7 @@
+REM SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+REM
+REM SPDX-License-Identifier: Apache-2.0
+
 @echo off
 :: Export all stored PuTTY sessions (and settings) to putty.reg on the Desktop.
 :: See http://stackoverflow.com/questions/13023920/how-to-export-putty-sessions-list

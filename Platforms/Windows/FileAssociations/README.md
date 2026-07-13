@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # File associations
 
 `.reg` files that restore the Windows **default** file-type associations. Import

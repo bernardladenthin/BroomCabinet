@@ -1,4 +1,9 @@
 <?php
+
+// SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+//
+// SPDX-License-Identifier: Apache-2.0
+
 // EXAMPLE ONLY — optional server-side receiver for the GPIO counter.
 //
 // gpiocounter.py can POST its per-minute value to a URL (see the commented-out

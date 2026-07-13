@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+name: REUSE Compliance
+
+# REUSE checks licensing/copyright of every file, so any change anywhere in
+# the tree can affect the result - no path filter here on purpose.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  reuse:
+    name: REUSE lint (whole repo)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Official FSFE action: runs `reuse lint` over the repository root and
+      # fails the job if any file is missing copyright/licensing information
+      # or references a license text not present in LICENSES/.
+      - name: REUSE lint
+        uses: fsfe/reuse-action@v6

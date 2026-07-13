@@ -1,4 +1,9 @@
 #!/bin/sh
+
+# SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+
 # Capture one image from a USB webcam and store it under
 # /home/pi/cam/<YYYYMMDD>/<HH>/<YYYYMMDDHHMMSS>.jpg
 # Flat variant (no date folders):

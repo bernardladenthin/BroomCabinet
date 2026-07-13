@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Registry tweaks
 
 Standalone `.reg` tweaks. Import by double-clicking (or `regedit /s file.reg`).

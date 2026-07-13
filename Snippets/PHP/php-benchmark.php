@@ -1,4 +1,8 @@
 <?
+// SPDX-FileCopyrightText: 2006 Free-Webhosts.com
+//
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /*
 ##########################################################################
 #                   Free PHP Benchmark Performance Script                #

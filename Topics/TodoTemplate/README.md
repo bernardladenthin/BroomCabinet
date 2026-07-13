@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2015 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Plain-text to-do template
 
 To-do lists and a task-card template built from Unicode ballot-box glyphs —

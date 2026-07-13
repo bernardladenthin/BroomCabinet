@@ -1,4 +1,9 @@
 #!/bin/bash
+
+# SPDX-FileCopyrightText: 2016 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+
 DATEVAR=`date +20\%y\%m\%d_\%H\%M\%S`
 
 rrdtool graph "daily_$DATEVAR.png" \

@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2016 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # BroomCabinet
 
 Some useful stuff and work in progress.

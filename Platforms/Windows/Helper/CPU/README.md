@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # 🖥️ Windows CPU Power Optimization Guide
 A quick reference to restore and optimize your Windows power settings for better CPU performance.
 ## ⚡ 1. Restore the Default Power Plan

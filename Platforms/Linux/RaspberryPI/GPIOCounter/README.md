@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2016 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # GPIO counter
 
 Counts falling edges on a GPIO pin (e.g. the impulse output of an energy meter,

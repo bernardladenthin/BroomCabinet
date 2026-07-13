@@ -1,0 +1,11 @@
+LicenseRef-SevenForums
+
+These .reg files were created by Shawn Brink ("Brink") and published in the
+Seven Forums tutorial "Default File Type Associations - Restore" (#19449),
+first published 2009-08-04:
+https://www.sevenforums.com/tutorials/19449-default-file-type-associations-restore.html
+
+No explicit license or redistribution grant is stated at the source. They are
+included here for reference/convenience with attribution to the author; all
+rights remain with the original author. The registry values themselves are the
+factual default file-type associations shipped with Microsoft Windows.

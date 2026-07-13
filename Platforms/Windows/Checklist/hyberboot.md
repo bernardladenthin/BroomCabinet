@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SessionManager\Power
 HiberbootEnabled to 0
 

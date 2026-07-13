@@ -1,1 +1,5 @@
+REM SPDX-FileCopyrightText: 2017 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+REM
+REM SPDX-License-Identifier: Apache-2.0
+
 @call powercfgtweakcpuminmax 0 0

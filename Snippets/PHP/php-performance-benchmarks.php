@@ -1,4 +1,7 @@
 <?php
+// SPDX-FileCopyrightText: 2008 Thiemo Maettig <http://maettig.com/>
+//
+// SPDX-License-Identifier: LicenseRef-Maettig
 
 error_reporting( 0 );
 
