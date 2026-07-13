@@ -185,7 +185,8 @@ public final class ConnectionLayer<T> implements ShutdownRunnable, Runnable,
                     hasToConnect = true;
                 } else {
                     Transceiver.debugLog("ConnectionLayer.readBoxedByteMessage(): now BinaryMessage.readFromDataInput(dis);");
-                    bm = BinaryMessage.fromDataInputJava8(dis);
+                    bm = BinaryMessage.fromDataInputJava8(dis,
+                        transceiverSession.transceiverConfiguration.maxPayloadLength);
                     Transceiver.debugLog("ConnectionLayer.readBoxedByteMessage(): FINISHED BinaryMessage.readFromDataInput(dis);");
                     break;
                 }

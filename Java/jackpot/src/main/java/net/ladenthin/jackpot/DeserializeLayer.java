@@ -85,7 +85,8 @@ public class DeserializeLayer<T> implements Runnable, ShutdownRunnable {
          */
         DeserializerRunnable<T> unboxing =
             new DeserializerRunnable<>(deserializerFactory, bm,
-                cTransceiverSession.transceiverConfiguration.settingsCompression);
+                cTransceiverSession.transceiverConfiguration.settingsCompression,
+                cTransceiverSession.transceiverConfiguration.maxPayloadLength);
         
         /**
          * Submit the runnable to the {@link ExecutorService}.

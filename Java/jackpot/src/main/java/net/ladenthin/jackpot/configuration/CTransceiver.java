@@ -53,6 +53,21 @@ public class CTransceiver implements Serializable {
     public CMessageIdLong messageIdLong;
 
     /**
+     * The default {@link #maxPayloadLength}. Unit: [bytes].
+     */
+    public static final int DEFAULT_MAX_PAYLOAD_LENGTH = 64 * 1024 * 1024;
+
+    /**
+     * Upper bound for a single message payload, enforced on BOTH sides: the sender rejects
+     * oversized serialized messages (surfaced as a
+     * {@link net.ladenthin.jackpot.message.TError}; the wire sequence stays intact), and the
+     * receiver rejects frames claiming more — a corrupt or malicious length would otherwise
+     * allocate gigabytes and kill the reader with an OutOfMemoryError. Both sides of a
+     * connection should configure the same value. Unit: [bytes].
+     */
+    public int maxPayloadLength = DEFAULT_MAX_PAYLOAD_LENGTH;
+
+    /**
      * Complete constructor, this contains all possible configuration options.
      * @param serialization
      * @param deserialization

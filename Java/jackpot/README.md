@@ -202,6 +202,7 @@ The full constructor lets you set:
 | `connector` | the matching `C*Connector` inside a `CConnector` | — |
 | `heartbeat` | see below | `new Heartbeat()` |
 | `messageIdLong` | id range `begin`/`end`; both sides must configure the same `begin` | full `long` range |
+| `maxPayloadLength` | upper bound per message payload, enforced on both sides (sender rejects with a `TError`, receiver rejects oversized/corrupt frames and decompression bombs before allocating) | 64 MiB |
 
 ### `Heartbeat`
 
@@ -262,8 +263,9 @@ Ports are validated to `[0, 65535]`.
 
 * One connection per `Transceiver`; both directions of one logical link need matching
   configurations (same serialization, same `messageIdLong.begin`).
-* The receiver's ahead-of-time buffer and the sender's retain buffer are unbounded; a
-  malicious or very bursty peer can grow them (bounded in practice by the resend/ack cycle).
+* The receiver's ahead-of-time buffer and the sender's retain buffer are unbounded in message
+  COUNT; a very bursty peer can grow them (bounded in practice by the resend/ack cycle).
+  Individual message SIZE is bounded by `maxPayloadLength` on both sides.
 * No TLS/authentication — run over trusted networks or tunnel.
 * `java.util.Observable` is deprecated since Java 9 (the API still works; the library targets
   Java 8).
@@ -286,9 +288,13 @@ mvn package      # JAR
 
 The JaCoCo coverage report lands in `target/site/jacoco/index.html`.
 
-The integration tests bind localhost TCP ports 12345, 23456, 34567, 45678, 56789, 61234 and
-create FIFOs under `target/`. The Unix pipe round trip runs on Linux only; the Windows pipe
-round trip is disabled (needs a Windows host).
+The integration tests bind localhost TCP ports 12345, 23456, 24680, 24681, 25000, 25001,
+26000, 26001, 34567, 45678, 56789, 61234 and create FIFOs under `target/`. The Unix pipe
+round trip runs on Linux only; the Windows pipe round trip is disabled (needs a Windows
+host). Highlights of the integration suite: 100-message ordered bursts (uni- and
+bidirectional), a connection kill-and-restore through a TCP proxy proving loss recovery,
+serialization-failure recovery, silent-peer expiration, shutdown thread termination, and
+GZIP/Gson end-to-end round trips.
 
 ## History
 

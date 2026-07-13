@@ -91,6 +91,19 @@ public final class BinaryMessage implements Comparable<BinaryMessage>,
         return id;
     }
 
+    /**
+     * The length of the (possibly compressed) payload as it goes on the wire.
+     *
+     * @return the payload length in bytes
+     * @throws IllegalStateException when this is not a message-state frame
+     */
+    public int getPayloadLength() {
+        if (!isStateMessage()) {
+            throw new IllegalStateException();
+        }
+        return msg.length;
+    }
+
     public boolean isLz4Used() {
         if (EnumSet.of(State.MESSAGE).contains(state)) {
             return flags.isLz4Used();
@@ -190,6 +203,17 @@ public final class BinaryMessage implements Comparable<BinaryMessage>,
     }
 
     public final byte[] unbox(final SettingsCompression settingsCompression) throws IOException {
+        return unbox(settingsCompression, Integer.MAX_VALUE);
+    }
+
+    /**
+     * Unbox with an upper bound for the decompressed size.
+     *
+     * @param maxUncompressedLength decompressing beyond this many bytes aborts with an
+     * {@link IOException} (defense against decompression bombs). Unit: [bytes].
+     */
+    public final byte[] unbox(final SettingsCompression settingsCompression,
+        final int maxUncompressedLength) throws IOException {
         if (!isStateMessage()) {
             throw new IllegalStateException();
         }
@@ -219,6 +243,15 @@ public final class BinaryMessage implements Comparable<BinaryMessage>,
                 int n;
                 while ((n = inGZIP.read(gzipBuffer)) >= 0) {
                     baos.write(gzipBuffer, 0, n);
+                    /**
+                     * The frame header's uncompressed size is only a claim — the ACTUAL
+                     * inflated byte count is what grows without bound in a decompression
+                     * bomb, so the loop itself must enforce the limit.
+                     */
+                    if (baos.size() > maxUncompressedLength) {
+                        throw new IOException("decompressed payload exceeds maxUncompressedLength "
+                            + maxUncompressedLength);
+                    }
                 }
                 finalBytes = baos.toByteArray();
 
@@ -267,6 +300,19 @@ public final class BinaryMessage implements Comparable<BinaryMessage>,
     }
 
     public static BinaryMessage fromDataInputJava8(DataInput dIn) throws IOException {
+        return fromDataInputJava8(dIn, Integer.MAX_VALUE);
+    }
+
+    /**
+     * Read a frame with an upper bound for wire-provided lengths.
+     *
+     * @param maxPayloadLength frames claiming a payload, an uncompressed size or an
+     * acknowledgement batch beyond this bound are rejected with an {@link IOException}
+     * BEFORE anything is allocated (defense against corrupt frames and allocation attacks).
+     * Unit: [bytes].
+     */
+    public static BinaryMessage fromDataInputJava8(DataInput dIn, final int maxPayloadLength)
+        throws IOException {
         // read the flags
         final BinaryMessageFlags bmf = BinaryMessageFlags.fromDataInputReplaceJava8(dIn);
         final long id = dIn.readLong();
@@ -284,6 +330,16 @@ public final class BinaryMessage implements Comparable<BinaryMessage>,
              */
             if (size < 0) {
                 throw new IOException("corrupt frame: negative acknowledged count " + size);
+            }
+            /**
+             * Reject BEFORE allocating: a huge wire-provided count would allocate gigabytes
+             * and kill the reader (or the whole JVM) with an OutOfMemoryError. Each
+             * acknowledged id occupies eight bytes on the wire, so the payload bound implies
+             * a count bound.
+             */
+            if (size > maxPayloadLength / Long.BYTES) {
+                throw new IOException("frame exceeds maxPayloadLength: acknowledged count "
+                    + size + " > " + (maxPayloadLength / Long.BYTES));
             }
             List<Long> acknowledged = new ArrayList<>(size);
             for (int i = 0; i < size; ++i) {
@@ -305,6 +361,16 @@ public final class BinaryMessage implements Comparable<BinaryMessage>,
             if (uncompressedSize < 0 || msgLength < 0) {
                 throw new IOException("corrupt frame: negative size (uncompressedSize="
                     + uncompressedSize + ", msgLength=" + msgLength + ")");
+            }
+            /**
+             * Reject BEFORE allocating: a huge wire-provided length would allocate gigabytes
+             * and kill the reader (or the whole JVM) with an OutOfMemoryError. The
+             * uncompressed size is bounded too — it is the allocation target of the LZ4
+             * decompression and the claimed inflation of a GZIP payload.
+             */
+            if (msgLength > maxPayloadLength || uncompressedSize > maxPayloadLength) {
+                throw new IOException("frame exceeds maxPayloadLength " + maxPayloadLength
+                    + " (uncompressedSize=" + uncompressedSize + ", msgLength=" + msgLength + ")");
             }
             final byte[] msg = new byte[msgLength];
             dIn.readFully(msg);

@@ -256,6 +256,75 @@ public class BinaryMessageTest {
     }
     // </editor-fold>
 
+    // <editor-fold defaultstate="collapsed" desc="payload length cap">
+    /**
+     * A frame claiming a payload larger than the configured maximum must be rejected BEFORE
+     * the array is allocated: a huge length from a corrupt or malicious peer would otherwise
+     * allocate blindly and kill the reader with an OutOfMemoryError.
+     */
+    @Test
+    public void fromDataInputJava8_payloadLengthAboveMaximum_throwsIOException() throws IOException {
+        // arrange: message-state frame claiming a 2 GiB payload; cap at 1 KiB
+        final DataInputStream dIn = rawFrame(0, 1L, 100, Integer.MAX_VALUE);
+
+        // act, assert
+        assertThrows(IOException.class, () -> BinaryMessage.fromDataInputJava8(dIn, 1024));
+    }
+
+    @Test
+    public void fromDataInputJava8_uncompressedSizeAboveMaximum_throwsIOException() throws IOException {
+        // arrange: a tiny compressed payload claiming to inflate to 2 GiB (decompression
+        // bomb); cap at 1 KiB
+        final DataInputStream dIn = rawFrame(1, 1L, Integer.MAX_VALUE, 4, 0x0BADF00D);
+
+        // act, assert
+        assertThrows(IOException.class, () -> BinaryMessage.fromDataInputJava8(dIn, 1024));
+    }
+
+    @Test
+    public void fromDataInputJava8_acknowledgedCountAboveMaximum_throwsIOException() throws IOException {
+        // arrange: acknowledged-state frame claiming 2^28 ids (2 GiB of longs); cap at 1 KiB
+        final DataInputStream dIn = rawFrame(FLAG_ACKNOWLEDGED, 1L, 1 << 28);
+
+        // act, assert
+        assertThrows(IOException.class, () -> BinaryMessage.fromDataInputJava8(dIn, 1024));
+    }
+
+    @Test
+    public void fromDataInputJava8_payloadWithinMaximum_acceptedAndRoundTrips() throws IOException {
+        // arrange
+        final BinaryMessage bm = BinaryMessage.box(1L, Common.simpleByteArray, Common.simpleSettingsCompression);
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        bm.toDataOutput(new DataOutputStream(baos));
+
+        // act: read back with a cap comfortably above the payload
+        final BinaryMessage recreated = BinaryMessage.fromDataInputJava8(
+            new DataInputStream(new ByteArrayInputStream(baos.toByteArray())), 1024 * 1024);
+
+        // assert
+        assertThat(recreated, is(equalTo(bm)));
+    }
+
+    /**
+     * The GZIP decompression loop must stop at the configured maximum even when the frame
+     * header understates the real inflated size — the actual decompressed byte count is what
+     * grows without bound in a decompression bomb.
+     */
+    @Test
+    public void unbox_gzipInflatesBeyondMaximum_throwsIOException() throws IOException {
+        // arrange: a highly compressible 64 KiB payload, then unbox with a 1 KiB cap
+        final byte[] payload = new byte[64 * 1024];
+        final BinaryMessage bm = BinaryMessage.box(1L, payload, Common.alwaysGZIPSettingsCompression);
+
+        // pre-assert
+        assertThat(Common.errorNotGZIPUsed, bm.isGzipUsed(), is(true));
+
+        // act, assert
+        assertThrows(IOException.class,
+            () -> bm.unbox(Common.alwaysGZIPSettingsCompression, 1024));
+    }
+    // </editor-fold>
+
     // <editor-fold defaultstate="collapsed" desc="large payload">
     @Test
     public void fromDataInputJava8_oneMebibytePayload_roundTripsCorrectly() throws IOException {

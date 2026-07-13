@@ -170,7 +170,26 @@ public class SerializeLayer<T> implements ParallelMessageTransmitter<T>, Shutdow
                      * {@link messageLayer}. The call of the method {@link #MessageLayer.transmitMessage(BinaryMessage bm)}
                      * will be sequential only.
                      */
-                    messageLayer.transmitMessage(task.future.get());
+                    final BinaryMessage boxed = task.future.get();
+
+                    /**
+                     * Sender-side payload bound: an oversized message would be rejected by
+                     * the receiver's frame guard, and the resend mechanism would then retry
+                     * it forever. Reject it here instead — like a failed serialization, the
+                     * already-allocated wire id is filled with a heartbeat so the sequence
+                     * stays consecutive, and the failure is surfaced.
+                     */
+                    final int maxPayloadLength =
+                        cTransceiverSession.transceiverConfiguration.maxPayloadLength;
+                    if (boxed.getPayloadLength() > maxPayloadLength) {
+                        messageLayer.transmitMessage(BinaryMessage.createHeartbeat(task.id));
+                        errorLayer.notifyException(new IllegalArgumentException(
+                            "serialized message exceeds maxPayloadLength " + maxPayloadLength
+                                + ": " + boxed.getPayloadLength() + " bytes"));
+                        continue;
+                    }
+
+                    messageLayer.transmitMessage(boxed);
                 } catch (ExecutionException e) {
                     /**
                      * The wire message id was allocated before the serialization ran, so a
