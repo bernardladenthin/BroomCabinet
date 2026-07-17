@@ -7,9 +7,9 @@ package net.ladenthin.jackpot.deserializer;
 
 import java.lang.reflect.Type;
 
-import com.dyuproject.protostuff.ProtostuffIOUtil;
-import com.dyuproject.protostuff.Schema;
-import com.dyuproject.protostuff.runtime.RuntimeSchema;
+import io.protostuff.ProtostuffIOUtil;
+import io.protostuff.Schema;
+import io.protostuff.runtime.RuntimeSchema;
 
 /**
  * Protostuff implementation of a {@link Deserializer}.
