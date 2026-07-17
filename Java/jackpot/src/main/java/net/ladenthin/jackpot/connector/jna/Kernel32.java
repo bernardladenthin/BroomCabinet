@@ -15,7 +15,7 @@ import java.util.Arrays;
 import java.util.List;
 
 public interface Kernel32 extends StdCallLibrary {
-    Kernel32 INSTANCE = (Kernel32) Native.loadLibrary("kernel32", Kernel32.class);
+    Kernel32 INSTANCE = (Kernel32) Native.load("kernel32", Kernel32.class);
     Kernel32 SYNC_INSTANCE = (Kernel32) Native.synchronizedLibrary(INSTANCE);
 
     class SECURITY_ATTRIBUTES extends Structure {
