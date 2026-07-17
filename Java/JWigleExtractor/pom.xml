@@ -31,7 +31,7 @@ SPDX-License-Identifier: Apache-2.0
         <plugins>
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.14.1</version>
+                <version>3.15.0</version>
                 <configuration>
                     <release>8</release>
                 </configuration>
@@ -71,7 +71,7 @@ SPDX-License-Identifier: Apache-2.0
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>6.1.1</version>
+            <version>6.1.2</version>
             <scope>test</scope>
         </dependency>
 		<dependency>
