@@ -19,7 +19,7 @@ SPDX-License-Identifier: Apache-2.0
     <url>https://github.com/bernardladenthin/broomcabinet</url>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <javafx.version>24.0.2</javafx.version>
+        <javafx.version>21.0.11</javafx.version>
         <javafx.platform>win</javafx.platform> <!-- or linux, mac -->
     </properties>
     <inceptionYear>2016</inceptionYear>
@@ -107,7 +107,7 @@ SPDX-License-Identifier: Apache-2.0
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.15.0</version>
                 <configuration>
-                    <release>8</release>
+                    <release>21</release>
                     <encoding>UTF-8</encoding>
                 </configuration>
             </plugin>
