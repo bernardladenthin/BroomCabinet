@@ -13,6 +13,24 @@ Projects and notes for the Raspberry Pi.
 | [`GPIOCounter/`](GPIOCounter/) | Count GPIO pulses and graph them daily. |
 | [`Webcam/`](Webcam/) | Capture images from a USB webcam via `fswebcam` on a cron schedule. |
 
+## Time-lapse camera capture (`motion` / MMAL)
+
+When capturing a time-lapse with the [`motion`](https://motion-project.github.io/)
+daemon and a Raspberry Pi camera (MMAL), fixing exposure and white balance keeps
+consecutive frames consistent — otherwise auto-exposure makes the resulting video
+flicker. Set the MMAL camera control parameters in `motion.conf`:
+
+```conf
+mmalcam_control_params -awb none -iso 100 --shutter 4500
+```
+
+* `-awb none` — disable auto white balance (locked colour temperature).
+* `-iso 100` — fix the sensor sensitivity (low ISO = less noise).
+* `--shutter 4500` — fix the exposure time in microseconds (4.5 ms).
+
+The captured JPEG sequence can then be renumbered and encoded into a video with
+[`Python/PyImageSequencer`](../../../Python/PyImageSequencer/).
+
 ## Useful links
 
 * **Connect to Wi-Fi from the command line** (`wpa_supplicant`, headless `/boot`
