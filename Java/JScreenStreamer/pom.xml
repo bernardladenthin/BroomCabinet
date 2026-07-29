@@ -20,7 +20,7 @@ SPDX-License-Identifier: Apache-2.0
     <description>JScreenStreamer</description>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <javafx.version>21.0.11</javafx.version>
+        <javafx.version>21.0.12</javafx.version>
         <javafx.platform>win</javafx.platform> <!-- or linux, mac -->
     </properties>
 
