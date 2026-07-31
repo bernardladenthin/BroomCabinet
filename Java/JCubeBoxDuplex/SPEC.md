@@ -139,6 +139,6 @@ einziges verändertes Ciphertext-Byte lässt beide Prüfungen scheitern.
 
 ## 8. Selbsttest
 
-`net.ladenthin.cbd.Demo` verifiziert: Round-Trip, Anker-Pflicht, Falsch-Schlüssel-
+`net.ladenthin.jcubeboxduplex.Demo` verifiziert: Round-Trip, Anker-Pflicht, Falsch-Schlüssel-
 Ablehnung, Manipulations-Ablehnung, Keystream-Avalanche ≈ 0.5, Nonce-Wirkung und
 leeren Klartext.
