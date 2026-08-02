@@ -34,6 +34,31 @@ The detailed log is written to `%WinDir%\Logs\CBS\CBS.log`. If SFC cannot repair
 in normal mode, run it again in Safe Mode. Reference:
 <https://support.microsoft.com/kb/929833>
 
+### Clean up the WinSxS component store
+
+The `%WinDir%\WinSxS` folder (side-by-side component store) grows with every
+update and must never be deleted manually. Use DISM instead — run from an
+elevated prompt:
+
+```bat
+Dism.exe /Online /Cleanup-Image /AnalyzeComponentStore
+Dism.exe /Online /Cleanup-Image /StartComponentCleanup
+```
+
+`/AnalyzeComponentStore` reports the actual size and whether a cleanup is
+recommended; `/StartComponentCleanup` removes superseded component versions
+(uninstalled updates are kept for 30 days by default).
+
+Add `/ResetBase` to also drop *all* superseded versions immediately — this
+frees the most space, but installed updates can then no longer be uninstalled:
+
+```bat
+Dism.exe /Online /Cleanup-Image /StartComponentCleanup /ResetBase
+```
+
+Reference:
+<https://learn.microsoft.com/windows-hardware/manufacture/desktop/clean-up-the-winsxs-folder>
+
 ### Reboot straight into the advanced boot / Safe Mode menu
 
 ```bat
