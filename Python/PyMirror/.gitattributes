@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# These files are written on Windows and published for everyone. Without this, git stores whatever
+# the working tree happens to hold -- CRLF -- and the sources arrive with a ^M on every line for
+# anyone on Linux or macOS. Settling it before the first commit costs nothing; settling it after
+# costs a diff that touches every line of every file and buries the next real change in it.
+#
+# Scoped to this directory deliberately. The rest of the repository holds .bat files, where CRLF
+# is the correct answer and a repo-wide rule would be wrong.
+*.py            text eol=lf
+*.md            text eol=lf
+.gitattributes  text eol=lf
