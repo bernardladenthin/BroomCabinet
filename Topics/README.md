@@ -16,5 +16,6 @@ OS-specific helpers live in [`../Platforms/`](../Platforms/) instead.
 | [`ECC/`](ECC/) | Checking ECC memory and detecting logged ECC/WHEA errors (Windows + Linux). |
 | [`FileEndings/`](FileEndings/) | File-name patterns (LaTeX build artifacts, OS junk files) for `.gitignore`/backup excludes, with `rm`/`find` cleanup commands. |
 | [`GpsLogging/`](GpsLogging/) | PHP + MySQL endpoint for the Android GPSLogger app, with CSV/GPX/JSON export (sanitized example). |
+| [`InterviewPrep/`](InterviewPrep/) | CS fundamentals refresher for technical interviews — complexity notation, classic algorithms, data-structure trade-offs, SOLID/CRUD/ACID/REST, regex cheat sheet, UML sketching. |
 | [`TodoTemplate/`](TodoTemplate/) | Plain-text to-do glyphs (☐ ☑ ☒) and an ASCII task-card template. |
 | [`TrailingSpaces/`](TrailingSpaces/) | Groovy script to find file names with leading/trailing/double spaces. |
