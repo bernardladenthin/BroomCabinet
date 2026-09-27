@@ -38,7 +38,6 @@ import argparse
 import importlib.util
 import os
 import sys
-import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
