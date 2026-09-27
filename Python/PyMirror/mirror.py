@@ -1989,6 +1989,7 @@ def fix_times(name, base_url):
     if not os.path.isdir(root):
         print("  %s: does not exist" % name)
         return
+    exclude = EXCLUDE.get(name, ())
     pending = [base_url]
     seen = {base_url}
     dirs = stamped = nodate = absent = 0
@@ -2008,8 +2009,7 @@ def fix_times(name, base_url):
             if href.endswith("/"):
                 rel = child[len(base_url):]
                 if any(rel.startswith(x) for x in exclude):
-                    log.line("SKIPPED (excluded) %s" % child)
-                    continue
+                    continue  # never mirrored, so nothing on disk to stamp
                 pending.append(child)
                 continue
             if mtime is None:

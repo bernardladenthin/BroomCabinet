@@ -39,7 +39,6 @@ USAGE
 """
 
 import argparse
-import inspect
 import os
 import shutil
 import subprocess
@@ -221,7 +220,7 @@ def main():
     print("mirror.py: %s\n" % MIRROR)
 
     out, _, _ = run(CONTRACT_CHECK.format(mirror=MIRROR, contract=json.dumps(CONTRACT)), 60)
-    line = next((l for l in out.splitlines() if l.startswith("CONTRACT-")), "CONTRACT-FAIL: no output")
+    line = next((ln for ln in out.splitlines() if ln.startswith("CONTRACT-")), "CONTRACT-FAIL: no output")
     print("  %s" % line)
     if not line.startswith("CONTRACT-OK"):
         print("\n  The stubs no longer match the code they replace. Fix them before believing\n"
