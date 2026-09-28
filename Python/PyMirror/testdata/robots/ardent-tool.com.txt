@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Disallow: /incoming/*
+Sitemap: http://www.ardent-tool.com/sitemap.xml

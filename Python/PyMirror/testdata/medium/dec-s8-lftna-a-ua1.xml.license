@@ -1,0 +1,6 @@
+SPDX-FileCopyrightText: the extractor's own index beside `dec-s8-lftna-a-ua1.dsk` in this collection
+  (somuchstuff-pdp8). It states, for each file on a 1970s DEC OS/8 disk, the octal block range
+  it occupies -- a statement of fact about a medium, quoted whole because a block table with
+  rows removed proves nothing.
+
+SPDX-License-Identifier: LicenseRef-factual-listing

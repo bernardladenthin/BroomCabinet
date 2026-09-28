@@ -1,0 +1,745 @@
+{
+ "bare-apache-----.html": {
+  "archive": "zx-gatekeeper-dec",
+  "bytes": 604,
+  "entries": [
+   [
+    "binaries/",
+    null,
+    false
+   ],
+   [
+    "contrib/",
+    null,
+    false
+   ],
+   [
+    "patches/",
+    null,
+    false
+   ]
+  ],
+  "matcher": "bare",
+  "trimmed": false
+ },
+ "bare-apache----i.html": {
+  "archive": "aixpdslib",
+  "bytes": 452,
+  "entries": [
+   [
+    "/pub/",
+    null,
+    false
+   ],
+   [
+    "RISC/",
+    null,
+    false
+   ]
+  ],
+  "matcher": "bare",
+  "trimmed": false
+ },
+ "bare-caddy-----.html": {
+  "archive": "ibiblio-historic-linux",
+  "bytes": 2375,
+  "entries": [
+   [
+    "index.html",
+    null,
+    false
+   ],
+   [
+    "changes93.html",
+    null,
+    false
+   ]
+  ],
+  "matcher": "bare",
+  "trimmed": false
+ },
+ "bare-caddy----i.html": {
+  "archive": "oldskool",
+  "bytes": 2944,
+  "entries": [
+   [
+    "windows95.html",
+    null,
+    false
+   ],
+   [
+    "freebsd.html",
+    null,
+    false
+   ],
+   [
+    "successor.html",
+    null,
+    false
+   ],
+   [
+    "bsdos.html",
+    null,
+    false
+   ],
+   [
+    "wildboar.html",
+    null,
+    false
+   ],
+   [
+    "satan.html",
+    null,
+    false
+   ],
+   [
+    ".",
+    null,
+    false
+   ]
+  ],
+  "matcher": "bare",
+  "trimmed": false
+ },
+ "bare-plain-----.html": {
+  "archive": "ps-2.kev009.com",
+  "bytes": 133,
+  "entries": [
+   [
+    "testDir/test2.html",
+    null,
+    false
+   ]
+  ],
+  "matcher": "bare",
+  "trimmed": false
+ },
+ "bare-plain----i.html": {
+  "archive": "next-68k-org",
+  "bytes": 277,
+  "entries": [
+   [
+    "index.html",
+    null,
+    false
+   ]
+  ],
+  "matcher": "bare",
+  "trimmed": false
+ },
+ "bare-plain---f-.html": {
+  "archive": "ps-2.kev009.com",
+  "bytes": 191,
+  "entries": [
+   [
+    "helpindx.htm",
+    null,
+    false
+   ],
+   [
+    "searchh.htm",
+    null,
+    false
+   ]
+  ],
+  "matcher": "bare",
+  "trimmed": false
+ },
+ "bare-plain---fi.html": {
+  "archive": "ardent-tool",
+  "bytes": 1549,
+  "entries": [
+   [
+    "head.htm",
+    null,
+    false
+   ],
+   [
+    "232.htm",
+    null,
+    false
+   ],
+   [
+    "233.htm",
+    null,
+    false
+   ]
+  ],
+  "matcher": "bare",
+  "trimmed": false
+ },
+ "pre-apache----i.html": {
+  "archive": "dec-ftp-2006",
+  "bytes": 688,
+  "entries": [
+   [
+    "/pub/DEC/",
+    null,
+    false
+   ],
+   [
+    "EISA/",
+    null,
+    false
+   ]
+  ],
+  "matcher": "pre",
+  "trimmed": false
+ },
+ "pre-apache--d-i.html": {
+  "archive": "bullfreeware",
+  "bytes": 708,
+  "entries": [
+   [
+    "/aixtoolbox/",
+    null,
+    true
+   ],
+   [
+    "ppc/",
+    null,
+    true
+   ]
+  ],
+  "matcher": "pre",
+  "trimmed": false
+ },
+ "pre-apache-sd-i.html": {
+  "archive": "bullfreeware",
+  "bytes": 763,
+  "entries": [
+   [
+    "/aixtoolbox/RPMS/ppc/",
+    null,
+    true
+   ],
+   [
+    "klyx-2.0-1.aix4.3.ppc.rpm",
+    2306867,
+    true
+   ]
+  ],
+  "matcher": "pre",
+  "trimmed": false
+ },
+ "pre-plain----i.html": {
+  "archive": "aixtools",
+  "bytes": 589,
+  "entries": [
+   [
+    "/",
+    null,
+    false
+   ],
+   [
+    "gcc/",
+    null,
+    false
+   ]
+  ],
+  "matcher": "pre",
+  "trimmed": false
+ },
+ "pre-plain--d-i.html": {
+  "archive": "bullfreeware",
+  "bytes": 782,
+  "entries": [
+   [
+    "/download/",
+    null,
+    true
+   ]
+  ],
+  "matcher": "pre",
+  "trimmed": false
+ },
+ "pre-plain-sd--.html": {
+  "archive": "vtda",
+  "bytes": 812,
+  "entries": [
+   [
+    "00_ROMS.NFO",
+    439,
+    true
+   ],
+   [
+    "fc00_mon.bin",
+    256,
+    true
+   ],
+   [
+    "fd00_disk_copy_375.bin",
+    256,
+    true
+   ],
+   [
+    "fe00_disk_copy_376.bin",
+    256,
+    true
+   ],
+   [
+    "vg_monitor_turnkey.bin",
+    768,
+    true
+   ]
+  ],
+  "matcher": "pre",
+  "trimmed": false
+ },
+ "pre-plain-sd-i.html": {
+  "archive": "bullfreeware",
+  "bytes": 1065,
+  "entries": [
+   [
+    "/download/",
+    null,
+    true
+   ],
+   [
+    "pdftohtml-0.36.0.0.bff",
+    7549747,
+    true
+   ],
+   [
+    "samba-3.0.4.0.bff",
+    67423436,
+    true
+   ]
+  ],
+  "matcher": "pre",
+  "trimmed": false
+ },
+ "row-apache-sd--.html": {
+  "archive": "vtda",
+  "bytes": 12007,
+  "entries": [
+   [
+    "/glensideccc/",
+    null,
+    false
+   ],
+   [
+    "_Explaniation%20of%20Volume%20numbers%20and%20issues.txt",
+    603,
+    true
+   ],
+   [
+    "gccc5_2nl.pdf",
+    748544,
+    true
+   ],
+   [
+    "gccc5_4nl.pdf",
+    1992294,
+    true
+   ],
+   [
+    "gccc5_8nl.pdf",
+    433152,
+    true
+   ],
+   [
+    "gccc6_1nl.pdf",
+    1572864,
+    true
+   ],
+   [
+    "gccc6_2nl.pdf",
+    1992294,
+    true
+   ],
+   [
+    "gccc6_3nl.pdf",
+    2831155,
+    true
+   ],
+   [
+    "gccc6_4nl.pdf",
+    1992294,
+    true
+   ],
+   [
+    "gccc6_5nl.pdf",
+    2097152,
+    true
+   ],
+   [
+    "gccc6_6nl.pdf",
+    3250585,
+    true
+   ],
+   [
+    "gccc6_7nl.pdf",
+    2831155,
+    true
+   ],
+   [
+    "gccc7_1nl.pdf",
+    2936012,
+    true
+   ],
+   [
+    "gccc7_2nl.pdf",
+    2516582,
+    true
+   ],
+   [
+    "gccc7_3nl.pdf",
+    3670016,
+    true
+   ],
+   [
+    "gccc7_4nl.pdf",
+    3565158,
+    true
+   ],
+   [
+    "gccc7_5nl.pdf",
+    1677721,
+    true
+   ],
+   [
+    "gccc7_6nl.pdf",
+    1468006,
+    true
+   ],
+   [
+    "gccc7_7nl.pdf",
+    2202009,
+    true
+   ],
+   [
+    "gccc7_8nl.pdf",
+    1677721,
+    true
+   ],
+   [
+    "gccc7_9nl.pdf",
+    346112,
+    true
+   ],
+   [
+    "gccc8_1nl.pdf",
+    1887436,
+    true
+   ],
+   [
+    "gccc8_2nl.pdf",
+    2097152,
+    true
+   ],
+   [
+    "gccc8_3nl.pdf",
+    1677721,
+    true
+   ],
+   [
+    "gccc8_4nl.pdf",
+    1887436,
+    true
+   ],
+   [
+    "gccc8_5nl.pdf",
+    1887436,
+    true
+   ],
+   [
+    "gccc8_6nl.pdf",
+    2202009,
+    true
+   ],
+   [
+    "gccc8_7nl.pdf",
+    1468006,
+    true
+   ],
+   [
+    "gccc8_8nl.pdf",
+    2516582,
+    true
+   ],
+   [
+    "gccc8_9nl.pdf",
+    1887436,
+    true
+   ],
+   [
+    "gccc8_10nl.pdf",
+    1572864,
+    true
+   ],
+   [
+    "gccc9_1nl.pdf",
+    1468006,
+    true
+   ],
+   [
+    "gccc9_2nl.pdf",
+    881664,
+    true
+   ],
+   [
+    "gccc9_3nl.pdf",
+    600064,
+    true
+   ],
+   [
+    "gccc9_4nl.pdf",
+    800768,
+    true
+   ],
+   [
+    "gccc10_1nl.pdf",
+    1363148,
+    true
+   ],
+   [
+    "gccc10_2nl.pdf",
+    1363148,
+    true
+   ],
+   [
+    "gccc10_3nl.pdf",
+    1258291,
+    true
+   ],
+   [
+    "gccc10_4nl.pdf",
+    2202009,
+    true
+   ],
+   [
+    "gccc11_1nl.pdf",
+    1572864,
+    true
+   ],
+   [
+    "gccc11_2nl.pdf",
+    1677721,
+    true
+   ],
+   [
+    "gccc11_3nl.pdf",
+    1468006,
+    true
+   ],
+   [
+    "gccc11_4nl.pdf",
+    1468006,
+    true
+   ],
+   [
+    "gccc11_5nl.pdf",
+    791552,
+    true
+   ],
+   [
+    "gccc11_6nl.pdf",
+    2097152,
+    true
+   ],
+   [
+    "gccc12_1nl.pdf",
+    1153433,
+    true
+   ],
+   [
+    "gccc12_2nl.pdf",
+    1258291,
+    true
+   ],
+   [
+    "gccc12_3nl.pdf",
+    1153433,
+    true
+   ],
+   [
+    "gccc12_4nl.pdf",
+    1363148,
+    true
+   ],
+   [
+    "gccc12_5nl.pdf",
+    1572864,
+    true
+   ],
+   [
+    "gccc12_6nl.pdf",
+    1468006,
+    true
+   ],
+   [
+    "gccc12_7nl.pdf",
+    1572864,
+    true
+   ],
+   [
+    "gccc12_8nl.pdf",
+    1992294,
+    true
+   ],
+   [
+    "gccc12_9nl.pdf",
+    1363148,
+    true
+   ],
+   [
+    "gccc13_1nl.pdf",
+    1363148,
+    true
+   ],
+   [
+    "gccc13_2nl.pdf",
+    1258291,
+    true
+   ],
+   [
+    "gccc13_3nl.pdf",
+    2097152,
+    true
+   ],
+   [
+    "gccc13_4nl.pdf",
+    1363148,
+    true
+   ],
+   [
+    "gccc13_5nl.pdf",
+    2831155,
+    true
+   ],
+   [
+    "gccc13_6nl.pdf",
+    1153433,
+    true
+   ],
+   [
+    "gccc13_7nl.pdf",
+    3774873,
+    true
+   ],
+   [
+    "gccc13_8nl.pdf",
+    1153433,
+    true
+   ],
+   [
+    "gccc13_9nl.pdf",
+    2411724,
+    true
+   ]
+  ],
+  "matcher": "row",
+  "trimmed": false
+ },
+ "row-apache-sd-i.html": {
+  "archive": "vtda",
+  "bytes": 1030,
+  "entries": [
+   [
+    "/scratch/blit/software/",
+    null,
+    false
+   ],
+   [
+    "5620rom.cpio",
+    1153433,
+    true
+   ]
+  ],
+  "matcher": "row",
+  "trimmed": false
+ },
+ "row-plain-----.html": {
+  "archive": "oldskool",
+  "bytes": 3347,
+  "entries": [
+   [
+    "35_inch_drive.htm",
+    null,
+    false
+   ]
+  ],
+  "matcher": "row",
+  "trimmed": false
+ },
+ "row-plain----i.html": {
+  "archive": "mpoli-bbs",
+  "bytes": 7689,
+  "entries": [
+   [
+    "index.html",
+    null,
+    false
+   ],
+   [
+    "ohjeet.html",
+    null,
+    false
+   ]
+  ],
+  "matcher": "row",
+  "trimmed": false
+ },
+ "row-plain--d-i.html": {
+  "archive": "vtda",
+  "bytes": 884,
+  "entries": [
+   [
+    "/annexbits/",
+    null,
+    false
+   ],
+   [
+    "bfs/",
+    null,
+    true
+   ]
+  ],
+  "matcher": "row",
+  "trimmed": false
+ },
+ "row-plain-sd-i.html": {
+  "archive": "bullfreeware",
+  "bytes": 1842,
+  "entries": [
+   [
+    "/",
+    null,
+    false
+   ],
+   [
+    "FBE.tar.xz",
+    20971520,
+    true
+   ],
+   [
+    "Hyperledger/",
+    null,
+    true
+   ],
+   [
+    "filebeat.WithLIBGO",
+    27262976,
+    true
+   ],
+   [
+    "go8.0.0/",
+    null,
+    true
+   ],
+   [
+    "go8.0.1/",
+    null,
+    true
+   ],
+   [
+    "go8.1.0/",
+    null,
+    true
+   ]
+  ],
+  "matcher": "row",
+  "trimmed": false
+ }
+}

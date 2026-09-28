@@ -7,8 +7,11 @@ SPDX-License-Identifier: Apache-2.0
 # mirror — tools for archives that may not survive their maintainer
 
 A threaded mirror for whole HTTP archives and rsync modules, a checksum index that stays current
-as a side effect of mirroring, and three tools that use those checksums to answer questions about
-what you have. Standard library only; no dependencies.
+as a side effect of mirroring, tools that use those checksums to answer questions about what you
+have, and a handful more for the cases the crawler cannot reach: a host that is already gone, a
+wiki that will hand over its own source if asked properly, a site whose TLS chain is broken, and a
+blog that only admits to its own contents through a sitemap. Standard library only; no
+dependencies.
 
 They exist because the archives below are mostly one person's server, and because the ways a
 crawler quietly *fails to copy something* turn out to be far more numerous, and far harder to
@@ -16,12 +19,53 @@ notice, than the ways it fails loudly. Most of this file is about the second thi
 
 | | |
 |---|---|
+| `common.py` | the library the others are built on — `user_agent()`, `request_headers()`, `long_path`, `exists`, `isfile`, `safe_name`, `relative_to`, `sha256_file`, `sha256_bytes`, `iter_files`, `human`, `parse_size`, `OWN_FILES`. Not a tool: no command line. It exists because the copies had drifted into **eight** different bodies for `long_path`, **nine** for `human`, **three** user agents and **eight** own-files sets of which no two agreed. **27 of the 43 files import from it, `mirror.py` among them** |
 | `mirror.py` | mirrors the archives; writes each one's marker and checksum index |
 | `checksums.py` | the same manifest format for a tree that is *not* a mirror |
-| `audit.py` | reads any number of manifests; finds duplicates across trees, and files that lie about what they are. **Deletes nothing** |
+| `audit.py` | reads any number of manifests; finds duplicates across trees, and files that lie about what they are. `--listed` is the one check here that does **not** ask the tree about itself: it compares each file against the size the source's own stored directory index printed for it, which is how a truncated download is caught at all — one hashes to itself perfectly. **Deletes nothing** |
+| `holes-run.py` | drives `audit.py --holes` over the collection **one archive at a time**, one log per archive written atomically. 2.39 TB at a measured 76 MB/s is 8.3 h, and a single process prints only at the end — so a log that exists means that archive is finished, and a restart re-does exactly the one that was interrupted. The logs are the state |
+| `restate-marker.py` | moves a completion marker's counts onto the tree after a **deliberate** repair, and refuses to run without a `--reason` it writes *into* the marker. `completed` keeps the crawl's date: the archive was finished then and repaired today, and collapsing the two would age-wash the only record that says how old the mirror is |
+| `containment.py` | joins every archive's `.sha256sum` to answer *does one mirror contain another?* and *what would a deduplicating packer save?* — set arithmetic over 1.40 M hashes, no tree re-read |
 | `dedupe-docs.py` | deletes an outer copy, but only after re-reading both sides in full |
+| `verify-content.py` | reads every byte back and checks it against the recorded SHA-256 — the bit-rot check `mirror.py --verify` structurally cannot do. Resumable; reports MISMATCH, MISSING and UNREADABLE separately; never repairs. An archive with **no** index is reported loudly and exits non-zero: silence used to be indistinguishable from success |
+| `index-vs-tree.py` | path-level comparison of `.sha256sum` against the tree. Writes nothing |
+| `crawl-gap-audit.py` | re-reads the stored pages with a WIDER notion of what a link is, and asks the tree about each target. Finds what the crawler could not SEE -- `<img src>`, `<frame src>`, href-not-first, dropped case collisions. Reports what needs checking, never what is lost |
+| `find-html-imposters.py` | files whose bytes are an HTML error page under a binary name |
+| `pdf-identify.py` | says what a PDF is when its filename does not — `/Info`, the XMP packet, the bookmark tree, the edition notice and the printer's spine copy, all at once. Filing a document into a curated directory means naming it, and on the seven filed on 2026-09-20 **no single field sufficed**: three carried `/Title Contents`, one `/Title A`, and four yielded no extractable text at all |
+| `catalogue.py` | writes a self-describing CATALOGUE.md **into** the mirror tree, generated from its markers and PROVENANCE files — so a copy that outlives this repository can still say what it is |
+| `measure-remote.py` | how big is a candidate **before** any disk is committed — handles directory listings and mirrored websites alike, and says which bytes it measured versus read off a listing |
+| `reachability-probe.py` | can the crawler get *into* a site, or only as far as its front door |
 | `wayback-salvage.py` | recovers a host that is already gone, from the Internet Archive |
+| `suspect-reconsider.py` | re-checks every `.suspect` against **all** captures of its URL, not just the one that came up short. The rule it corrects — *a short transfer is final* — was true of a URL with one capture and got applied to URLs with several; 15 files came back |
+| `ia-item-fetch.py` | Internet Archive items from the metadata API, with Range resume and per-file MD5 against the Archive's own. Writes the index and marker when the run is clean |
+| `manifest-fetch.py` | fetches what an archive's **own** manifest names and the crawl could not reach. Distinguishes *gone from the copy* (404) from *failed* |
+| `subset-refetch.py` | fetches a known-missing list into an existing archive under a **hard request budget**, for a host that limits a count per window rather than a rate. Aborts on consecutive connect failures: unspent budget is cheap, the ban that follows hammering is not. Feed it URLs a crawl **recorded as failed**, never links scraped out of pages |
+| `pages-to-urllist.py` | builds a fetchable URL list from an archive's own stored pages — a list of **candidates**, never of files |
+| `remove-fragment-copies.py` | removes `#`-named duplicates, and only where the non-empty stem exists as a file and its SHA-256 matches |
+| `recheck-decisions.py` | probes the `LOST`, `FROZEN` and `CANDIDATES` lists — the claims about the outside world that rot while nothing on disk changes. Apex **and** `www.`; reads the page title so a parked domain is not mistaken for a return; counts what it could not resolve as drift rather than as an all-clear |
+| `ask-the-source.py` | re-asks the hosts behind `ZERO_AT_SOURCE` whether they still serve those files as zeros — the only thing standing between 75 files and being reported as losses. Addresses come from `mirror.ARCHIVES`, never from guessing; keeps *the server refused* apart from *nobody answered*; touches nothing on disk |
+| `sfv-verify.py` | checks files against a `.sfv` manifest — CRC32, the format RHash writes. A second opinion from a different party, not a second run of ours |
+| `case-collision-recover.py` | sets the NTFS case-sensitivity flag on the affected directories, then fetches only the files a case-folding tree made the crawler drop |
+| `extract-container-tar.py` | unpacks a tar that is *packaging* rather than a document into an archive of its own. Dry-run, collision check, `RENAMED.txt` and `SYMLINKS.txt` |
+| `verify-extraction.py` | paths, sizes and content of an extraction against a third-party manifest |
+| `unpacked-vs-archive.py` | may this unpacked copy be deleted? Reads the members **out** of the archive beside it and compares SHA-256 — because a basename match says the archive holds *a* file of that name, not *these bytes*. The first real run found `x_off/Makefile` sharing its name with a member of the tar next to it and differing in content: a name check would have called it covered and lost it. An archive it cannot open is reported UNREADABLE and covers nothing; old LZW `.Z` goes through GNU gzip when that is present, and is never guessed at when it is not |
+| `http-subset-fetch.py`, `redbooks-fetch.py` | a chosen subset of a large HTTP tree, from an explicit URL list |
+| `pmwiki-source.py` | copies a PmWiki as raw markup, from its own page list, without crawling |
+| `dokuwiki-source.py` | the same for a DokuWiki, walking `?do=index` namespace by namespace |
+| `mediawiki-source.py` | the same for a MediaWiki, through its API — every title, revid, timestamp and SHA-256 land in `MANIFEST.tsv`, because a page's on-disk filename cannot carry its real title |
+| `autoindex-tls-broken.py` | an open directory whose TLS chain is incomplete, so no stdlib client will talk to it |
+| `b2-cluster.py` | measures what the collection is **made of** — bytes per compressibility class and per extension — and counts the byte-identical files held more than once, from the stored digests alone. Then it checks `b2-pack.py`'s grouping against that: how much duplication sits inside a unit where a solid block collapses it, how much crosses a boundary and is paid for twice, and whether any archive is left unclaimed. It imports the units rather than restating them, because a check against its own copy of the answer checks nothing |
+| `b2-pack.py` | plans the nineteen WinRAR units that carry the collection to cold storage, and **prints rather than runs** — `--execute` is opt-in. A multi-volume RAR cannot be appended to, so a unit is the unit of *rebuilding*, and the grouping follows what a project needs together rather than what compresses well. Every switch it emits was measured against a real WinRAR; two were wrong until they were. Reads only the per-archive indexes, never the collection's files |
+| `blogger-sitemap.py` | a Blogger site, enumerated from `sitemap.xml` because its front page is infinite scroll |
+| `nginx-autoindex-gallery.py` | a small nginx autoindex, at the `Crawl-delay` its robots.txt asks for |
+| `move-mirror.py` | relocates a mirror tree between volumes, re-reading both sides rather than trusting the move |
+| `refresh-table.py` | rebuilds `mirror.py`'s HELD table from the tree, carrying every hand-written note across |
+| `common_test.py` | `unittest` over `common.py`, and every case is a mistake one of the copies actually made: a trailing dot surviving `long_path`, a relative path reaching `exists`, `human` being decimal while `parse_size` is binary, the agent not beginning `Mozilla/`, one own-files set. It also asserts that `mirror.py` resolves these to *this* module rather than to a copy of its own |
 | `wedge_test.py` | the termination tests for `mirror.py` |
+| `parse_listing_test.py` | the listing-parser tests. They check **both** directions: that the newer link and image forms are found, and that the size and date columns a real index carries are still read correctly |
+| `drivers-exclude-test.py` | the 108 cases behind the `oldskool` driver exclusions. They check the **encoded** path, because `EXCLUDE` matches what the listing served — a vendor name with a space has to be written `%20` or it matches nothing |
+| `trust-index-test.py` | the eight cases for `--trust-index`, the skip that makes a re-run cheap: a file named in the checksum index and present on disk is not fetched again |
+| `robots_verdict_test.py` | the seven `robots.txt` readings this collection has argued about — a 188-agent blocklist that does not name us, a 45-agent block with an empty `Disallow:` whose *intent* is honoured anyway, a club that names us on one vhost and serves no file on another, and a `Disallow:` that reaches the path we actually want |
 
 ```
 python mirror.py --root /srv/mirror                    all archives, resuming
@@ -36,8 +80,62 @@ python dedupe-docs.py --root /srv/collection --mirror /srv/mirror
 python wedge_test.py
 ```
 
-Every path is a parameter. None of these tools has a default location for anything, which is the
-subject of the next section.
+Every path is a parameter, and `mirror.py` in particular has **no default root** -- the subject of
+the next section.
+
+The tools added later relax this. **Thirty-one of them** default `--root` to `Q:\mirror` --
+`autoindex-tls-broken.py`, `b2-cluster.py`, `b2-pack.py`, `blogger-sitemap.py`, `case-collision-recover.py`,
+`containment.py`,
+`corpus-coverage.py`, `crawl-gap-audit.py`, `extract-container-tar.py`, `fill-from-local.py`, `find-html-imposters.py`,
+`holes-run.py`, `holes-vs-source.py`, `http-subset-fetch.py`, `ia-item-fetch.py`,
+`index-vs-tree.py`, `iso-second-opinion.py`, `manifest-fetch.py`,
+`nginx-autoindex-gallery.py`, `page-extensions.py`,
+`pages-to-urllist.py`, `recheck-decisions.py`, `redbooks-fetch.py`, `refresh-table.py`,
+`remove-fragment-copies.py`, `sfv-verify.py`, `subset-refetch.py`, `suspect-reconsider.py`,
+`truncated-vs-source.py`, `verify-content.py`, `verify-extraction.py`.
+**Eight** demand `--root` outright (`catalogue.py`, `checksums.py`, `dedupe-docs.py`,
+`dokuwiki-source.py`, `mediawiki-source.py`, `pmwiki-source.py`, `restate-marker.py`,
+`wayback-salvage.py`); **two** take it without a default (`audit.py`, `mirror.py`).
+
+**And eight take no `--root` at all** — `ask-the-source.py`, `common.py`,
+`contract-mutations.py`, `measure-remote.py`, `move-mirror.py`, `pdf-identify.py`,
+`reachability-probe.py`, `unpacked-vs-archive.py` — because none of them walks the collection.
+`ask-the-source.py` is the clearest case: it reads recorded lengths from a table and bytes from a
+URL, and a `--root` it never used would be an invitation to believe it had checked something on
+disk. 31 + 8 + 2 + 8 = **49 scripts with an argument parser**, which is the whole set.
+
+They are maintenance tools for one collection rather than general-purpose fetchers, and the trade
+is deliberate -- but it is a trade. This paragraph named three tools for a while, then kept naming
+three as the count reached eleven, and listed `catalogue.py` among the defaulting ones when it
+actually refuses to run without `--root`.
+
+**And it went stale again between those two sentences and this one**: corrected on 2026-09-16 from
+eleven to seventeen, with `sfv-verify.py` moved out of the no-default group because it has since
+grown one. A paragraph that documents its own tendency to rot is not thereby protected from
+rotting. The lists are re-derivable and that is the point -- grep `add_argument("--root"` in each
+file and classify by whether the match carries `required=True`, a `default=`, or neither. Do that
+rather than trusting the three numbers above.
+
+**And a third time, on 2026-09-21**: six to seven, because `mediawiki-source.py` was added and
+this paragraph was not. The re-derivation above is what caught it, and it is worth saying how it
+nearly did not: a grep read by eye gave the wrong answer twice, once missing a `required=True`
+split across lines and once missing a `default=os.environ.get(...)`. Parsing the files instead --
+`ast`, every `add_argument("--root")`, look at its keywords -- gave 17/7/2 and matched the named
+lists exactly. The instruction stands; reading the matches by eye does not.
+
+**A fourth time, on 2026-09-24 -- and that instruction is now a test.** The lists had reached
+24/8/2 while the paragraph still said 17/7/2, and a whole group was missing: eight tools take no
+`--root` at all, which nobody had ever counted. It was found while adding one line about
+`ask-the-source.py`, and the first attempt to re-derive it used a regular expression -- the exact
+thing two corrections up says not to do.
+
+That is four. An instruction to check something by hand is a comment with a runtime cost, which is
+what this project refuses everywhere else, so `readme-root-groups-test.py` now parses every script
+with `ast` and compares the four sets against the four lists above, plus the spelled-out number in
+front of each. Deliberately breaking the paragraph three ways -- a file dropped from a list, a
+wrong number, a file in the wrong group -- fails it each time. The re-derivation instruction above
+is kept, because it is still how somebody reads the answer; it is simply no longer the only thing
+standing between this paragraph and its fifth correction.
 
 ## Where the mirror goes
 
@@ -53,30 +151,42 @@ there says you mean it.
 
 ## What it mirrors
 
-| | Files | Size | Source |
-|---|---:|---:|---|
-| `bitsavers` | 176 012 | 1 241.5 GB | the computing documentation archive, via `rsync.mirrorservice.org` |
-| `ibm-aix` | 190 976 | 702.4 GB | IBM's own AIX distribution tree, including the Toolbox |
-| `ps-2.kev009.com` | 94 899 | 332.0 GB | RS/6000, AS/400, S/390 and PS/2 documentation and firmware |
-| `vtda` | 29 759 | 234.7 GB | the Vintage Technology Digital Archive, five rsync modules |
-| `oss4aix.org` | 184 465 | 208.0 GB | Michael Perzl's AIX open-source builds — RPMs, SRPMs, specs, patches |
-| `bull-rpms` | 7 117 | 45.8 GB | Bull Freeware binaries, via the power-devops rescue |
-| `ardent-tool` | 23 185 | 23.6 GB | The Ardent Tool of Capitalism — board-level RS/6000 detail |
-| `bull-srpms` | 1 873 | 19.2 GB | the sources those binaries were built from |
-| `rwth-aachen-ftp` | 10 561 | 10.3 GB | an open directory at RWTH Aachen, including a copy of IBM's PC BBS |
-| `tuhs` | 12 139 | 9.3 GB | The Unix Heritage Society — the original UNIX distribution tapes |
-| `gsi-collection` | 4 688 | 0.9 GB | GSI Darmstadt's vintage collection |
-| `filibeto-aix-lib` | 174 | 0.8 GB | the AIX manual sets IBM no longer serves |
-| `aixtools` | 99 | 0.26 GB | AIX software as installp/BFF filesets — **salvaged; the site is gone** |
-| **13 archives** | **735 947** | **2 828.8 GB** | |
+**The table lives in `mirror.py`, not here** -- its opening block lists every archive with its
+file count, size and the note that explains why it was taken, followed by what is deferred,
+what was measured and rejected, and what an operator has forbidden. `catalogue.py` writes the
+same figures into the mirror tree itself.
+
+This sentence used to open with "Thirty-seven archives, 826 162 files, 3.51 TB" -- three
+numbers, in the very paragraph that says the numbers do not live here. By 2026-09-10 the true
+figures were 71, 1 394 095 and 3.71 TB, and nothing had said otherwise for weeks. The counts
+are REMOVED rather than corrected: a figure that must be updated by hand in a document nobody
+regenerates will simply be wrong again, and the paragraph below is about exactly that.
+
+That is not tidiness. This file carried a second copy of the table for exactly one day before the
+two disagreed: the README said 26 archives where the code said 30. A list that has to be edited in
+two places to stay true will be wrong in one of them, and the stale copy reads as authoritatively
+as the current one. The status now sits beside the code that produces it, where `ARCHIVES`,
+`EXTERNAL` and `DO_NOT_FETCH` can be checked against it in one screen.
+
+What follows here is the *reasoning* that does not belong in a table: the selection rule, the
+archives that are exceptions to it, and the defects this tool has shipped and fixed.
 
 One deliberate omission: `bits/NetBSD/` inside bitsavers, 606.8 GB of an operating system that is
 in no danger whatsoever. It is named in `RSYNC["bitsavers"]["filter"]` rather than left to memory.
 
-### One of them is not a mirror
+`mirror.py` is the master record, and its opening block is the place to start: a status table
+covering everything held, deferred, measured-and-rejected, and forbidden by an operator, followed
+by the defect classes that keep costing us whole subtrees. Sources considered and **not** taken
+are there too, with the measurement behind each decision and the four premises that turned out to
+be false. Read it before proposing a new source.
 
-`aixtools` is listed in `FROZEN`, not in `RSYNC` or the crawler's set, because **its source no
-longer exists**. Michael Felt's site published open-source software for AIX as installp/BFF
+### Nine of them are not mirrors
+
+`FROZEN` holds nine archives whose sources are gone. This section describes the first of them and
+the shape they all share; the list itself is in `mirror.py`, which is where it stays current.
+
+`aixtools` is in `FROZEN`, not in `RSYNC` or the crawler's set, because **its source no longer
+exists**. Michael Felt's site published open-source software for AIX as installp/BFF
 filesets rather than as RPM — installable without `rpm.rte`, which is what an old AIX needs and
 what nothing else here carries. It died between its last capture on 2025-01-14 and 2026-08-29,
 when this was checked: `/tools/` answers 404 rather than 403, both vhosts serve Apache's stock
@@ -94,6 +204,32 @@ is refused with its reason, while `--index` and `--verify` keep working on what 
 
 This is also the argument of this whole directory arriving once: an archive served by one person,
 with no successor, that went away before it was copied.
+
+### And eighteen this tool does not fetch
+
+`EXTERNAL` holds eighteen archives whose sources are alive and answering, but for which this
+crawler is the wrong instrument. One example carries the reasoning; the list is in `mirror.py`.
+
+`perzl-wiki` is one of them. A wiki is not a file tree. A PmWiki hands any reader its complete page list in **one request**
+(`?n=Site.AllRecentChanges&action=source`) and then each page as raw markup, so the copy is a list
+worked once rather than a walk over links: no `?action=edit` requests, nothing to exclude, and the
+result is what the wiki actually stores rather than a skin wrapped around it.
+
+`EXTERNAL` and `FROZEN` share a behaviour and differ in the remedy. A frozen archive can never be
+improved. This one can — by re-running `pmwiki-source.py`. Pointing the crawler at it would not
+fail; it would quietly build a second, worse copy beside the good one, which is the kind of
+failure this file exists to catalogue.
+
+**How it was nearly missed is worth more than the copy.** It sat in the collection's search brief
+from the beginning, parked as low priority with the reason *"a wiki needs different handling from
+a file tree"*. That reason expired the day `HTML_CRAWL` was added for exactly that shape — and
+nothing pointed back at the entry. It was also recorded twice under two hostnames that nobody
+connected: the project's vanity domain 301-redirects to the hoster's numbered vhost, so a search
+for either name finds one record and not the other. It surfaced in the end by accident.
+
+The rule that follows: **record an exclusion together with the condition that would revive it.** An
+exclusion written as a fact about the target is never revisited. One written as a limit of this
+tool would have been revisited the day the tool changed.
 
 ### The selection rule
 
@@ -239,14 +375,24 @@ A mirroring run refreshes the index when it finishes, so re-mirroring keeps the 
 as a side effect — whatever the run changed is exactly what gets re-hashed. `--no-index`
 suppresses that, and `--index` does it alone, without touching the network.
 
-**This catches what `--verify` cannot.** `--verify` compares file and byte counts, which finds what
-went missing or arrived. It cannot see a file whose content changed while its size stayed the same
-— and over years and terabytes that is the realistic failure, on archives that are in several
-cases the last copy in existence.
+**The index records what `--verify` cannot — but writing it is not the same as checking it.**
+`--verify` compares file and byte counts, which finds what went missing or arrived. It cannot see
+a file whose content changed while its size stayed the same, and over years and terabytes that is
+the realistic failure, on archives that are in several cases the last copy in existence.
+
+Nor does refreshing the index find it. **The refresh is deliberately skip-based** — that is the
+whole point of keeping size and mtime — so a file whose bytes rotted while its size and timestamp
+stayed put is skipped, keeps its old hash, and the index goes on vouching for it. The stored
+checksum is a *claim*, and re-running the thing that wrote the claim cannot test it.
+
+Only reading every byte back and re-hashing it can, which is `verify-content.py`. It has to be a
+separate tool precisely because it must ignore the optimisation that makes indexing fast. Run it
+before long-term archiving and after any move between volumes. The whole collection is
+**3.74 TB in 1 402 661 files** as this is written; a full re-read runs at disk speed.
 
 ## What the tool learned the hard way
 
-Ten defects, each found by measurement rather than reasoning, and every one of them invisible in a
+Fourteen defects, each found by measurement rather than reasoning, and every one of them invisible in a
 progress bar. They are listed because the next archive will break the tool in some new way, and the
 pattern is more useful than the individual fixes.
 
@@ -268,8 +414,8 @@ hand-written page linked a subdirectory *without* a trailing slash — the only 
 — so the directory's own index page was fetched and written to disk as a file. **49 files and
 7.6 GB hung behind it.** The failures said `FileExistsError` and `FileNotFoundError`, which reads
 like a disk problem and is not one. Detected at the cause now: a 301 onto the same path plus a
-slash means "that is a directory", so the page it returns is not saved. A scan of all twelve
-archives for the same shape checked 76 000 candidates and found no others — which fits, because
+slash means "that is a directory", so the page it returns is not saved. A scan of every archive held at the
+time -- twelve of them -- checked 76 000 candidates for the same shape and found no others — which fits, because
 generated autoindexes always emit the slash.
 
 Those three defects all struck **the same archive**, and that is not a coincidence: it is the only
@@ -306,6 +452,36 @@ front page names.
 **Reachability and usefulness are two different tests.** A mirror was chosen because it answered
 first: 1.11 MB/s, against 9.29 from the one that answered second.
 
+**A page's pictures are part of the page.** Link extraction read `<a href="…">` and nothing else —
+not single quotes, not unquoted, and never `<img src>`. Across the hand-written archives, stored
+pages named **10 067 inlined images that were not on disk**, and a sample HEADed against the
+origins came back 200 for every one. In `ardent-tool` those are `2524_System_Board_Bottom.gif` and
+`penarch.jpg`: board photographs and architecture diagrams, in an archive that exists for
+board-level detail. Fixed, and the first re-crawl recovered **1 800+ files** in its opening minutes.
+
+**A directory that serves a document cannot be enumerated at all.** On `gatekeeper.dec.com`,
+`.../SRC/research-reports/SRC-021-html/` does not return a listing — it returns the research
+paper. The parser read a paper as though it were an index and took the figures it links, and
+everything else in that directory was simply invisible: `evolve.css`, `footnode.html`, backup
+files ending in `~`, and a subdirectory confusingly named `icons.gif/`. Worse, the paper itself
+was parsed and discarded, because a page is only *saved* when its URL ends in `.html` and a
+directory URL ends in `/` — twelve DEC SRC papers were held as illustrations with no text.
+
+**This is a limit, not a defect, and it is why manifests are kept.** No amount of crawling can
+see what nothing links to. What closed it was `Index-byname`, the source's own listing: measured
+against it, that archive was **509 files short after three runs that each reported COMPLETE with
+zero failures**. Nothing had failed; the files were never requested. `manifest-fetch.py` exists
+for exactly this, and the same relationship holds for bitsavers' `.tar.txt` and bullfreeware's
+`.sfv`.
+
+**And the same measurement, run the other way, refused a much larger claim.** Those pages also
+carry 15 478 single-quoted or unquoted `<a href>` in `ardent-tool` alone, and one Blogspot page in
+`techsysadm` has 251 `href='` against 4 `href="`. Resolved against the tree, the whole collection
+was short **50 files** — 48 in one archive. Every other target had been reached another way, and
+techsysadm's are absolute off-site URLs that were never archive children. A pattern count is not a
+loss count, and the gap between 57 254 and 50 is the entire reason this list insists on
+measurement.
+
 ## Case collisions
 
 NTFS folds case; HTTP paths do not. Two remote files differing only in case land on one local file,
@@ -320,6 +496,27 @@ the next three, and **4 019 in IBM's tree**, where they are not incidental: `lib
 It needs no elevation and is inherited only by directories made **afterwards**, never
 retroactively — so it is only ever effective on a fresh root. Proven end-to-end before the real
 run: the same subtree produced **1 041 files without the flag and 1 043 with it**.
+
+Where the flag is absent the crawler keeps the first name, drops the second and logs
+`COLLISION DROPPED`. That is the right fallback — a deterministic, logged loss beats whichever
+download finished last — but it is still a loss, and nobody read those lines for six weeks.
+
+### What auditing them actually takes
+
+773 `COLLISION DROPPED` lines exist across the collection. They are **not** 773 losses, and
+getting from one number to the other takes three steps, each of which killed a wrong answer:
+
+1. **Ask the tree, not the log.** A DROPPED line proves a file was skipped that day. An identical
+   claim about `ardent-tool` was retracted once already because a later run had healed it.
+2. **Decode before comparing.** One pair was `CK_E020%20Series.pdf` against
+   `CK_E020 Series.pdf` — the same URL, encoded two ways. Never a case collision at all.
+3. **Fetch both spellings and compare bytes.** Of six pairs sampled from `ps-2.kev009.com`,
+   **three were byte-identical** — the same file listed twice, nothing lost — and three were
+   genuinely different: `epr2f.inf` is 1 155 162 bytes against 1 397 388 for `Epr2f.inf`.
+
+The answer was **153 real losses, all in one archive**, recovered on 2026-09-08 with
+`case-collision-recover.py`. Skipping step 3 would have turned that into a claim about all 765
+lines in that log; skipping step 1 would have added four more that were never missing.
 
 ## Logs and file dates
 
@@ -340,6 +537,13 @@ listings — **2 519 requests instead of 195 000**, because one listing carries 
 files. The price is precision, minutes instead of seconds, which for a twenty-year-old package is
 not worth 190 000 requests. The result is a real archive's date profile rather than "everything
 made today": the oldest file in the oss4aix mirror is a patch from **30 August 2000**.
+
+**Except where the source has no date to give.** `ardent-tool.com` serves its HTML pages with no
+`Last-Modified` header at all, and being a hand-written site it has no directory listings to take
+dates from either — so those 1 400-odd pages carry the time they were fetched, and a re-crawl
+re-stamps every one of them. That is the honest outcome rather than a defect: inventing a date
+would be worse. It is worth knowing before reading a date profile, and before wondering why an
+incremental backup sees 1 400 changed files after a run that fetched almost nothing.
 
 ## Tests
 
@@ -364,6 +568,142 @@ Repairing it turned up a real defect: the worker's queue-item unpack sat one lin
 enough of them killed every thread — after which the producer blocked forever on a queue nobody
 would ever drain again. That case is now a scenario of its own.
 
+### Cold storage: nineteen units, and why not ninety-eight
+
+`b2-pack.py` groups the 98 archives into nineteen WinRAR units for Backblaze B2 and a shelf of
+M-Discs. The grouping is measured, not chosen:
+[`measurements/collection-composition-2026-09-26.md`](measurements/collection-composition-2026-09-26.md)
+counted the collection from its own indexes and found that **two thirds of it cannot be compressed
+at all** — `pdf` alone is 1.21 TB of scanned paper — while **0.5 % is text**. So the compression
+settings barely matter. What does matter is **171.37 GB of byte-identical duplicates**, of which
+111.46 GB sits in the Bull group: `bull-rpms` is contained 100 % in `bullfreeware` *and* 100 % in
+`ia-bullfreeware`. One unit, sorted so the copies are adjacent, turns 185 GB into about 70.
+
+The constraint that decides everything else is that **a multi-volume RAR cannot be appended to**, so
+a later correction repacks a whole unit. A unit is therefore a set of mirrors that belong to one
+subject *and* tend to change together — which is why `fsck-aix-media` sits with AIX rather than with
+its own host, so that an AIX-under-QEMU project does not fetch 404 GB of other vendors to reach
+87 GB of install media.
+
+[`measurements/winrar-recovery-2026-09-26.md`](measurements/winrar-recovery-2026-09-26.md) is the
+other half: every switch put to a real WinRAR rather than remembered. Two were wrong in the tool
+until then — `-scul` instead of `-scfl`, which stored **none** of five files with non-ASCII names,
+and a claim that `-sv` prevents a file being split, which it does not. It also settled the rule that
+costs everything if got wrong once: `-k` belongs in the packing command and must never be a separate
+step, because locking afterwards rewrote every volume and left `rar rc` reporting *"Es fehlen 14
+Volumen. Wiederherstellung unmöglich."*
+
+### Nothing here may name the author's machine
+
+`privacy-test.py` is a ratchet, and it exists because the hand sweep that produced it was not good
+enough. On 2026-09-26 every script was read for private information. Four things turned up: a
+private volume **and** directory in a `mirror.py` comment, an absolute path into the source tree
+quoted in `refresh-table.py` while describing a bug that was already fixed, a literal **form feed**
+in `common_test.py` where `\funet-unix` belonged — written through a shell that ate the backslash,
+so the measurement it quotes had been unreadable for as long as it had been there — and, eleven
+lines below the first one, the same drive letter again with **no separator after the colon**.
+
+That fourth one is the whole argument. The sweep that found the other three could not see it,
+because its pattern demanded a `\` or `/` after `X:`. A check that only recognises `X:\` is not a
+check for a drive letter, and no amount of re-reading the file would have said so. Both halves are
+now tests: each of the four findings is fed through the patterns verbatim and must be caught, and
+each repaired sentence must pass — otherwise the ratchet has merely forbidden a form of words.
+
+What it allows is named, one entry at a time, with a reason: `Q:\mirror` because it is documented in
+`--help` output, `C:\Program Files\7-Zip` because that is where somebody else's installer puts a
+tool, `C:\tmp` and `R:\tree` because they are synthetic and prove path handling, and `move-mirror.py`'s
+bare `X: -> Q:` because that tool exists to move between volumes and naming them *is* the
+explanation. A dead allowance fails the suite, so an exception cannot outlive what it excused.
+
+The one file it does not scan is itself: a detector has to quote what it detects, and scanning it
+reports its own pattern table. That is the same trap a census of `urlopen` calls here fell into when
+it counted the line that named `urlopen` in order to look for it.
+
+### Five directories of real bytes, because the thing under test is somebody else's output
+
+[`testdata/listings/`](testdata/listings/README.md) holds 21 directory listings, one per parser
+form found across 287 112 stored pages. [`testdata/heads/`](testdata/heads/README.md) holds 13
+file **heads** of 512 bytes, one per way a file can lie about what it is — `magic_mismatch` reads
+a head and never more, so a head is the whole of what is under test.
+[`testdata/robots/`](testdata/robots/README.md) holds seven `robots.txt`, stored whole.
+[`testdata/medium/`](testdata/medium/README.md) holds a 1970s OS/8 disk's block index, one real
+512-byte block of it, and a derived map of which of its 737 blocks are zeros.
+[`testdata/objblk/`](testdata/objblk/README.md) holds four Ultima VI map-chunk records, 3 183
+bytes, one of them a byte short of what its own header demands.
+
+**How much of somebody else's file to keep is itself a decision, and it is made the same way
+every time: store what the test reads, and not the file it came out of.** A head is 512 bytes
+because `magic_mismatch` never reads further. A robots.txt is stored whole because half a
+statement of somebody's wishes says something different from the whole. The OS/8 disk image is
+**not** stored — it is 377 344 bytes of DEC's software, 363 of its 737 blocks are zeros, and
+copying a third of a megabyte to show that some of it is nothing would be copying it for no
+reason; a 737-character map says everything the tests ask. What that leaves on trust — whether
+the map is a true statement about the image — is checked by a test that re-derives it from the
+image and skips itself where the collection is not mounted.
+
+**The robots files were captured because half of them had already gone.** Of the four hosts whose
+rules `robots_verdict_test.py` records, `irixnet.org` and `4corn.co.uk` still answer and are now
+on disk; `update.uu.se` and `hpux.connect.org.uk` do not connect at all, and for those the inline
+text in that test is the only record that survives. A robots.txt is a live statement of
+somebody's wishes and can be rewritten tomorrow — these fixtures turn "we decided this was
+permitted" into something that fails loudly when the permission changes.
+
+Neither set could have been invented. Among the heads are a GIF missing exactly its first byte, a
+JPEG whose four header bytes were overwritten while `JFIF` survives two bytes later, and an HTML
+error page that opens with a **comment** before its doctype. That last one cost the collection
+the most: `looks_like_html()` skipped a byte-order mark and leading whitespace and not a comment,
+so the single most common error page here — found under an `.exe` name, eight `.rpm` names and 28
+image names on one day — was reported as a vague signature mismatch instead of being named.
+
+Every fixture is checked against the code that was wrong before it was added. Two of the seven
+heads fail under the old `looks_like_html`, which is the difference between a fixture that guards
+a fix and one that merely accompanies it.
+
+### Where the open work is written down
+
+There is no TODO file. There was one until 2026-09-25, and its last two items closed the
+same day; the twenty-two before them had already moved into the things they were about --
+see "Where the records live" above. A list of open work is worth keeping only while
+something is open.
+
+[`AUDIT-FINDINGS-2026-09-24.md`](AUDIT-FINDINGS-2026-09-24.md) is the first full `--ruins --empty`
+pass over the collection, and is worth reading for one reason beyond its findings: the two raw
+counts it starts from are both misleading, and it says how far and why. Its directory-pages section
+now carries a **partly superseded** banner: the 32 pages it is about were restored on 2026-09-25 and
+the blocker is gone, while the 341 absent files behind them are not. The table itself was left as
+measured, because a record edited to match today cannot show that the fix worked.
+
+[`ARCHIVES-NOTES-2026-09-17.md`](ARCHIVES-NOTES-2026-09-17.md) is 100 KB of snapshot and the one
+file here that documents its own reason to exist wrongly. It said three comparisons had failed to
+show whether the prose moved into the archives' `PROVENANCE.md` files had lost anything.
+[`measurements/archives-notes-recoverable-2026-09-25.md`](measurements/archives-notes-recoverable-2026-09-25.md)
+settled it: **92 of 539 sentences are in no `PROVENANCE.md` at all**, and one archive named there
+was deleted and has none. What is missing is the measurement errors and the retractions — a
+`PROVENANCE.md` says what an archive is, not what was believed about it on the way there.
+
+### Two tools ask the collection instead of asserting
+
+Most of what `mirror.py` claims is a claim about **what somebody else's server writes**, and the
+collection holds 288 000 pages written by those servers. So the claims can be checked against
+reality without asking a single host anything — no requests, no rate limits, no answer that
+changes between two runs. Both are read-only.
+
+- **`corpus-coverage.py`** reads every stored page and reports what `parse_listing` makes of it.
+  It goes non-zero only when a page holds in-scope links the parser cannot see — the shape the
+  `ps-2.kev009.com` finding had, where lighttpd listings parsed to nothing and 1 955 PDFs stayed
+  missing from an archive marked COMPLETE.
+- **`page-extensions.py`** asks the opposite question: which names get linked and stored, and
+  which of them does nothing ever *walk*. Its finding is one sentence — a stored file whose first
+  bytes are markup, under a name no page predicate accepts. Such a file was saved as content and
+  never opened for links, which is exactly how sun3arc's 134 `.phtml` pages hid behind a run that
+  reported COMPLETE with zero failures.
+
+Both carry the same warning in their own words: **measure at the level the caller decides at.**
+Comparing the two page predicates over raw `href`s reported 50 differences that do not exist,
+because the crawler never sees a raw `href` — it sees `child`, after `urljoin`, with everything
+off-host already dropped. The reasoning that had called those 50 impossible was simply wrong, and
+only measuring said so.
+
 > **Before changing `mirror.py`, read the `REQUIREMENTS` block at the top of it.** Thirty-five
 > numbered rules, each written after something broke, each dated so it can be traced back. Most of
 > those breakages were **silent**: the run ended, printed DONE, wrote a completion marker, and was
@@ -377,3 +717,43 @@ would ever drain again. That case is now a scenario of its own.
 produce is not: a mirror is third-party material copied verbatim, and each archive carries
 whatever terms its source carries. Nothing in a mirror is extracted, disassembled or derived —
 it is a byte copy of what a public server serves.
+
+---
+
+## Where the records live
+
+Twenty-two questions were settled about this collection in September 2026, and their
+measurements are not in any document about them. Each one lives in the thing it is about,
+because those homes are better than a paragraph — a table with a reason per row, a fixture,
+a test that fails, a run's own logs. **Every one was checked to have such a home before the
+prose describing it was removed.**
+
+| | what it settled | where it lives now |
+|---|---|---|
+| A3 | `MAGIC` knew no image format | seven extensions in `common.MAGIC`, with tests |
+| B1 | 33 directory pages stored as files | repaired; `restate-marker.py` + 11 tests; the 32 listings restored, `measurements/dirpages-restored-2026-09-25.md` |
+| C1 | 26 280 signature mismatches, 21 real | `audit.PAGE_AT_SOURCE`, `SOURCE_CONVENTIONS` |
+| C2 | 79 zero files in one capture | `audit.ZERO_IN_CAPTURE` |
+| C3 | ~274 zero files, three groups | `ZERO_AT_SOURCE` (75), `ZERO_IN_THE_MEDIUM` (43), `testdata/medium/`, `testdata/objblk/` |
+| C4 | `--holes` had never run whole | `measurements/holes-run/` — 99 logs + README, `holes-record-test.py` |
+| C5 | 279 unidentified binaries | `testdata/heads/` — InstallShield and the source-damaged PDF as fixtures |
+| C6 | 64 of C4's findings unjudged | `measurements/holes-vs-source-2026-09-25.md` |
+| C8 | is anything worth re-fetching | `measurements/nothing-to-refetch-2026-09-25.md`, and `Q:\DEC` |
+| D1 | `page-extensions.py` not gate-ready | `common.looks_like_a_copy_of_a_page()` |
+| D2 | `--ruins` output not machine-readable | the column width is measured from the reasons present |
+| D3 | two tools walked the archives themselves | both use `iter_archives` |
+| D4 | `ruff` ran only in CI | installed; it found a defect that had inverted a whole tool |
+| D5 | a listing's size column is not exact | `common.size_agrees()`, `listing_step()` |
+| D6 | `--listed`, the first external record | built; found an HTML page under an `.exe` name |
+| D7 | `mirror.py`'s exit codes | **withdrawn — the item was wrong**, and the measurement was mine |
+| D8 | long checks printed nothing | `report=` on all five checks |
+| D9 | nine broad catches | all narrowed; `narrowed-catches-test.py` |
+| D10 | 41 `time.sleep` in 17 tools, three meanings | `common.Pacer`, `common.Backoff`, `sleeps-test.py` — 41 down to 4, each with its reason |
+| D12 | a private collection's own pointer table named directories that did not exist | corrected there; the history sentence deliberately left as written |
+| E1 | the chain compared the tree with itself | `--declared` and `common.declared_length` — the seventh kind of record, and the only one needing nothing but the file |
+| E2 | mutations reached 2 of 7 modules | 13 mutations over all 7, generated from `LIBRARIES` |
+
+**What is deliberately NOT here any more:** the arguments. They moved into the docstrings of the
+things they are about, which is where somebody changing that code will actually read them --
+`ZERO_AT_SOURCE` explains why widening `MAGIC` means re-reading it, `Pacer` explains what a delay
+means, `declared_length` explains why "no opinion" and "damaged" are different answers.

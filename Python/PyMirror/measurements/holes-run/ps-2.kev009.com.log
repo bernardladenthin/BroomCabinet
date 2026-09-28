@@ -1,0 +1,8 @@
+=== Holes: entirely empty blocks in the middle of a file ===
+  (reads every file of 16 MB or more in full -- this takes a while)
+    36.1 MB     6/  37 blocks empty (16.2 %)  pccbbs/netvista_software/rrusb26br.exe
+    37.1 MB    24/  38 blocks empty (63.2 %)  pccbbs/netvista_software/rrusb26ct.exe
+  2 incomplete files, 2958 files read in full
+
+
+=== archive finished ===  ps-2.kev009.com  818.4 s

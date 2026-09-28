@@ -1,0 +1,46 @@
+<!--#exec cmd="header -n 'Kernel Change Summary 1.1.91 -> 1.1.92'" -->
+<h1>Changes from 1.1.91 to 1.1.92</h1>
+<h5> These changes are archived on <a
+href="ftp://ftp.crynwr.com:pub/kchanges">ftp.crynwr.com:pub/kchanges</a>
+and <a
+href="http://www.crynwr.com/kchanges">http://www.crynwr.com/kchanges</a>.
+I cannot answer questions about Linux -- I merely summarize the kernel
+patches after reading them.  I try to make them useful to everyone,
+but kernel hackers should take them with a grain of salt and read the
+patches themselves.  The patch file is <a
+href="http://sunsite.unc.edu/pub/Linux/kernel/v1.1/patch92.gz">patch92.gz</a>
+</h5>
+<ul>
+<li>Remove selection from i386/config.in.
+<li>Don't worry about SONY CD errors when there's no caddy inserted.
+<li>Misc fixes to the SONY CDU-535 driver.
+<li>Selection, virtual console and console character set mapping code
+	split out into its own file.
+<li>Shift state handled differently in keyboard handler.
+<li>/dev/vcs added to control the virtual consoles.
+<li>TIOCLINUX 0, 8, and 9 ioctls removed -- use /dev/vcs.
+<li>PIO_UNIMAPCLR PIO_UNIMAP GIO_UNIMAP ioctls added for Unicode mapping in user space.
+<li>EATA/DMA driver (1.17.00) now disables DEBUG_RESET by default.
+	Register a board even if it does not assert DMA protocol
+	support (DPT SK2011B does not report correctly the dmasup
+	bit).
+<li>If we're removing the last SCSI host registered, it's safe to reuse
+	its host number (avoids memory holes at boot time).
+<li>Give SCSI CD-ROMs 50% more time to spin up.
+<li>UltraStor 14F/34F (1.17.00) now qualified to run with 32 sglists.  DEBUG_RESET
+	is disabled by default.
+<li>File locking removed dependency on file descriptors. dup()'ed file
+	descriptors now get the same locks as the original file
+	descriptors, and a close() on any file descriptor removes ALL
+	the locks on the file for the current process. Since locks
+	still depend on the process id, locks are inherited after an
+	exec() but not after a fork(). This agrees with POSIX, and
+	both BSD and SVR4 practice.
+<li>/proc/array updated for the new page_dir scheme from patch91.
+<li>Serious changes in the memory management code.
+<li>Proxy ARP now works for the whole network.
+<li>Fix ETH_P_ALL echoback lengths.
+</ul>
+<h3>[<a href="index.html">Index</a>][<a href="changes93.html">Next</a>]</h3>
+<!-- Date: 06 Mar 1995 05:28:47 GMT -->
+<!--#exec cmd="trailer"-->

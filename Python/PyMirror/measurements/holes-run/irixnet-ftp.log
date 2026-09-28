@@ -1,0 +1,9 @@
+=== Holes: entirely empty blocks in the middle of a file ===
+  (reads every file of 16 MB or more in full -- this takes a while)
+    19.0 MB     1/  20 blocks empty (5.0 %)  nekoware/obsolete/archive/GNUSparseFile.0/neko_gettext-0.17.tardist
+    43.0 MB     1/  44 blocks empty (2.3 %)  nekoware/obsolete/archive/GNUSparseFile.0/neko_thunderbird-2.0.0.25pre_mar2012.tardist
+    26.0 MB     1/  27 blocks empty (3.7 %)  nekoware/obsolete/archive/GNUSparseFile.0/neko_uhexen2-cvs-20090802.tardist
+  3 incomplete files, 507 files read in full
+
+
+=== archive finished ===  irixnet-ftp  487.6 s

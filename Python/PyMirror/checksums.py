@@ -14,9 +14,9 @@ collection, a media directory, anything -- written as one pair of files at its t
     collection.sha256sum    derived, in the format `sha256sum -c` reads
 
 Same format and the same incremental rule: a file is re-hashed only when its size or its mtime
-moved, compared in nanoseconds. The primitives come from mirror.py by import rather than by
-copying, because a manifest format defined in two places is a manifest format that will
-eventually disagree with itself.
+moved, compared in nanoseconds. The format itself -- the index, the sums file, the batched
+hashing -- comes from common.py, because a manifest format defined in two places is a manifest
+format that will eventually disagree with itself.
 
     python checksums.py --root /srv/collection            refresh
     python checksums.py --root /srv/collection --force    re-hash everything
@@ -35,39 +35,17 @@ WHAT TO LEAVE OUT
 """
 
 import argparse
-import importlib.util
 import os
 import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-
-INDEX_FILE = "collection-index.csv"
-SUMS_FILE = "collection.sha256sum"
+# RENAMED 2026-09-22: these were INDEX_FILE and SUMS_FILE here and in mirror.py, where
+# they name DIFFERENT files. One identifier, two meanings, in one directory.
+from common import (COLLECTION_INDEX, COLLECTION_SUMS, hash_tree, human,
+                    long_path, read_index, relative_to, write_index)
 
 # Top-level directories skipped unless --skip says otherwise. `mirror` is here because a mirror
 # tree carries its own manifest and must not be described twice; `__pycache__` is not content.
 SKIP_TOP = {"mirror", "__pycache__"}
-
-
-def _load_mirror_tool():
-    """Load mirror.py, which sits next to this file, by path.
-
-    By path and not by `import mirror`, because a directory named `mirror/` is a plausible thing
-    to find beside either script -- and it would be a candidate for the same module name, a
-    namespace package shadowing the module or not depending on how the script was started.
-    """
-    path = os.path.join(HERE, "mirror.py")
-    if not os.path.isfile(path):
-        sys.exit("mirror.py is expected next to this script, at %s.\n"
-                 "  The manifest format lives there; this tool only applies it to a tree that "
-                 "is not a mirror." % path)
-    spec = importlib.util.spec_from_file_location("_mirror_tool", path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
-mt = _load_mirror_tool()
 
 
 def iter_collection(root, skip):
@@ -79,10 +57,12 @@ def iter_collection(root, skip):
         for f in names:
             if f.endswith(".part"):
                 continue
-            if top and f in (INDEX_FILE, SUMS_FILE):
+            if top and f in (COLLECTION_INDEX, COLLECTION_SUMS):
                 continue
             full = os.path.join(dirpath, f)
-            yield os.path.relpath(full, root).replace(os.sep, "/"), full
+            rel = relative_to(root, full)
+            if rel is not None:
+                yield rel, full
 
 
 def main():
@@ -112,17 +92,17 @@ def main():
         sys.exit("--out names %s, which is not a directory." % out)
     skip = set(args.skip) if args.skip is not None else set(SKIP_TOP)
 
-    idx_path = os.path.join(out, INDEX_FILE)
-    sums_path = os.path.join(out, SUMS_FILE)
+    idx_path = os.path.join(out, COLLECTION_INDEX)
+    sums_path = os.path.join(out, COLLECTION_SUMS)
 
-    old = {} if args.force else mt.read_index(idx_path)
+    old = {} if args.force else read_index(idx_path)
     rows = {}
     todo = []
     todo_bytes = 0
 
     for rel, full in iter_collection(root, skip):
         try:
-            st = os.stat(mt.long_path(full))
+            st = os.stat(long_path(full))
         except OSError:
             continue
         prev = old.get(rel)
@@ -135,19 +115,19 @@ def main():
     total = len(rows) + len(todo)
     print("%s%s: %d files, %d carried over, %d to hash (%s)"
           % (root, " without %s" % "/, ".join(sorted(skip)) if skip else "",
-             total, len(rows), len(todo), mt.human(todo_bytes)), flush=True)
+             total, len(rows), len(todo), human(todo_bytes)), flush=True)
 
     if not todo:
         if rows == old and os.path.exists(idx_path) and os.path.exists(sums_path):
             print("unchanged", flush=True)
             return
-        mt.write_index(idx_path, sums_path, rows)
+        write_index(idx_path, sums_path, rows)
         print("nothing to hash, index rewritten", flush=True)
         return
 
-    done, done_bytes, failed, elapsed = mt.hash_tree(
+    done, done_bytes, failed, elapsed = hash_tree(
         todo, rows, args.workers, args.interval,
-        checkpoint=lambda: mt.write_index(idx_path, sums_path, rows))
+        checkpoint=lambda: write_index(idx_path, sums_path, rows))
 
     print("%d files indexed, %d hashed in %dm%02ds (%.0f MB/s)"
           % (len(rows), done, elapsed // 60, elapsed % 60,

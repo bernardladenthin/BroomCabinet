@@ -1,0 +1,7 @@
+=== Holes: entirely empty blocks in the middle of a file ===
+  (reads every file of 16 MB or more in full -- this takes a while)
+    18.8 MB    18/  19 blocks empty (94.7 %)  Miscellany/AlphaStations.avi
+  1 incomplete files, 15 files read in full
+
+
+=== archive finished ===  zx-alphant-nt  5.9 s

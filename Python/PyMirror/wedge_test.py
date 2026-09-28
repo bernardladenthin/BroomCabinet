@@ -129,6 +129,10 @@ SCENARIOS = {
 
 DRIVER = """
 import importlib.util, os, sys, time, types
+# mirror.py imports common.py from beside it. `python -c` leaves sys.path[0] as the
+# working directory, not the script's, so the directory has to be named here or the
+# import fails for a reason that has nothing to do with what is being tested.
+sys.path.insert(0, os.path.dirname(r'{mirror}'))
 spec = importlib.util.spec_from_file_location('mirror', r'{mirror}')
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 
@@ -160,7 +164,7 @@ def ITEM(i):
 # terminates the run and would read as a pass -- see the module docstring.
 args = types.SimpleNamespace(workers=8, queue=128, interval=3600, fresh=True,
                              case_sensitive=False, archive=None, seed=None,
-                             no_index=True, hash_workers=2)
+                             no_index=True, hash_workers=2, trust_index=False)
 try:
     m.mirror('wedgetest', 'http://127.0.0.1:9/', args)
 except BaseException as exc:
@@ -169,7 +173,8 @@ print('REACHED-END')
 """
 
 CONTRACT_CHECK = """
-import importlib.util, inspect, json, sys
+import importlib.util, inspect, json, os, sys
+sys.path.insert(0, os.path.dirname(r'{mirror}'))
 spec = importlib.util.spec_from_file_location('mirror', r'{mirror}')
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 bad = []
@@ -220,7 +225,8 @@ def main():
     print("mirror.py: %s\n" % MIRROR)
 
     out, _, _ = run(CONTRACT_CHECK.format(mirror=MIRROR, contract=json.dumps(CONTRACT)), 60)
-    line = next((ln for ln in out.splitlines() if ln.startswith("CONTRACT-")), "CONTRACT-FAIL: no output")
+    line = next((ln for ln in out.splitlines() if ln.startswith("CONTRACT-")),
+                "CONTRACT-FAIL: no output")
     print("  %s" % line)
     if not line.startswith("CONTRACT-OK"):
         print("\n  The stubs no longer match the code they replace. Fix them before believing\n"

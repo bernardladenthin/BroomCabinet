@@ -1,0 +1,8 @@
+=== Holes: entirely empty blocks in the middle of a file ===
+  (reads every file of 16 MB or more in full -- this takes a while)
+   315.3 MB    18/ 316 blocks empty (5.7 %)  drivers/SanDisk/DashboardSetupSA.exe
+   505.0 MB   308/ 506 blocks empty (60.9 %)  drivers/unsorted/sonic blue/ReplayTV/SYSTEM_BACKUPS/ReplayTV_Backup.rtv
+  2 incomplete files, 1003 files read in full
+
+
+=== archive finished ===  oldskool  697.5 s

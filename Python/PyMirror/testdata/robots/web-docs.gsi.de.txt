@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /~beamtime/php/beam_request_form.php
+Disallow: /~beamtime/php/beam_request_submit.php
+

@@ -1,0 +1,157 @@
+  ... (root)                       1 file
+  ... abc-bladet                   139 files
+  ... adoxa-dos                    441 files
+  ... agilent-ftp-2009             818 files
+  ... aix-orphans                  307 files
+  ... aix-qemu-git                 171 files
+  ... AIX5-IA64                    96 files
+  ... aixpdslib                    2186 files
+  ... aixtools                     115 files
+  ... apollo-clavius               240 files
+  ... ardent-tool                  25000 files so far
+  ... ardent-tool                  25706 files
+  ... biblionik-bull               279 files
+  ... bitsavers                    25000 files so far
+  ... bitsavers                    50000 files so far
+  ... bitsavers                    75000 files so far
+  ... bitsavers                    100000 files so far
+  ... bitsavers                    125000 files so far
+  ... bitsavers                    150000 files so far
+  ... bitsavers                    175000 files so far
+  ... bitsavers                    176032 files
+  ... bretjohnson                  54 files
+  ... bull-rpms                    7121 files
+  ... bull-srpms                   1877 files
+  ... bullfreeware                 14935 files
+  ... circle4                      413 files
+  ... crashing-org                 7235 files
+  ... crashing-org-kernel          761 files
+  ... crashing-org-www             7 files
+  ... cryp-to-cwg                  26 files
+  ... csiph-gallery                47 files
+  ... csri-toronto                 6 files
+  ... damage-rt                    270 files
+  ... debian-powerpc-boot          76 files
+  ... dec-ftp-2006                 22176 files
+  ... decromancer-bits             402 files
+  ... develooper-hpux              584 files
+  ... devicetree-openfirmware      127 files
+  ... dialectronics                280 files
+  ... filibeto-aix-lib             178 files
+  ... fsck-aix-apps                359 files
+  ... fsck-aix-media               612 files
+  ... fsck-ibm-other               1331 files
+  ... fsck-vendors                 9376 files
+  ... funet-aix                    46 files
+  ... giga-nl-walter               529 files
+  ... gsi-collection               6243 files
+  ... hp-alphaserver-2008          10206 files
+  ... hp-labs-2007                 9175 files
+  ... hp-labs-linux-salvage        129 files
+  ... hp-openvms-2008              25000 files so far
+  ... hp-openvms-2008              27377 files
+  ... ia-bull-aix433-2005          205 files
+  ... ia-bull-aix433-2013          252 files
+  ... ia-bull-toolbox-43           276 files
+  ... ia-bullfreeware              11974 files
+  ... ibiblio-historic-linux       25000 files so far
+  ... ibiblio-historic-linux       50000 files so far
+  ... ibiblio-historic-linux       75000 files so far
+  ... ibiblio-historic-linux       100000 files so far
+  ... ibiblio-historic-linux       125000 files so far
+  ... ibiblio-historic-linux       150000 files so far
+  ... ibiblio-historic-linux       175000 files so far
+  ... ibiblio-historic-linux       200000 files so far
+  ... ibiblio-historic-linux       225000 files so far
+  ... ibiblio-historic-linux       225114 files
+  ... ibiblio-ppc-ports            6 files
+  ... ibm-aix                      25000 files so far
+  ... ibm-aix                      50000 files so far
+  ... ibm-aix                      75000 files so far
+  ... ibm-aix                      100000 files so far
+  ... ibm-aix                      125000 files so far
+  ... ibm-aix                      150000 files so far
+  ... ibm-aix                      175000 files so far
+  ... ibm-aix                      190978 files
+  ... ibm-openxl-docs              799 files
+  ... ibm-redbooks                 2875 files
+  ... ibm-rs6000-support           1623 files
+  ... iffly-wiki                   972 files
+  ... infania-os-history           1015 files
+  ... infania-solaris              2563 files
+  ... infania-tl1                  18773 files
+  ... infania-tl2                  19852 files
+  ... infania-unixos2              44 files
+  ... irixnet-ftp                  2774 files
+  ... linuxfoundation-refspecs     259 files
+  ... logs                         315 files
+  ... misterhayden                 149 files
+  ... mpoli-bbs                    23184 files
+  ... ndwiki-norsk-data            3847 files
+  ... next-68k-org                 25000 files so far
+  ... next-68k-org                 50000 files so far
+  ... next-68k-org                 75000 files so far
+  ... next-68k-org                 100000 files so far
+  ... next-68k-org                 125000 files so far
+  ... next-68k-org                 150000 files so far
+  ... next-68k-org                 175000 files so far
+  ... next-68k-org                 200000 files so far
+  ... next-68k-org                 225000 files so far
+  ... next-68k-org                 234765 files
+  ... nice-next                    4543 files
+  ... novasareforever-aviion       373 files
+  ... oldskool                     25000 files so far
+  ... oldskool                     50000 files so far
+  ... oldskool                     75000 files so far
+  ... oldskool                     77632 files
+  ... os2bbs                       21480 files
+  ... oss4aix.org                  25000 files so far
+  ... oss4aix.org                  50000 files so far
+  ... oss4aix.org                  75000 files so far
+  ... oss4aix.org                  100000 files so far
+  ... oss4aix.org                  125000 files so far
+  ... oss4aix.org                  150000 files so far
+  ... oss4aix.org                  175000 files so far
+  ... oss4aix.org                  184469 files
+  ... parisc-firmware              41 files
+  ... penguinppc                   626 files
+  ... perzl-wiki                   1114 files
+  ... ps-2.kev009.com              25000 files so far
+  ... ps-2.kev009.com              50000 files so far
+  ... ps-2.kev009.com              75000 files so far
+  ... ps-2.kev009.com              100000 files so far
+  ... ps-2.kev009.com              125000 files so far
+  ... ps-2.kev009.com              150000 files so far
+  ... ps-2.kev009.com              175000 files so far
+  ... ps-2.kev009.com              200000 files so far
+  ... ps-2.kev009.com              206414 files
+  ... rs6000-microcode             202 files
+  ... rwth-aachen-ftp              10565 files
+  ... sco-devspecs                 17 files
+  ... sco-gabi                     139 files
+  ... somuchstuff-pdp8             25000 files so far
+  ... somuchstuff-pdp8             50000 files so far
+  ... somuchstuff-pdp8             75000 files so far
+  ... somuchstuff-pdp8             100000 files so far
+  ... somuchstuff-pdp8             110576 files
+  ... square7-vintage              401 files
+  ... sun3arc                      1110 files
+  ... technologists-dellunix       9 files
+  ... technologists-sauer          62 files
+  ... techsysadm                   365 files
+  ... transputer-classiccmp        1066 files
+  ... tuhs                         12143 files
+  ... tvsat-cpc710                 5 files
+  ... typewritten                  3413 files
+  ... ultimate-fastpath            41 files
+  ... vtda                         25000 files so far
+  ... vtda                         29763 files
+  ... wotug-inmos                  64 files
+  ... zx-alphant-nt                524 files
+  ... zx-be-os                     1749 files
+  ... zx-gatekeeper-dec            9187 files
+  ... zx-hobbes-os2                10726 files
+  ... zx-kednos-vms                638 files
+  ... zx-microway                  478 files
+  ... zx-sgi-freeware-old          1299 files
+  ... zx-ultrix-freeware           19 files

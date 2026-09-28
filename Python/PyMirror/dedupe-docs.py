@@ -50,53 +50,20 @@ WHERE THINGS LIVE
 import argparse
 import collections
 import csv
-import hashlib
 import io
 import os
 import sys
 
+from common import human, long_path, sha256_file
+
+from common import COLLECTION_INDEX, EMPTY_SHA256, INDEX_FILE
+
 DOCS = "docs"
-COLLECTION_INDEX = "collection-index.csv"
-MIRROR_INDEX = ".mirror-index.csv"
 REPORT = "dedupe-docs-report.csv"
-
-CHUNK = 1 << 20
-EMPTY_SHA = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-
-
-def long_path(path):
-    """Windows refuses paths over 260 characters without the \\\\?\\ prefix.
-
-    Not via os.path.abspath(): normalising strips a trailing dot, and the prefix exists partly to
-    preserve exactly that. Here the consequence is quiet rather than loud -- a stat that fails
-    turns into "cannot verify", so the file is skipped and kept. Safe, but it hides work.
-    """
-    if os.name != "nt":
-        return path
-    if not os.path.isabs(path):
-        path = os.path.join(os.getcwd(), path)
-    path = path.replace("/", "\\")
-    return path if path.startswith("\\\\?\\") else "\\\\?\\" + path
-
-
-def sha256_file(path):
-    h = hashlib.sha256()
-    with open(long_path(path), "rb") as fh:
-        for chunk in iter(lambda: fh.read(CHUNK), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
 
 def load_index(path):
     with io.open(path, encoding="utf-8", newline="") as fh:
         return [(r["path"], int(r["size"]), r["sha256"]) for r in csv.DictReader(fh)]
-
-
-def human(n):
-    for unit in ("B", "K", "M", "G"):
-        if abs(n) < 1024 or unit == "G":
-            return "%.1f%s" % (n, unit)
-        n /= 1024.0
 
 
 def main():
@@ -135,7 +102,7 @@ def main():
     # --- propose pairs from the manifests -----------------------------------
     mirror_by_hash = collections.defaultdict(list)
     for arch in sorted(os.listdir(mirror_root)):
-        idx = os.path.join(mirror_root, arch, MIRROR_INDEX)
+        idx = os.path.join(mirror_root, arch, INDEX_FILE)
         if os.path.exists(idx):
             for rel, size, digest in load_index(idx):
                 mirror_by_hash[digest].append((arch, rel))
@@ -145,7 +112,7 @@ def main():
                  % (mirror_root, mirror_root))
 
     candidates = [(p, s, h) for p, s, h in load_index(index_path)
-                  if p.startswith(prefixes) and h != EMPTY_SHA and h in mirror_by_hash]
+                  if p.startswith(prefixes) and h != EMPTY_SHA256 and h in mirror_by_hash]
 
     print("Under: %s" % ", ".join(prefixes))
     print("%d candidates from the manifests (%s)"

@@ -1,0 +1,13 @@
+#Sitemap: http://files.mpoli.fi/sitemap-9.txt
+#Sitemap: http://files.mpoli.fi/sitemap-8.txt
+#Sitemap: http://files.mpoli.fi/sitemap-7.txt
+#Sitemap: http://files.mpoli.fi/sitemap-6.txt
+#Sitemap: http://files.mpoli.fi/sitemap-5.txt
+#Sitemap: http://files.mpoli.fi/sitemap-4.txt
+#Sitemap: http://files.mpoli.fi/sitemap-3.txt
+#Sitemap: http://files.mpoli.fi/sitemap-2.txt
+#Sitemap: http://files.mpoli.fi/sitemap-1.txt
+#Sitemap: http://files.mpoli.fi/sitemap-0.txt
+
+#User-agent: ia_archiver
+#Disallow: /unpacked/

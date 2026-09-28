@@ -5,3 +5,11 @@
 target/
 __pycache__/
 *.pyc
+.vscode/
+
+# The working copy `contract-mutations.py` holds while it breaks a library rule on purpose,
+# runs the suite, and puts the original back. It exists for seconds at a time -- but while it
+# does, the real file is DELIBERATELY BROKEN and this one holds the good bytes. Committing in
+# that window would take both: a mutated library, and a stray copy explaining nothing.
+# Seen on 2026-09-25, when two runs overlapped and `git status` showed exactly that pair.
+*.mutating

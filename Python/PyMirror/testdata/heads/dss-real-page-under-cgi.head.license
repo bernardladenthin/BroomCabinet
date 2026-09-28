@@ -1,0 +1,7 @@
+SPDX-FileCopyrightText: the first 512 bytes of seds-frommert/ngc/ngcdss.cgi, as held in this
+  collection. Quoted as the NEGATIVE case beside the three above: a genuine page from the same
+  directory, the same generator and the same `.cgi` extension, which the error-page check must
+  NOT report. A fixture set that only holds examples of what a rule catches proves half of it;
+  the file itself is 866 bytes and is not reproduced here.
+
+SPDX-License-Identifier: LicenseRef-factual-listing

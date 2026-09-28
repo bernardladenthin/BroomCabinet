@@ -1,0 +1,20 @@
+=== Holes: entirely empty blocks in the middle of a file ===
+  (reads every file of 16 MB or more in full -- this takes a while)
+    73.8 MB    13/  74 blocks empty (17.6 %)  Apple/MacTest/Mactest Pro G3/MTP G3 7.5.2 03-04.cdr
+   612.4 MB     2/ 613 blocks empty (0.3 %)  Be/BeOS Install Media/BeOS 5.0 Professional/Alternate Install Media/BeOS R5 for PPC and x86.toast
+   284.9 MB     2/ 285 blocks empty (0.7 %)  Silicon Graphics/IRIX Install Media/SGI IRIX 4D1 3.3 (Tape)/Tape Images.rar
+    44.2 MB     9/  45 blocks empty (20.0 %)  Silicon Graphics/IRIX Install Media/SGI IRIX 6.1 (R8000)/Patches/6.1_Indigo2_Power_ChallengeM.tardist
+    46.4 MB    10/  47 blocks empty (21.3 %)  Silicon Graphics/IRIX Install Media/SGI IRIX 6.1 (R8000)/Patches/6.1_Power_Challenge_Power_Onyx.tardist
+   270.8 MB    11/ 271 blocks empty (4.1 %)  Silicon Graphics/IRIX Install Media/SGI IRIX 6.2/Patches/6.2_All-Challenge_All-Onyx.tardist
+    94.1 MB    12/  95 blocks empty (12.6 %)  Silicon Graphics/IRIX Install Media/SGI IRIX 6.2/Patches/6.2_Crimson.tardist
+   319.2 MB    12/ 320 blocks empty (3.8 %)  Silicon Graphics/IRIX Install Media/SGI IRIX 6.2/Patches/6.2_Indigo_Indy_ChallengeS_All-Indigo2.tardist
+   114.0 MB    12/ 114 blocks empty (10.5 %)  Silicon Graphics/IRIX Install Media/SGI IRIX 6.2/Patches/6.2_y2k.tardist
+   548.2 MB    15/ 549 blocks empty (2.7 %)  Silicon Graphics/IRIX Install Media/SGI IRIX 6.5/SGI IRIX 6.5.0/_Unsorted/irix-65-foundation1.efs
+   258.4 MB    16/ 259 blocks empty (6.2 %)  Silicon Graphics/IRIX Install Media/SGI IRIX 6.5/SGI IRIX 6.5.0/_Unsorted/irix-65-foundation2.efs
+   373.4 MB    30/ 374 blocks empty (8.0 %)  Sun Microsystems/Solaris Install Media/Oracle Solaris 11/Oracle Solaris 11 Express 11-2010/sol-11-exp-201011-ai-x86.usb
+   824.4 MB    68/ 825 blocks empty (8.2 %)  Sun Microsystems/Solaris Install Media/Oracle Solaris 11/Oracle Solaris 11 Express 11-2010/sol-11-exp-201011-live-x86.usb
+   574.2 MB    46/ 575 blocks empty (8.0 %)  Sun Microsystems/Solaris Install Media/Oracle Solaris 11/Oracle Solaris 11 Express 11-2010/sol-11-exp-201011-text-x86.usb
+  14 incomplete files, 728 files read in full
+
+
+=== archive finished ===  fsck-vendors  1175.3 s
