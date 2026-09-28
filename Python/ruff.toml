@@ -9,5 +9,16 @@
 # the unpinned `pip install ruff` in python-ci.yml every module went red on main without a line of
 # code changing. These are the rules the scripts were written against -- syntax errors, undefined
 # names, unused imports and the like. Widening them is a separate, deliberate change.
+# W605 IS THE ONE ADDITION TO THAT SET, AND IT WAS EARNED. On 2026-09-27 a PyMirror test file
+# went in carrying `"C:\mirror\\"` -- an invalid escape sequence, which Python accepts today and
+# warns about. `ruff check .` passed it, because W is not in the group above, and Python CI runs
+# exactly that. It was caught only by a LOCAL `compileall -W error::SyntaxWarning`, which CI does
+# not run, so on any other day it reaches main and every later run prints a warning nobody put
+# there.
+#
+# It costs nothing and it is not taste: `--select W605` over the whole repository finds no further
+# case, and "this string does not mean what it looks like" is a defect in the same family as E7,
+# not a style preference. The alternative -- a compileall step in the workflow -- catches the same
+# class and adds a job step; this adds a word.
 [lint]
-select = ["E4", "E7", "E9", "F"]
+select = ["E4", "E7", "E9", "F", "W605"]

@@ -1,0 +1,43 @@
+{
+ "measured": "2026-09-24",
+ "source": "oldskool/CMSSoundPatches/Games/ULTIMA6/SAVEGAME",
+ "objblk_files": 69,
+ "size_matches_header": 68,
+ "short": [
+  [
+   "OBJBLKDF",
+   3089,
+   3090
+  ]
+ ],
+ "cases": [
+  {
+   "file": "OBJBLKAF",
+   "bytes": 2,
+   "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+   "objects": 0,
+   "why": "all zeros, 2 bytes: the record is COMPLETE and says zero objects"
+  },
+  {
+   "file": "OBJBLKAA",
+   "bytes": 18,
+   "sha256": "8fd9e8de640735f096a54d3402f3373972061107f1080da843c5485b6e02b7dc",
+   "objects": 2,
+   "why": "the smallest non-empty one, 18 B = 2 + 8 x 2"
+  },
+  {
+   "file": "OBJBLKAC",
+   "bytes": 74,
+   "sha256": "c22df36288dd832a11f2bfef3ab0948f0d85c3f7c1e00c6c6ef0a4244791c3cb",
+   "objects": 9,
+   "why": "74 B = 2 + 8 x 9, a second witness for the record size"
+  },
+  {
+   "file": "OBJBLKDF",
+   "bytes": 3089,
+   "sha256": "b235e47f56c67d33fd184b9cd6b73aeaf8ed89a5a0af9102de92b2e426d48312",
+   "objects": 386,
+   "why": "3089 B where its own header demands 3090 -- ONE BYTE SHORT"
+  }
+ ]
+}

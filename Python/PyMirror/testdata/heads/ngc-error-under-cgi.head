@@ -1,0 +1,24 @@
+<html><head>
+<title>    NGC Error !</title>
+
+<link rev="owner" title="Contact Maintainer" href="http://spider.seds.org/Contact/spider.html">
+<meta name="author" content="Hartmut Frommert">
+<meta name="distribution" value="global">
+</head>
+
+<body>
+
+<h2>    NGC Error !</h2>
+
+Erroneous input !
+Only NGC, IC, and Messier catalog inquiries accepted.
+<p>
+
+<hr>
+
+<b>New search</b>:
+<p>
+
+Please type in the NGC number (number only, or preceded by "N" or "NGC")
+or the IC number preceded by "I" or "IC",
+or the Messier n

@@ -1,0 +1,93 @@
+[
+ {
+  "file": "irixnet.org.txt",
+  "host": "irixnet.org",
+  "url": "https://irixnet.org/robots.txt",
+  "path": "/",
+  "bytes": 4909,
+  "sha256": "2631c520c0ff92faff94aba1b412ccdc4f0138b17cccb7a5bd6ad150e3f4ed4e",
+  "verdict": [
+   "OPEN",
+   "robots.txt carries no rule that reaches us"
+  ],
+  "why": "188 named agents sharing one Disallow and NO `User-agent: *` anywhere -- an agent that is not named has no rule"
+ },
+ {
+  "file": "4corn.co.uk.txt",
+  "host": "4corn.co.uk",
+  "url": "https://4corn.co.uk/robots.txt",
+  "path": "/",
+  "bytes": 1227,
+  "sha256": "33abf1c1941231c0753785412a5a30eaa91095e439c409e81782af28ca6764dd",
+  "verdict": [
+   "NO-OP BLOCK",
+   "names us in a group of 45 agents, but its Disallow is EMPTY -- honour the intent, not the syntax"
+  ],
+  "why": "45 AI agents listed with an EMPTY Disallow, which by the letter of the standard permits everything. A machine may not read a typo as consent"
+ },
+ {
+  "file": "ps-2.kev009.com.txt",
+  "host": "ps-2.kev009.com",
+  "url": "https://ps-2.kev009.com/robots.txt",
+  "path": "/rs6000/",
+  "bytes": 253,
+  "sha256": "e29a2da83dc15caf7d4b8b3c6f2c85f1a3cf51af7c1522fa65539e9f25763693",
+  "verdict": [
+   "OPEN",
+   "robots.txt carries no rule that reaches us"
+  ],
+  "why": "a live host this collection fetches from"
+ },
+ {
+  "file": "ardent-tool.com.txt",
+  "host": "ardent-tool.com",
+  "url": "https://ardent-tool.com/robots.txt",
+  "path": "/",
+  "bytes": 93,
+  "sha256": "180274b13a299e6e49c1582265746bc008f841f3b2c928ede67ce6d6bc198cf8",
+  "verdict": [
+   "OPEN",
+   "robots.txt carries no rule that reaches us"
+  ],
+  "why": "a live host this collection fetches from"
+ },
+ {
+  "file": "files.mpoli.fi.txt",
+  "host": "files.mpoli.fi",
+  "url": "https://files.mpoli.fi/robots.txt",
+  "path": "/hardware/",
+  "bytes": 508,
+  "sha256": "b8a3adec9952cbe95a2816286a231096b880c69acea876c8f82966ec1d40eda9",
+  "verdict": [
+   "OPEN",
+   "robots.txt carries no rule that reaches us"
+  ],
+  "why": "a live host this collection fetches from"
+ },
+ {
+  "file": "web-docs.gsi.de.txt",
+  "host": "web-docs.gsi.de",
+  "url": "https://web-docs.gsi.de/robots.txt",
+  "path": "/~kraemer/COLLECTION/",
+  "bytes": 120,
+  "sha256": "c9a2ce564b9dc3a915b68afc141da1402952def6802d05469fec2055c05c85cb",
+  "verdict": [
+   "OPEN",
+   "robots.txt carries no rule that reaches us"
+  ],
+  "why": "a live host this collection fetches from"
+ },
+ {
+  "file": "bitsavers.org.txt",
+  "host": "bitsavers.org",
+  "url": "https://bitsavers.org/robots.txt",
+  "path": "/",
+  "bytes": 0,
+  "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "verdict": [
+   "OPEN",
+   "robots.txt carries no rule that reaches us"
+  ],
+  "why": "an EMPTY robots.txt -- zero bytes, which is not the same as no robots.txt and not the same as a blanket refusal"
+ }
+]

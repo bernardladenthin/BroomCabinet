@@ -1,0 +1,202 @@
+=== holes: 99 archive(s), 0 already done, 99 to go ===
+    done 0 B, left 3.98 TB (marker figures, whole archives -- not the >= 16 MB subset)
+[1/99] bitsavers                             1.20 TB
+        21 finding(s)
+[2/99] ibm-aix                             702.37 GB
+        15 finding(s)
+[3/99] fsck-vendors                        403.65 GB
+        14 finding(s)
+[4/99] ps-2.kev009.com                     342.00 GB
+        2 finding(s)
+[5/99] vtda                                234.73 GB
+        0 finding(s)
+[6/99] oss4aix.org                         207.96 GB
+        0 finding(s)
+[7/99] oldskool                            149.23 GB
+        2 finding(s)
+[8/99] fsck-ibm-other                      105.94 GB
+        9 finding(s)
+[9/99] fsck-aix-media                       70.12 GB
+        0 finding(s)
+[10/99] ia-bullfreeware                      66.16 GB
+        0 finding(s)
+[11/99] irixnet-ftp                          53.62 GB
+        3 finding(s)
+[12/99] bullfreeware                         49.40 GB
+        0 finding(s)
+[13/99] bull-rpms                            45.81 GB
+        0 finding(s)
+[14/99] next-68k-org                         37.65 GB
+        0 finding(s)
+[15/99] dec-ftp-2006                         36.04 GB
+        0 finding(s)
+[16/99] ibm-rs6000-support                   27.12 GB
+        0 finding(s)
+[17/99] ardent-tool                          22.00 GB
+        0 finding(s)
+[18/99] somuchstuff-pdp8                     19.17 GB
+        0 finding(s)
+[19/99] bull-srpms                           19.17 GB
+        0 finding(s)
+[20/99] ibm-redbooks                         16.94 GB
+        0 finding(s)
+[21/99] fsck-aix-apps                        16.76 GB
+        0 finding(s)
+[22/99] infania-solaris                      16.44 GB
+        0 finding(s)
+[23/99] zx-microway                          15.66 GB
+        0 finding(s)
+[24/99] ibiblio-historic-linux               15.44 GB
+        0 finding(s)
+[25/99] develooper-hpux                      12.61 GB
+        0 finding(s)
+[26/99] os2bbs                               10.82 GB
+        0 finding(s)
+[27/99] rwth-aachen-ftp                      10.27 GB
+        0 finding(s)
+[28/99] tuhs                                  9.33 GB
+        0 finding(s)
+[29/99] zx-hobbes-os2                         8.83 GB
+        0 finding(s)
+[30/99] zx-gatekeeper-dec                     8.59 GB
+        0 finding(s)
+[31/99] mpoli-bbs                             5.66 GB
+        0 finding(s)
+[32/99] hp-labs-2007                          3.98 GB
+        0 finding(s)
+[33/99] novasareforever-aviion                3.96 GB
+        0 finding(s)
+[34/99] crashing-org-kernel                   3.81 GB
+        0 finding(s)
+[35/99] gsi-collection                        3.11 GB
+        0 finding(s)
+[36/99] zx-ultrix-freeware                    2.62 GB
+        0 finding(s)
+[37/99] agilent-ftp-2009                      2.47 GB
+        0 finding(s)
+[38/99] ia-bull-aix433-2013                   2.36 GB
+        0 finding(s)
+[39/99] transputer-classiccmp                 1.86 GB
+        0 finding(s)
+[40/99] ndwiki-norsk-data                     1.72 GB
+        0 finding(s)
+[41/99] zx-alphant-nt                         1.66 GB
+        1 finding(s)
+[42/99] nice-next                             1.32 GB
+        0 finding(s)
+[43/99] hp-openvms-2008                       1.28 GB
+        0 finding(s)
+[44/99] zx-kednos-vms                         1.17 GB
+        0 finding(s)
+[45/99] hp-alphaserver-2008                   1.05 GB
+        0 finding(s)
+[46/99] ia-bull-aix433-2005                 980.67 MB
+        0 finding(s)
+[47/99] zx-sgi-freeware-old                 944.43 MB
+        0 finding(s)
+[48/99] filibeto-aix-lib                    841.13 MB
+        0 finding(s)
+[49/99] crashing-org                        744.71 MB
+        0 finding(s)
+[50/99] ia-bull-toolbox-43                  695.40 MB
+        0 finding(s)
+[51/99] decromancer-bits                    668.29 MB
+        0 finding(s)
+[52/99] zx-be-os                            539.50 MB
+        0 finding(s)
+[53/99] damage-rt                           504.03 MB
+        0 finding(s)
+[54/99] abc-bladet                          454.87 MB
+        0 finding(s)
+[55/99] biblionik-bull                      360.57 MB
+        0 finding(s)
+[56/99] technologists-sauer                 344.52 MB
+        0 finding(s)
+[57/99] AIX5-IA64                           325.40 MB
+        0 finding(s)
+[58/99] giga-nl-walter                      319.98 MB
+        0 finding(s)
+[59/99] infania-tl1                         269.79 MB
+        0 finding(s)
+[60/99] aixtools                            263.49 MB
+        0 finding(s)
+[61/99] infania-tl2                         254.76 MB
+        0 finding(s)
+[62/99] sun3arc                             222.32 MB
+        0 finding(s)
+[63/99] circle4                             188.87 MB
+        0 finding(s)
+[64/99] square7-vintage                     103.86 MB
+        0 finding(s)
+[65/99] rs6000-microcode                     81.18 MB
+        0 finding(s)
+[66/99] technologists-dellunix               78.62 MB
+        0 finding(s)
+[67/99] adoxa-dos                            75.99 MB
+        0 finding(s)
+[68/99] penguinppc                           75.97 MB
+        0 finding(s)
+[69/99] debian-powerpc-boot                  73.06 MB
+        0 finding(s)
+[70/99] bretjohnson                          70.24 MB
+        0 finding(s)
+[71/99] aix-orphans                          70.00 MB
+        0 finding(s)
+[72/99] infania-os-history                   68.60 MB
+        0 finding(s)
+[73/99] aix-qemu-git                         63.67 MB
+        0 finding(s)
+[74/99] parisc-firmware                      40.87 MB
+        0 finding(s)
+[75/99] techsysadm                           38.98 MB
+        0 finding(s)
+[76/99] dialectronics                        29.79 MB
+        0 finding(s)
+[77/99] typewritten                          25.46 MB
+        0 finding(s)
+[78/99] apollo-clavius                       23.76 MB
+        0 finding(s)
+[79/99] cryp-to-cwg                          21.64 MB
+        0 finding(s)
+[80/99] devicetree-openfirmware              17.36 MB
+        0 finding(s)
+[81/99] sco-devspecs                         15.73 MB
+        0 finding(s)
+[82/99] csiph-gallery                        11.17 MB
+        0 finding(s)
+[83/99] wotug-inmos                           9.47 MB
+        0 finding(s)
+[84/99] aixpdslib                             8.15 MB
+        0 finding(s)
+[85/99] ibiblio-ppc-ports                     8.06 MB
+        0 finding(s)
+[86/99] funet-aix                             7.23 MB
+        0 finding(s)
+[87/99] linuxfoundation-refspecs              6.94 MB
+        0 finding(s)
+[88/99] ibm-openxl-docs                       6.52 MB
+        0 finding(s)
+[89/99] iffly-wiki                            6.03 MB
+        0 finding(s)
+[90/99] hp-labs-linux-salvage                 4.07 MB
+        0 finding(s)
+[91/99] ultimate-fastpath                     3.78 MB
+        0 finding(s)
+[92/99] misterhayden                          3.71 MB
+        0 finding(s)
+[93/99] perzl-wiki                            3.19 MB
+        0 finding(s)
+[94/99] sco-gabi                              1.73 MB
+        0 finding(s)
+[95/99] tvsat-cpc710                        436.25 kB
+        0 finding(s)
+[96/99] infania-unixos2                     272.71 kB
+        0 finding(s)
+[97/99] csri-toronto                         63.32 kB
+        0 finding(s)
+[98/99] crashing-org-www                      5.59 kB
+        0 finding(s)
+[99/99] logs                                      0 B
+        0 finding(s)
+
+=== 99 archive(s) read, 67 finding(s), 0 failed ===

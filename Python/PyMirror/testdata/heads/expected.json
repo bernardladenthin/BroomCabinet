@@ -1,0 +1,171 @@
+[
+  {
+    "file": "gif-missing-first-byte.head",
+    "from": "hp-openvms-2008/doc/73final/5932/ZK-1933.gif",
+    "full_size": 18759,
+    "head_sha256": "10a8a46ab7720aa2375ac4870e5f1c2ad96176a0f080164c01fe4f367678ad38",
+    "what": "a GIF whose first byte is gone: the file opens F87ac, one byte into GIF87a",
+    "verdict": "does not begin with the .gif signature",
+    "error_page": null
+  },
+  {
+    "file": "jpeg-header-overwritten.head",
+    "from": "os2bbs/bitmap/becvic.jpg",
+    "full_size": 282476,
+    "head_sha256": "94c651c1aa0028bc66528037e83759de86500d93bc7d7e7ff4b2ad5c1ff497eb",
+    "what": "the four JPEG bytes replaced by yOya, with JFIF still legible two bytes later",
+    "verdict": "does not begin with the .jpg signature",
+    "error_page": null
+  },
+  {
+    "file": "html-behind-a-comment.jpg.head",
+    "from": "bullfreeware/bullfreeware.com/aixl.jpg",
+    "full_size": 7531,
+    "head_sha256": "dbb02560f5a0e41b0b58d4a069e4f6722cf0ada409a0b32f9017e80af63bbf15",
+    "what": "an HTML page under an image name that opens with a comment, not with the doctype",
+    "verdict": "HTML under a .jpg name",
+    "error_page": null
+  },
+  {
+    "file": "html-behind-a-comment.rpm.head",
+    "from": "bull-srpms/redis/redis-2.6.16-1.src.rpm",
+    "full_size": 7655,
+    "head_sha256": "dbb02560f5a0e41b0b58d4a069e4f6722cf0ada409a0b32f9017e80af63bbf15",
+    "what": "the same page under a package name, which is how it was first found",
+    "verdict": "HTML under a .rpm name",
+    "error_page": null
+  },
+  {
+    "file": "zero-filled.jpg.head",
+    "from": "hp-alphaserver-2008/alphaserver/docs/partitions/WebHelp/cablelegend.jpg",
+    "full_size": 3429,
+    "head_sha256": "076a27c79e5ace2a3d47f9dd2e83e4ff6ea8872b3c2218f66c92b89b55f36560",
+    "what": "an image of nothing at all",
+    "verdict": "does not begin with the .jpg signature",
+    "error_page": null
+  },
+  {
+    "file": "http-response-kept.pdf.head",
+    "from": "ps-2.kev009.com/pccbbs/networkcomputer/amereagl.pdf",
+    "full_size": 195459,
+    "head_sha256": "fab42a66c515369ff873cc09b2dfa9d91851720bafad87556d2a1b5edf2bce2c",
+    "what": "a raw HTTP response stored as the file, headers and all -- the source serves it this way",
+    "verdict": "does not begin with the .pdf signature",
+    "error_page": null
+  },
+  {
+    "file": "directory-page.head",
+    "from": "bullfreeware/bullfreeware.com/download/index.html",
+    "full_size": 1142,
+    "head_sha256": "c82ebb12358099d87d8e07c6583dd5c9ebb92c16c1bfa410e5bddaf5f232c4a0",
+    "what": "a generated directory index, the shape that blocks a whole subtree when saved as a file",
+    "verdict": "a generated directory listing saved as a file",
+    "error_page": null
+  },
+  {
+    "file": "installshield-under-dot-z.head",
+    "from": "mpoli-bbs/drivers_1/CD/TEAC/6X/TEACCDP.Z",
+    "full_size": 89074,
+    "head_sha256": "2ec3bd687521225b0f816b85ef02f1b4926a0f2a753d75b1d6554b7b3118b197",
+    "what": "an InstallShield 3.x Z archive under a .Z name, which compress(1) also claims",
+    "verdict": "does not begin with the .z signature",
+    "error_page": null
+  },
+  {
+    "file": "pdf-damaged-at-the-source.head",
+    "from": "ps-2.kev009.com/rs6000/manuals/SAN/DS4000_FAStT/DS4000_FAStT/FAStT_CD/5196_NAS_300G/Service_Guide.pdf",
+    "full_size": 5208540,
+    "head_sha256": "416878f9181724b51f082a003692521a1ec3fdf3e1d954292f965c0006443522",
+    "what": "a PDF whose header is gone and whose tail stops mid-object -- byte-identical to what the source still serves",
+    "verdict": "does not begin with the .pdf signature",
+    "error_page": null
+  },
+  {
+    "file": "geocities-under-pdf.head",
+    "from": "ps-2.kev009.com/basil.holloway/ALL PDF/cs4231a.pdf",
+    "full_size": 7461,
+    "head_sha256": "8c513225de3560469c4b78830202b60fb6811be67898b82d6f6890900c401bd3",
+    "what": "a Yahoo! GeoCities shutdown page where a PDF should be -- the source still serves it",
+    "verdict": "HTML under a .pdf name",
+    "error_page": null
+  },
+  {
+    "file": "ibm-marketing-under-pdf.head",
+    "from": "ps-2.kev009.com/basil.holloway/ALL PDF/sa380544.pdf",
+    "full_size": 51919,
+    "head_sha256": "3dd73d914cce3efe661f3397e54e772d6083e0c1960270b0e45f3e136764145a",
+    "what": "an IBM eServer marketing page under a manual's name, served by the source to this day",
+    "verdict": "HTML under a .pdf name",
+    "error_page": null
+  },
+  {
+    "file": "wayback-under-tar-z.head",
+    "from": "ardent-tool/comms/rcm204a.tar.z",
+    "full_size": 2376,
+    "head_sha256": "3ca2481265a93caa276d3861424ad082e88056e129d5c3b7f121df921c9da165",
+    "what": "an Internet Archive Wayback page stored as a compressed tarball",
+    "verdict": "HTML under a .z name",
+    "error_page": null
+  },
+  {
+    "file": "notfound-under-zip.head",
+    "from": "mpoli-bbs/hardware/DISPLAY/S3/964N3S3.ZIP",
+    "full_size": 177,
+    "head_sha256": "222e52b60563fc6977f1bc0abba7a35b25fb971ec7586e89294b51633ae623d5",
+    "what": "a 404 page under a .ZIP name -- 177 bytes, so this fixture is the WHOLE file",
+    "verdict": "HTML under a .zip name",
+    "error_page": [
+      "not found",
+      "stock",
+      "404 File Not Found"
+    ]
+  },
+  {
+    "file": "ngc-error-under-cgi.head",
+    "from": "seds-frommert/ngc/ngc.cgi",
+    "full_size": 1038,
+    "head_sha256": "529f6602a583a461305ac09f0b7bddf25346cbb1bc333c1c70d2d5d5fc9a6a12",
+    "what": "a CGI form handler's error page, HTTP 200, under the .cgi name it is entitled to",
+    "verdict": null,
+    "error_page": [
+      "error",
+      "weak",
+      "NGC Error !"
+    ]
+  },
+  {
+    "file": "ngc-error-in-french.head",
+    "from": "seds-frommert/ngc/ngc_fr.cgi",
+    "full_size": 1303,
+    "head_sha256": "928e8043c289552856c1110866149b13725015585ce6cbce1bb840a80250d650",
+    "what": "the same error page in French: `Erreur NGC !`, which is why the vocabulary is not English",
+    "verdict": null,
+    "error_page": [
+      "error",
+      "weak",
+      "Erreur NGC !"
+    ]
+  },
+  {
+    "file": "ngcic-error-in-a-heading.head",
+    "from": "seds-frommert/ngc/ngcic.cgi",
+    "full_size": 150,
+    "head_sha256": "afd2dcee114acf412bb76bbd7fb4057bf339c0d433871d2c044efe0b0bd3e6ff",
+    "what": "150 bytes, error in both <title> and <h1> -- the whole file, not a head",
+    "verdict": null,
+    "error_page": [
+      "error",
+      "weak",
+      "NGC/IC Error!"
+    ]
+  },
+  {
+    "file": "dss-real-page-under-cgi.head",
+    "from": "seds-frommert/ngc/ngcdss.cgi",
+    "full_size": 866,
+    "head_sha256": "e5e02017816ec1508cf7156e0d1554b5f4bf55de771736c8e34a9b81b4fd3c95",
+    "what": "THE NEGATIVE CASE: a genuine page beside the six, same .cgi extension, same directory",
+    "verdict": null,
+    "error_page": null
+  }
+]

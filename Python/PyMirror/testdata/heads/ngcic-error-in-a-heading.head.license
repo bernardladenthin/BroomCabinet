@@ -1,0 +1,9 @@
+SPDX-FileCopyrightText: seds-frommert/ngc/ngcic.cgi, as held in this collection. Quoted as
+  evidence that such a page may name itself in <h1> as well as in <title>, which is what the
+  heading fallback is for.
+
+  THIS ONE IS THE WHOLE FILE and not a head, because the whole file is 150 bytes: a doctype-less
+  <html>, a title, a centred heading and one sentence of generated text. Cutting 512 bytes out
+  of 150 is not possible, and there is nothing behind it to leave out.
+
+SPDX-License-Identifier: LicenseRef-factual-listing

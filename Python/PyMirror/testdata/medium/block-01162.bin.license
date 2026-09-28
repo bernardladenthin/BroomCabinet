@@ -1,0 +1,5 @@
+SPDX-FileCopyrightText: one 512-byte block of `dec-s8-lftna-a-ua1.dsk` in this collection
+  (somuchstuff-pdp8), block 01162 octal. Kept because it is the only part of the image the
+  tests need to read as real bytes: it is what proves the block-to-offset mapping is right.
+
+SPDX-License-Identifier: LicenseRef-factual-listing

@@ -1,0 +1,548 @@
+This script deletes nothing. It only reports.
+
+=== Declared: files that state their own length and do not have it ===
+  A FILE SHORTER THAN IT SAYS IT IS -- these are losses
+         2.43 GB missing  82.11 MB of 2.52 GB  ISO 9660  bitsavers/bits/HP/HP_9000/HPUX_9/CD/app_2_of_2.iso
+         2.28 GB missing  237.01 MB of 2.52 GB  ISO 9660  bitsavers/bits/HP/HP_9000/HPUX_9/CD/hpux_9.1_update.iso
+         2.26 GB missing  22.02 MB of 2.28 GB  ISO 9660  fsck-ibm-other/OS400_i Install Media/HMC Stuff (not well sorted)/HMC1/MH01560.iso
+         2.19 GB missing  327.73 MB of 2.52 GB  ISO 9660  fsck-vendors/HP/HP-UX Install Media/HPUX 11i By JPS/HPUX 11i CD 2 of 2 By JPS.iso
+         2.05 GB missing  462.41 MB of 2.52 GB  ISO 9660  bitsavers/bits/HP/HP_9000/HP-UX_Installers/HP-UX_1x.xx_1998-04_Extension_Software_-_General_patches.iso
+         2.01 GB missing  501.59 MB of 2.52 GB  ISO 9660  fsck-vendors/HP/HP-UX Install Media/HPUX 11i By JPS/HPUX 11i CD 1 of 2 By JPS.iso
+         1.88 GB missing  639.76 MB of 2.52 GB  ISO 9660  bitsavers/bits/HP/HP_9000/HPUX_9/CD/app_1_of_2.iso
+       559.56 MB missing  2.89 MB of 562.45 MB  RIFF      zx-hobbes-os2/pub/multimedia/wave/wav/os2-nokturnel.wav
+       559.06 MB missing  452.20 kB of 559.51 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/dir5.10_linuxonpowr_test.iso
+       341.03 MB missing  89.55 MB of 430.58 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/32p0213.iso
+       299.79 MB missing  341.21 MB of 641.00 MB  ISO 9660  oldskool/drivers/Tandy/Sensation I/Tandy Sensation I Bookshelf CD.iso
+       208.91 MB missing  160.86 MB of 369.77 MB  RIFF      hp-labs-2007/personal/Eric_Setton/slides/penguins_comparison.avi
+       188.56 MB missing  10.08 MB of 198.64 MB  ISO 9660  ps-2.kev009.com/pccbbs/options/06p4907.iso
+       139.16 MB missing  350.22 MB of 489.39 MB  ISO 9660  fsck-aix-media/RS6000/IBM AIX 4.3.3/LCD4_0291_13 (12-2000 Bonus Pack)/AIX_V4.3.3_Bonus_Pack_12.2000_1_of_4.iso
+        71.52 MB missing  573.18 MB of 644.70 MB  ISO 9660  bitsavers/bits/IBM/Softcopy_Collection_CD/SK2T_0730-17_Transaction_Processing_and_Data_199710/SK2T_0730-17_1.iso
+        60.62 MB missing  330.60 MB of 391.22 MB  ISO 9660  fsck-vendors/SCO/SCO Unix Installers/SCO UnixWare 7.0.1/unixware_701_cd2.iso
+        28.09 MB missing  20.45 MB of 48.54 MB  ISO 9660  ps-2.kev009.com/rs6000-firmware/01SF222_075_075.iso
+        21.22 MB missing  50.77 MB of 72.00 MB  ISO 9660  rwth-aachen-ftp/mirrors/ps2supersite.homedns.org/pccbbs/pc_servers/37l6176.iso
+        21.22 MB missing  50.77 MB of 72.00 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers/37l6176.iso
+         9.16 MB missing  5.77 MB of 14.93 MB  RIFF      zx-hobbes-os2/pub/multimedia/wave/wav/fareast.wav
+         4.55 MB missing  34.82 kB of 4.59 MB  ISO 9660  zx-microway/DiskImages/memtest-2.9.iso
+         2.87 MB missing  113.66 kB of 2.98 MB  RIFF      oldskool/drivers/unsorted/Gravis/ULTRASOUND BBS Archive/SOUND/WAV/FILES/TROUBL_1.WAV
+         2.04 MB missing  49.15 kB of 2.09 MB  RIFF      oldskool/drivers/3com/ftp.toya.net.pl/uzytkowe/sterowniki/karty_sieciowe/Archiwum/3Com/3c509/boodoo2.wav
+         1.08 MB missing  524.40 kB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2nj931a.iso
+       519.63 kB missing  1.21 MB of 1.73 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2jj939a.iso
+       311.30 kB missing  74.50 MB of 74.81 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers/90p3062.iso
+       307.20 kB missing  733.18 MB of 733.49 MB  ISO 9660  fsck-ibm-other/z Install Media/IBM zVM 4.4.0 (ADCD)/zvm_440_adcd_cd2.iso
+       307.20 kB missing  661.58 MB of 661.88 MB  ISO 9660  fsck-ibm-other/z Install Media/IBM zVM 4.4.0 (ADCD)/zvm_440_adcd_cd1.iso
+       307.20 kB missing  591.24 MB of 591.55 MB  ISO 9660  oldskool/drivers/Plustek/Opticbook 3900/Plustek Scanner.iso
+       307.20 kB missing  549.13 MB of 549.44 MB  ISO 9660  zx-ultrix-freeware/risc-vax-bonus-sept-2004-mode1.iso
+       307.20 kB missing  243.55 MB of 243.86 MB  ISO 9660  zx-ultrix-freeware/starfish-freeware-risc-vax-september-2004.iso
+       307.20 kB missing  107.01 MB of 107.32 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/26r0539.iso
+       307.20 kB missing  36.68 MB of 36.98 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/ata133.iso
+       307.20 kB missing  35.08 MB of 35.39 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/23k4693.iso
+       307.20 kB missing  18.18 MB of 18.49 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers/31r3502.iso
+       307.20 kB missing  11.26 MB of 11.57 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/26r0555.iso
+       307.20 kB missing  10.73 MB of 11.03 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/26k4981.iso
+       307.20 kB missing  7.93 MB of 8.24 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/26k4986.iso
+       307.20 kB missing  3.45 MB of 3.76 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/41y7960.iso
+       307.20 kB missing  3.37 MB of 3.68 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/brcm_fw_nic_12018_anyos_i386.iso
+       307.20 kB missing  3.36 MB of 3.66 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/42c5634.iso
+       307.20 kB missing  3.35 MB of 3.65 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/brcm_fw_nic_12017_anyos_i386.iso
+       307.20 kB missing  3.02 MB of 3.33 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/41y7877.iso
+       307.20 kB missing  3.02 MB of 3.33 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/40k8515.iso
+       307.20 kB missing  3.02 MB of 3.33 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/brcm_fw_nic_12021_anyos_i386.iso
+       307.20 kB missing  3.02 MB of 3.33 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/39y4807.iso
+       307.20 kB missing  3.02 MB of 3.33 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/39m4726.iso
+       307.20 kB missing  3.02 MB of 3.33 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/31r3461.iso
+       307.20 kB missing  3.02 MB of 3.33 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers/39m7065.iso
+       307.20 kB missing  3.02 MB of 3.33 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers/31r3023.iso
+       307.20 kB missing  3.02 MB of 3.33 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers/31r3006.iso
+       307.20 kB missing  3.02 MB of 3.33 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers/31r2992.iso
+       307.20 kB missing  3.02 MB of 3.33 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/26r0570.iso
+       307.20 kB missing  3.02 MB of 3.33 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/25r5011.iso
+       307.20 kB missing  3.02 MB of 3.33 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/brcm_fw_nic_nx2-140_anyos_i386.iso
+       307.20 kB missing  3.02 MB of 3.33 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/brcm_fw_nic_nx2-130_anyos_i386.iso
+       307.20 kB missing  3.02 MB of 3.33 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/brcm_fw_nic_nx2-120_anyos_i386.iso
+       307.20 kB missing  3.02 MB of 3.33 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/brcm_fw_nic_nx2-110_anyos_i386.iso
+       307.20 kB missing  3.02 MB of 3.33 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/brcm_fw_nic_12024_anyos_i386.iso
+       307.20 kB missing  3.02 MB of 3.33 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/brcm_fw_nic_12023_anyos_i386.iso
+       307.20 kB missing  3.02 MB of 3.33 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/brcm_fw_nic_12022_anyos_i386.iso
+       307.20 kB missing  3.02 MB of 3.33 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/brcm_fw_nic_12019_anyos_i386.iso
+       307.20 kB missing  3.02 MB of 3.32 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/39y4899.iso
+       288.77 kB missing  193.17 MB of 193.46 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers/02r3178.iso
+       262.14 kB missing  129.86 MB of 130.12 MB  ISO 9660  fsck-vendors/Microsoft/Windows x86 Install Media/Microsoft Windows 98/Microsoft Windows 98 SE/Alternate Install Media/Win98SE.iso
+        46.83 kB missing  46.88 kB of 93.71 kB  RIFF      oldskool/drivers/unsorted/Gravis/ULTRASOUND BBS Archive/SOUND/WAV/FILES/SWIRLB4.WAV
+        20.48 kB missing  456.38 MB of 456.40 MB  ISO 9660  fsck-vendors/NeXT/OpenStep Applications/CUBX Windows 5.0 for OpenStep/cubx_windows_50_for_openstep.iso
+         4.10 kB missing  33.25 MB of 33.26 MB  ISO 9660  vtda/bits/radio/Alinco/AlincoHandheldPack1_20031011.iso
+         2.05 kB missing  430.58 MB of 430.58 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers/32p0213.iso
+         2.05 kB missing  42.86 MB of 42.86 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers_iso/31r1054.iso
+         2.05 kB missing  4.90 MB of 4.91 MB  ISO 9660  rwth-aachen-ftp/mirrors/ps2supersite.homedns.org/pccbbs/pc_servers/09n7367.iso
+         2.05 kB missing  4.90 MB of 4.91 MB  ISO 9660  ps-2.kev009.com/pccbbs/pc_servers/09n7367.iso
+         2.05 kB missing  4.43 MB of 4.43 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2zj934a.iso
+         2.05 kB missing  4.43 MB of 4.43 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2zj933a.iso
+         2.05 kB missing  4.43 MB of 4.43 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2zj932a.iso
+         2.05 kB missing  4.43 MB of 4.43 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2zj930a.iso
+         2.05 kB missing  3.39 MB of 3.39 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_software/t3gy9la.iso
+         2.05 kB missing  2.61 MB of 2.62 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2sj930a.iso
+         2.05 kB missing  2.61 MB of 2.61 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2sj929a.iso
+         2.05 kB missing  2.61 MB of 2.61 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2sj928a.iso
+         2.05 kB missing  2.61 MB of 2.61 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2sj927a.iso
+         2.05 kB missing  2.61 MB of 2.61 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2sj926a.iso
+         2.05 kB missing  2.61 MB of 2.61 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2sj925a.iso
+         2.05 kB missing  2.58 MB of 2.58 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2sj931a.iso
+         2.05 kB missing  2.57 MB of 2.57 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2uj933a.iso
+         2.05 kB missing  2.57 MB of 2.57 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2ug933a.iso
+         2.05 kB missing  2.57 MB of 2.57 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2uj943a.iso
+         2.05 kB missing  2.57 MB of 2.57 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2uj938a.iso
+         2.05 kB missing  2.57 MB of 2.57 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2uj935a.iso
+         2.05 kB missing  2.57 MB of 2.57 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2ug943a.iso
+         2.05 kB missing  2.57 MB of 2.57 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2ug938a.iso
+         2.05 kB missing  2.57 MB of 2.57 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2ug935a.iso
+         2.05 kB missing  2.08 MB of 2.08 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2tj951a.iso
+         2.05 kB missing  2.07 MB of 2.08 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2tj950a.iso
+         2.05 kB missing  2.07 MB of 2.08 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2tj948a.iso
+         2.05 kB missing  2.07 MB of 2.08 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2tj9047a.iso
+         2.05 kB missing  2.05 MB of 2.06 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2tj953a.iso
+         2.05 kB missing  2.05 MB of 2.05 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_drivers/2tj952a.iso
+         2.05 kB missing  1.73 MB of 1.73 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2mj939a.iso
+         2.05 kB missing  1.73 MB of 1.73 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2mj938a.iso
+         2.05 kB missing  1.73 MB of 1.73 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2mj937a.iso
+         2.05 kB missing  1.73 MB of 1.73 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2mj936a.iso
+         2.05 kB missing  1.73 MB of 1.73 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2jj938a.iso
+         2.05 kB missing  1.73 MB of 1.73 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2jj937a.iso
+         2.05 kB missing  1.72 MB of 1.73 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2rj932a.iso
+         2.05 kB missing  1.72 MB of 1.73 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2rj928a.iso
+         2.05 kB missing  1.72 MB of 1.73 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2rj927a.iso
+         2.05 kB missing  1.72 MB of 1.73 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2rj926a.iso
+         2.05 kB missing  1.72 MB of 1.73 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2jj936a.iso
+         2.05 kB missing  1.72 MB of 1.73 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2jj935a.iso
+         2.05 kB missing  1.72 MB of 1.73 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2jj934a.iso
+         2.05 kB missing  1.72 MB of 1.73 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2jj932b.iso
+         2.05 kB missing  1.72 MB of 1.73 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2jj932a.iso
+         2.05 kB missing  1.72 MB of 1.73 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2jj931a.iso
+         2.05 kB missing  1.72 MB of 1.72 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2mj935a.iso
+         2.05 kB missing  1.72 MB of 1.72 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2mj934a.iso
+         2.05 kB missing  1.72 MB of 1.72 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2mj932b.iso
+         2.05 kB missing  1.72 MB of 1.72 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2mj932a.iso
+         2.05 kB missing  1.72 MB of 1.72 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2mj931a.iso
+         2.05 kB missing  1.72 MB of 1.72 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2mj930a.iso
+         2.05 kB missing  1.72 MB of 1.72 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2jj930a.iso
+         2.05 kB missing  1.72 MB of 1.72 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2jj929a.iso
+         2.05 kB missing  1.72 MB of 1.72 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2jj926a.iso
+         2.05 kB missing  1.72 MB of 1.72 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2jj924a.iso
+         2.05 kB missing  1.72 MB of 1.72 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2mj926a.iso
+         2.05 kB missing  1.72 MB of 1.72 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2mj924a.iso
+         2.05 kB missing  1.72 MB of 1.72 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2jj922a.iso
+         2.05 kB missing  1.72 MB of 1.72 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2jj920a.iso
+         2.05 kB missing  1.72 MB of 1.72 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2mj923a.iso
+         2.05 kB missing  1.72 MB of 1.72 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2mj922a.iso
+         2.05 kB missing  1.71 MB of 1.71 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2ej943a.iso
+         2.05 kB missing  1.71 MB of 1.71 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2ej942a.iso
+         2.05 kB missing  1.71 MB of 1.71 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2ej941a.iso
+         2.05 kB missing  1.71 MB of 1.71 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2ej940a.iso
+         2.05 kB missing  1.70 MB of 1.71 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2ej937a.iso
+         2.05 kB missing  1.70 MB of 1.71 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2ej936a.iso
+         2.05 kB missing  1.70 MB of 1.71 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2ej935a.iso
+         2.05 kB missing  1.70 MB of 1.71 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2ej934a.iso
+         2.05 kB missing  1.70 MB of 1.70 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_drivers/2ej931a.iso
+         2.05 kB missing  1.70 MB of 1.70 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_drivers/2ej927a.iso
+         2.05 kB missing  1.70 MB of 1.70 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2ej932a.iso
+         2.05 kB missing  1.70 MB of 1.70 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2ej931a.iso
+         2.05 kB missing  1.70 MB of 1.70 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2ej927a.iso
+         2.05 kB missing  1.70 MB of 1.70 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2ej926a.iso
+         2.05 kB missing  1.70 MB of 1.70 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2gj924a.iso
+         2.05 kB missing  1.70 MB of 1.70 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2gj923a.iso
+         2.05 kB missing  1.70 MB of 1.70 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2gj922a.iso
+         2.05 kB missing  1.70 MB of 1.70 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2gj920a.iso
+         2.05 kB missing  1.70 MB of 1.70 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2gj919a.iso
+         2.05 kB missing  1.70 MB of 1.70 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2gj917a.iso
+         2.05 kB missing  1.62 MB of 1.62 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2oj927a.iso
+         2.05 kB missing  1.62 MB of 1.62 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2oj926a.iso
+         2.05 kB missing  1.62 MB of 1.62 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2pj917a.iso
+         2.05 kB missing  1.61 MB of 1.61 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2pj914a.iso
+         2.05 kB missing  1.61 MB of 1.61 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2bj952a.iso
+         2.05 kB missing  1.61 MB of 1.61 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2bj951a.iso
+         2.05 kB missing  1.61 MB of 1.61 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2bj950a.iso
+         2.05 kB missing  1.61 MB of 1.61 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_software/2bj948a.iso
+         2.05 kB missing  1.61 MB of 1.61 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2pj923a.iso
+         2.05 kB missing  1.61 MB of 1.61 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2nj920a.iso
+         2.05 kB missing  1.61 MB of 1.61 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2bj949a.iso
+         2.05 kB missing  1.61 MB of 1.61 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2bj947a.iso
+         2.05 kB missing  1.60 MB of 1.61 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2pj922a.iso
+         2.05 kB missing  1.60 MB of 1.61 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2oj945a.iso
+         2.05 kB missing  1.60 MB of 1.61 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2oj944a.iso
+         2.05 kB missing  1.60 MB of 1.61 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2oj943a.iso
+         2.05 kB missing  1.60 MB of 1.61 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2nj929a.iso
+         2.05 kB missing  1.60 MB of 1.61 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2fj925a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2qj918a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2pj920a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2pj918a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2oj942a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2oj941a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2oj940a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2oj938a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2oj937a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2oj936a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2oj935a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2oj934a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2oj933a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2nj930a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2nj928a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2nj926a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2fj923a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2fj922a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2fj921a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2qj925a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2qj924a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2qj923a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2qj922a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2qj921a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2qj920a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2qj917a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2qj915a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2nj927a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2nj925a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2nj924a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2hj913a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2hj912a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2hj911a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2hj909a.iso
+         2.05 kB missing  1.60 MB of 1.60 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/2dj913a.iso
+         2.05 kB missing  1.54 MB of 1.54 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/c915jy21a_flash.iso
+         2.05 kB missing  1.52 MB of 1.53 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/c661jtf8a_flash.iso
+         2.05 kB missing  1.52 MB of 1.53 MB  ISO 9660  ps-2.kev009.com/pccbbs/thinkcentre_bios/61jyfaa_flash.iso
+    205 files
+
+  and 327 files whose own record is GONE -- a zip must end with a central directory:
+       140.24 MB  ZIP       zx-alphant-nt/Incoming/sf4.0.zip
+       109.66 MB  ZIP       ibm-aix/products/ccpp/vacpp50/tuscany_500_tnb.baseoption.zip
+       102.07 MB  ZIP       oldskool/drivers/Miscellaneous/vintagecomputer.ca/files/Apple/Lisa/Apple_LISA_Documents_vol_2.zip
+        56.40 MB  ZIP       zx-kednos-vms/pub/misc/ias/iassrc.zip
+        56.31 MB  ZIP       agilent-ftp-2009/HP_Inst_v3/ftp.agilent.com/pub/callpub/comms/WNS/E6474A/Nitro_3.0.zip
+        40.40 MB  ZIP       zx-kednos-vms/pub/misc/ios/1841-12.zip
+        25.47 MB  ZIP       zx-hobbes-os2/pub/multimedia/video/avi/21cdavi9.zip
+        19.91 MB  ZIP       agilent-ftp-2009/HP_Inst_v1/ftp.agilent.com/pub/callpub/rfmw/esa_psa/Agilent Option 230.zip
+        17.04 MB  ZIP       mpoli-bbs/software/ALPHA/ALL/USNTFIXA.ZIP
+        15.68 MB  ZIP       zx-alphant-nt/Incoming/NT4Svr_Option_Pack.zip
+        12.09 MB  ZIP       ps-2.kev009.com/pccbbs/pc_servers/39r6735.zip
+        12.06 MB  ZIP       oldskool/drivers/unsorted/SOUND/CreativeLabs/lw30full_9x.zip
+        10.93 MB  ZIP       ndwiki-norsk-data/images/ND110-22-12-2019-2.zip
+         8.28 MB  ZIP       zx-kednos-vms/pub/misc/ias/ias.zip
+         7.80 MB  ZIP       zx-hobbes-os2/pub/os2/util/network/netware/nw212pt2.zip
+         7.19 MB  ZIP       zx-alphant-nt/Incoming/exch55bothClientAndSP1.zip
+         7.12 MB  ZIP       zx-be-os/pub/beos_updates/r5.0/personal_edition/BeOS-5.0.1-PersonalEd-x86-Update.zip
+         5.24 MB  ZIP       zx-alphant-nt/Incoming/a_bits.zip
+         5.19 MB  ZIP       zx-alphant-nt/Incoming/exch55cli_axp.zip
+         5.03 MB  ZIP       mpoli-bbs/software/MISC/MEETINGS/MP9606R2.ZIP
+         3.43 MB  ZIP       zx-kednos-vms/pub/misc/lisp/lisp031-h.zip
+         3.31 MB  ZIP       zx-kednos-vms/pub/kednos/axp/pli044/dpli044.zip
+         3.25 MB  ZIP       zx-hobbes-os2/pub/os2/system/drivers/printer/CJOS31LE.zip
+         2.77 MB  ZIP       rwth-aachen-ftp/as/precompiled/i286-unknown-dpmi/asxcurr-142-bld153.zip
+         2.60 MB  ZIP       zx-hobbes-os2/pub/os2/games/egbeta1.zip
+         2.28 MB  ZIP       os2bbs/otherapp/magnus.zip
+         2.16 MB  ZIP       mpoli-bbs/hardware/NET/NOVELL/SECURITY.ZIP
+         2.08 MB  ZIP       zx-alphant-nt/Applications/Trbls05-alpha.zip
+         1.99 MB  ZIP       zx-kednos-vms/pub/teco/teco32_tv_av/teco32_tv_av.zip
+         1.90 MB  ZIP       mpoli-bbs/software/DOS/MISC/142MLSND.ZIP
+         1.90 MB  ZIP       mpoli-bbs/software/MISC/MEETINGS/MPM9606J.ZIP
+         1.84 MB  ZIP       oldskool/drivers/chaintech/AGP/AL/2302V_16.ZIP
+         1.74 MB  ZIP       oldskool/uwpuml/rpg/exile11.zip
+         1.66 MB  ZIP       oldskool/drivers/unsorted/Gravis/ULTRASOUND BBS Archive/MISC/RR_CH_01.ZIP
+         1.44 MB  ZIP       ibiblio-historic-linux/ftp-archives/sunsite.unc.edu/Sep-29-1996/Incoming/dilinux5.zip
+         1.44 MB  ZIP       ibiblio-historic-linux/ftp-archives/sunsite.unc.edu/Sep-29-1996/Incoming/dilinux4.zip
+         1.44 MB  ZIP       ibiblio-historic-linux/ftp-archives/sunsite.unc.edu/Sep-29-1996/Incoming/dilinux3.zip
+         1.44 MB  ZIP       ibiblio-historic-linux/ftp-archives/sunsite.unc.edu/Sep-29-1996/Incoming/dilinux2.zip
+         1.44 MB  ZIP       ibiblio-historic-linux/ftp-archives/sunsite.unc.edu/Sep-29-1996/Incoming/dilinux1.zip
+         1.44 MB  ZIP       ibiblio-historic-linux/distributions/dilinux-19960930/dilinux5.zip
+         1.44 MB  ZIP       ibiblio-historic-linux/distributions/dilinux-19960930/dilinux4.zip
+         1.44 MB  ZIP       ibiblio-historic-linux/distributions/dilinux-19960930/dilinux3.zip
+         1.44 MB  ZIP       ibiblio-historic-linux/distributions/dilinux-19960930/dilinux2.zip
+         1.44 MB  ZIP       ibiblio-historic-linux/distributions/dilinux-19960930/dilinux1.zip
+         1.43 MB  ZIP       ibiblio-historic-linux/distributions/dilinux-19960930/dilinux6.zip
+         1.42 MB  ZIP       ibiblio-historic-linux/ftp-archives/sunsite.unc.edu/Sep-29-1996/Incoming/dilinux6.zip
+         1.38 MB  ZIP       mpoli-bbs/skene/ASM96/PC/DEMOS/ATW_PROT.ZIP
+         1.37 MB  ZIP       zx-hobbes-os2/pub/os2/dev/cplusplus/patches/csetc011.zip
+         1.36 MB  ZIP       mpoli-bbs/software/WIN16/NET/STACKS/HOOKED1.ZIP
+         1.34 MB  ZIP       mpoli-bbs/software/WIN32/NET/STACKS/WRAMP121.ZIP
+         1.32 MB  ZIP       oldskool/drivers/chaintech/AGP/Cirrus/5446OS2.ZIP
+         1.31 MB  ZIP       ps-2.kev009.com/pccbbs/pc_servers/24p2816.zip
+         1.30 MB  ZIP       mpoli-bbs/software/WIN16/COMMUNIC/ZFAX40.ZIP
+         1.05 MB  ZIP       oldskool/drivers/unsorted/Gravis/ULTRASOUND BBS Archive/SOUND/MISC/EXPOZE_2.ZIP
+         1.05 MB  ZIP       ardent-tool/Procom/disks/dk0149.zip
+         1.05 MB  ZIP       ardent-tool/Procom/disks/dk0084.zip
+         1.05 MB  ZIP       ardent-tool/Procom/disks/dk0151.zip
+         1.05 MB  ZIP       ardent-tool/Procom/disks/dk0147.zip
+         1.02 MB  ZIP       mpoli-bbs/software/WIN16/NET/STACKS/WINMED10.ZIP
+         1.00 MB  ZIP       zx-hobbes-os2/pub/os2/system/x11/XFree86/v3.1/312fvfb.zip
+       999.42 kB  ZIP       ibm-rs6000-support/spworld/E1.zip
+       991.70 kB  ZIP       zx-kednos-vms/pub/kednos/plidocs/zip/pdf/pli_ref_manual_pdf.zip
+       988.39 kB  ZIP       ps-2.kev009.com/bocaresearch/Drivers&Software/Archived/File_area_13/VOYW1_0.ZIP
+       988.39 kB  ZIP       oldskool/drivers/Boca/Drivers&Software/Archived/File_area_13/VOYW1_0.ZIP
+       947.20 kB  ZIP       zx-hobbes-os2/pub/os2/apps/comm/offline/fleet1241.zip
+       930.10 kB  ZIP       zx-kednos-vms/pub/zk/kits/zk_with_ifc.zip
+       807.77 kB  ZIP       zx-hobbes-os2/pub/os2/system/x11/XFree86/v3.1/312fslib.zip
+       791.50 kB  ZIP       zx-kednos-vms/pub/zk/kits/zk011.zip
+       781.50 kB  ZIP       zx-hobbes-os2/pub/os2/system/x11/XFree86/v3.3/s33p9k.zip
+       770.05 kB  ZIP       oldskool/drivers/unsorted/Gravis/ULTRASOUND BBS Archive/SOUND/MISC/MAZ_6TH2.ZIP
+       698.37 kB  ZIP       mpoli-bbs/hardware/DISPLAY/OTHER/A4027R15.ZIP
+       625.91 kB  ZIP       zx-kednos-vms/pub/misc/ruleworks/rulkavms.zip
+       596.90 kB  ZIP       zx-kednos-vms/pub/mmk/kits/ess-vaxvms-mmk-v0500--1-pcsi.zip
+       590.42 kB  ZIP       zx-kednos-vms/pub/misc/ruleworks/rulkawin.zip
+       581.60 kB  ZIP       mpoli-bbs/software/MISC/UPDATES/WW0981.ZIP
+       524.00 kB  ZIP       mpoli-bbs/software/PROGRAMM/ASM/SBSTUFF.ZIP
+       501.76 kB  ZIP       ps-2.kev009.com/ncr3xxx/pcfiles/Video_Drivers/ATI_Mach32/64MPG208.ZIP
+       501.76 kB  ZIP       ardent-tool/NCR/files/Video_Drivers/ATI_Mach32/64MPG208.ZIP
+       470.82 kB  ZIP       mpoli-bbs/software/WIN16/COMMUNIC/MTV3TEXT.ZIP
+       461.10 kB  ZIP       zx-kednos-vms/pub/mmk/kits/mmk050-a.zip
+       458.75 kB  ZIP       mpoli-bbs/software/MISC/MEETINGS/9409-03.ZIP
+       441.78 kB  ZIP       mpoli-bbs/software/WIN16/FONTS/FMONST35.ZIP
+       428.70 kB  ZIP       mpoli-bbs/hardware/DISPLAY/S3/S3-801.ZIP
+       404.99 kB  ZIP       mpoli-bbs/software/DOS/MISC/STORY351.ZIP
+       391.68 kB  ZIP       oldskool/drivers/unsorted/Gravis/ULTRASOUND BBS Archive/SOUND/S3M/FILES/SKY_SFT8.ZIP
+       385.02 kB  ZIP       oldskool/drivers/unsorted/Gravis/ULTRASOUND BBS Archive/SOUND/MIDI/FILES/MIDI7_11.ZIP
+       371.61 kB  ZIP       oldskool/MPS/demos/gs2new.zip
+       359.13 kB  ZIP       ps-2.kev009.com/pccbbs/ambra/et4util.zip
+       358.40 kB  ZIP       ps-2.kev009.com/ncr3xxx/pcfiles/Video_Drivers/ATI_Mach32/M32UTL.ZIP
+       358.40 kB  ZIP       ardent-tool/NCR/files/Video_Drivers/ATI_Mach32/M32UTL.ZIP
+       332.24 kB  ZIP       mpoli-bbs/software/MISC/MEETINGS/OLIOLA.ZIP
+       314.10 kB  ZIP       zx-kednos-vms/pub/misc/lisp/lisp031-j.zip
+       308.74 kB  ZIP       mpoli-bbs/skene/MUSIC/OTHER/KJUNKKA4.ZIP
+       277.96 kB  ZIP       transputer-classiccmp/software/network-routers/dvorak.zip
+       250.85 kB  ZIP       oldskool/drivers/nvidia/older_drivers/Version06_18/Detonator Nt4-618.zip
+       240.67 kB  ZIP       oldskool/uwpuml/arcade/droid.zip
+       235.63 kB  ZIP       mpoli-bbs/hardware/HDD/OTHER/S2R10-H.ZIP
+       222.24 kB  ZIP       mpoli-bbs/software/DOS/MISC/EI41.ZIP
+       221.41 kB  ZIP       oldskool/drivers/unsorted/Gravis/ULTRASOUND BBS Archive/MISC/ASM_94.ZIP
+       220.15 kB  ZIP       oldskool/drivers/unsorted/Gravis/ULTRASOUND BBS Archive/SOUND/FAR/FILES/RETRIB.ZIP
+       216.72 kB  ZIP       oldskool/drivers/unsorted/Gravis/ULTRASOUND BBS Archive/SOUND/MIDI/FILES/4UNLIMIT.ZIP
+       212.99 kB  ZIP       mpoli-bbs/software/MISC/MEETINGS/9409-37.ZIP
+       203.50 kB  ZIP       zx-kednos-vms/pub/mmk/kits/mmk050-e.zip
+       201.22 kB  ZIP       zx-kednos-vms/pub/kednos/axp/pli044/plirtl044.zip
+       195.58 kB  ZIP       zx-kednos-vms/pub/kednos/axp/pli043/dplirtl042h.zip
+       191.73 kB  ZIP       zx-hobbes-os2/pub/os2/apps/calc/units155a.zip
+       190.76 kB  ZIP       zx-be-os/pub/obsolete/util/JobBroker.zip
+       186.34 kB  ZIP       oldskool/drivers/unsorted/Gravis/ULTRASOUND BBS Archive/SOUND/MIDI/FILES/ERICMID.ZIP
+       186.19 kB  ZIP       oldskool/drivers/unsorted/Gravis/ULTRASOUND BBS Archive/SOUND/MIDI/FILES/XWINGMID.ZIP
+       184.83 kB  ZIP       mpoli-bbs/skene/MUSIC/OTHER/KJUNKKA3.ZIP
+       182.50 kB  ZIP       zx-kednos-vms/pub/mmk/kits/mmk050_source.zip
+       159.71 kB  ZIP       zx-kednos-vms/pub/mx/mx061-g.zip
+       159.57 kB  ZIP       oldskool/uwpuml/patches/cars94.zip
+       146.43 kB  ZIP       zx-gatekeeper-dec/pub/X11/R6-contrib/misdirected/vpool.zip
+       146.43 kB  ZIP       dec-ftp-2006/pub/X11/contrib/misdirected/vpool.zip
+       146.43 kB  ZIP       dec-ftp-2006/pub/X11/R6-contrib/misdirected/vpool.zip
+       140.18 kB  ZIP       zx-hobbes-os2/pub/os2/util/backup/qb3pach3.zip
+       131.40 kB  ZIP       oldskool/drivers/unsorted/S3/VIRGE_GX2(357)/w9534202.zip
+       106.50 kB  ZIP       os2bbs/internet/psiftp97.zip
+       106.50 kB  ZIP       oldskool/uwpuml/romulus/hints/barisexe.zip
+       102.91 kB  ZIP       mpoli-bbs/skene/PARTIES/TP6/DEMOS/COMPOST.ZIP
+       102.51 kB  ZIP       oldskool/uwpuml/arcade/sfly21.zip
+       100.31 kB  ZIP       oldskool/uwpuml/puzzle/cipher22.zip
+        94.90 kB  ZIP       zx-gatekeeper-dec/pub/net/infosys/NCSA/Web/Mosaic/Unix/source/Mosaic-src-2.7b4.zip
+        93.80 kB  ZIP       oldskool/drivers/unsorted/Gravis/ULTRASOUND BBS Archive/SOUND/MTM/FILES/UNRM_KLF.ZIP
+        86.09 kB  ZIP       oldskool/drivers/IBM/actionmedia/support files/iris_index_files/gl-386.zip
+        84.48 kB  ZIP       oldskool/uwpuml/arcade/dop12.zip
+        83.74 kB  ZIP       mpoli-bbs/software/MISC/MEETINGS/9409-31.ZIP
+        82.42 kB  ZIP       mpoli-bbs/software/MISC/MEETINGS/9409-32.ZIP
+        82.07 kB  ZIP       zx-kednos-vms/pub/misc/vt-parser/parser.zip
+        81.72 kB  ZIP       mpoli-bbs/software/MISC/MEETINGS/9409-01.ZIP
+        80.34 kB  ZIP       mpoli-bbs/software/MISC/MEETINGS/9409-26.ZIP
+        78.41 kB  ZIP       oldskool/drivers/unsorted/Gravis/ULTRASOUND BBS Archive/INFO/PATREF23.ZIP
+        75.75 kB  ZIP       mpoli-bbs/software/MISC/MEETINGS/9409-25.ZIP
+        75.55 kB  ZIP       oldskool/uwpuml/romulus/cracks/bak-slv.zip
+        74.75 kB  ZIP       ibiblio-historic-linux/ftp-archives/sunsite.unc.edu/Nov-06-1994/apps/graphics/rays/rayce28l.zip
+        60.16 kB  ZIP       mpoli-bbs/software/MISC/MEETINGS/9409-27.ZIP
+        56.32 kB  ZIP       os2bbs/bbs/ps140i.zip
+        50.43 kB  ZIP       zx-hobbes-os2/pub/os2/apps/internet/www/editors/imghtml.zip
+        34.04 kB  ZIP       oldskool/drivers/unsorted/Gravis/ULTRASOUND BBS Archive/INFO/PLIST.ZIP
+        33.27 kB  ZIP       mpoli-bbs/drivers_1/HD/SEKALAIS/ALLMFM.ZIP
+        32.26 kB  ZIP       oldskool/drivers/unsorted/Elsa/t2d_w95_w98_driver_tools.zip
+        29.70 kB  ZIP       next-68k-org/next/next-ftp.peak.org/next/documents/korean/NeXTstationPC_Making_Korean_Guide99.rtfd.zip
+        29.70 kB  ZIP       next-68k-org/next/ftp.peak.org/next/documents/korean/NeXTstationPC_Making_Korean_Guide99.rtfd.zip
+        29.70 kB  ZIP       next-68k-org/next-ftp.peak.org/next/documents/korean/NeXTstationPC_Making_Korean_Guide99.rtfd.zip
+        29.70 kB  ZIP       next-68k-org/ftp.peak.org/next/documents/korean/NeXTstationPC_Making_Korean_Guide99.rtfd.zip
+        29.18 kB  ZIP       oldskool/drivers/unsorted/amstrad.zip
+        24.58 kB  ZIP       oldskool/drivers/unsorted/pk600P.zip
+        16.38 kB  ZIP       zx-gatekeeper-dec/pub/X11/R6-contrib/utilities/tshost.zip
+        16.38 kB  ZIP       dec-ftp-2006/pub/X11/contrib/utilities/tshost.zip
+        16.38 kB  ZIP       dec-ftp-2006/pub/X11/R6-contrib/utilities/tshost.zip
+        12.13 kB  ZIP       oldskool/drivers/unsorted/Gravis/ULTRASOUND BBS Archive/SOUND/MIDI/FILES/HWBANDGU.ZIP
+         7.01 kB  ZIP       mpoli-bbs/hardware/NET/NOVELL/TFTPD.ZIP
+         5.90 kB  ZIP       oldskool/uwpuml/arcade/zyclunt.zip
+         5.70 kB  ZIP       mpoli-bbs/hardware/NET/NOVELL/SYNC.ZIP
+         4.92 kB  ZIP       zx-hobbes-os2/pub/multimedia/pointer/bloody.zip
+         4.32 kB  ZIP       oldskool/uwpuml/romulus/cracks/arenacrk.zip
+         4.10 kB  ZIP       oldskool/drivers/Central Point/OptionBoard/website mirrors/retro.icequake.net Option Board website mirror/dob/files/unsorted/copy2pc_303.zip
+         4.10 kB  ZIP       oldskool/OptionBoard/website mirrors/retro.icequake.net Option Board website mirror/dob/files/unsorted/copy2pc_303.zip
+         3.37 kB  ZIP       oldskool/uwpuml/romulus/cheats/rbtrn.zip
+         3.10 kB  ZIP       bitsavers/bits/Convergent/ngen/ooxtract.py_.zip
+         1.92 kB  ZIP       bitsavers/bits/Users_Groups/FOG/QX10/extracted/QX10.01/HELP4.ZIP
+         1.92 kB  ZIP       bitsavers/bits/Users_Groups/FOG/QX10/extracted/QX10.01/HELP3.ZIP
+         1.83 kB  ZIP       somuchstuff-pdp8/trunk/pdp8/cjl/pqs8/8u/cjl/Kermit-12_Release_Files/K12IP0.ODT
+         1.83 kB  ZIP       somuchstuff-pdp8/trunk/pdp8/cjl/pqs8/8u/cjl/Kermit-12_Release_Files/K12IP1.ODT
+         1.54 kB  ZIP       bitsavers/bits/Users_Groups/FOG/QX10/extracted/QX10.01/HELP1.ZIP
+         1.46 kB  ZIP       zx-alphant-nt/Utilities/we96a32d.zip
+         1.28 kB  ZIP       bitsavers/bits/Users_Groups/FOG/QX10/extracted/QX10.01/HELP2.ZIP
+         1.16 kB  ZIP       perzl-wiki/Main.Zip
+           177 B  ZIP       mpoli-bbs/hardware/DISPLAY/S3/964N3S3.ZIP
+            46 B  ZIP       somuchstuff-pdp8/trunk/Eagle/projects/RF08/rfomni/rf08.xpi
+            34 B  ZIP       ibm-aix/ifixes/powersc/MFA20/README.docx
+            34 B  ZIP       ibm-aix/ifixes/powersc/MFA13/README.docx
+            34 B  ZIP       ibm-aix/efixes/powersc/MFA20/README.docx
+            34 B  ZIP       ibm-aix/efixes/powersc/MFA13/README.docx
+            13 B  ZIP       mpoli-bbs/hardware/HDD/SEAGATE/ST-FIX.ZIP
+             4 B  ZIP       mpoli-bbs/hardware/SOUND/GRAVIS/TEXT/V5N18.ZIP
+             1 B  ZIP       ibiblio-historic-linux/ftp-archives/tsx-11.mit.edu/Oct-07-1996/ALPHA/Wine/development/Cica-Mirror/olespec.zip
+             1 B  ZIP       ibiblio-historic-linux/ftp-archives/sunsite.unc.edu/Sep-29-1996/ALPHA/wine/development/Cica-Mirror/olespec.zip
+             0 B  ZIP       zx-kednos-vms/pub/watcher/latest.zip
+             0 B  ZIP       zx-kednos-vms/pub/sqlite3/latest.zip
+             0 B  ZIP       zx-kednos-vms/pub/netlib/latest.zip
+             0 B  ZIP       zx-kednos-vms/pub/mmk/latest.zip
+             0 B  ZIP       zx-kednos-vms/pub/cka/latest.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/util/disk/dfsee104.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/games/action/quake/qwsvos2.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/games/action/fodder.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/games/action/doom/mds2v15.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/games/action/doom/doomwads.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/dev/wps/newobj10.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/dev/util/pdlzip-1.0-os2.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/dev/util/dos2unix-5.1-os2.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/dev/util/Lzip.v1.10.os2.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/money/pmstock.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/mmedia/util/mixers/umix_01.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/internet/www/cgi/wftsrc17.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/internet/www/cgi/wft17.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/internet/news/reader/bgyn1.0.04.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/graphics/viewer/shbmp212.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/graphics/scrncapt/snap_ii.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/graphics/scrncapt/pu2v15.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/graphics/scrncapt/gotch178.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/graphics/scrncapt/capture.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/graphics/scan/tamelang.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/graphics/scan/tame101c.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/graphics/scan/tame100rc2.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/graphics/scan/tame098.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/graphics/scan/pmsan052.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/graphics/scan/goat_007b.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/graphics/presentation/freelan3.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/graphics/convert/pcx2prn.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/editors/epm/epmtex31.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/xhs400.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/term/protk10.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/term/pmqvt.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/term/lw32text.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/qrz2.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/offline/mr2_dict.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/imileo31.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/bbs/util/xm198os2.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/bbs/util/tgdisos2.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/bbs/util/sqshp111.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/bbs/util/ptktexe0.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/bbs/util/psfax2.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/bbs/util/newsdesk.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/bbs/util/mm105.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/bbs/util/lcall002.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/bbs/util/fidtun.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/bbs/util/btp_eebe.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/bbs/util/bsrc_260.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/bbs/maximus/maxcid03.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/bbs/maximus/maxcgis.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/bbs/fd226-o.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/bbs/door/topo200.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/comm/bbs/difflist.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/clock/tnytme2.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/clock/mouseclk.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/clock/itsnow11.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/calendar/gebtag_os2_upd.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/calc/mortpm.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/calc/katcal.zip
+             0 B  ZIP       zx-hobbes-os2/pub/os2/apps/analysis/upclient2.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/video/webexani/waterfal.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/video/avi/21cdavi5.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/video/Warpstock2010sf.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/music/mod/unlabelled/walkman3.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/music/mod/unlabelled/trainbea.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/music/mod/unlabelled/thunder.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/music/mod/unlabelled/taketime.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/music/mod/unlabelled/steam.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/music/mod/unknown/dirt.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/music/mod/unknown/crystlhm.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/music/mod/unknown/bruno-fr.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/music/mod/JPN/freaked.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/music/midi/unlabelled/radio_ga.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/music/midi/unlabelled/erie.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/images/icons/ticn10ih.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/images/icons/osx.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/images/icons/lpicons2.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/images/icons/linico01.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/images/icons/ecs_os2_icons.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/images/icons/bucket_itheme_for_ecs.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/images/icons/articons.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/images/icons/add_icons_for_basic_flat_folder_itheme_rev_1.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/images/icons/absicons.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/images/icons/FolderIcons.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/images/bmp/os2ram.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/images/bmp/junglbmp.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/images/bmp/bmpfake2.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/images/bmp/art64k.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/images/bmp/3dwarp.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/fonts/ps/schwawal.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/fonts/ps/rscunfon.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/fonts/ps/riversid.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/fonts/ps/papyrus.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/fonts/ps/nordi.zip
+             0 B  ZIP       zx-hobbes-os2/pub/multimedia/fonts/ps/davysrib.zip
+             0 B  ZIP       zx-hobbes-os2/pub/java/util/filecopy02.zip
+             0 B  ZIP       zx-hobbes-os2/pub/java/dev/osaj-os2.zip
+             0 B  ZIP       zx-hobbes-os2/pub/java/dev/jdk12_basedocs.zip
+             0 B  ZIP       zx-hobbes-os2/pub/java/dev/javacc_2-1_os2.zip
+             0 B  ZIP       zx-hobbes-os2/pub/java/apps/internet/zt_251.zip
+             0 B  ZIP       zx-hobbes-os2/pub/java/apps/internet/www/siteat12.zip
+             0 B  ZIP       zx-hobbes-os2/pub/java/apps/internet/misc/limewirewinnovm17c.zip
+             0 B  ZIP       zx-hobbes-os2/pub/java/apps/internet/chat/aimjava2.zip
+             0 B  ZIP       zx-hobbes-os2/pub/java/apps/editors/jstyle12.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/vbrun123.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/prn2qts12.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/prn2qts11.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/prn2qts.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/pmst11.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/pmdir.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/pcx2prn12.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/pcx2prn.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/pcidevs_20100721.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/mahlvls.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/jmines111-ico.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/exceptq70.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/exceptq70-dev.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/eCs-2-on-modern-laptop-win7-rev-1.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/dfsee105.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/delayed/rtmpdump-2.2b-os2-20100330.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/delayed/openssl-1.0.0a-os2knix-20100603-runtime.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/delayed/openssl-1.0.0a-os2knix-20100603-dev.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/delayed/openssl-0.9.8o-os2knix-20100602-runtime.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/delayed/openssl-0.9.8o-os2knix-20100602-dev.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/delayed/4os2_3.05A.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/bkupsmon0123.zip
+             0 B  ZIP       zx-hobbes-os2/pub/incoming/SmartRen09os2.zip
+             0 B  ZIP       zx-gatekeeper-dec/pub/X11/R6-contrib/graphics/xaos21b.zip
+             0 B  ZIP       zx-be-os/pub/samples/r3/network_kit/tulip.zip
+             0 B  ZIP       zx-be-os/pub/samples/media_kit/MediaConverter.zip
+             0 B  ZIP       zx-alphant-nt/Incoming/pro_audio_cards/tbdriversaxp.zip
+             0 B  ZIP       zx-alphant-nt/Incoming/openoffice6.05.zip
+             0 B  ZIP       os2bbs/product/sw2e5.zip
+             0 B  ZIP       os2bbs/multimed/mulalb23.zip
+             0 B  ZIP       os2bbs/gnu/bison128.zip
+             0 B  ZIP       os2bbs/games/twiz20.zip
+             0 B  ZIP       os2bbs/file/eabr031.zip
+             0 B  ZIP       os2bbs/file/dx.zip
+             0 B  ZIP       oldskool/uwpuml/romulus/cracks/f1modemcrk.zip
+             0 B  ZIP       oldskool/uwpuml/romulus/cheats/dhe23.zip
+             0 B  ZIP       mpoli-bbs/software/WIN16/NET/STACKS/WSTMR311.ZIP
+             0 B  ZIP       mpoli-bbs/software/DOS/MISC/DRC21.ZIP
+             0 B  ZIP       mpoli-bbs/hardware/DISPLAY/S3/S3-924.ZIP
+             0 B  ZIP       dec-ftp-2006/pub/X11/contrib/graphics/xaos21b.zip
+             0 B  ZIP       dec-ftp-2006/pub/X11/R6-contrib/graphics/xaos21b.zip
+
+  and 1673 files longer than declared, which is ordinary (padding, a stub, trailing
+  metadata) and is counted rather than listed:
+    ISO 9660    779, at most 640.42 MB extra
+    RIFF          8, at most 10.16 kB extra
+    ZIP         886, at most 9.09 kB extra
+
+  68843 files asked, 0 files could not be read
+

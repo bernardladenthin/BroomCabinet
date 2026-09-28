@@ -1,0 +1,27 @@
+=== Holes: entirely empty blocks in the middle of a file ===
+  (reads every file of 16 MB or more in full -- this takes a while)
+    99.3 MB     1/ 100 blocks empty (1.0 %)  bits/MIPS/Comperex/MipsRiscOS.tz
+   314.0 MB    48/ 315 blocks empty (15.2 %)  bits/Sun/CD/Solaris_1.1.2_SPARC_1994/Volume_1.toast
+   179.4 MB     1/ 180 blocks empty (0.6 %)  bits/Sun/CD/Solaris_2.6/Developer_Connection_Enterprise_Dec99-Feb00/704-7054-10_SOLARIS_MANAGEMENT_SDK_111999.toast
+   301.2 MB     1/ 302 blocks empty (0.3 %)  bits/Sun/CD/Solaris_2.6/Developer_Connection_Enterprise_Dec99-Feb00/cwpro4_solaris_java.toast
+   133.2 MB     1/ 134 blocks empty (0.7 %)  bits/Sun/CD/Solaris_2.6/Solaris_2.6_Hardware_Mar98_Desktop_SPARC/704-6065-10_SUPP_SOL_2_6_HW398_SMCC.toast
+   402.1 MB     1/ 403 blocks empty (0.2 %)  bits/Sun/CD/Solaris_2.6/Solaris_2.6_Hardware_Mar98_Desktop_SPARC/704-6082-10_SOL_2_6_HW2_SPARC_SMCC_DT.toast
+   334.3 MB     1/ 335 blocks empty (0.3 %)  bits/Sun/CD/Solaris_2.6/Solaris_2.6_Hardware_Mar98_Desktop_SPARC/704-6120-10_SOL_2_6_HW2_DOC.toast
+    61.2 MB     1/  62 blocks empty (1.6 %)  bits/Sun/CD/Solaris_2.6/Solaris_2.6_Hardware_Mar98_Desktop_SPARC/704-6168-10_S26_MAINTENANCE_UPDATE_1_SPARC.toast
+   475.0 MB     1/ 476 blocks empty (0.2 %)  bits/Sun/CD/Solaris_2.6/Solaris_2.6_Hardware_May98_Server_SPARC/704-5768-10_SOLARIS_SRVR_INTRANET_EXT_1_0.toast
+    17.1 MB     1/  18 blocks empty (5.6 %)  bits/Sun/CD/Solaris_2.6/Solaris_2.6_Hardware_May98_Server_SPARC/704-6212-10_NETSCAPE.toast
+   539.6 MB     1/ 540 blocks empty (0.2 %)  bits/Sun/CD/Solaris_2.6/Solaris_2.6_Hardware_May98_Server_SPARC/704-6220-10_SOL_2_6_598_SPARC_SMCC_SVR.toast
+   135.0 MB     1/ 136 blocks empty (0.7 %)  bits/Sun/CD/Solaris_2.6/Solaris_2.6_Hardware_May98_Server_SPARC/704-6221-10_SUPP_SOL_2_6_598_SMCC.toast
+   104.3 MB     1/ 105 blocks empty (1.0 %)  bits/Sun/CD/Solaris_2.6/Solaris_2.6_Hardware_May98_Server_SPARC/704-6250-10_S26_MAINTENANCE_UPDATE_2_SPARC.toast
+   399.6 MB     1/ 400 blocks empty (0.2 %)  bits/Sun/CD/Solaris_2.6/Solaris_2.6_Hardware_May98_Server_SPARC/704-6277-10_SOL_2_6_HW3_DOC.toast
+   332.2 MB     1/ 333 blocks empty (0.3 %)  bits/Sun/CD/Solaris_2.6/Solaris_2.6_Software_SPARC/704-5668-10_SOLARIS_2_6_DOCUMENTATION.toast
+   148.2 MB     1/ 149 blocks empty (0.7 %)  bits/Sun/CD/Solaris_2.6/Solaris_2.6_Software_SPARC/hsg80_v83c_sun.toast
+   389.1 MB     1/ 390 blocks empty (0.3 %)  bits/Sun/CD/Solaris_8_Jun00_Intel/704-7169-10_SOL_8_600_LANG_IA.toast
+   403.1 MB     1/ 404 blocks empty (0.2 %)  bits/Sun/CD/Solaris_8_Jun00_Intel/704-7245-10_S8_SOFTWARE_COMPANION.toast
+   280.3 MB    32/ 281 blocks empty (11.4 %)  bits/Sun/CD/SunOS_4.1_Sun_4_1990/SunOS_4.1.toast
+    29.0 MB    27/  29 blocks empty (93.1 %)  www.computer.museum.uq.edu.au/pdf/DEC-11-HDUMA-B-D DU11 Single Line Programmable Synchronous Interface Maintenance Manual.pdf
+    76.0 MB    56/  76 blocks empty (73.7 %)  www.computer.museum.uq.edu.au/RSX/AA-L668A-TC RSX-11M & M-PLUS RMS-11 Macro Programmer's Guide.pdf
+  21 incomplete files, 13811 files read in full
+
+
+=== archive finished ===  bitsavers  6990.9 s

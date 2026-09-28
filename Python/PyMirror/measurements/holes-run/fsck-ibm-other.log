@@ -1,0 +1,15 @@
+=== Holes: entirely empty blocks in the middle of a file ===
+  (reads every file of 16 MB or more in full -- this takes a while)
+   170.3 MB     1/ 171 blocks empty (0.6 %)  OS2 Applications/IBM C Set++ For OS2 3.0 Beta 2 (MDF)/CSet++v3Beta.mdf
+   278.6 MB     1/ 279 blocks empty (0.4 %)  OS2 Applications/Lotus Notes Mail 4.1 OS2/MERLIN.mdf
+  3802.0 MB   659/3802 blocks empty (17.3 %)  OS400_i Install Media/iOS 7.2/B_GROUP1_01_IBM_i_RS_720-00_LCD8_2043_00.udf
+  4109.0 MB    72/4109 blocks empty (1.8 %)  OS400_i Install Media/iOS 7.2/B_GROUP1_02_IBM_i_RS_720-00_LCD8_2044_00.udf
+  1673.0 MB    13/1673 blocks empty (0.8 %)  OS400_i Install Media/iOS 7.2/B_GROUP1_03_IBM_i_RS_720-00_LCD8_2045_00.udf
+  3605.0 MB   132/3605 blocks empty (3.7 %)  OS400_i Install Media/iOS 7.2/B_GROUP1_04_IBM_i_RS_720-00_LCD8_2046_00.udf
+  3691.0 MB   111/3691 blocks empty (3.0 %)  OS400_i Install Media/iOS 7.2/B_GROUP1_05_IBM_i_RS_720-00_LCD8_2047_00.udf
+  2380.8 MB  1248/2381 blocks empty (52.4 %)  OS400_i Install Media/iOS 7.2/I_BASE_01_Licensed_Machine_Code_RS_720-C_LCD8_2058_02.udf
+  1027.0 MB     1/1027 blocks empty (0.1 %)  OS400_i Install Media/iOS 7.2/LCD8_1833_00_F_MULTI_NLV_5639-ZC1_Zend_Server_Community_Edition_for_i.udf
+  9 incomplete files, 141 files read in full
+
+
+=== archive finished ===  fsck-ibm-other  192.6 s

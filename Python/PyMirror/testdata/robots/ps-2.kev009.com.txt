@@ -1,0 +1,12 @@
+# ps-2.kev009.com robots.txt
+
+# Allow all except to cgi-bin.  Point to sitemap.
+User-agent: *
+Disallow: /cgi-bin/
+Allow: /
+Sitemap: http://ps-2.kev009.com:8081/sitemap_index.xml
+
+# Pointless bot with high crawl rate...
+User-agent: ShopWiki
+Disallow: /
+

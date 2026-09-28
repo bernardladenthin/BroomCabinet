@@ -1,0 +1,6 @@
+SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+  One archive's log from the full `--holes` run of 2026-09-25, written by holes-run.py.
+  These logs are the EVIDENCE the README beside them summarises, and holes-record-test.py
+  re-derives its figures from them; see that README.
+
+SPDX-License-Identifier: Apache-2.0

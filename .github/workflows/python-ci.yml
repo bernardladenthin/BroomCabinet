@@ -76,6 +76,29 @@ jobs:
             python3 "$f" --help
           done
 
+      # THE SMOKE TEST IS NOT A TEST RUN, and until 2026-09-22 it was quietly
+      # doing duty as one. PyMirror's test files ignore argv, so `--help`
+      # happened to execute their cases - three of the five. The other two
+      # have an argparse and printed their help instead, so their cases had
+      # never run in CI at all. A test that an argument can switch off is a
+      # test that will be off on the day it matters.
+      #
+      # So: run them by name, with no arguments, and let a non-zero exit fail
+      # the job. A project with no test files says so and passes.
+      - name: Tests
+        working-directory: Python/${{ matrix.project }}
+        run: |
+          shopt -s nullglob
+          tests=( *_test.py *-test.py )
+          if [ ${#tests[@]} -eq 0 ]; then
+            echo "no test files in this project"
+            exit 0
+          fi
+          for t in "${tests[@]}"; do
+            echo "=== $t"
+            python3 "$t"
+          done
+
   # Single required status check for branch protection - green only if
   # every discovered project's lint-and-smoke-test job succeeded.
   all-green:

@@ -1,0 +1,6 @@
+=== Holes: entirely empty blocks in the middle of a file ===
+  (reads every file of 16 MB or more in full -- this takes a while)
+  0 incomplete files, 27 files read in full
+
+
+=== archive finished ===  ia-bull-aix433-2013  11.5 s

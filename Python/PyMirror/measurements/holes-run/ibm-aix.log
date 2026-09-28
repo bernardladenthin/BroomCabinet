@@ -1,0 +1,21 @@
+=== Holes: entirely empty blocks in the middle of a file ===
+  (reads every file of 16 MB or more in full -- this takes a while)
+    27.3 MB     6/  28 blocks empty (21.4 %)  efixes/ipv6002/U817726.bff
+   101.0 MB     7/ 101 blocks empty (6.9 %)  efixes/security/kernel_fix.tar
+    91.9 MB     1/  92 blocks empty (1.1 %)  fixes/byCompID/5622DJX00/djx_02_01_01.client/djx_02_01_01.client.2.1.2.2.U483554.bff
+    91.7 MB     1/  92 blocks empty (1.1 %)  fixes/byCompID/5622DJX00/djx_02_01_01.client/djx_02_01_01.client.2.1.2.2.U486564.bff
+    92.1 MB     1/  93 blocks empty (1.1 %)  fixes/byCompID/5622DJX00/djx_02_01_01.client/djx_02_01_01.client.2.1.2.2.U489424.bff
+    87.0 MB     1/  87 blocks empty (1.1 %)  fixes/v3/db2/db2_02_01.client.2.1.1.1.U441267.bff
+    95.8 MB     1/  96 blocks empty (1.0 %)  fixes/v3/other/djx_02_01.client.2.1.2.2.U471902.bff
+    75.9 MB     1/  76 blocks empty (1.3 %)  fixes/v3/other/djx_02_01_01.client.2.1.2.2.U471901.bff
+    87.0 MB     1/  87 blocks empty (1.1 %)  fixes/v4/db2/db2_02_01.client.02.01.0001.0001.U441267.bff
+    74.6 MB     1/  75 blocks empty (1.3 %)  fixes/v4/db2/db2_02_01.client.02.01.0002.0000.U446791.bff
+    76.8 MB     3/  77 blocks empty (3.9 %)  fixes/v4/db2/db2_02_01.client.02.01.0002.0002.U449586.bff
+    95.8 MB     1/  96 blocks empty (1.0 %)  fixes/v4/other/djx_02_01.client.02.01.0002.0002.U471902.bff
+    91.7 MB     1/  92 blocks empty (1.1 %)  fixes/v4/other/djx_02_01_01.client.02.01.0002.0002.U486564.bff
+    27.3 MB     6/  28 blocks empty (21.4 %)  ifixes/ipv6002/U817726.bff
+   101.0 MB     7/ 101 blocks empty (6.9 %)  ifixes/security/kernel_fix.tar
+  15 incomplete files, 5163 files read in full
+
+
+=== archive finished ===  ibm-aix  4409.8 s

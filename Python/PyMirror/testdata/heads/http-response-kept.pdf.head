@@ -1,0 +1,8 @@
+HTTP/1.1 200 Document follows
+Server: Domino-Go-Webserver/4.6
+Date: Fri, 20 Feb 1998 21:28:58 GMT
+Content-Type: application/pdf
+Content-Length: 195255
+Last-Modified: Wed, 05 Nov 1997 18:13:32 GMT
+
+%PDF-1.01 0 obj<< /CreationDate (Thu, Sep 4, 1997)/Producer (Acrobat Distiller 1.0.2 for Macintosh)>> endobj2 0 obj[ /PDF /Text /ImageC ]endobj3 0 obj<< /Pages 5 0 R /Type /Catalog /Outlines 24 0 R >> endobj4 0 obj<< /Type /Page /Parent 5 0 R /Resources << /Font 23 0 R /XObject << /Im

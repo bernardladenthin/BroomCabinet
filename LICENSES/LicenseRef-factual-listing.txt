@@ -1,0 +1,50 @@
+LicenseRef-factual-listing
+
+The files under Python/PyMirror/testdata/listings/ are fragments of generated
+directory listings: the output a web server (Apache mod_autoindex, lighttpd,
+nginx, Caddy and similar) produces when asked for a directory that has no index
+page. Each one was taken from a copy of a public archive held in this
+collection, and trimmed to the generator's own output -- the table or <pre>
+block and its rows. Prose written by a person around the listing is removed.
+
+They are here because the parser that reads such listings has to be tested
+against the shapes servers really emit, and a synthetic example proves nothing
+about a server nobody controls. Each file has a .license sidecar naming the
+archive it came from.
+
+What remains is a machine's rendering of a directory: file names, sizes and
+dates, in the layout its configuration dictates. No explicit license or
+redistribution grant is stated at any of the sources. The names and figures are
+factual statements about what those directories contained on the day they were
+copied; any rights in the surrounding markup remain with whoever generated or
+configured it.
+
+
+The files under Python/PyMirror/testdata/heads/ are a different kind of
+quotation and need their own paragraph, because the reasoning above does not
+reach them. They are not directory listings. Each is the FIRST 512 BYTES of one
+stored file, kept because the checks under test -- magic_mismatch() and
+looks_like_an_error_page() -- read a head and never more, so the head is the
+whole of what is under test. One is shorter: the file it comes from is 150 bytes
+in total, and there is nothing behind it to leave out.
+
+Copying a 282 KB JPEG to prove something about its first four bytes would be
+copying it for no reason, and that is the measure applied throughout: the
+fixture is as small as the question allows. Every one has a .license sidecar
+naming the file and the archive it came from, the byte count taken, and the byte
+count of the original that is not here.
+
+What those 512 bytes contain is, in almost every case, structure rather than
+authorship: a doctype, meta tags, table scaffolding, or the opening signature of
+a binary format. Two carry more than that and are named rather than glossed
+over. html-behind-a-comment.jpg.head and .rpm.head open with
+`<!-- Copyright (C) Bull SAS - 2019 -->` and include one sentence of site
+description; they are here because that leading comment is exactly the defect
+under test -- it sits before the doctype and made an HTML error page read as a
+damaged JPEG. geocities-under-pdf.head carries Yahoo! GeoCities' server-inserted
+wrapper markup.
+
+No explicit license or redistribution grant is stated at any of these sources
+either. The fragments are quoted as technical evidence of what particular bytes
+are, in the smallest amount that can carry the evidence; any rights in them
+remain with whoever wrote or generated them.

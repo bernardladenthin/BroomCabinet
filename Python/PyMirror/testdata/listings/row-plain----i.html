@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="generator" content="Metropoli-PCB-Indexer">
+    <title>Metropoli BBS - C:\SEKALAISET\OHJEET</title>
+    <style>
+        /* FONT DEFINITION: Forces browser to use local file aliased as MetropoliRetro */
+        @font-face {
+            font-family: 'MetropoliRetro';
+            src: url('/retrofonts/Perfect%20DOS%20VGA%20437%20Win.woff') format('woff'),
+                 url('/retrofonts/Perfect%20DOS%20VGA%20437%20Win.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        :root {
+            --bg-color: #000000;
+            --crt-bg: #080808;          
+            --dos-white: #DDDDDD;       
+            --dos-grey: #999999;        
+            --dos-yellow: #DDDD44;      
+            --dos-cyan: #44DDDD;        
+            --dos-green: #44DD44;       
+            --dos-red-bg: #AA0000;      
+            --action-color: #00AAAA;    
+            --hover-white: #FFFFFF;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--dos-white);
+            font-family: 'MetropoliRetro', monospace;
+            font-size: 19px;
+            line-height: 21px; 
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            min-width: fit-content; 
+        }
+        
+        /* Explicitly force PRE tags to inherit the Retro Font */
+        pre, code, kbd, samp {
+            font-family: 'MetropoliRetro', monospace;
+            font-size: inherit;
+        }
+
+        /* The main CRT Container. Width is injected dynamically (110ch or 132ch) */
+        .crt-frame {
+            background-color: var(--crt-bg);
+            display: block;
+            width: 110ch; 
+            padding: 20px;
+            border: 1px solid #333;
+            box-sizing: border-box;
+        }
+
+        a { text-decoration: none; color: inherit; cursor: pointer; }
+
+        .bbs-header {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--dos-grey);
+            padding-bottom: 10px;
+            color: var(--dos-white);
+        }
+        
+        .header-logo { height: 160px; width: auto; }
+
+        .breadcrumb a:hover { color: var(--dos-yellow); background-color: #0000AA; }
+
+        .ctx-link {
+            display: block;
+            margin-top: 5px;
+            color: var(--dos-grey);
+            font-family: 'MetropoliRetro', monospace;
+            font-size: 19px;
+        }
+        .ctx-link a { color: var(--action-color); text-decoration: none; }
+        .ctx-link a:hover { color: var(--hover-white); background-color: var(--action-color); }
+
+        .file-table { width: 100%; border-collapse: collapse; table-layout: auto; }
+
+        th {
+            text-align: left;
+            color: var(--dos-yellow);
+            border-bottom: 1px solid var(--dos-grey);
+            padding: 5px 10px; 
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+            /* Force the Retro font and remove implicit bolding */
+            font-family: 'MetropoliRetro', monospace;
+            font-weight: normal; 
+        }
+        
+        td { padding: 0 10px; vertical-align: top; }
+        
+        /* COLUMNS */
+        .col-name { width: 1px; white-space: nowrap; color: var(--dos-white); }
+        
+        /* Action column uses 'pre' to preserve spaces */
+        .col-action { 
+            width: 13ch; 
+            white-space: pre; 
+            text-align: left; 
+            color: var(--action-color); 
+        }
+        
+        .col-size { width: 1px; white-space: nowrap; text-align: right; color: var(--dos-green); }
+        .col-date { width: 1px; white-space: nowrap; text-align: left; color: var(--dos-cyan); }
+        .col-desc { width: auto; white-space: pre-wrap; color: var(--dos-grey); }
+
+        /* HOVER EFFECTS */
+        tbody tr:hover { background: linear-gradient(to bottom, var(--dos-red-bg) 21px, transparent 21px); }
+        tbody tr:first-child td { padding-top: 12px; }
+        tbody tr:first-child:hover {
+            background: linear-gradient(to bottom, transparent 12px, var(--dos-red-bg) 12px, var(--dos-red-bg) 33px, transparent 33px);
+        }
+        tbody tr:hover .col-name a, tbody tr:hover .col-size, tbody tr:hover .col-date, tbody tr:hover .col-action a { color: var(--hover-white) !important; }
+        tbody tr:hover .col-desc::first-line { color: var(--hover-white) !important; }
+
+        .unpack-btn { color: var(--action-color); }
+        .dir-label { color: var(--action-color); }
+        
+        /* Sort Indicators */
+        .sort-asc::after { content: " ▲"; }
+        .sort-desc::after { content: " ▼"; }
+    </style>
+</head>
+<body>
+
+<div class="crt-frame">
+    <div class="bbs-header">
+        <img src="/mpolilogo2-transparent-500x500.png" class="header-logo" alt="Metropoli BBS">
+        <div>
+            <pre>Metropoli BBS</pre>
+            <pre><span class="breadcrumb"><a href="../../index.html">C:</a>\<a href="../index.html">SEKALAISET</a>\<a href="index.html">OHJEET</a></span></pre>
+            
+        </div>
+    </div>
+
+    <table class="file-table" id="fileTable">
+        <thead>
+            <tr>
+                <th class="col-name" onclick="sortTable(0, 'text')">FILENAME</th>
+                <th class="col-action"></th>
+                <th class="col-size" onclick="sortTable(2, 'size')">SIZE</th>
+                <th class="col-date" onclick="sortTable(3, 'date')">DATE</th>
+                <th class="col-desc">DESCRIPTION</th>
+            </tr>
+        </thead>
+        <tbody id="fileTableBody">
+
+        <tr data-bytes="2409" data-timestamp="631152000">
+            <td class="col-name"><a href="ohjeet.html">ohjeet.html</a></td>
+            <td class="col-action"></td>
+            <td class="col-size">2409</td>
+            <td class="col-date"></td>
+            <td class="col-desc"></td>
+        </tr>        </tbody>
+    </table>
+    <pre style="margin-top: 15px; border-top: 1px solid #444; padding-top: 10px; color: #777;"> TOTAL: 1</pre>
+</div>
+
+<script>
+var sortOrder = { 0: "asc", 2: "asc", 3: "asc" };
+
+function sortTable(n, type) {
+  var table = document.getElementById("fileTable");
+  var tbody = document.getElementById("fileTableBody");
+  var rows = Array.from(tbody.rows);
+  
+  var dir = sortOrder[n] === "asc" ? "desc" : "asc";
+  sortOrder[n] = dir;
+
+  var headers = table.getElementsByTagName("th");
+  for (var i = 0; i < headers.length; i++) {
+    headers[i].className = headers[i].className.replace(" sort-asc", "").replace(" sort-desc", "");
+  }
+  headers[n].className += (dir === "asc" ? " sort-asc" : " sort-desc");
+
+  rows.sort(function(a, b) {
+    var xContent, yContent;
+    
+    if (type === 'size') {
+      xContent = parseInt(a.getAttribute('data-bytes')) || 0;
+      yContent = parseInt(b.getAttribute('data-bytes')) || 0;
+    } else if (type === 'date') {
+      xContent = parseInt(a.getAttribute('data-timestamp')) || 0;
+      yContent = parseInt(b.getAttribute('data-timestamp')) || 0;
+    } else {
+      xContent = a.getElementsByTagName("TD")[n].innerText.trim().toLowerCase();
+      yContent = b.getElementsByTagName("TD")[n].innerText.trim().toLowerCase();
+    }
+
+    if (xContent > yContent) return dir === "asc" ? 1 : -1;
+    if (xContent < yContent) return dir === "asc" ? -1 : 1;
+    return 0;
+  });
+
+  var fragment = document.createDocumentFragment();
+  rows.forEach(function(row) {
+    fragment.appendChild(row);
+  });
+  tbody.appendChild(fragment);
+}
+</script>
+</body>
+</html>
