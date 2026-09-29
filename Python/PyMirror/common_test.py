@@ -5574,5 +5574,84 @@ class TestFollowListingsIsOffOnPurpose(unittest.TestCase):
             shutil.rmtree(d, ignore_errors=True)
 
 
+class TestPatience(unittest.TestCase):
+    """The rule that stops a url-list fetch when the host has gone away.
+
+    Written against the two incidents in the class docstring: dialectronics, where each further
+    trip cost tolerance in the next window, and openpa, where six unanswered requests in a row
+    were the signal a person acted on by hand.
+    """
+
+    def test_a_fresh_one_is_not_spent(self):
+        self.assertFalse(common.Patience(limit=3).spent)
+
+    def test_it_stops_at_the_limit_and_not_before(self):
+        p = common.Patience(limit=3)
+        self.assertFalse(p.went_quiet())
+        self.assertFalse(p.went_quiet())
+        self.assertTrue(p.went_quiet())
+        self.assertTrue(p.spent)
+
+    def test_an_answer_resets_the_run(self):
+        """FOUR failures either side of one reply must not add up to eight."""
+        p = common.Patience(limit=5)
+        for _ in range(4):
+            p.went_quiet()
+        p.answered()
+        for _ in range(4):
+            self.assertFalse(p.went_quiet())
+        self.assertFalse(p.spent)
+
+    def test_scattered_failures_never_stop_a_healthy_run(self):
+        """Nine failures spread through 2 000 requests is a lumpy archive, not a refusal."""
+        p = common.Patience(limit=5)
+        for i in range(2000):
+            if i % 200 == 0:
+                p.went_quiet()
+            else:
+                p.answered()
+            self.assertFalse(p.spent)
+
+    def test_the_worst_streak_is_kept_after_a_reset(self):
+        """A run that survived may still want to report how close it came."""
+        p = common.Patience(limit=9)
+        for _ in range(4):
+            p.went_quiet()
+        p.answered()
+        p.went_quiet()
+        self.assertEqual(p.worst, 4)
+        self.assertEqual(p.quiet, 1)
+
+    def test_a_404_is_an_answer_and_not_silence(self):
+        """The distinction the class exists for: a status is the server speaking.
+
+        A manifest naming 300 files the mirror never kept produces 300 straight 404s. That must
+        run to the end -- it is the answer to the question being asked.
+        """
+        p = common.Patience(limit=5)
+        for _ in range(300):
+            p.answered()                    # what the caller does for ANY http status
+        self.assertFalse(p.spent)
+
+    def test_the_reason_names_the_count_and_the_failure(self):
+        p = common.Patience(limit=2)
+        p.went_quiet("TimeoutError")
+        p.went_quiet("TimeoutError")
+        self.assertIn("2 requests in a row", p.reason)
+        self.assertIn("TimeoutError", p.reason)
+
+    def test_a_reason_is_readable_before_anything_failed(self):
+        """Nothing may raise on the reporting path -- a crash while stopping loses the run."""
+        self.assertIn("0 requests in a row", common.Patience().reason)
+
+    def test_a_limit_below_one_is_refused(self):
+        """limit=0 would stop before the first request and report the host as gone."""
+        with self.assertRaises(ValueError):
+            common.Patience(limit=0)
+
+    def test_it_is_exported(self):
+        self.assertIn("Patience", common.__all__)
+
+
 if __name__ == "__main__":
     unittest.main()

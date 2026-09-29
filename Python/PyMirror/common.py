@@ -144,7 +144,7 @@ __all__ = [
     "read_marker", "write_marker", "marker_text", "MARKER_COLUMN",
     "iter_tree", "scan_tree", "hash_tree", "HASH_BATCH",
     "http_open", "http_get", "http_try", "head_size", "unverified_context",
-    "quote_url", "Pacer", "Backoff",
+    "quote_url", "Pacer", "Backoff", "Patience",
     "declared_length", "DECLARES_ITS_LENGTH",
     "ZIP_TAIL", "ZIP_EOCD", "ZIP_CD_ENTRY", "ZIP64_MARK", "ISO_PVD_AT",
     "load_peer", "load_mirror", "source_url", "HTTP_FACE", "find_tool", "split_archive",
@@ -1444,6 +1444,71 @@ class Backoff:
         if wait > 0:
             self._sleep(wait)
         return wait
+
+
+class Patience:
+    """How many requests a run may waste on a host that has stopped answering, before it stops.
+
+    `Pacer` decides how OFTEN to ask and `Backoff` how long to wait before asking AGAIN. Neither
+    can decide to stop, and stopping is the thing this collection has had to learn twice by
+    losing a host:
+
+        dialectronics  2026-09-16  377 requests, then 28, then 2 -- each trip cost tolerance in
+                                   the next window, and the third one bought the ban.
+        openpa         2026-09-27  "six in a row on /doc/ pages, WinError 10060. Stopped at once
+                                   instead of retried."
+
+    Both times a PERSON noticed and stopped it. A url-list fetch has no person watching: it walks
+    its list to the end because that is what a list is, and 31 urls at a 120 s timeout is an hour
+    of knocking on a door that has already been shut.
+
+    THE COUNT IS CONSECUTIVE, NEVER CUMULATIVE. A run over 2 000 files that collects nine
+    scattered failures is a healthy run over a lumpy archive; nine in a row is a host that went
+    away. Summing them would abandon the first and tolerate the second, which is backwards.
+
+    AND A 404 RESETS IT, WHICH IS THE WHOLE POINT. An HTTP status -- any status, including 404 and
+    410 -- is the server SPEAKING TO US. It costs it nothing, it says the connection is alive, and
+    a manifest full of files the mirror never kept will legitimately produce a long run of them.
+    Only silence counts here: a timeout, a refused connection, a reset. That distinction already
+    exists in `http_try`, whose docstring says why the two kinds of "no" must not be collapsed;
+    this is the same line drawn one level up, where it decides whether to carry on at all.
+
+        patience = Patience(limit=5)
+        for url in urls:
+            ...
+            patience.answered() if the_server_replied else patience.went_quiet()
+            if patience.spent:
+                print(patience.reason); break
+    """
+
+    def __init__(self, limit=5):
+        if limit < 1:
+            raise ValueError("a limit below 1 would stop before the first request: %r" % limit)
+        self.limit = limit
+        self.quiet = 0
+        self.worst = 0
+
+    def answered(self):
+        """The server replied -- 200, 404, 500, anything. The run is talking to something."""
+        self.quiet = 0
+
+    def went_quiet(self, what="no answer"):
+        """Nothing came back: a timeout, a refusal, a reset. -> True once the limit is reached."""
+        self.quiet += 1
+        self.worst = max(self.worst, self.quiet)
+        self.last = what
+        return self.spent
+
+    @property
+    def spent(self):
+        return self.quiet >= self.limit
+
+    @property
+    def reason(self):
+        """What to print when a run stops. Says the count, because that is the evidence."""
+        return ("STOPPED: %d requests in a row went unanswered (%s). The host is not refusing "
+                "individual files, it has stopped talking. Leave it alone for days."
+                % (self.quiet, getattr(self, "last", "no answer")))
 
 
 # The formats in this collection that STATE THEIR OWN LENGTH, and what they are called when they

@@ -162,9 +162,15 @@ def ITEM(i):
 
 # Every attribute mirror() reads. Missing one raises AttributeError *inside* mirror, which
 # terminates the run and would read as a pass -- see the module docstring.
+# give_up is deliberately enormous. This file tests what happens when a run WEDGES, and the
+# give-up guard is a second way for a run to end -- one that would terminate several scenarios
+# for the right reason and hide the wrong one. The CONTROL scenario is the clearest: its worker
+# blocks forever and must keep blocking, and a guard that abandoned the run would turn the one
+# test that proves this harness can see a hang into a pass.  [2026-09-29]
 args = types.SimpleNamespace(workers=8, queue=128, interval=3600, fresh=True,
                              case_sensitive=False, archive=None, seed=None,
-                             no_index=True, hash_workers=2, trust_index=False)
+                             no_index=True, hash_workers=2, trust_index=False,
+                             give_up=10 ** 9)
 try:
     m.mirror('wedgetest', 'http://127.0.0.1:9/', args)
 except BaseException as exc:

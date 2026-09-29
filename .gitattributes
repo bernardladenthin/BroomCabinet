@@ -11,3 +11,42 @@
 # next commit -- a diff touching the whole repository, which is not a thing to
 # hide inside a licensing fix. That stays a separate decision.
 *.tsv text eol=lf
+
+# THE FIXTURES ARE QUOTED BYTES AND MUST NEVER BE TRANSFORMED. Everything under testdata/ is a
+# fragment captured from a real server -- the first 512 bytes of a stored file, a server's own
+# directory listing, a robots.txt -- and the tests assert the byte count and the sha256. Each
+# .license sidecar states the exact count too, as the record of what was and was not reproduced.
+#
+# MEASURED 2026-09-29 ON THIS CHECKOUT, with core.autocrlf=true, the Windows default and what is
+# set here: 100 of the 117 files under testdata/ are LONGER in the working tree than the blob git
+# stores. html-behind-a-comment.jpg.head is 524 bytes where the fixture is 512 and its own sidecar
+# says 512; every LF had become CRLF. heads-test.py and robots-fixtures-test.py both failed, on 16
+# fixtures between them.
+#
+# THE REPOSITORY WAS NEVER WRONG -- `git show HEAD:<path>` returns the correct 512 bytes -- and CI
+# on ubuntu-latest never saw it, because autocrlf is off there. So the defect is invisible from
+# the one place that runs the tests automatically and certain on the machine the fixtures were
+# made on. A fixture that changes between checkouts is not a fixture.
+#
+# `-text` AND NOT `text eol=lf`, WHICH IS THE OPPOSITE CHOICE FROM THE *.tsv LINE ABOVE and is
+# deliberate. eol=lf still declares the file to be text, so git keeps the right to normalise it on
+# the way in as well; these files may hold anything at all -- one is a truncated JPEG, another a
+# GIF with its first byte removed -- and the correct instruction is that they are not text and
+# nothing may touch them in either direction.
+#
+# "IN EITHER DIRECTION" IS NOT THEORETICAL -- TWO FIXTURES WERE ALREADY DAMAGED IN THE REPOSITORY,
+# and it was the opposite direction from the one above. autocrlf converts CRLF to LF on the way IN
+# as well, so the two heads whose real bytes CONTAIN CR were silently shortened when they were
+# committed: geocities-under-pdf.head lost 2 bytes and ibm-marketing-under-pdf.head lost 5. Both
+# were then 512-byte fixtures that were not 512 bytes, in a directory whose whole point is that
+# the byte count is exact.
+#
+# NEITHER THE COMMIT NOR ANY CHECKOUT COMPLAINED. The failure surfaced only because heads-test.py
+# records a sha256 per fixture and re-reads the file: the recorded digests were right and the
+# committed files were wrong. Fixing the checkout direction alone would have left them broken and
+# looking fixed, which is the worse outcome -- the tests would have gone green over bad data.
+#
+# THEY WERE RESTORED FROM THE MIRROR, not reconstructed: the first 512 bytes were re-read from
+# ps-2.kev009.com/basil.holloway/ALL PDF/{cs4231a,sa380544}.pdf, and both digests then matched
+# what the test had recorded all along. The originals were never lost -- only the copies were.
+Python/PyMirror/testdata/** -text

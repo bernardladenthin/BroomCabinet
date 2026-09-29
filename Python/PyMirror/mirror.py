@@ -1671,7 +1671,7 @@ import urllib.error
 import urllib.parse
 
 from common import (COMPLETE_MARKER, INDEX_FILE, MIN_FREE_BYTES, ROOT_MARKER, SUMS_FILE,
-                    Backoff, Pacer,
+                    Backoff, Pacer, Patience,
                     comparable_path, hash_tree, http_date, http_open, human,
                     iter_tree, local_path, long_path, looks_like_a_document,
                     looks_like_a_loop,
@@ -5587,6 +5587,11 @@ class Stats:
         self.trusted = 0        # skipped on the index, without asking the source
         self.listfail = 0
         self.enum_done = False
+        # WHAT STOPS A RUN WHOSE HOST HAS GONE AWAY. See `abandon` in worker() and in the
+        # producer; the limit is set in the run itself, because a Stats() is built before the
+        # arguments are known.
+        self.patience = Patience()
+        self.abandon = None
 
 
 def reporter(stats, log, stop, interval):
@@ -5934,6 +5939,66 @@ MIN_INTERVAL = {
     # suggested 4 s and the instruction was 5. It is one person's site of a few hundred
     # hand-written articles and the whole archive is under 50 MB, so the slower figure costs
     # about ten minutes and buys the thing that actually matters.
+    #
+    # PROBED ONCE ON 2026-09-28 AT 23:18, twelve hours after the last request, and the answer was
+    # the SAME REFUSAL rather than a new one. One HEAD on a page this collection already holds --
+    # /about.html, chosen because a held path cannot be blamed for the silence -- gave URLError
+    # after 42.4 s. The 2026-09-27 hand probe gave 42 s. Two measurements a day apart agreeing to
+    # the second is not noise: it is a firewall dropping the SYN on a fixed timer, which is the
+    # same state, not a deteriorating or a lifting one.
+    #
+    # WHY THE DURATION IS WORTH WRITING DOWN AT ALL. "Still blocked" is what both probes say and
+    # it is the less useful half. A refusal that CHANGED its timing would mean somebody touched
+    # the rule, and that is the only cheap signal available from outside -- there is nothing else
+    # to read from a host that sends no bytes. So the next probe records its seconds too, and a
+    # figure that is not 42 is the thing worth acting on.
+    #
+    # AND ON 2026-09-29 AT 09:10 THE FIGURE WAS NOT 42. The same probe, the same held page, ten
+    # hours after the last one: HTTP 200 in 1.0 s. That is the signal the paragraph above was
+    # written to look for, and it arrived the very next morning -- so the ban was roughly a day
+    # long and not the "days" this note feared.
+    #
+    # WHAT WAS THEN TAKEN, AND WHAT WAS DELIBERATELY NOT. 30 urls the 2026-09-27/28 runs had given
+    # up on, fetched by manifest-fetch.py --url-list at 5 s, ONE connection: 30 fetched, 0 gone,
+    # 0 failed, 2.5 MB, every one a genuine article or image (find-html-imposters.py --pages found
+    # no error page wearing a 200). The archive is at 174 files. NO CRAWL WAS RUN AND NO MARKER
+    # WAS WRITTEN. The measurement floor is 492, so roughly 318 files remain, and reaching them
+    # means walking the 46 pages whose links were never followed -- which is the decision the
+    # paragraph above hands to a person, not a thing to do because the host happens to answer.
+    #
+    # THE URL LIST IS A RECORD, NOT A SCRATCH FILE: logs/openpa-wanted-2026-09-29.txt, built from
+    # logs/errors-openpa.txt (FAIL + LISTFAIL), minus what was already held, minus the robots.txt
+    # wildcard group. 91 urls named, 60 already held, 30 wanted, 0 forbidden -- the arithmetic is
+    # in the file's header so the next run can check it rather than trust it.
+    #
+    # THE WILDCARD GROUP WAS RE-READ FROM THE HOST rather than from EXCLUDE, and it is worth the
+    # request: 13 of the 30 sit under risc/images/, which LOOKS like the disallowed images/ and is
+    # not it. robots.txt path rules anchor at the root, so `Disallow: /images/` reaches /images/
+    # and nothing else. Matching it as a substring would have refused 13 files nobody refused.
+    #
+    # A CRAWL FOLLOWED AT 10:19 THE SAME MORNING AND THE HOST SHUT IT OFF AFTER FIVE MINUTES.
+    # 5 s, one connection, --trust-index. It went perfectly and then stopped dead:
+    #
+    #     10:24  135 files  2.2/s   fail 0  lostdir 0
+    #     10:29  181 files  0.0/s   fail 0  lostdir 0   first timeout at 10:28:27
+    #     10:34  184 files  0.0/s   fail 2  lostdir 2
+    #     10:55  184 files  0.0/s   fail 9  lostdir 9   killed by hand
+    #
+    # NOT ONE FILE AFTER 10:29, and twenty-six minutes of asking anyway. The budget today was
+    # about 90 requests -- 30 clean on the url list at 09:20, then ~60 on the crawl. Compare
+    # dialectronics: 377, then 28, then 2. The shape is the same and 5 s did not change it.
+    #
+    # SO THE 5 s IS NOT WHAT IS WRONG AND NEITHER IS THE CONNECTION COUNT. This host meters
+    # REQUESTS PER DAY, not requests per second, and no pace expressible in this table can buy
+    # more of them. The archive is at 184 files against a floor of 492. Either it is filled a
+    # hundred a day over a week, or it stays where it is -- still a decision for a person.
+    #
+    # WHAT THE RUN ITSELF GOT WRONG, AND IS NOW FIXED. Nothing stopped it. common.Patience had
+    # been written that same morning for manifest-fetch.py -- the tool that walks 30 urls in two
+    # minutes with somebody watching -- and NOT for the tool that runs unattended for hours. The
+    # nine "unreadable listings" it recorded are the worst of it: each is written down as a lost
+    # subtree whose standing advice is "re-run to pick them up", and not one of them was
+    # unreadable. See --give-up, the ABANDONED verdict, and give-up-test.py.
     "openpa": 5.0,
 
     # 0.3 s WAS WRONG AND THE HOST SAID SO WITHIN A MINUTE. The reasoning was that a BBS
@@ -5950,6 +6015,12 @@ MIN_INTERVAL = {
     #
     # 4 s AND ONE WORKER when this is tried again, and not before the host has been left alone
     # for days -- see WORKERS_BY_ARCHIVE below, which is the half that actually mattered here.
+    #
+    # PROBED ONCE ON 2026-09-28 AT 23:19, twenty-four hours after the last request: one HEAD on
+    # gfd/apparc/index.html, a page already held, URLError after 21.2 s. The 2026-09-27 probe was
+    # 21 s on a page and a zip. Same reading as openpa above and for the same reason -- the timer
+    # is stable, so the rule behind it is untouched, and a day is not the "days" this note asks
+    # for. Both probes cost one request each and are logged in logs/probe-2026-09-28.log.
     "dreamlandbbs-os2": 4.0,
 
 }
@@ -6218,6 +6289,14 @@ def worker(q, root, base_url, stats, log):
             # and the run wedged in precisely the way described above -- no error, no progress,
             # forever. Measured 2026-08-29. The item is logged rather than the URL, because on
             # a malformed item there is no URL yet.  [2026-08-29]
+            # ONCE THE RUN IS ABANDONED THE QUEUE IS DRAINED, NOT WORKED. Every item still in
+            # it is one more request at a host that has stopped answering, and the queue holds
+            # up to 128 of them. They are not counted as failures either -- they were never
+            # tried, and a file nobody asked for is not a file that is gone.
+            with stats.lock:
+                giving_up = stats.abandon is not None
+            if giving_up:
+                continue
             try:
                 url, _size, mtime = item
                 result = download(url, local_path(root, base_url, url), stats, log, mtime)
@@ -6234,6 +6313,17 @@ def worker(q, root, base_url, stats, log):
                     stats.permfail += 1
                 else:
                     stats.failed += 1
+                # THREE OF THE FOUR ARE THE SERVER ANSWERING and only the fourth is silence.
+                # `permfail` is a 404 it chose to send, `skip` means the file is already here,
+                # `ok` speaks for itself. `fail` is what is left after download() exhausted its
+                # retries: a timeout, a refused connection, a reset -- or a 5xx repeated until
+                # the ladder ran out, which is a host in trouble and equally a reason to stop.
+                if result == "fail":
+                    if stats.patience.went_quiet("download") and not stats.abandon:
+                        stats.abandon = stats.patience.reason
+                        log.line(stats.abandon, error=True)
+                else:
+                    stats.patience.answered()
         finally:
             q.task_done()
 
@@ -6419,6 +6509,14 @@ def producer(q, base_url, stats, log, case_sensitive=False, alive=None, exclude=
         put_item(q, (s, None, None), alive, log)
 
     while pending:
+        # THE PRODUCER CHECKS TOO, and it has to: the workers stop asking for files, but
+        # enumeration is a separate stream of requests -- one per directory listing -- and on
+        # 2026-09-29 those were most of what kept reaching openpa.net after it had gone quiet.
+        with stats.lock:
+            if stats.abandon:
+                log.line("ENUMERATION ABANDONED with %d listings unread. They are NOT recorded "
+                         "as lost -- nothing asked for them." % len(pending), error=True)
+                break
         url = pending.pop()
         try:
             # Rebind url to where the fetch actually ended up, so the relative links below
@@ -6653,6 +6751,7 @@ def mirror(name, base_url, args):
         log.line("CASE-SENSITIVE already set on %s" % root)
 
     stats = Stats()
+    stats.patience = Patience(limit=args.give_up)
     q = queue.Queue(maxsize=args.queue)
     stop = threading.Event()
 
@@ -6711,7 +6810,17 @@ def mirror(name, base_url, args):
     report_unused_excludes(name, log)
 
     elapsed = time.time() - t0
-    verdict = "COMPLETE" if not (stats.listfail or stats.failed) else "INCOMPLETE"
+    # THREE VERDICTS AND NOT TWO. A run that was abandoned is incomplete in the same way a run
+    # with one unreadable listing is incomplete, and saying so in the same word loses the thing
+    # worth knowing: the rest of the tree was never asked for. INCOMPLETE invites "re-run to pick
+    # them up", which is the sentence printed below and the wrong advice at a host that has just
+    # stopped answering. A marker cannot be written for either -- abandoning takes at least
+    # `--give-up` failures, so stats.failed is non-zero and always was -- but the WORD is what
+    # anyone reads.
+    if stats.abandon:
+        verdict = "ABANDONED"
+    else:
+        verdict = "COMPLETE" if not (stats.listfail or stats.failed) else "INCOMPLETE"
     log.line("DONE %s %s in %dh%02dm  files=%d (skip %d, of which %d trusted to the index "
              "and never requested)  bytes=%s  403=%d  fail=%d  retries=%d  collisions=%d  "
              "unreadable-listings=%d"
@@ -6719,11 +6828,16 @@ def mirror(name, base_url, args):
                 stats.done, stats.skipped, stats.trusted, human(stats.bytes),
                 stats.permfail, stats.failed, stats.retries, stats.collisions,
                 stats.listfail))
-    if stats.listfail:
+    if stats.listfail and not stats.abandon:
         # Each of these took a whole subtree with it. Say so in the loudest available place.
         log.line("WARNING %d directory listings could not be read after %d attempts; "
                  "every file below them is missing. Re-run to pick them up."
                  % (stats.listfail, ATTEMPTS), error=True)
+    elif stats.abandon:
+        log.line("%s  The %d unreadable listings above are a SYMPTOM of that and not %d separate "
+                 "losses; do NOT re-run to pick them up."
+                 % (stats.abandon, stats.listfail, stats.listfail), error=True)
+        print("    " + stats.abandon, flush=True)
 
     if verdict == "COMPLETE":
         write_marker(root, name, base_url, stats, elapsed)
@@ -7222,6 +7336,14 @@ def main():
                     help="simultaneous connections per archive (default 8)")
     ap.add_argument("--queue", type=int, default=128,
                     help="bounded queue depth (default 128)")
+    ap.add_argument("--give-up", type=int, default=6, metavar="N",
+                    help="abandon the archive after N CONSECUTIVE requests that got no answer "
+                         "at all (default 6). A 404 is an answer and resets the count. MEASURED "
+                         "2026-09-29: openpa.net answered for five minutes, stopped, and this "
+                         "run spent the next 26 asking anyway -- 28 retries, 9 failures, nine "
+                         "subtrees recorded as lost that were never truly asked for. Six is one "
+                         "more than the five in a row that preceded every such incident here, "
+                         "so a genuinely lumpy archive is not cut short")
     ap.add_argument("--interval", type=float, default=10.0,
                     help="seconds between progress lines (default 10)")
     ap.add_argument("--fresh", action="store_true",
