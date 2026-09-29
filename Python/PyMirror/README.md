@@ -62,6 +62,7 @@ notice, than the ways it fails loudly. Most of this file is about the second thi
 | `refresh-table.py` | rebuilds `mirror.py`'s HELD table from the tree, carrying every hand-written note across |
 | `common_test.py` | `unittest` over `common.py`, and every case is a mistake one of the copies actually made: a trailing dot surviving `long_path`, a relative path reaching `exists`, `human` being decimal while `parse_size` is binary, the agent not beginning `Mozilla/`, one own-files set. It also asserts that `mirror.py` resolves these to *this* module rather than to a copy of its own |
 | `wedge_test.py` | the termination tests for `mirror.py` |
+| `give-up-test.py` | the ten cases for `--give-up`, the rule that abandons a run whose host has stopped answering. Two of them are the point: forty consecutive 404s must **not** stop a run, because a status is the server talking and a hand-written site full of dead links is exactly what this collection mirrors. Written after a crawl spent twenty-six minutes asking a host that had gone quiet, and recorded nine subtrees as lost that were never truly asked for |
 | `parse_listing_test.py` | the listing-parser tests. They check **both** directions: that the newer link and image forms are found, and that the size and date columns a real index carries are still read correctly |
 | `drivers-exclude-test.py` | the 108 cases behind the `oldskool` driver exclusions. They check the **encoded** path, because `EXCLUDE` matches what the listing served — a vendor name with a space has to be written `%20` or it matches nothing |
 | `trust-index-test.py` | the eight cases for `--trust-index`, the skip that makes a re-run cheap: a file named in the checksum index and present on disk is not fetched again |
@@ -353,6 +354,19 @@ corollaries that were learned rather than designed:
 - **Check all, then judge.** `all(verify(n) for n in ...)` short-circuits: one unverifiable archive
   ended the pass and left four mirrors unchecked. A verification that stops at the first problem
   does not verify.
+
+There is a third verdict, **ABANDONED**, and it exists because INCOMPLETE was giving the wrong
+advice. A run ends abandoned when `--give-up` consecutive requests get no answer *at all* — a
+timeout, a refused connection, a reset. A 404 is not one of those: a status is the server
+talking, and a hand-written site full of dead links would otherwise stop a run for doing exactly
+what it was asked to do.
+
+The distinction earns its keep in what is *not* written down afterwards. An unreadable listing is
+normally recorded as a lost subtree, and the advice printed beside it is "re-run to pick them up".
+When the host has gone quiet those listings were never unreadable, and re-running is the last
+thing anyone should do — so the warning is suppressed and the reason printed instead. On
+2026-09-29 a crawl of `openpa.net` was cut off five minutes in, spent twenty-six more asking
+anyway, and wrote down nine lost subtrees that were nothing of the kind.
 
 ## Checksums
 

@@ -30,7 +30,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from common import (COMPLETE_MARKER, MIRROR_ROOT, Pacer, exists, host_of, http_get,
+from common import (COMPLETE_MARKER, MIRROR_ROOT, Pacer, Patience, exists, host_of, http_get,
                     read_marker, scan_tree)
 from common import write_marker as common_write_marker
 
@@ -113,6 +113,12 @@ def main():
                          "report. Off by default because a top-up of a CRAWLED archive must "
                          "leave mirror.py's own marker alone, and this refuses to overwrite "
                          "one that is already there.")
+    ap.add_argument("--give-up", type=int, default=5, metavar="N",
+                    help="stop after N CONSECUTIVE requests that got no answer at all "
+                         "(default 5). A 404 is an answer and resets the count -- see "
+                         "common.Patience. A url-list has no person watching it, and "
+                         "31 urls at a 120 s timeout is an hour of knocking on a door "
+                         "that is already shut; that is how two hosts were lost.")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
@@ -169,6 +175,11 @@ def main():
 
     ok = gone = failed = 0
     total = 0
+    # WHAT DECIDES TO STOP. Not a count of failures -- a count of SILENCES in a row; see
+    # common.Patience for why a 404 must reset it and why summing them would get both cases
+    # backwards. `stopped` survives the loop so the summary can say the list was not finished.
+    patience = Patience(limit=args.give_up)
+    stopped = None
     for rel in todo:
         url = base_url + "/".join(urllib.parse.quote(p) for p in rel.split("/"))
         out = os.path.join(base_dir, rel.replace("/", os.sep))
@@ -184,14 +195,22 @@ def main():
             # A manifest describes the ORIGINAL. A 404 here means the file did not survive the
             # mirroring, which is a fact about the copy and not a failure of this run.
             gone += 1
+            # AN HTTP STATUS IS THE SERVER TALKING, so this is progress even though no file
+            # arrived. A manifest full of files the mirror never kept is a long run of these and
+            # must be allowed to finish -- it is the answer to the question being asked.
+            patience.answered()
             print("  GONE HTTP %s  %s" % (e.code, rel), flush=True)
             continue
         except Exception as exc:                               # noqa: BLE001
             failed += 1
             print("  FAIL   %s :: %s" % (rel, str(exc)[:60]), flush=True)
+            if patience.went_quiet(type(exc).__name__):
+                stopped = patience.reason
+                break
             continue
         with io.open(out, "wb") as fh:
             fh.write(body)
+        patience.answered()
         ok += 1
         total += len(body)
         if ok % 25 == 0:
@@ -199,8 +218,20 @@ def main():
 
     print("  DONE fetched %d, gone from the source %d, failed %d, %.1f MB"
           % (ok, gone, failed, total / 1e6))
+    if stopped:
+        # SAID TWICE AND ON PURPOSE. The count above is the same shape a finished run prints, and
+        # a run that stopped early has a REMAINDER -- anyone reading only the totals would take
+        # this for the whole list.
+        print("  " + stopped)
+        print("  %d of %d urls were never tried. Nothing here says they are gone."
+              % (len(todo) - (ok + gone + failed), len(todo)))
 
-    if args.marker:
+    if args.marker and stopped:
+        # A MARKER IS A CLAIM OF COMPLETENESS and this run stopped in the middle. Writing one here
+        # is the exact failure this collection has made twice over: `61 files, 0 failed` on a tree
+        # missing 99.4 % of itself. Refuse, and say so.
+        print("  NO MARKER WRITTEN -- the run stopped early, so it cannot claim the list is done.")
+    elif args.marker:
         write_marker(base_dir, args.archive, base_url, args.url_list or args.manifest,
                      len(named), gone, failed)
     elif ok:
