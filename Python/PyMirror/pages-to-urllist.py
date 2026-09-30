@@ -63,6 +63,30 @@ SKIP = ("http://", "https://", "//", "#", "mailto:", "javascript:", "data:", "?"
         "tel:", "about:", "file:")
 
 
+def refusals(here, archive):
+    """-> (EXCLUDE patterns for this archive, the checker), or ((), None) if mirror.py is absent.
+
+    WHY A LIST FROM HERE HAS TO BE FILTERED AT ALL. This tool reads pages and reports what they
+    name; a page names whatever its author linked, and an EXCLUDE entry is the record of what
+    this collection has decided -- or been told -- not to take. The two have never agreed and
+    were never going to.
+
+    MEASURED 2026-09-30 ON openpa: 621 urls harvested, of which 580 sit under images/ and
+    systems/images/. Those two paths are openpa.net's robots.txt WILDCARD group -- not a
+    preference of ours, a rule binding every crawler -- and the next line this tool prints is a
+    manifest-fetch.py command. An unfiltered list is therefore an instruction to fetch 580 things
+    nobody is allowed to fetch, printed by the tool as the obvious next step.
+
+    It was caught by hand, twice, on two consecutive days, by someone who happened to remember
+    the rule. That is not a check.
+    """
+    try:
+        m = load_mirror(here)
+        return tuple(m.EXCLUDE.get(archive, ())), m.is_excluded
+    except (OSError, AttributeError):
+        return (), None
+
+
 def base_urls(here):
     """-> {archive: base url} from mirror.py, or {} if it cannot be read."""
     try:
@@ -123,13 +147,19 @@ def main():
                         continue
                     named.setdefault(urllib.parse.urljoin(here_url, h), here_url)
 
-    files, dirs, outside = [], [], 0
+    patterns, excluded_by = refusals(here, args.archive)
+    files, dirs, outside, refused = [], [], 0, []
     for url in sorted(named):
         if not url.startswith(base):
             outside += 1
             continue
         rel = urllib.parse.unquote(url[len(base):])
         if not rel or rel.endswith("/"):
+            continue
+        # The archive's own EXCLUDE, applied with the crawler's own comparison rather than a
+        # second one written here -- see refusals() for what an unfiltered list would ask for.
+        if excluded_by and excluded_by(rel, patterns, args.archive):
+            refused.append(rel)
             continue
         local = os.path.join(root, *[p for p in rel.split("/") if p])
         if exists(local):
@@ -144,6 +174,23 @@ def main():
     print("  %s: %d stored pages read, %d targets named" % (args.archive, pages, len(named)))
     print("     %d outside the archive" % outside)
     print("     %d directory links without a trailing slash (already walked)" % len(dirs))
+    if refused:
+        # SAID BEFORE THE HEADLINE FIGURE, not after it. The count below is what the next command
+        # would fetch, and a reader who sees only that number cannot tell it was ever narrowed.
+        print("     %d REFUSED by EXCLUDE[%r] -- not offered, not counted below"
+              % (len(refused), args.archive))
+        for pattern in patterns:
+            n = sum(1 for r in refused if r.startswith(pattern))
+            if n:
+                print("        %-24s %d" % (pattern, n))
+    elif patterns:
+        print("     EXCLUDE[%r] is set (%s) and matched nothing here"
+              % (args.archive, ", ".join(patterns)))
+    elif excluded_by is None:
+        # A MISSING REGISTER MUST NOT LOOK LIKE AN EMPTY ONE. Without mirror.py this tool cannot
+        # know what is refused, and silence would read as "nothing is".
+        print("     WARNING mirror.py could not be read -- NO exclusion was applied. Check the "
+              "list by hand before fetching it.")
     print("     %d FILES NAMED AND NOT ON DISK" % len(files))
     for u in files[:12]:
         print("        %s" % urllib.parse.unquote(u[len(base):])[:86])

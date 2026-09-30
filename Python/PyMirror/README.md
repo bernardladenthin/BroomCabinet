@@ -62,6 +62,7 @@ notice, than the ways it fails loudly. Most of this file is about the second thi
 | `refresh-table.py` | rebuilds `mirror.py`'s HELD table from the tree, carrying every hand-written note across |
 | `common_test.py` | `unittest` over `common.py`, and every case is a mistake one of the copies actually made: a trailing dot surviving `long_path`, a relative path reaching `exists`, `human` being decimal while `parse_size` is binary, the agent not beginning `Mozilla/`, one own-files set. It also asserts that `mirror.py` resolves these to *this* module rather than to a copy of its own |
 | `wedge_test.py` | the termination tests for `mirror.py` |
+| `exclude-honoured-test.py` | the nine cases proving a URL list cannot carry what `EXCLUDE` refuses — at both ends, because a list is a file and may come from anywhere. Built from whatever patterns the register happens to hold, so they state a property rather than a fixture. The first one tested is the *over*-refusal: `risc/images/` is not `images/`, and a file wrongly refused never appears anywhere for anyone to miss |
 | `give-up-test.py` | the ten cases for `--give-up`, the rule that abandons a run whose host has stopped answering. Two of them are the point: forty consecutive 404s must **not** stop a run, because a status is the server talking and a hand-written site full of dead links is exactly what this collection mirrors. Written after a crawl spent twenty-six minutes asking a host that had gone quiet, and recorded nine subtrees as lost that were never truly asked for |
 | `parse_listing_test.py` | the listing-parser tests. They check **both** directions: that the newer link and image forms are found, and that the size and date columns a real index carries are still read correctly |
 | `drivers-exclude-test.py` | the 108 cases behind the `oldskool` driver exclusions. They check the **encoded** path, because `EXCLUDE` matches what the listing served — a vendor name with a space has to be written `%20` or it matches nothing |
@@ -543,6 +544,15 @@ makes the process exit non-zero.
 The rsync progress meter is only attached when stdout is a terminal. Redirected to a file it was
 36 MB of a line redrawing itself — 494 010 of 494 247 captured lines — so a redirected run gets
 `--stats` instead: what was transferred, once, at the end.
+
+**Watch `logs/<archive>.log`, not the redirected stdout.** They are not the same stream and only
+one of them arrives while the run is running. Python block-buffers stdout as soon as it is a file
+rather than a terminal, so `mirror.py … > run.log` can sit at 43 bytes for half an hour with the
+crawl working normally behind it. The per-archive log is written line by line and is the live
+one. Measured the hard way on 2026-09-29: a watcher was pointed at the redirected file, reported
+nothing for thirty minutes, and the run had meanwhile been cut off by its host after five — the
+tree had the answer the whole time, which is the same lesson as *ask the tree, not the log*, one
+level further down.
 
 Every mirrored file carries the date the **source** publishes, not the date it was copied. New
 downloads take it from `Last-Modified`, which is exact to the second and free, since the header

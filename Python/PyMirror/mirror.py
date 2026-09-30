@@ -5999,6 +5999,34 @@ MIN_INTERVAL = {
     # nine "unreadable listings" it recorded are the worst of it: each is written down as a lost
     # subtree whose standing advice is "re-run to pick them up", and not one of them was
     # unreadable. See --give-up, the ABANDONED verdict, and give-up-test.py.
+    #
+    # 2026-09-30: THE SAME THING AGAIN, TO THE MINUTE, WHICH SETTLES WHAT IT IS. 36 hours of
+    # quiet, one probe -> HTTP 200 in 0.3 s (0.3, against 1.0 the day before and 42 s of silence
+    # before that -- the host recovers fully, and quickly). Then a url-list fetch of the 9 files
+    # the cut-off crawl had failed on: 9 of 9, 0 failed, 1.0 MB, flawless at 5 s. Then a crawl at
+    # the same 5 s and the same single connection:
+    #
+    #     23:17  135 files  2.2/s   fail 0      23:22  181  0.0/s  retry 1
+    #     23:18  143 files  0.1/s   fail 0      23:24  181  0.0/s  fail 1
+    #     23:19  170/177+   0.4/s   fail 0      23:27  184  0.0/s  fail 2   stopped here
+    #     23:21  181/208+   0.1/s   fail 0
+    #
+    # Line for line the same progression as 2026-09-29, five minutes of health and then nothing.
+    # TWO MEASUREMENTS A DAY APART AGREEING THIS CLOSELY ARE NOT A HOST HAVING A BAD DAY. This
+    # host meters REQUESTS PER DAY -- roughly 60 on a crawl, ~90 counting the url list -- and no
+    # figure in this table can buy more of them. The pace is not the lever; the only lever is how
+    # many requests a session spends and on what.
+    #
+    # SO THE URL LIST IS THE INSTRUMENT FOR THIS ARCHIVE AND THE CRAWL IS NOT. A crawl spends its
+    # whole budget re-walking pages already on disk -- 181 of the 184 it touched were skips --
+    # while the url list spent 9 requests and got 9 files. --trust-index removes the DOWNLOADS
+    # but not the LISTING requests, and on a hand-written site every page is both.
+    #
+    # --give-up 6 IS TOO GENEROUS HERE, AND THE REASON IS ARITHMETIC I DID NOT DO. The default
+    # was chosen by counting incidents -- five in a row preceded every one -- without costing
+    # them: a failure here is three retries against a ~40 s timeout, so ~2 minutes, and six of
+    # those is twelve minutes of knocking. Use --give-up 2 on this host. The default stays 6
+    # because the cost of a failure is a property of the run, not of the register.
     "openpa": 5.0,
 
     # 0.3 s WAS WRONG AND THE HOST SAID SO WITHIN A MINUTE. The reasoning was that a BBS

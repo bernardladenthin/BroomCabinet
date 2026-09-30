@@ -31,6 +31,7 @@ import urllib.parse
 import urllib.request
 
 from common import (COMPLETE_MARKER, MIRROR_ROOT, Pacer, Patience, exists, host_of, http_get,
+                    load_mirror,
                     read_marker, scan_tree)
 from common import write_marker as common_write_marker
 
@@ -152,6 +153,39 @@ def main():
             m = LINE.match(line)
             if m and m.group(1).startswith(args.prefix):
                 named.append(m.group(1).lstrip("/"))
+
+    # THE ARCHIVE'S OWN EXCLUDE, ENFORCED HERE AND NOT ONLY WHERE THE LIST WAS MADE. A url list
+    # is a file; it can be hand-written, carried over from another day, or produced by a tool
+    # that did not know about EXCLUDE -- pages-to-urllist.py did not, until 2026-09-30, and on
+    # openpa it offered 580 urls under the two paths that host's robots.txt forbids to every
+    # crawler. This is the last point before a request leaves, so it is the one place the check
+    # cannot be skipped by feeding the fetch a different list.
+    #
+    # THE CHECK IS MIRROR.PY'S OWN, not a second comparison written here. A copy would be a
+    # fourth place the rule lives and would drift; see is_excluded's docstring, which exists
+    # because there were once three.
+    refused = []
+    try:
+        mirror = load_mirror(os.path.dirname(os.path.abspath(__file__)))
+        patterns = tuple(mirror.EXCLUDE.get(args.archive, ()))
+        if patterns:
+            keep = []
+            for r in named:
+                (refused if mirror.is_excluded(r, patterns, args.archive) else keep).append(r)
+            named = keep
+    except (OSError, AttributeError):
+        # A MISSING REGISTER IS NOT AN EMPTY ONE, and the difference decides whether a fetch is
+        # allowed to proceed. Refusing outright would make this tool unusable beside a mirror.py
+        # that moved; proceeding in silence is how a forbidden path gets fetched. So: say it.
+        print("  WARNING mirror.py could not be read -- NO exclusion was applied to this list.",
+              flush=True)
+    if refused:
+        print("  %d url(s) REFUSED by EXCLUDE[%r] and not requested:" % (len(refused),
+                                                                         args.archive))
+        for r in refused[:5]:
+            print("     %s" % r)
+        if len(refused) > 5:
+            print("     ... and %d more" % (len(refused) - 5))
 
     todo = [r for r in named
             if not exists(os.path.join(base_dir, r.replace("/", os.sep)))]
