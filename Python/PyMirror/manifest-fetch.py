@@ -30,7 +30,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from common import (COMPLETE_MARKER, MIRROR_ROOT, Pacer, Patience, exists, host_of, http_get,
+from common import (COMPLETE_MARKER, GONE_FILE, MIRROR_ROOT, Pacer, Patience, exists,
+                    host_of, http_get,
+                    load_mirror, local_failure, read_gone, record_gone,
                     read_marker, scan_tree)
 from common import write_marker as common_write_marker
 
@@ -113,6 +115,13 @@ def main():
                          "report. Off by default because a top-up of a CRAWLED archive must "
                          "leave mirror.py's own marker alone, and this refuses to overwrite "
                          "one that is already there.")
+    ap.add_argument("--ask-gone-again", action="store_true",
+                    help="ask for the paths this archive's " + GONE_FILE + " records as 404 or "
+                         "410. Off by default: three sessions in a row spent their first "
+                         "requests on the same dead names, because a 404 creates no file and so "
+                         "a list diffed against the tree names it again every time. On, because "
+                         "a host comes back and nothing on disk changes when it does -- the "
+                         "record keeps the DATE so this flag has something to mean")
     ap.add_argument("--give-up", type=int, default=5, metavar="N",
                     help="stop after N CONSECUTIVE requests that got no answer at all "
                          "(default 5). A 404 is an answer and resets the count -- see "
@@ -152,6 +161,56 @@ def main():
             m = LINE.match(line)
             if m and m.group(1).startswith(args.prefix):
                 named.append(m.group(1).lstrip("/"))
+
+    # THE ARCHIVE'S OWN EXCLUDE, ENFORCED HERE AND NOT ONLY WHERE THE LIST WAS MADE. A url list
+    # is a file; it can be hand-written, carried over from another day, or produced by a tool
+    # that did not know about EXCLUDE -- pages-to-urllist.py did not, until 2026-09-30, and on
+    # openpa it offered 580 urls under the two paths that host's robots.txt forbids to every
+    # crawler. This is the last point before a request leaves, so it is the one place the check
+    # cannot be skipped by feeding the fetch a different list.
+    #
+    # THE CHECK IS MIRROR.PY'S OWN, not a second comparison written here. A copy would be a
+    # fourth place the rule lives and would drift; see is_excluded's docstring, which exists
+    # because there were once three.
+    refused = []
+    try:
+        mirror = load_mirror(os.path.dirname(os.path.abspath(__file__)))
+        patterns = tuple(mirror.EXCLUDE.get(args.archive, ()))
+        if patterns:
+            keep = []
+            for r in named:
+                (refused if mirror.is_excluded(r, patterns, args.archive) else keep).append(r)
+            named = keep
+    except (OSError, AttributeError):
+        # A MISSING REGISTER IS NOT AN EMPTY ONE, and the difference decides whether a fetch is
+        # allowed to proceed. Refusing outright would make this tool unusable beside a mirror.py
+        # that moved; proceeding in silence is how a forbidden path gets fetched. So: say it.
+        print("  WARNING mirror.py could not be read -- NO exclusion was applied to this list.",
+              flush=True)
+    if refused:
+        print("  %d url(s) REFUSED by EXCLUDE[%r] and not requested:" % (len(refused),
+                                                                         args.archive))
+        for r in refused[:5]:
+            print("     %s" % r)
+        if len(refused) > 5:
+            print("     ... and %d more" % (len(refused) - 5))
+
+    # PATHS THIS SOURCE HAS ALREADY SAID IT DOES NOT HAVE. Skipped before the on-disk test, not
+    # after, because the on-disk test is exactly what cannot tell them apart: a 404 leaves no
+    # file, so "absent from the tree" is true of a file that is gone and of a file never asked
+    # for. Measured 2026-10-02 on openpa: images/dcsscr4.gif asked three times, answered the
+    # same way three times, and these names sort to the front -- dcss*, sna* -- so they were the
+    # first requests of a session the host grants a few dozen of.
+    gone = {} if args.ask_gone_again else read_gone(base_dir)
+    skipped_gone = [r for r in named if r in gone]
+    if skipped_gone:
+        print("  %d path(s) skipped: %s records them as 404/410. --ask-gone-again to ask anyway."
+              % (len(skipped_gone), GONE_FILE))
+        for r in skipped_gone[:5]:
+            print("     %s   (%s)" % (r, gone[r]))
+        if len(skipped_gone) > 5:
+            print("     ... and %d more" % (len(skipped_gone) - 5))
+        named = [r for r in named if r not in gone]
 
     todo = [r for r in named
             if not exists(os.path.join(base_dir, r.replace("/", os.sep)))]
@@ -199,12 +258,25 @@ def main():
             # arrived. A manifest full of files the mirror never kept is a long run of these and
             # must be allowed to finish -- it is the answer to the question being asked.
             patience.answered()
-            print("  GONE HTTP %s  %s" % (e.code, rel), flush=True)
+            # AND THE ANSWER IS WRITTEN DOWN, for 404 and 410 only; record_gone refuses the rest.
+            # Without this the same question is asked again next session, and there is no cheaper
+            # place to put the answer than beside the files it is about.
+            noted = record_gone(base_dir, rel, e.code)
+            print("  GONE HTTP %s  %s%s" % (e.code, rel, "" if noted else "  (already noted)"),
+                  flush=True)
             continue
         except Exception as exc:                               # noqa: BLE001
             failed += 1
             print("  FAIL   %s :: %s" % (rel, str(exc)[:60]), flush=True)
-            if patience.went_quiet(type(exc).__name__):
+            # DID THIS REQUEST REACH THE WIRE? On 2026-10-02 a 568-url run of openpa ended on two
+            # `[Errno 11001] getaddrinfo failed` and announced that the host had stopped talking
+            # and should be left alone for days. The owner's wifi had dropped; the host answered
+            # 200 within the minute. The run was right to stop and wrong about why, and the why is
+            # the part somebody acts on the next day.
+            unreached = local_failure(exc)
+            spent = (patience.unreachable(unreached) if unreached
+                     else patience.went_quiet(type(exc).__name__))
+            if spent:
                 stopped = patience.reason
                 break
             continue

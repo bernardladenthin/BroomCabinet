@@ -56,12 +56,15 @@ notice, than the ways it fails loudly. Most of this file is about the second thi
 | `autoindex-tls-broken.py` | an open directory whose TLS chain is incomplete, so no stdlib client will talk to it |
 | `b2-cluster.py` | measures what the collection is **made of** — bytes per compressibility class and per extension — and counts the byte-identical files held more than once, from the stored digests alone. Then it checks `b2-pack.py`'s grouping against that: how much duplication sits inside a unit where a solid block collapses it, how much crosses a boundary and is paid for twice, and whether any archive is left unclaimed. It imports the units rather than restating them, because a check against its own copy of the answer checks nothing |
 | `b2-pack.py` | plans the nineteen WinRAR units that carry the collection to cold storage, and **prints rather than runs** — `--execute` is opt-in. A multi-volume RAR cannot be appended to, so a unit is the unit of *rebuilding*, and the grouping follows what a project needs together rather than what compresses well. Every switch it emits was measured against a real WinRAR; two were wrong until they were. Reads only the per-archive indexes, never the collection's files |
+| `find-sitemaps.py` | asks each archive's host for `robots.txt` and then, if it declares none, makes **one** guess at `/sitemap.xml` — and compares what it lists against what the mirror holds. A sitemap is the operator's own statement of what the site consists of, which is the one kind of evidence a crawl cannot produce: `measure-remote.py` follows links, so it rediscovers our own reach and charges a HEAD per file for it. 7 of 104 archives publish a readable one, 12 publish a sitemap *index* (not followed), 5 answer HTTP 200 with an HTML page |
 | `blogger-sitemap.py` | a Blogger site, enumerated from `sitemap.xml` because its front page is infinite scroll |
 | `nginx-autoindex-gallery.py` | a small nginx autoindex, at the `Crawl-delay` its robots.txt asks for |
 | `move-mirror.py` | relocates a mirror tree between volumes, re-reading both sides rather than trusting the move |
 | `refresh-table.py` | rebuilds `mirror.py`'s HELD table from the tree, carrying every hand-written note across |
 | `common_test.py` | `unittest` over `common.py`, and every case is a mistake one of the copies actually made: a trailing dot surviving `long_path`, a relative path reaching `exists`, `human` being decimal while `parse_size` is binary, the agent not beginning `Mozilla/`, one own-files set. It also asserts that `mirror.py` resolves these to *this* module rather than to a copy of its own |
 | `wedge_test.py` | the termination tests for `mirror.py` |
+| `gone-record-test.py` | the twenty-two cases for `.mirror-gone`, the per-archive note of what the source answered 404 or 410 to. A 404 creates no file, so a list diffed against the tree names the same dead path every session — three sessions asked openpa for the same GIF, and those names sort to the front, so they were the first requests of a budget worth a few dozen. The tests pin what may **not** go in: not a timeout, and not 403 or 401, which say we may not have it rather than that it is gone |
+| `exclude-honoured-test.py` | the nine cases proving a URL list cannot carry what `EXCLUDE` refuses — at both ends, because a list is a file and may come from anywhere. Built from whatever patterns the register happens to hold, so they state a property rather than a fixture. The first one tested is the *over*-refusal: `risc/images/` is not `images/`, and a file wrongly refused never appears anywhere for anyone to miss |
 | `give-up-test.py` | the ten cases for `--give-up`, the rule that abandons a run whose host has stopped answering. Two of them are the point: forty consecutive 404s must **not** stop a run, because a status is the server talking and a hand-written site full of dead links is exactly what this collection mirrors. Written after a crawl spent twenty-six minutes asking a host that had gone quiet, and recorded nine subtrees as lost that were never truly asked for |
 | `parse_listing_test.py` | the listing-parser tests. They check **both** directions: that the newer link and image forms are found, and that the size and date columns a real index carries are still read correctly |
 | `drivers-exclude-test.py` | the 108 cases behind the `oldskool` driver exclusions. They check the **encoded** path, because `EXCLUDE` matches what the listing served — a vendor name with a space has to be written `%20` or it matches nothing |
@@ -84,10 +87,10 @@ python wedge_test.py
 Every path is a parameter, and `mirror.py` in particular has **no default root** -- the subject of
 the next section.
 
-The tools added later relax this. **Thirty-one of them** default `--root` to `Q:\mirror` --
+The tools added later relax this. **Thirty-two of them** default `--root` to `Q:\mirror` --
 `autoindex-tls-broken.py`, `b2-cluster.py`, `b2-pack.py`, `blogger-sitemap.py`, `case-collision-recover.py`,
 `containment.py`,
-`corpus-coverage.py`, `crawl-gap-audit.py`, `extract-container-tar.py`, `fill-from-local.py`, `find-html-imposters.py`,
+`corpus-coverage.py`, `crawl-gap-audit.py`, `extract-container-tar.py`, `fill-from-local.py`, `find-html-imposters.py`, `find-sitemaps.py`,
 `holes-run.py`, `holes-vs-source.py`, `http-subset-fetch.py`, `ia-item-fetch.py`,
 `index-vs-tree.py`, `iso-second-opinion.py`, `manifest-fetch.py`,
 `nginx-autoindex-gallery.py`, `page-extensions.py`,
@@ -103,7 +106,7 @@ The tools added later relax this. **Thirty-one of them** default `--root` to `Q:
 `reachability-probe.py`, `unpacked-vs-archive.py` — because none of them walks the collection.
 `ask-the-source.py` is the clearest case: it reads recorded lengths from a table and bytes from a
 URL, and a `--root` it never used would be an invitation to believe it had checked something on
-disk. 31 + 8 + 2 + 8 = **49 scripts with an argument parser**, which is the whole set.
+disk. 32 + 8 + 2 + 8 = **50 scripts with an argument parser**, which is the whole set.
 
 They are maintenance tools for one collection rather than general-purpose fetchers, and the trade
 is deliberate -- but it is a trade. This paragraph named three tools for a while, then kept naming
@@ -355,6 +358,29 @@ corollaries that were learned rather than designed:
   ended the pass and left four mirrors unchecked. A verification that stops at the first problem
   does not verify.
 
+### What "complete" can and cannot mean
+
+A marker rests on **link-following**: a crawl takes what pages link, and `measure-remote.py`
+crawls too, so a measurement confirms the same reach at one HEAD per file and adds only byte
+sizes. Neither can see a file nothing links. That was a theoretical caveat until 2026-10-02, when
+`find-sitemaps.py` compared `ardent-tool` against its own `sitemap.xml` and found **32 pages the
+mirror lacked** — in directories already held in full (`Apricot/prodcode` had `td,te,tf,tg.html`
+and not `jp,np,qf,qp,sb.html`), none among the 42 recorded 404s, all 32 answering 200. An archive
+marked COMPLETE since 11 September, found short by the first independent check ever run against
+one.
+
+So completeness here is a chain of claims, strongest first:
+
+1. **The operator's own inventory** — `sitemap.xml`, two requests, and the only evidence that does
+   not come from our own method. `openpa` settled this way: 168 of 168.
+2. **Link closure** — harvest with `pages-to-urllist.py`, fetch, harvest again until no new name
+   appears. Zero requests per round, because the pages are already on disk. A stored RSS feed
+   counts as a second local source; `openpa.xml` named 14 files no page did.
+3. **What nothing lists** — irreducible. No method available finds it, measurement included.
+
+A marker may therefore honestly say "link- and sitemap-closed". It may not say "complete" and mean
+more than that.
+
 There is a third verdict, **ABANDONED**, and it exists because INCOMPLETE was giving the wrong
 advice. A run ends abandoned when `--give-up` consecutive requests get no answer *at all* — a
 timeout, a refused connection, a reset. A 404 is not one of those: a status is the server
@@ -406,9 +432,26 @@ before long-term archiving and after any move between volumes. The whole collect
 
 ## What the tool learned the hard way
 
-Fourteen defects, each found by measurement rather than reasoning, and every one of them invisible in a
+Sixteen defects, each found by measurement rather than reasoning, and every one of them invisible in a
 progress bar. They are listed because the next archive will break the tool in some new way, and the
 pattern is more useful than the individual fixes.
+
+**A failure on your own side is not evidence about the other side.** A 568-url run ended on two
+`[Errno 11001] getaddrinfo failed` and printed *"it has stopped talking. Leave it alone for
+days."* Errno 11001 is a DNS lookup that failed: the owner's wifi had dropped, no request ever
+left the machine, and the host answered HTTP 200 in 0.2 s a minute later. The run was right to
+stop and wrong about why — and the why is what somebody acts on the next day. There are three
+outcomes, not two: the server answered, the server did not, or we never reached it. A timeout
+belongs to the host and justifies waiting; a dead resolver belongs to us and justifies nothing.
+
+**A repeated experiment confirms repeatability, not the reason.** Two crawls of the same host were
+cut off after roughly 60 requests each, a day apart, at the same minute. That was written down as
+"this host meters requests per day, roughly 60" — in the voice of a measurement, with the
+reasoning that two readings agreeing that closely could not be coincidence. They were not a
+coincidence: they were the *same experiment run twice*. Nothing had yet asked the host for
+anything of a different shape. When a URL list did, it got **371 consecutive requests with zero
+failures** — six times the asserted ceiling. The observation was sound and the word "day" was
+invented; the sentence that did the damage is the one that sounds most careful.
 
 **A listing matcher counted the wrong row.** A pattern that matched nothing but lighttpd's "Parent
 Directory" row counted as a successful parse, suppressed the fallback, and hid **97 % of an
@@ -543,6 +586,15 @@ makes the process exit non-zero.
 The rsync progress meter is only attached when stdout is a terminal. Redirected to a file it was
 36 MB of a line redrawing itself — 494 010 of 494 247 captured lines — so a redirected run gets
 `--stats` instead: what was transferred, once, at the end.
+
+**Watch `logs/<archive>.log`, not the redirected stdout.** They are not the same stream and only
+one of them arrives while the run is running. Python block-buffers stdout as soon as it is a file
+rather than a terminal, so `mirror.py … > run.log` can sit at 43 bytes for half an hour with the
+crawl working normally behind it. The per-archive log is written line by line and is the live
+one. Measured the hard way on 2026-09-29: a watcher was pointed at the redirected file, reported
+nothing for thirty minutes, and the run had meanwhile been cut off by its host after five — the
+tree had the answer the whole time, which is the same lesson as *ask the tree, not the log*, one
+level further down.
 
 Every mirrored file carries the date the **source** publishes, not the date it was copied. New
 downloads take it from `Last-Modified`, which is exact to the second and free, since the header

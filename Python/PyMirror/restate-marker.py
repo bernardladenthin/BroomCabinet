@@ -29,7 +29,9 @@ the second would quietly turn a two-week-old mirror into a fresh one.
     python restate-marker.py ... --apply
 """
 import argparse
+import io
 import os
+import re
 import sys
 
 from common import (COMPLETE_MARKER, human, long_path, marker_text, read_marker, say, scan_tree,
@@ -42,7 +44,21 @@ from common import (COMPLETE_MARKER, human, long_path, marker_text, read_marker,
 # names the count the second repair started from, and the crawl's original figure is gone from
 # the file. That is acceptable while repairs are rare and each one is written up elsewhere; it
 # would not be if this became routine, and the fix then is a list rather than a sentence.
+#
+# IT BECAME A LIST ON 2026-10-02, the day the paragraph above came true. ardent-tool was restated
+# a SECOND time -- 25701 -> 25733, for 32 pages its own sitemap.xml names and no page links -- and
+# the dry run showed the FIRST restatement gone from the preview: the +25 files from a removed
+# directory page, and with them the crawl's own original figure of 25608. The paragraph above was
+# right about the cost and right about the fix; the only thing left was to stop predicting it.
+#
+# EACH LINE IS ONE REPAIR, oldest first, so the chain back to what the crawl itself wrote stays
+# unbroken however many follow. Earlier lines are carried across VERBATIM: they are somebody's
+# record of what they did, and rewording them in passing would be the same loss as dropping them,
+# made quieter. A marker written before this change has its one repair as a bare paragraph, and
+# that paragraph is recovered as the first entry rather than discarded.
 RESTATED = "RESTATED"
+# What a repair line starts with. Read as well as written, so the list survives the next restate.
+ENTRY = "  * "
 
 
 def restate(root, archive, reason, apply_it=False, report=say):
@@ -72,7 +88,11 @@ def restate(root, archive, reason, apply_it=False, report=say):
 
     fields["files"] = str(new[0])
     fields["bytes"] = str(new[1])
-    prose = _prose(old, new, reason)
+    # The marker as it stands. Its earlier repair lines are not in `fields` -- read_marker returns
+    # the header -- so the file itself is the only place to carry them from.
+    with io.open(long_path(path), encoding="utf-8", errors="replace") as fh:
+        existing = fh.read()
+    prose = _prose(old, new, reason, existing)
     if apply_it:
         write_marker(path, fields, prose)
         report("  %-22s written" % "")
@@ -82,17 +102,63 @@ def restate(root, archive, reason, apply_it=False, report=say):
     return (old, new)
 
 
-def _prose(old, new, reason):
+FROM = re.compile(r"^from (\d+) files and (\d+) bytes", re.M)
+
+
+def earlier_entries(text, reached=None):
+    """-> the repair lines an existing marker already carries, verbatim and in order.
+
+    Two shapes exist and both have to be read. A marker restated since 2026-10-02 carries one
+    ENTRY line per repair. One restated before that carries a single paragraph instead, and the
+    paragraph is recovered as the first entry -- dropping it is the loss this function was written
+    to stop.
+
+    `reached` IS WHAT THE OLD SHAPE CANNOT SAY FOR ITSELF, and leaving it out broke the promise
+    this change was made to keep. The old paragraph records only the figures the repair moved
+    AWAY from -- "from 25608 files" -- because the figures it moved TO were simply the header. By
+    the time a second restate reads it the header has moved on, so the first entry would arrive
+    with no destination and the chain would still have a hole in it where the crawl used to be.
+    The caller knows the missing number: it is the count this restate is itself moving away from.
+    """
+    if RESTATED not in (text or ""):
+        return []
+    tail = text.split(RESTATED, 1)[1]
+    lines = [ln[len(ENTRY):].rstrip() for ln in tail.splitlines() if ln.startswith(ENTRY)]
+    if lines:
+        return lines
+    out = []
+    for ln in tail.splitlines():
+        if ln.startswith("`completed`"):
+            break
+        stripped = ln.strip()
+        if (not stripped or stripped.startswith(":") or stripped.startswith("from ")
+                or stripped.endswith("deliberate repair:")):
+            continue
+        out.append(stripped)
+    joined = " ".join(out).strip()
+    if not joined:
+        return []
+    was = FROM.search(tail)
+    if was and reached:
+        joined = ("%s -> %s files, %s -> %s bytes: %s"
+                  % (was.group(1), reached[0], was.group(2), reached[1], joined))
+    return [joined]
+
+
+def _prose(old, new, reason, existing=""):
     """The words under the header. They must say that a crawl did not write this."""
+    # `old` is both this repair's starting point and the previous one's destination.
+    entries = earlier_entries(existing, reached=old)
+    entries.append("%d -> %d files, %d -> %d bytes: %s" % (old[0], new[0], old[1], new[1], reason))
     return ("This mirror is complete. `--fresh` refuses to run while this file exists;\n"
             "delete it by hand if you really mean to fetch the whole archive again.\n"
             "`--verify` compares the tree against the two figures above.\n"
             "\n"
-            "%s: the two figures above were moved after the crawl that wrote this file,\n"
-            "from %d files and %d bytes, by a deliberate repair:\n"
+            "%s: the two figures above are NOT the crawl's. Every deliberate repair since,\n"
+            "oldest first -- the first `->` on the list is where the crawl itself left off:\n"
             "%s\n"
-            "`completed` above is still the crawl's date, not the repair's."
-            % (RESTATED, old[0], old[1], reason))
+            "`completed` above is still the crawl's date, not any repair's."
+            % (RESTATED, "\n".join(ENTRY + e for e in entries)))
 
 
 def main(argv=None):

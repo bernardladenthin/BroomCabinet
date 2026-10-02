@@ -139,6 +139,53 @@ class WhenTheHostStopsAnswering(unittest.TestCase):
         self.assertEqual(len([ln for ln in log.lines if "in a row" in ln]), 1)
 
 
+class AndWhenTheFaultIsOurOwn(unittest.TestCase):
+    """download() reports whether the request reached the wire; worker() must use it.
+
+    MEASURED 2026-10-02 in the sister tool: two `[Errno 11001] getaddrinfo failed` ended a run of
+    openpa with "it has stopped talking. Leave it alone for days." The wifi had dropped and the
+    host answered 200 within the minute. The crawl path had the same hole.
+    """
+
+    def run_with(self, results, unreached, limit=2):
+        stats = MIRROR.Stats()
+        stats.patience = MIRROR.Patience(limit=limit)
+        log = Log()
+        q = queue.Queue()
+        for _ in results:
+            q.put(("https://example.invalid/f", None, None))
+        q.put(None)
+        pending = list(results)
+
+        def fake(*_a, **_kw):
+            # What download() does on its way out: leave the last attempt's verdict on stats.
+            stats.unreached = unreached
+            return pending.pop(0)
+
+        real = MIRROR.download
+        MIRROR.download = fake
+        try:
+            MIRROR.worker(q, "root", "https://example.invalid/", stats, log)
+        finally:
+            MIRROR.download = real
+        return stats
+
+    def test_a_local_failure_abandons_with_the_right_reason(self):
+        stats = self.run_with(["fail"] * 2, "DNS lookup failed (11001)")
+        self.assertTrue(stats.abandon)
+        self.assertIn("never reached the wire", stats.abandon)
+        self.assertNotIn("Leave it alone for days", stats.abandon)
+
+    def test_the_hosts_silence_still_reads_as_the_hosts(self):
+        stats = self.run_with(["fail"] * 2, None)
+        self.assertTrue(stats.abandon)
+        self.assertIn("Leave it alone for days", stats.abandon)
+
+    def test_stats_carries_the_field_download_writes(self):
+        """A rename here would make worker() read None for ever and the fix would vanish."""
+        self.assertIsNone(MIRROR.Stats().unreached)
+
+
 class WhatTheRunSaysAfterwards(unittest.TestCase):
 
     def test_abandoned_is_its_own_verdict(self):
