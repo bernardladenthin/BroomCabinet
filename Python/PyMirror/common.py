@@ -722,6 +722,18 @@ BOOKKEEPING_FILES = frozenset(OWN_FILES | {
     "RENAMED.txt",              # names changed to be storable, and what they were
     "SYMLINKS.txt",             # links the source had and a copy cannot
     "EXTRACTED-FROM.md",        # this tree was unpacked from that archive
+    # WHICH FILES A FRAGMENT-COPY REMOVAL TOOK, and why each was the same document as its
+    # neighbour. Added 2026-10-02, when the tool's own docstring was found to call it "the same
+    # reasoning as RENAMED.txt beside an extracted tree" while the name was in NEITHER set -- so it
+    # was being counted as content by every auditor. Four archives carry one: ardent-tool,
+    # gsi-collection, ibm-aix and ps-2.kev009.com.
+    #
+    # THE WIDE SET ONLY, exactly like RENAMED.txt above it, and that choice is what makes this safe
+    # to add today. iter_tree and therefore every marker skip the NARROW set; putting the name
+    # there would move four markers by one file each, and the four were rewritten from the tree
+    # hours ago and agree with it. Here it changes what an auditor reads and nothing a marker
+    # claims.
+    "FRAGMENT-COPIES-REMOVED.txt",
     "SHA256SUMS",               # written by the one-off fetchers, in sha256sum(1) form
 })                              # STILL-MISSING.txt is inherited from OWN_FILES, see there
 

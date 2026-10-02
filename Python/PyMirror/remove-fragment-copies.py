@@ -43,6 +43,7 @@ which is printed at the end -- it carries hashes over and costs seconds.
 """
 
 import argparse
+import datetime
 import hashlib
 import io
 import os
@@ -50,8 +51,14 @@ import re
 import shutil
 import sys
 
+
 from common import (MIRROR_ROOT, COMPLETE_MARKER, OWN_FILES, is_partial, isfile, long_path,
                     relative_to)
+
+
+def today():
+    """-> the date this run happened, as the marker and the record both have to say."""
+    return datetime.date.today().isoformat()
 
 
 
@@ -123,8 +130,14 @@ def write_record(base, pairs):
     """
     p = os.path.join(base, "FRAGMENT-COPIES-REMOVED.txt")
     with io.open(p, "w", encoding="utf-8", newline="\n") as fh:
-        fh.write("# Files removed 2026-09-13 because they were the same document as the file\n"
-                 "# beside them, saved a second time under a URL fragment. Verified by SHA-256\n"
+        # THE DATE IS TODAY'S, NOT THE DAY THIS TOOL WAS WRITTEN. It read "2026-09-13" here and in
+        # the marker line below -- the day of authorship -- so a removal performed on 2026-10-02
+        # was recorded as having happened three weeks earlier, in an archive's own marker. The
+        # marker is what somebody reads in a year, and `completed` beside it is deliberately left
+        # alone precisely so the two dates mean different things; a wrong second date is therefore
+        # worse than none at all.
+        fh.write("# Files removed %s because they were the same document as the file\n" % today()
+                 + "# beside them, saved a second time under a URL fragment. Verified by SHA-256\n"
                  "# at the moment of deletion, not by size.\n"
                  "#\n"
                  "# A '#anchor' names a position INSIDE a document, never a document. This\n"
@@ -159,11 +172,11 @@ def fix_marker(base, removed, freed):
     if not (nf and nb):
         return "MARKER NOT UNDERSTOOD -- left alone, run --verify"
     s2 = s2.rstrip("\n") + (
-        "\n\nREMOVED 2026-09-13: %d files saved under a URL fragment, %d bytes. Each was the same\n"
+        "\n\nREMOVED %s: %d files saved under a URL fragment, %d bytes. Each was the same\n"
         "document as the file beside it -- verified by SHA-256 at the moment of deletion, not by\n"
         "size -- and existed only because this crawler treated `page.html#anchor` as a filename\n"
         "until strip_fragment() was added on 2026-09-03. Every one cost the source a full\n"
-        "transfer. The figures above were rewritten from the tree.\n" % (removed, freed))
+        "transfer. The figures above were rewritten from the tree.\n" % (today(), removed, freed))
     with io.open(long_path(p), "w", encoding="utf-8", newline="\n") as fh:
         fh.write(s2)
     return "marker: files %d, bytes %d" % (n, b)

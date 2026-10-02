@@ -32,7 +32,7 @@ import urllib.request
 
 from common import (COMPLETE_MARKER, GONE_FILE, MIRROR_ROOT, Pacer, Patience, exists,
                     host_of, http_get,
-                    load_mirror, local_failure, read_gone, record_gone,
+                    load_mirror, local_failure, read_gone, record_gone, under_site,
                     read_marker, scan_tree)
 from common import write_marker as common_write_marker
 
@@ -147,10 +147,21 @@ def main():
             u = line.strip()
             if not u or u.startswith("#"):
                 continue
-            if not u.startswith(base_url):
+            # THE SAME SITE UNDER ANOTHER SPELLING IS STILL THE SAME SITE -- and this was the
+            # THIRD tool to get it wrong on 2026-10-02. pages-to-urllist.py and find-sitemaps.py
+            # were both fixed hours earlier; this one was overlooked, and the first list that met
+            # it lost all 4 404 entries at once: ftp.zx.net.nz publishes its sitemap over https
+            # while the archive is registered on http, so every single url was reported OUTSIDE
+            # THE BASE and the run ended "0 paths, 0 missing, DONE fetched 0" -- a clean zero that
+            # looked like there was nothing to do.
+            #
+            # Three tools, one rule, now one implementation: common.under_site. What decides
+            # offsite is the base, not how the scheme or the `www.` happens to be written.
+            cut = under_site(u, base_url)
+            if cut is None:
                 print("  OUTSIDE THE BASE, skipped: %s" % u[:78])
                 continue
-            rel = urllib.parse.unquote(u[len(base_url):])
+            rel = urllib.parse.unquote(cut)
             if rel.startswith(args.prefix.lstrip("/")) or args.prefix == "/":
                 named.append(rel)
     else:
