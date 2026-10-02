@@ -43,6 +43,7 @@ import tempfile
 import threading
 import time
 import unittest
+import socket
 import urllib.error
 import urllib.parse
 from unittest import mock
@@ -5657,6 +5658,108 @@ class TestPatience(unittest.TestCase):
 
     def test_it_is_exported(self):
         self.assertIn("Patience", common.__all__)
+
+
+class TestLocalFailure(unittest.TestCase):
+    """Did the request reach the wire, or did it never leave this machine?
+
+    WHY THE QUESTION EXISTS, 2026-10-02. A 568-url run of openpa ended on two
+    `[Errno 11001] getaddrinfo failed` and printed "it has stopped talking. Leave it alone for
+    days." The owner's wifi had dropped. The host answered HTTP 200 in 0.2 s a minute later, so
+    the advice would have cost days over a fault on our own side -- and the fault was not even
+    the host's to have.
+    """
+
+    def gai(self, errno=11001):
+        return urllib.error.URLError(socket.gaierror(errno, "getaddrinfo failed"))
+
+    def test_the_incident_itself(self):
+        self.assertTrue(common.local_failure(self.gai()))
+
+    def test_both_spellings_of_a_dns_failure(self):
+        """11001 on Windows, -2 and -3 on Linux. A list with one of them passes only at home."""
+        for errno in (11001, -2, -3):
+            self.assertTrue(common.local_failure(self.gai(errno)), errno)
+
+    def test_a_timeout_is_NOT_local(self):
+        """The one case that does justify waiting: the request went out, nothing came back."""
+        self.assertIsNone(common.local_failure(urllib.error.URLError(socket.timeout("timed out"))))
+
+    def test_winerror_10060_is_NOT_local(self):
+        """What a blocked host actually looks like here, and what must stay blamed on the host."""
+        self.assertIsNone(common.local_failure(urllib.error.URLError(OSError(10060, "timed out"))))
+
+    def test_a_refused_connection_is_NOT_local(self):
+        """Something answered the SYN with a reset. That is the host talking, and excusing it as
+        our own fault would hide exactly the refusal this collection must notice."""
+        self.assertIsNone(
+            common.local_failure(urllib.error.URLError(ConnectionRefusedError(10061, "refused"))))
+
+    def test_an_unreachable_network_is_local(self):
+        self.assertTrue(common.local_failure(urllib.error.URLError(OSError(10051, "no route"))))
+
+    def test_it_unwraps_because_the_errno_is_never_on_top(self):
+        """urllib raises URLError whose `reason` holds the socket error, so a check that reads
+        only the outer exception finds nothing -- the silent form of this mistake."""
+        outer = self.gai()
+        self.assertIsNone(getattr(outer, "errno", None))
+        self.assertTrue(common.local_failure(outer))
+
+    def test_it_does_not_recurse_forever_on_a_self_referencing_chain(self):
+        exc = urllib.error.URLError("x")
+        exc.reason = exc
+        self.assertIsNone(common.local_failure(exc))
+
+    def test_an_ordinary_exception_is_not_local(self):
+        self.assertIsNone(common.local_failure(ValueError("x")))
+        self.assertIsNone(common.local_failure(None))
+
+
+class TestPatienceTellsTheTwoApart(unittest.TestCase):
+
+    def test_a_run_lost_to_the_local_network_says_do_not_wait(self):
+        p = common.Patience(limit=2)
+        p.unreachable("DNS lookup failed (11001)")
+        p.unreachable("DNS lookup failed (11001)")
+        self.assertTrue(p.spent)
+        self.assertIn("never reached the wire", p.reason)
+        self.assertIn("no reason to wait", p.reason)
+        self.assertNotIn("Leave it alone for days", p.reason)
+
+    def test_a_run_lost_to_the_host_still_says_wait(self):
+        p = common.Patience(limit=2)
+        p.went_quiet("TimeoutError")
+        p.went_quiet("TimeoutError")
+        self.assertIn("Leave it alone for days", p.reason)
+        self.assertNotIn("never reached the wire", p.reason)
+
+    def test_a_mixed_streak_refuses_to_pick_a_side(self):
+        """Neither reading is safe, and guessing one would send somebody the wrong way."""
+        p = common.Patience(limit=2)
+        p.unreachable("DNS lookup failed (11001)")
+        p.went_quiet("TimeoutError")
+        self.assertIn("MIXED", p.reason)
+
+    def test_an_answer_clears_the_local_count_with_the_streak(self):
+        """A connection that dropped and came back is not still dropped."""
+        p = common.Patience(limit=5)
+        p.unreachable("DNS lookup failed (11001)")
+        p.answered()
+        p.went_quiet("TimeoutError")
+        self.assertEqual(p.local, 0)
+        self.assertIn("Leave it alone for days", p.reason)
+
+    def test_both_kinds_count_towards_the_same_limit(self):
+        """Two counters would let a flapping connection alternate for ever without stopping."""
+        p = common.Patience(limit=4)
+        p.unreachable()
+        p.went_quiet()
+        p.unreachable()
+        self.assertFalse(p.spent)
+        self.assertTrue(p.went_quiet())
+
+    def test_local_failure_is_exported_beside_patience(self):
+        self.assertIn("local_failure", common.__all__)
 
 
 if __name__ == "__main__":

@@ -432,9 +432,17 @@ before long-term archiving and after any move between volumes. The whole collect
 
 ## What the tool learned the hard way
 
-Fifteen defects, each found by measurement rather than reasoning, and every one of them invisible in a
+Sixteen defects, each found by measurement rather than reasoning, and every one of them invisible in a
 progress bar. They are listed because the next archive will break the tool in some new way, and the
 pattern is more useful than the individual fixes.
+
+**A failure on your own side is not evidence about the other side.** A 568-url run ended on two
+`[Errno 11001] getaddrinfo failed` and printed *"it has stopped talking. Leave it alone for
+days."* Errno 11001 is a DNS lookup that failed: the owner's wifi had dropped, no request ever
+left the machine, and the host answered HTTP 200 in 0.2 s a minute later. The run was right to
+stop and wrong about why — and the why is what somebody acts on the next day. There are three
+outcomes, not two: the server answered, the server did not, or we never reached it. A timeout
+belongs to the host and justifies waiting; a dead resolver belongs to us and justifies nothing.
 
 **A repeated experiment confirms repeatability, not the reason.** Two crawls of the same host were
 cut off after roughly 60 requests each, a day apart, at the same minute. That was written down as

@@ -106,6 +106,7 @@ import html
 import io
 import os
 import re
+import socket
 import subprocess
 import sys
 import threading
@@ -144,7 +145,7 @@ __all__ = [
     "read_marker", "write_marker", "marker_text", "MARKER_COLUMN",
     "iter_tree", "scan_tree", "hash_tree", "HASH_BATCH",
     "http_open", "http_get", "http_try", "head_size", "unverified_context",
-    "quote_url", "Pacer", "Backoff", "Patience",
+    "quote_url", "Pacer", "Backoff", "Patience", "local_failure", "UNREACHED",
     "GONE_FILE", "GONE_STATUS", "read_gone", "record_gone",
     "declared_length", "DECLARES_ITS_LENGTH",
     "ZIP_TAIL", "ZIP_EOCD", "ZIP_CD_ENTRY", "ZIP64_MARK", "ISO_PVD_AT",
@@ -1521,6 +1522,49 @@ class Backoff:
         return wait
 
 
+# Errno values that mean the request NEVER LEFT THIS MACHINE. Both spellings of each, because the
+# collection runs on Windows and its CI on Linux, and a list with only one of them is a check that
+# passes in the place it was written and nowhere else.
+#
+#   11001 / -2 / -3   getaddrinfo failed -- no DNS answer, or none yet (EAI_NONAME, EAI_AGAIN)
+#   10051 / 101       network unreachable -- no route from here at all
+#   10065 / 113       host unreachable
+#   10050 / 100       the network itself is down, which is what a dropped wifi looks like
+#
+# A REFUSED CONNECTION IS NOT HERE, on purpose. ECONNREFUSED means a machine answered the SYN with
+# a reset: something is at that address and it declined. That is the host talking, and treating it
+# as a local fault would excuse exactly the refusal this collection must notice.
+UNREACHED = frozenset((11001, -2, -3, 10051, 101, 10065, 113, 10050, 100))
+
+
+def local_failure(exc):
+    """-> a short label when a failure happened on OUR side of the wire, else None.
+
+    WHAT THIS IS FOR. `Patience` has to tell "the host stopped answering" from "we never asked it",
+    and only the exception knows. Measured 2026-10-02: a run of openpa ended on two
+    `[Errno 11001] getaddrinfo failed` and announced that the host had stopped talking and should
+    be left alone for days. The owner's wifi had dropped; the host answered 200 within the minute.
+
+    IT UNWRAPS, BECAUSE THE INTERESTING ERRNO IS NEVER ON TOP. urllib raises URLError whose
+    `reason` is the socket error, so `exc.errno` on the URLError is None and a check that reads
+    only the outer exception finds nothing and reports nothing -- the silent form of this mistake.
+
+    AND A TIMEOUT IS NOT LOCAL. `socket.timeout` means the request went out and nothing came back,
+    which is the host's silence and the one case that does justify waiting. The whole value of this
+    function is that it says None for that.
+    """
+    seen = 0
+    while exc is not None and seen < 5:          # a URLError wrapping an OSError wrapping... stop.
+        if isinstance(exc, socket.gaierror):
+            return "DNS lookup failed (%s)" % (exc.errno,)
+        errno = getattr(exc, "errno", None)
+        if errno in UNREACHED:
+            return "%s (errno %s)" % (getattr(exc, "strerror", None) or "unreachable", errno)
+        exc = getattr(exc, "reason", None)
+        seen += 1
+    return None
+
+
 class Patience:
     """How many requests a run may waste on a host that has stopped answering, before it stops.
 
@@ -1548,10 +1592,31 @@ class Patience:
     exists in `http_try`, whose docstring says why the two kinds of "no" must not be collapsed;
     this is the same line drawn one level up, where it decides whether to carry on at all.
 
+    AND THERE ARE THREE OUTCOMES, NOT TWO -- learned 2026-10-02, after this class had already been
+    in use for three days. A 568-url run of openpa stopped itself correctly and then gave the wrong
+    advice:
+
+        FAIL systems/images/saicgalaxy1996.gif :: [Errno 11001] getaddrinfo failed
+        STOPPED: ... it has stopped talking. Leave it alone for days.
+
+    Errno 11001 is a DNS lookup that failed. The owner's WLAN had dropped. No request ever left
+    this machine, the host was never asked anything, and it answered 200 in 0.2 s a minute later --
+    so "leave it alone for days" would have cost days over a hiccup on our own side.
+
+    SO: the server answered, the server did not answer, OR WE NEVER REACHED IT. The third says
+    nothing whatever about the host, and `unreachable()` is how a caller says so. The run still
+    stops -- carrying on with no network is pointless -- but what it writes down is different, and
+    what it writes down is what somebody acts on tomorrow.
+
         patience = Patience(limit=5)
         for url in urls:
             ...
-            patience.answered() if the_server_replied else patience.went_quiet()
+            if the_server_replied:
+                patience.answered()
+            elif local_failure(exc):
+                patience.unreachable(local_failure(exc))
+            else:
+                patience.went_quiet(type(exc).__name__)
             if patience.spent:
                 print(patience.reason); break
     """
@@ -1562,10 +1627,14 @@ class Patience:
         self.limit = limit
         self.quiet = 0
         self.worst = 0
+        # How many of the CURRENT streak never reached the wire. Reset with the streak, because a
+        # run that recovered and failed again later is a different event.
+        self.local = 0
 
     def answered(self):
         """The server replied -- 200, 404, 500, anything. The run is talking to something."""
         self.quiet = 0
+        self.local = 0
 
     def went_quiet(self, what="no answer"):
         """Nothing came back: a timeout, a refusal, a reset. -> True once the limit is reached."""
@@ -1574,16 +1643,42 @@ class Patience:
         self.last = what
         return self.spent
 
+    def unreachable(self, what="no route to the host"):
+        """We never got to the wire: DNS failed, no route, no network. -> True at the limit.
+
+        Counted in the SAME streak, because the run must stop either way and two counters would
+        let a flapping connection alternate between them forever without ever reaching a limit.
+        What differs is the reason, not the arithmetic.
+        """
+        self.local += 1
+        return self.went_quiet(what)
+
     @property
     def spent(self):
         return self.quiet >= self.limit
 
     @property
     def reason(self):
-        """What to print when a run stops. Says the count, because that is the evidence."""
+        """What to print when a run stops. Says the count, because that is the evidence.
+
+        THREE WORDINGS, because the advice differs and the advice is the point. Blaming a host for
+        our own dropped wifi sends somebody away for days; blaming our wifi for a host that has
+        genuinely stopped sends them back to hammer it.
+        """
+        last = getattr(self, "last", "no answer")
+        if self.local and self.local == self.quiet:
+            return ("STOPPED: %d requests in a row never reached the wire (%s). THIS SAYS NOTHING "
+                    "ABOUT THE HOST -- it was not asked, and nothing here is evidence about those "
+                    "files. Check this machine's own network, then run again; there is no reason "
+                    "to wait." % (self.quiet, last))
+        if self.local:
+            return ("STOPPED: %d requests in a row went unanswered (%s), and %d of them never "
+                    "reached the wire. MIXED, so neither reading is safe: check this machine's "
+                    "network first, and only treat the host as refusing if the rest still times "
+                    "out once it is sound." % (self.quiet, last, self.local))
         return ("STOPPED: %d requests in a row went unanswered (%s). The host is not refusing "
                 "individual files, it has stopped talking. Leave it alone for days."
-                % (self.quiet, getattr(self, "last", "no answer")))
+                % (self.quiet, last))
 
 
 # The formats in this collection that STATE THEIR OWN LENGTH, and what they are called when they

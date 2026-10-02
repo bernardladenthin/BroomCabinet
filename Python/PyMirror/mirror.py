@@ -1671,7 +1671,7 @@ import urllib.error
 import urllib.parse
 
 from common import (COMPLETE_MARKER, INDEX_FILE, MIN_FREE_BYTES, ROOT_MARKER, SUMS_FILE,
-                    Backoff, Pacer, Patience,
+                    Backoff, Pacer, Patience, local_failure,
                     comparable_path, hash_tree, http_date, http_open, human,
                     iter_tree, local_path, long_path, looks_like_a_document,
                     looks_like_a_loop,
@@ -5640,6 +5640,9 @@ class Stats:
         # arguments are known.
         self.patience = Patience()
         self.abandon = None
+        # download() leaves the last attempt's verdict here: a short label when the request never
+        # reached the wire, None when the host was actually asked and stayed silent.
+        self.unreached = None
 
 
 def reporter(stats, log, stop, interval):
@@ -6415,8 +6418,14 @@ def download(url, dest, stats, log, mtime=None):
                 log.line("PERMFAIL HTTP %d %s" % (exc.code, url), error=True)
                 return "permfail"
             reason = "HTTP %d" % exc.code
+            unreached = None
         except Exception as exc:  # noqa: BLE001 -- socket, DNS, TLS, disk; all retryable
             reason = "%s: %s" % (type(exc).__name__, exc)
+            # DID THE REQUEST REACH THE WIRE AT ALL? Carried out of here because worker() decides
+            # whether to abandon the run and cannot see this exception. Without it a dropped wifi
+            # is written down as the host refusing us -- measured on manifest-fetch.py's openpa run
+            # of 2026-10-02, which blamed a host that answered 200 a minute later.
+            unreached = local_failure(exc)
 
         if attempt < ATTEMPTS - 1:
             with stats.lock:
@@ -6425,6 +6434,11 @@ def download(url, dest, stats, log, mtime=None):
             RETRY.wait(attempt)
 
     log.line("FAIL %s %s" % (reason, url), error=True)
+    # THE LAST ATTEMPT'S VERDICT IS THE ONE THAT COUNTS. A file whose first try hit a dead resolver
+    # and whose third timed out was reaching the host by the end, and the host is what the run has
+    # to decide about.
+    with stats.lock:
+        stats.unreached = unreached
     return "fail"
 
 
@@ -6474,8 +6488,16 @@ def worker(q, root, base_url, stats, log):
                 # `ok` speaks for itself. `fail` is what is left after download() exhausted its
                 # retries: a timeout, a refused connection, a reset -- or a 5xx repeated until
                 # the ladder ran out, which is a host in trouble and equally a reason to stop.
+                #
+                # AND `fail` SPLITS AGAIN, which is the 2026-10-02 lesson: a failure that never
+                # reached the wire -- DNS gone, no route, the wifi dropped -- is not the host's
+                # silence and must not be recorded as it. download() leaves its verdict in
+                # stats.unreached; see Patience.unreachable and local_failure.
                 if result == "fail":
-                    if stats.patience.went_quiet("download") and not stats.abandon:
+                    note = getattr(stats, "unreached", None)
+                    spent = (stats.patience.unreachable(note) if note
+                             else stats.patience.went_quiet("download"))
+                    if spent and not stats.abandon:
                         stats.abandon = stats.patience.reason
                         log.line(stats.abandon, error=True)
                 else:

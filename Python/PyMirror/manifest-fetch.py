@@ -32,7 +32,7 @@ import urllib.request
 
 from common import (COMPLETE_MARKER, GONE_FILE, MIRROR_ROOT, Pacer, Patience, exists,
                     host_of, http_get,
-                    load_mirror, read_gone, record_gone,
+                    load_mirror, local_failure, read_gone, record_gone,
                     read_marker, scan_tree)
 from common import write_marker as common_write_marker
 
@@ -268,7 +268,15 @@ def main():
         except Exception as exc:                               # noqa: BLE001
             failed += 1
             print("  FAIL   %s :: %s" % (rel, str(exc)[:60]), flush=True)
-            if patience.went_quiet(type(exc).__name__):
+            # DID THIS REQUEST REACH THE WIRE? On 2026-10-02 a 568-url run of openpa ended on two
+            # `[Errno 11001] getaddrinfo failed` and announced that the host had stopped talking
+            # and should be left alone for days. The owner's wifi had dropped; the host answered
+            # 200 within the minute. The run was right to stop and wrong about why, and the why is
+            # the part somebody acts on the next day.
+            unreached = local_failure(exc)
+            spent = (patience.unreachable(unreached) if unreached
+                     else patience.went_quiet(type(exc).__name__))
+            if spent:
                 stopped = patience.reason
                 break
             continue
