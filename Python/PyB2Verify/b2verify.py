@@ -150,7 +150,9 @@ def preflight(target: tuple[str, int] | None = None, timeout: float | None = Non
     except OSError as e:  # includes TimeoutError and ssl.SSLError
         return (f"TCP to {host}:{port} works, but the TLS handshake failed after "
                 f"{time.monotonic() - start:.0f} s ({e.__class__.__name__}). The network path to "
-                f"B2 is broken or filtered here; this is not a problem of the key or the checksums.")
+                f"B2 is broken or filtered here; this is not a problem of the key or the checksums. "
+                f"The usual cause is a path-MTU black hole: large reply packets are lost on the way "
+                f"back. See README.md, 'TCP connects but TLS to B2 never completes'.")
     finally:
         sock.close()
 

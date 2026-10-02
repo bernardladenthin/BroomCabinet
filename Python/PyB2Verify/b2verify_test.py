@@ -75,7 +75,14 @@ class PreflightTest(unittest.TestCase):
         self.assertIsNotNone(problem)
         self.assertIn("TLS handshake failed", problem)
         self.assertIn("not a problem of the key", problem)
+        # The first real occurrence was a path-MTU black hole; the message must point there.
+        self.assertIn("path-MTU", problem)
+        self.assertIn("TLS to B2 never completes", problem)
         self.assertLess(elapsed, 5)
+
+    def test_the_readme_section_the_message_points_to_exists(self):
+        readme = Path(__file__).with_name("README.md").read_text(encoding="utf-8")
+        self.assertIn("### TCP connects but TLS to B2 never completes", readme)
 
     def test_refused_connection_is_reported(self):
         problem = b2verify.preflight(closed_port(), timeout=1.0)
