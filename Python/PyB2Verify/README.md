@@ -1,0 +1,124 @@
+<!--
+SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
+# PyB2Verify — proving that a Backblaze B2 backup still holds the same bytes
+
+A backup is only as good as the last time somebody checked it. B2 stores a checksum next to each
+file, but it computed that checksum once, at upload, and nothing re-reads the bytes against it.
+A local disk does not check its files either. So two questions stay open for years: *does the
+bucket hold what the disk holds?* and *does either of them still hold what it held a year ago?*
+
+These tools answer both, and **never upload, change or delete anything in B2**.
+
+| | |
+|---|---|
+| `b2verify.py` | the command line: index each side, compare them, re-read either side against its index |
+| `b2lib.py` | the rules: selection, stream hashing, checksum files, comparison, run planning. No network, no third-party package |
+| `b2lib_test.py` | covers `b2lib.py`, including an S3 ETag reference implementation and a path longer than 300 characters |
+| `b2verify_test.py` | drives `hash-local`, `verify-local` and `compare` end to end through the real command line, on a throwaway tree with a flipped byte |
+| `privacy_test.py` | refuses drive letters, keys, e-mail addresses and home directories in this project |
+
+Needs `b2sdk` and `boto3` (`requirements.txt`) for the commands that talk to B2. `--help`, the
+library and every test run on the standard library alone.
+
+## Setup
+
+    python -m venv .venv
+    .venv\Scripts\python -m pip install -r requirements.txt
+
+Create an **application key with read access only** in the B2 console. A master key works for the
+B2 API but is refused by B2's S3 endpoint, which this tool needs for large files (below) — and a
+key that can delete has no business in a verification tool.
+
+The configuration is a properties file **outside this repository**; it holds the key:
+
+    keyId=<application key id>
+    applicationKey=<application key>
+    localRoot=D:/backup                     one directory per bucket below it
+    stateDir=D:/backup-state                optional; default: the directory of this file
+    reportDir=D:/backup-state/reports       optional; default: <stateDir>/reports
+    exclude=Thumbs.db,desktop.ini,*.lnk     optional; glob patterns that are never compared
+    flatBuckets=example-flat-bucket         optional; buckets uploaded without their directories
+    ignoreDirs=scratch                      optional; directories below localRoot that are no bucket
+
+The checksum and report directories may live inside `localRoot`; they are recognised by their
+configured path and never taken for a bucket. Pass the file with `--config FILE`, or set `B2VERIFY_CONFIG` once in a small wrapper script.
+
+## Two sides, two indexes, one comparison
+
+Each side is indexed on its own, so either can be refreshed or re-read without touching the other:
+
+    python b2verify.py hash-b2                    what B2 states: SHA-1, else S3 ETag and part sizes
+    python b2verify.py hash-local                 local checksums, re-reading only what changed
+    python b2verify.py compare                    the two indexes against each other, 1:1
+
+    python b2verify.py verify-local               re-read every local file against its index
+    python b2verify.py verify-b2                  the bucket listing against its index
+    python b2verify.py verify-b2 --download       stream every file from B2 and hash it
+
+    python b2verify.py check                      quick and live: names and sizes only
+
+Everything lands in `<stateDir>/checksums/{local,b2}/<bucket>.tsv` — plain tab-separated text with
+size, modification time, SHA-1, ETag, part sizes, the time of the last successful check and the
+relative path — and in one Markdown report per bucket and check.
+
+Run `hash-b2` **before** `hash-local`: the part sizes come from B2, and the local file is cut the
+same way while it is read anyway.
+
+## Large files have no SHA-1 in B2, and still get checked
+
+A file uploaded in parts usually carries no SHA-1 at all. Its S3 ETag is the MD5 of the
+concatenated part MD5s, suffixed with the part count. `hash-b2` asks B2's S3 endpoint for that
+ETag and for the part sizes; `hash-local` then cuts the local file at the same boundaries. One
+read produces both the SHA-1 and the ETag, so an 18 GB archive is verified without downloading it.
+
+`verify-b2 --download` checks the other direction — that B2 still *delivers* what its metadata
+claims. The download is streamed straight into the hasher; no temporary file is written. A file
+confirmed through its ETag gets its real SHA-1 recorded, so it is comparable by SHA-1 from then on.
+
+## Silent damage is reported, never written over
+
+`hash-local` re-reads only files whose size or modification time moved. With `--force` it reads
+everything — and if a file has the same size and the same time but different bytes, that is not
+a new version, it is damage: the saved checksum is **kept**, the file is reported, and the exit
+status is 1. `verify-local` then says whether the copy in B2 still matches the saved checksum,
+i.e. whether the file can be restored from there.
+
+A file that fails a check loses its *last checked* time, so every later run reads it again until
+somebody looks at it.
+
+## Long runs: threads, resume, age, selection
+
+    --threads 8                 files in parallel (default: local 1, B2 4); one B2 connection each
+    --resume                    continue an interrupted run where it stopped
+    --older-than 90             only files not successfully checked for 90 days
+    --include '\.mp4$'          relative path, regex, repeatable, case-insensitive
+    --exclude '^Recordings/'
+    --min-size 1M               inclusive
+    --max-size 1M               exclusive: --max-size 1M and --min-size 1M split a bucket exactly
+
+Progress is written every 30 seconds, so an interruption costs at most that much. A single
+download stream is often slow (a few MB/s); threads help with many files, not with one large one.
+A whole collection is better verified in portions — one bucket per night with `--older-than 90`.
+
+## Things it deals with that are easy to get wrong
+
+| | |
+|---|---|
+| paths of 260 characters and more | every local access goes through the `\\?\` prefix on Windows, so the result does not depend on the machine's LongPathsEnabled setting |
+| one name, two spellings | names are compared in Unicode NFC; B2 and a Windows disk do not always agree |
+| buckets uploaded without directories | `flatBuckets` / `--flat` compares file names only and reports a name that occurs twice instead of guessing |
+| folders created in the B2 web interface | the `.bzEmpty` placeholder is not a file and is ignored |
+| a B2 file replaced by a new upload | B2 files are immutable; a new file id means new content, so nothing is carried over from the old one |
+
+## Tests
+
+    python b2lib_test.py
+    python b2verify_test.py
+    python privacy_test.py
+
+No B2 account is needed. The commands that do need one — `hash-b2`, `verify-b2` and `check` — were
+run against real buckets of several terabytes while this was written.
