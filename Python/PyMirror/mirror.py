@@ -2250,6 +2250,28 @@ ARCHIVES = [
     # zx-alphant-nt -- see PROVENANCE.md in the archive.
     ("zx-alphant-nt", "http://ftp.zx.net.nz/pub/archive/ftp.alphant.com/"),
     # zx-sgi-freeware-old -- see PROVENANCE.md in the archive.
+    # ITS HAND-WRITTEN MARKER IS SHORT BY 4 404 FILES, found 2026-10-02 by the operator's own
+    # sitemap and not by anything of ours. ftp.zx.net.nz declares a sitemap INDEX in robots.txt
+    # whose 27 parts are gzipped TEXT lists -- 1 319 587 paths for the whole site, 5.8 MB
+    # compressed, one request each. Bucketed by base, seven of the eight zx-* archives agree with
+    # it within single digits. This one does not:
+    #
+    #     inventory 5 699   held 1 295   MISSING 4 404
+    #
+    # AND THE MARKER'S REASONING IS WHAT MADE IT INVISIBLE. It explains, correctly, that cd-1/ to
+    # cd-4/ answer 404 and always will, and then concludes "WHAT IS HERE IS COMPLETE: source/
+    # (1 288 files), beta/ (2), and the five HTML pages -- everything zx actually serves under this
+    # path." The missing files are in none of those four directories. They are in Inst/ (2 570),
+    # fw-6.2/ (691), Installable/ (486), Dist/ (333) and fw-5.3/ (177) -- directories the root HTML
+    # page does not link, so a crawl that follows links could never reach them. A true explanation
+    # of four dead links drew attention away from five live directories.
+    #
+    # THEY ARE SERVED. Three sampled by hand answered HTTP 200. Total bytes unknown: a text sitemap
+    # carries no sizes, and the 0.944 GB in the marker is what the 1 295 held files weigh.
+    #
+    # NOT FETCHED, and the marker is left exactly as written. Correcting a completion claim is a
+    # decision about somebody else's server and about this collection's own record, and both belong
+    # to a person. The pace is already set at 1.5 s with two workers below.
     ("zx-sgi-freeware-old", "http://ftp.zx.net.nz/pub/archive/sgi-freeware-old/"),
     # zx-be-os -- see PROVENANCE.md in the archive.
     ("zx-be-os", "http://ftp.zx.net.nz/pub/archive/ftp.be.com/"),
@@ -2322,7 +2344,18 @@ ARCHIVES = [
     # base and are dropped -- measured, after a run that fetched the 61 index pages, reported
     # `61 files, 0 failed` and marked the archive COMPLETE over a tree missing 99.4 % of itself.
     # The base must be spelled the way the source spells its own links.
-    ("dreamlandbbs-os2", "http://www.dreamlandbbs.com/gfd/"),
+    # https SINCE 2026-10-02, AND THE RECORD BELOW IT WAS WRONG FOR FIVE DAYS BECAUSE OF THE
+    # SCHEME. Registered as `http://` on 2026-09-27, which was right when it was written. The host
+    # has since closed port 80: every request went to a shut door and timed out at 21.2 s, three
+    # times across five days, and all three were written down as a rate-limit penalty -- see
+    # MIN_INTERVAL["dreamlandbbs-os2"], where the mistake is now marked as one.
+    #
+    # ONE CALL OF common.reach SETTLED IT:  TCP 80 timed out, TCP 443 open in 0.0 s.
+    #
+    # Nothing was refusing anything. 5 648 files and 14.05 GB were reachable the whole time, and
+    # `https://.../gfd/apparc/index.html` answered 200 in 1.3 s from this machine on the first try.
+    # recheck-decisions.py --only bases now watches every archive's base for exactly this.
+    ("dreamlandbbs-os2", "https://www.dreamlandbbs.com/gfd/"),
 
     # The other half of the same host. Measured 2026-09-27 before it was added: 37 files,
     # 381.64 MB, 12 pages, every size read off the listings, no failures and no cap reached.

@@ -43,7 +43,7 @@ import sys
 import urllib.parse
 
 from common import (MIRROR_ROOT, BOOKKEEPING_FILES, Pacer, exists, host_of, http_try,
-                    load_mirror, long_path)
+                    load_mirror, long_path, under_site)
 from robots import robots_verdict, sitemaps
 
 LOC = re.compile(r"<loc>\s*([^<\s]+)\s*</loc>", re.I)
@@ -70,27 +70,10 @@ def held_paths(archive_dir):
     return out
 
 
-def bases(base):
-    """-> every spelling of this base that means the same site.
-
-    THE APEX AND `www.` ARE DIFFERENT NAMES AND THE SAME SITE, which recheck-decisions.py already
-    says in its own docstring -- `crynwr.com` resolves while `www.crynwr.com` does not. A plain
-    prefix test therefore reads one spelling as a foreign host.
-
-    MEASURED ON THE FIRST SURVEY, 2026-10-02: ardent-tool is registered as https://ardent-tool.com/
-    and its sitemap writes every one of its 2430 entries as https://www.ardent-tool.com/... . All
-    2430 were reported OUTSIDE THE BASE and the archive as MISSING 0 -- a clean bill of health
-    produced by comparing a site against itself and finding no overlap. The scheme is folded for
-    the same reason: a site that moved to https still lists http, or the reverse.
-    """
-    parts = urllib.parse.urlsplit(base)
-    hosts = {parts.netloc}
-    hosts.add(parts.netloc[4:] if parts.netloc.startswith("www.") else "www." + parts.netloc)
-    out = {urllib.parse.urlunsplit((scheme, host, parts.path, "", ""))
-           for scheme in ("http", "https") for host in hosts}
-    # Longest first, so a base of /a/ is tried before a base of / and a path is cut at the
-    # deepest spelling that matches rather than the shortest.
-    return tuple(sorted(out, key=len, reverse=True))
+# `bases` LIVED HERE AND IS NOW common.site_prefixes. It was written for this tool on 2026-10-02
+# and pages-to-urllist.py needed the identical thing hours later, for the identical reason: a
+# plain prefix test reads one spelling of a site as a foreign host and the archive then looks
+# complete because nothing overlapped. Two private copies of that rule would drift.
 
 
 def internal(locs, base, archive_dir=None):
@@ -106,14 +89,13 @@ def internal(locs, base, archive_dir=None):
     reported MISSING 3025, which reads as a catastrophe and is a category error. They are counted
     on their own and left out of the comparison.
     """
-    prefixes = bases(base)
     inside, outside, pageish, dirish = set(), 0, 0, []
     for loc in locs:
-        hit = next((p for p in prefixes if loc.startswith(p)), None)
-        if hit is None:
+        cut = under_site(loc, base)
+        if cut is None:
             outside += 1
             continue
-        rel = urllib.parse.unquote(loc[len(hit):]).split("#")[0].split("?")[0]
+        rel = urllib.parse.unquote(cut).split("#")[0].split("?")[0]
         if not rel or rel.endswith("/"):
             continue
         if "." not in rel.rsplit("/", 1)[-1]:

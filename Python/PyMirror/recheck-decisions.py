@@ -36,7 +36,7 @@ about this run, not about the host. Those come back as UNKNOWN and are never fol
 refusals.
 
     python recheck-decisions.py                 # everything, differences highlighted
-    python recheck-decisions.py --only lost     # lost | frozen | candidates
+    python recheck-decisions.py --only lost     # lost | frozen | candidates | bases
     python recheck-decisions.py --quiet         # print only what no longer matches the record
 """
 import argparse
@@ -51,6 +51,7 @@ import urllib.parse
 import urllib.request
 
 from common import (MIRROR_ROOT, ARCHIVE_MARKERS, Pacer, host_of, http_open, http_try,
+                    reach, scheme_drift,
                     load_mirror, looks_like_a_placeholder_page, page_title)
 from robots import robots_verdict
 
@@ -370,9 +371,69 @@ def section_candidates(mod, quiet, pacer):
     return drift
 
 
+def section_bases(mod, quiet, pacer):
+    """Does every archive's OWN base URL still work? -> the number that no longer does.
+
+    THE GAP THIS CLOSES, and this file already argued for it in its own first paragraph: LOST,
+    FROZEN and CANDIDATES are "a statement about the world OUTSIDE this collection, made on one
+    day, and the world moves". A BASE URL is exactly the same kind of claim and was the one this
+    tool did not check -- it did not mention ARCHIVES at all.
+
+    MEASURED 2026-10-02, after five days of getting it wrong. dreamlandbbs.com closed port 80 and
+    moved to HTTPS; the base said `http://`, so every request went to a shut door and timed out at
+    21.2 s. That was recorded three times as a rate-limit penalty and the archive was left alone,
+    while 5 648 files and 14.05 GB stayed reachable over `https`. 51 of the 104 archives are
+    registered on `http://` and nothing was watching any of them.
+
+    IT PROBES PORTS, NOT PAGES. One TCP handshake per port says whether anything is listening,
+    which is what distinguishes a stale record from a refusal; `scheme_drift` names the first and
+    stays silent about the second rather than guessing. A 404 on a path is a different question and
+    belongs to the tool that fetches.
+    """
+    print("=== ARCHIVES: does each base still answer? ===")
+    bad = 0
+    for name, base in mod.ARCHIVES:
+        if not base.startswith("http"):
+            continue                      # rsync:// is not a scheme this probes
+        # TWO DIFFERENT NAMES FOR TWO DIFFERENT JOBS, and the first run of this section got it
+        # wrong. host_of() strips a leading `www.` because that is what FOLDING AN INDEX needs --
+        # one site should not grow two directory trees. A connection needs the name as written:
+        # `dreamlandbbs.com` does not resolve while `www.dreamlandbbs.com` does, which is the
+        # apex-vs-www hazard this file's own docstring describes in the opposite direction
+        # (`crynwr.com` answers, `www.crynwr.com` does not). Probing the folded name reported DNS
+        # failures for hosts that were answering.
+        #
+        # The PACER still keys on the folded name, which is right: two spellings are one operator
+        # and should share one rate.
+        host = urllib.parse.urlsplit(base).hostname
+        if not host:
+            print("  %-24s no host in the base URL: %s" % (name, base))
+            bad += 1
+            continue
+        pacer.wait(host_of(base))
+        got = reach(host)
+        drift = scheme_drift(got)
+        want = "https" if base.startswith("https") else "http"
+        if got["dns"] is not None:
+            print("  %-24s DNS FAILS: %s" % (name, got["dns"]))
+            bad += 1
+        elif drift and drift != want:
+            print("  %-24s SCHEME DRIFT: registered %s, but port %d is shut and %s answers"
+                  % (name, want, 80 if want == "http" else 443, drift))
+            bad += 1
+        elif all(v is not None for v in got["ports"].values()):
+            # BOTH PORTS SHUT IS NOT A DRIFT and must not be reported as one. It is the shape of a
+            # host refusing this address -- openpa reads exactly this -- or of one that is gone.
+            print("  %-24s NOTHING LISTENING on 80 or 443 (refusal, or the host is gone)" % name)
+            bad += 1
+        elif not quiet:
+            print("  %-24s ok" % name)
+    return bad
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--only", choices=["lost", "frozen", "candidates"])
+    ap.add_argument("--only", choices=["lost", "frozen", "candidates", "bases"])
     ap.add_argument("--quiet", action="store_true",
                     help="print only entries that no longer match the record")
     ap.add_argument("--pause", type=float, default=1.0, help="seconds between hosts (default 1)")
@@ -401,6 +462,9 @@ def main():
             print("")
     if args.only in (None, "candidates"):
         total += section_candidates(mod, args.quiet, pacer)
+        print("")
+    if args.only in (None, "bases"):
+        total += section_bases(mod, args.quiet, pacer)
         print("")
 
     print("%d item(s) no longer match what mirror.py records." % total)
