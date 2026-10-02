@@ -112,6 +112,7 @@ import sys
 import threading
 import time
 import types
+import zlib
 import urllib.error
 import urllib.parse
 
@@ -125,7 +126,7 @@ __all__ = [
     "human", "parse_size", "plural", "say",
     "LISTING_FLOOR", "listing_step", "size_agrees",
     "read_manifest", "find_manifests", "NEVER_CONTENT_DIRS",
-    "parse_listing", "parse_date", "resolution_base",
+    "parse_listing", "parse_date", "date_text", "resolution_base",
     "ROW_RE", "LIGHTTPD_RE", "PRE_RE", "LINK_RE", "LINK_ODD_RE", "FRAME_RE",
     "BASE_RE", "DATE_FORMATS",
     "WINDOWS_RESERVED",
@@ -169,6 +170,8 @@ __all__ = [
     "MIN_FREE_BYTES", "COLLISION_DROPPED", "BFF_MAGIC", "FETCH_FAILED", "failed_urls",
     "OWN_FILES", "is_own_file", "BOOKKEEPING_FILES", "is_bookkeeping_file",
     "COMPLETE_MARKER", "INDEX_FILE", "SUMS_FILE", "PROVENANCE_FILE", "CATALOGUE_FILE",
+    "DIGESTS", "digests_of_file", "crc32_text", "MANIFEST_FILES",
+    "SHA1_FILE", "MD5_FILE", "SFV_FILE", "write_manifests", "read_manifests", "read_sfv", "read_sums", "sfv_line",
     "MIRROR_ROOT",
     "ROOT_MARKER", "ARCHIVE_MARKERS", "archive_root",
     "COLLECTION_INDEX", "COLLECTION_SUMS",
@@ -408,6 +411,66 @@ def sha256_file(path, chunk=HASH_CHUNK):
     return h.hexdigest()
 
 
+# The four this collection records, and who asks for each. Order is the order they are written in,
+# strongest first, so a file listing them reads as a descending statement of confidence.
+#
+#   sha256  ours. The one a verification decides on.
+#   sha1    what BACKBLAZE B2 stores per file (X-Bz-Content-Sha1), so a copy in cold storage can be
+#           checked against what B2 itself recorded without downloading it back.
+#   md5     what the INTERNET ARCHIVE publishes, and the reason md5 is here at all. Measured
+#           2026-10-02 on this collection's own IA-METADATA.json: md5 on 204 of 204 files, crc32
+#           and sha1 on 203, and sha256 on NONE. An index of sha256 alone cannot be compared with
+#           the Archive for any file at all -- and the Archive is the second opinion this
+#           collection reaches for whenever an origin is gone.
+#   crc32   what RAR and ZIP store per member, so a container can be checked against the index
+#           without unpacking it, and what .sfv files in the wild carry -- including the two RHash
+#           sets that came with ia-bullfreeware from before its upload.
+#
+# WEAK IS NOT THE SAME AS USELESS. md5 and sha1 are broken for COLLISION resistance and crc32 was
+# never more than a transmission check. Nobody is forging a 2002 AIX package to match our index;
+# what threatens a mirror is a truncated resume, a flipped bit, an error page saved as a .zip, and
+# a 32-bit check catches every one of those. The strong answer is sha256 and stays sha256.
+DIGESTS = ("sha256", "sha1", "md5", "crc32")
+
+
+def crc32_text(value):
+    """A CRC32 as the eight upper-case hex digits every .sfv in the wild uses."""
+    return "%08X" % (value & 0xFFFFFFFF)
+
+
+def digests_of_file(path, chunk=HASH_CHUNK, want=DIGESTS):
+    """-> {name: hex text} for one file, computed in ONE READ.
+
+    ONE READ IS THE WHOLE POINT. Four passes would be four reads, and this collection is 4.02 TB
+    on a disk that delivers about 208 MB/s cold -- five and a half hours per pass. Measured
+    2026-10-02 on a 470 MB file, CPU only, with the disk out of the picture:
+
+        sha256 alone              1551 MB/s
+        sha256+sha1+crc32          583 MB/s
+        all four                   309 MB/s        <- md5 alone is 658, the expensive one
+        the disk, cold             208 MB/s
+
+    So all four together still outrun the disk and the run stays disk-bound: the three extra
+    digests cost no wall clock, only the one pass that has to happen anyway. md5 halves the CPU
+    headroom (2.8x over the disk down to 1.5x) and that is the only price.
+
+    `want` EXISTS FOR THE CALLER THAT NEEDS ONE, not as an optimisation. Asking for a subset saves
+    nothing worth measuring; it is here so a tool that means "the sha256 of this file" can say so.
+    """
+    hs = {name: hashlib.new(name) for name in want if name != "crc32"}
+    crc = 0
+    with open(long_path(path), "rb") as fh:
+        for block in iter(lambda: fh.read(chunk), b""):
+            for h in hs.values():
+                h.update(block)
+            if "crc32" in want:
+                crc = zlib.crc32(block, crc)
+    out = {name: h.hexdigest() for name, h in hs.items()}
+    if "crc32" in want:
+        out["crc32"] = crc32_text(crc)
+    return out
+
+
 # How much of a file to read before deciding it is worth reading further. Almost every file in a
 # collection fails at the first byte, so the probe is what makes the question affordable: a pass
 # over 1.76 million files costs about 7 GB of reading instead of the tree's full 3.8 TB.
@@ -534,6 +597,24 @@ def iter_files(root, own_files=None):
 COMPLETE_MARKER = ".mirror-complete"        # a run finished with nothing outstanding
 INDEX_FILE = ".mirror-index.csv"            # per archive: path, size, mtime, sha256
 SUMS_FILE = ".sha256sum"                    # the same digests in sha256sum(1) format
+# THE THREE WEAKER MANIFESTS, written beside the sha256 one and never instead of it. Each exists
+# because somebody ELSE speaks that algorithm and nobody speaks ours:
+#
+#   .sha1sum   Backblaze B2 records a SHA-1 per file (X-Bz-Content-Sha1)
+#   .md5sum    the Internet Archive publishes md5 for every file and sha256 for none
+#   .sfv       RAR and ZIP store a CRC32 per member, and .sfv is what carries one on disk
+#
+# THE NAMES ARE THE TOOLS' OWN, not ours. `sha1sum -c .sha1sum` and `md5sum -c .md5sum` work
+# unchanged, and OpenHashTab, QuickSFV and TeraCopy read all three without being told anything.
+# An archive that outlives these scripts is still verifiable with what a system already has, which
+# is the whole point of writing a standard format rather than a fourth column.
+SHA1_FILE = ".sha1sum"
+MD5_FILE = ".md5sum"
+SFV_FILE = ".sfv"                           # CRC32; there is no crc32sum(1), .sfv is the format
+# algorithm -> the file that carries it. One table, so a caller cannot pair them by hand wrongly.
+MANIFEST_FILES = types.MappingProxyType({
+    "sha256": SUMS_FILE, "sha1": SHA1_FILE, "md5": MD5_FILE, "crc32": SFV_FILE,
+})
 # Per archive: the paths a URL-LIST fetch asked for and the server answered 404 or 410 to.
 # Measured 2026-10-02: images/dcsscr4.gif had been asked for THREE TIMES across three sessions
 # and answered the same way each time. A 404 creates no file, so the path stays "absent", and a
@@ -616,6 +697,14 @@ OWN_FILES = frozenset({
     # the three: the name is new as of 2026-10-02, so ZERO of the markers on disk was written
     # against a tree holding it, and excluding it cannot put a marker at odds with its own tree.
     GONE_FILE,
+    # THE SAME MEASUREMENT AS GONE_FILE ABOVE, and the same easy case: all three names are
+    # new on 2026-10-02, so ZERO markers on disk were written against a tree holding them
+    # and excluding them cannot put a marker at odds with its own tree. They must be in
+    # the NARROW set: a manifest counted as content is hashed into the index and then
+    # reported as changed every time the manifests are rewritten.
+    SHA1_FILE,
+    MD5_FILE,
+    SFV_FILE,
 })
 
 # BOOKKEEPING_FILES is what a tool may skip when it only wants CONTENT -- an auditor, a lister, a
@@ -3095,6 +3184,21 @@ def magic_mismatch(name, head):
 HASH_BATCH = 2000
 
 
+def sfv_line(crc, rel):
+    """One line of a .sfv: `<name> <CRC32>`, the COLUMNS THE OTHER WAY ROUND from sha256sum(1).
+
+    That reversal is the whole hazard of this format. `sha256sum` writes `<hash> *<path>` and an
+    .sfv writes `<path> <hash>`, so a reader that splits from the left gets the first word of a
+    filename with a space in it. sfv-verify.py splits from the RIGHT for exactly this reason, and
+    this writer is its counterpart: what we emit has to be what we already know how to read.
+
+    No `;` comment line is written per file. RHash puts size and mtime there and sfv-verify.py
+    deliberately does not parse them as authority -- writing our own would invite some later
+    reader to.
+    """
+    return "%s %s\n" % (rel, crc)
+
+
 def sums_line(digest, rel):
     """One line of sha256sum(1) output, in binary mode.
 
@@ -3203,6 +3307,135 @@ def read_index(path):
                     continue
     except OSError:
         return {}
+    return out
+
+
+def write_manifests(archive_dir, digests, want=("sha1", "md5", "crc32")):
+    """Write the weaker manifests beside the sha256 one, from one mapping, atomically.
+
+    `digests` is {relative path: {algorithm: hex}} -- the shape digests_of_file returns, one entry
+    per file. -> the paths written.
+
+    ONE MAPPING, WRITTEN IN ONE CALL, and that is the only defence against the failure this
+    collection has already had. Eight tools once each kept their own idea of which files were
+    bookkeeping and no two agreed -- 0 identical pairs out of 28. Four manifests of the same tree,
+    written from four places at four times, would go the same way, and a manifest that disagrees
+    with its neighbours is worse than a missing one: it looks like evidence.
+
+    SHA-256 IS NOT WRITTEN HERE, on purpose. `.sha256sum` is derived from the CSV index by
+    write_index(), which is checkpointed DURING a long hash run so an interruption leaves a valid
+    partial index. These three describe a finished pass and are written once at the end of it.
+    Two writers, two lifetimes, and the one that must survive an interruption is the one that
+    already does. A test asserts all four cover the same set of paths.
+
+    A FILE WHOSE DIGEST IS MISSING IS SKIPPED RATHER THAN WRITTEN BLANK. A manifest line with an
+    empty hash passes `-c` on nothing and reads as a check that was made.
+
+    AND A MANIFEST WITH NO LINES AT ALL IS NOT WRITTEN, which the first trial on a real archive
+    found the hard way. csri-toronto's index was already current, so nothing was re-hashed, so
+    there was nothing to write -- and three EMPTY files appeared beside a populated .sha256sum.
+    `md5sum -c` over zero lines reports success, which is the shape this collection distrusts most:
+    a clean zero that looks like a verification. An absent file says "not done yet" and cannot be
+    mistaken for anything else.
+    """
+    ordered = sorted(digests.items())
+    written = []
+    for algo in want:
+        name = MANIFEST_FILES[algo]
+        path = os.path.join(archive_dir, name)
+        if not any(got.get(algo) for _rel, got in ordered):
+            continue
+        tmp = path + ".tmp"
+        with open(long_path(tmp), "w", encoding="utf-8", newline="") as fh:
+            for rel, got in ordered:
+                value = got.get(algo)
+                if not value:
+                    continue
+                fh.write(sfv_line(value, rel) if algo == "crc32" else sums_line(value, rel))
+        os.replace(long_path(tmp), long_path(path))
+        written.append(path)
+    return written
+
+
+def read_sums(path):
+    """-> {relative path: digest} from a sha256sum(1)-format file. A missing file gives {}.
+
+    The line is `<hex> *<path>` and a path may contain spaces, so the split is on the FIRST ` *`
+    rather than on whitespace. That separator was written out by hand in four places before
+    2026-10-02 -- mirror.py and three tests -- which is how one format comes to have four slightly
+    different opinions about a filename that contains " *" itself.
+
+    GNU's leading-backslash escape is not decoded; such a line is SKIPPED rather than guessed at.
+    Neither a backslash nor a newline can occur in a Windows filename, so nothing here can produce
+    one, and a file that carries one came from somewhere else and is better noticed than
+    half-read.
+    """
+    out = {}
+    if not exists(path):
+        return out
+    with io.open(long_path(path), encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            line = line.rstrip("\n")
+            if not line or line.startswith("\\"):
+                continue
+            digest, sep, rel = line.partition(" *")
+            if sep and digest and rel:
+                out[rel] = digest
+    return out
+
+
+def read_manifests(archive_dir, want=("sha1", "md5", "crc32")):
+    """-> {rel: {algorithm: hex}} from whatever manifests the archive already carries.
+
+    WHY A READ-BACK EXISTS AT ALL. An index run hashes only what changed -- that is what makes a
+    re-run over a finished archive cost a stat of the tree instead of a read of it. The files it
+    carries over therefore have no weaker digests in hand, and writing the manifests from the run's
+    own results alone would shrink them to whatever happened to be re-hashed. The first incremental
+    run after the one-time full pass would have thrown nearly all of it away.
+    """
+    out = {}
+    for algo in want:
+        path = os.path.join(archive_dir, MANIFEST_FILES[algo])
+        pairs = (read_sfv(path) if algo == "crc32" else read_sums(path).items())
+        for rel, value in pairs:
+            out.setdefault(rel, {})[algo] = value
+    return out
+
+
+def read_sfv(path):
+    """-> [(filename, CRC32 as upper-case hex)] from a .sfv. Unreadable lines are skipped.
+
+    MOVED HERE FROM sfv-verify.py ON 2026-10-02, when this collection started WRITING .sfv files
+    as well as reading somebody else's. A format with a reader in one file and a writer in another
+    is a format with two opinions; `sfv_line` and this function are now the same pair.
+
+    Lines beginning with `;` are comments -- RHash puts size and mtime there, which is useful to a
+    human and is deliberately not read as authority. The data line is `<name> <8 hex digits>`, and
+    THE NAME MAY CONTAIN SPACES, so the split is from the RIGHT.
+
+    A MISSING FILE IS AN EMPTY LIST, and this was learned the moment it moved here. As
+    sfv-verify.parse_sfv it was only ever called on a path a person had typed, so a missing file
+    was their mistake and an exception was the right answer. read_manifests calls it on a name that
+    does not exist yet -- the first index run of an archive has no .sfv -- and the end-to-end run
+    died on FileNotFoundError. Lifting a function into a library gives it callers with different
+    preconditions; read_sums and read_index already answered this way, and now so does this.
+    """
+    out = []
+    if not exists(path):
+        return out
+    with io.open(long_path(path), encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith(";"):
+                continue
+            parts = line.rsplit(None, 1)
+            if len(parts) != 2 or len(parts[1]) != 8:
+                continue
+            try:
+                int(parts[1], 16)
+            except ValueError:
+                continue
+            out.append((parts[0].replace("\\", "/"), parts[1].upper()))
     return out
 
 
@@ -3317,7 +3550,7 @@ def read_marker(path):
 
 
 def hash_tree(entries, rows, workers, interval, checkpoint, label="", batch_size=HASH_BATCH,
-              report=None):
+              report=None, digests=None):
     """Hash `entries` into `rows` in bounded batches, checkpointing as it goes.
 
     `entries` is [(rel, full, size, mtime_ns)]; `rows` is the index being assembled and IS MUTATED
@@ -3328,6 +3561,14 @@ def hash_tree(entries, rows, workers, interval, checkpoint, label="", batch_size
     checkpoint also runs in `finally`. Without that, the work between the last timed checkpoint
     and the interruption is simply lost.
 
+    `digests`, when a caller passes a dict, is filled with {rel: {algorithm: hex}} FOR THE SAME
+    READ -- all four of DIGESTS instead of sha256 alone. The three weaker ones exist for the
+    parties that could give a second opinion and do not speak sha256: B2 records sha1, the
+    Internet Archive publishes md5 and never sha256, RAR and ZIP store crc32. Measured
+    2026-10-02: all four together run at 309 MB/s against a disk that gives 208, so they cost the
+    one pass and no wall clock. Omit the argument and nothing changes -- the extra work is not
+    done at all, which is what a caller that only wants to decide `--trust-index` should ask for.
+
     -> (files done, bytes done, [(rel, error)], elapsed seconds)
     """
     report = report or _progress
@@ -3335,18 +3576,29 @@ def hash_tree(entries, rows, workers, interval, checkpoint, label="", batch_size
     total_bytes = sum(e[2] for e in entries)
     failed = []
     t0 = last_print = last_write = time.time()
+    # One function either way, so the two paths cannot read a file differently.
+    work = digests_of_file if digests is not None else sha256_file
 
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
             for start in range(0, len(entries), batch_size):
                 chunk = entries[start:start + batch_size]
-                futures = [(item, ex.submit(sha256_file, item[1])) for item in chunk]
+                futures = [(item, ex.submit(work, item[1])) for item in chunk]
                 for (rel, _full, size, mtime_ns), fut in futures:
                     try:
-                        rows[rel] = (size, mtime_ns, fut.result())
+                        got = fut.result()
                     except OSError as exc:
                         failed.append((rel, str(exc)))
                         continue
+                    if digests is None:
+                        rows[rel] = (size, mtime_ns, got)
+                    else:
+                        # THE CSV KEEPS ITS FOUR COLUMNS. Widening it would break every reader of
+                        # the 113 indexes already on disk, for three values no verification here
+                        # decides on; the weaker digests go to their own standard-format manifests
+                        # instead, which is also what makes them readable without these scripts.
+                        rows[rel] = (size, mtime_ns, got["sha256"])
+                        digests[rel] = got
                     done += 1
                     done_bytes += size
 
@@ -3577,6 +3829,37 @@ def parse_date(text):
         except (ValueError, OverflowError):
             continue
     return None
+
+
+def date_text(epoch):
+    """The inverse of parse_date: epoch seconds -> the listing text it would have been read from.
+
+    -> "" for None, which is what parse_date returns for a date it could not hold. A caller
+    printing a column wants a blank there, not the word None or the year 1970.
+
+    WHY THIS IS IN THE LIBRARY AND NOT IN A TEST. parse_date calls time.mktime, which reads a
+    listing date IN THE TIME ZONE OF THE MACHINE PARSING IT. A listing says `2024-01-01 00:00`
+    and carries no zone, so the epoch it becomes is not a property of the listing -- it is a
+    property of the listing and the reader together. Anything that compares a parsed date against
+    an expected one must therefore go back through the SAME localtime, or it is comparing a date
+    with a time zone.
+
+    MEASURED, TWICE, THE SECOND TIME IN PUBLIC. parse_listing_test.py pinned 1704063600.0 -- that
+    sum in CET -- and the GitHub runner is UTC: it failed by one hour and took the whole Python CI
+    job down on three consecutive merges to main, 2026-09-28 to 2026-10-02. common_test.py had
+    already met the same thing ("wrong by eight hours"), fixed it with a local helper, and written
+    the lesson into a docstring BESIDE ITS OWN FIX -- while the line it was describing, in the
+    other file, stayed as it was. A lesson recorded next to code that already obeys it is not a
+    check on the code that does not, and a helper in one test file is not available to the next.
+
+    IT IS NOT A WORKAROUND FOR A TIME-ZONE BUG, which is worth saying plainly: the absolute
+    instant a listing means cannot be recovered, because the server does not say which zone it
+    printed. See the note on DATE_FORMATS. This function makes the round trip exact; it cannot
+    make the original unambiguous.
+    """
+    if epoch is None:
+        return ""
+    return time.strftime("%Y-%m-%d %H:%M", time.localtime(epoch))
 
 
 BASE_RE = re.compile(r'<base\s[^>]*href="([^"]+)"', re.I)

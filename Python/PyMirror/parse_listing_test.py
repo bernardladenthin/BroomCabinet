@@ -239,8 +239,21 @@ def run(m, check):
     # filesystem mirrored here, let alone 400.
     long_row = ('<table><tr><td><a href="f.bin">%s</a></td><td>2024-01-01 00:00</td>'
                 '<td>12K</td></tr></table>')
+    # THE DATE IS READ BACK THROUGH localtime AND NOT PINNED AS AN EPOCH NUMBER. parse_date uses
+    # time.mktime, which reads a listing date in the TIME ZONE OF THE MACHINE PARSING IT, so an
+    # absolute constant here passes only where it was written. This line held 1704063600.0 -- CET
+    # -- from 2026-09-17 until 2026-10-02, and the GitHub runner is UTC: it failed by exactly one
+    # hour and took the whole Python CI job with it on the merges of #35, #36 and #38.
+    #
+    # THE LESSON WAS ALREADY WRITTEN DOWN AND IN THE WRONG FILE. common_test.py's TestParseDate
+    # says in its own docstring that "parse_listing_test.py's first draft did exactly that and was
+    # wrong by eight hours" -- a note about THIS line, beside the file that had been fixed, while
+    # the line it describes stayed as it was. A lesson recorded next to the code that already obeys
+    # it is not a check on the code that does not.
+    got = m.parse_listing(long_row % ("x" * 399))
     check("bound: 399 characters -- file WITH size and date",
-          m.parse_listing(long_row % ("x" * 399)), [("f.bin", 12288, 1704063600.0)])
+          [(h, s, common.date_text(t)) for h, s, t in got],
+          [("f.bin", 12288, "2024-01-01 00:00")])
     check("bound: 401 characters -- file present, columns gone",
           [(h, s, t) for h, s, t in m.parse_listing(long_row % ("x" * 401))],
           [("f.bin", None, None)])
