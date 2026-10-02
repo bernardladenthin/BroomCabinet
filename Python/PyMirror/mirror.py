@@ -4178,10 +4178,24 @@ EXCLUDE = {
     # everything it is going to. Worth recognising by eye until something recognises it in code:
     # the whole-site run in September showed the same shape and was read as progress.
     #
-    # SO THE FIGURE TO WEIGH IS ~222 MB FOR Jumper Reference, with OEMINFO/ and ROM Archive/ not
-    # reached at all. Tiny, and on subject -- jumper settings and ROM dumps for old boards. The
-    # cost is not bytes but PATIENCE: taking it means a crawl that walks ~100 000 pages to fetch
-    # ~42 000 files, and mirror.py has no page cap.
+    # SO THE FIGURE TO WEIGH IS ~222 MB FOR Jumper Reference. The cost is not bytes but PATIENCE:
+    # taking it means a crawl that walks ~100 000 pages to fetch ~42 000 files, and mirror.py has
+    # no page cap.
+    #
+    # OEMINFO/ AND ROM Archive/ WERE MEASURED EXACTLY ON 2026-10-02, and they are nothing like
+    # that. Both are plain Apache listings rather than the cross-linked per-board maze, so a walk
+    # costs 38 directory requests:
+    #
+    #   Hardware Info/OEMINFO/       17 dirs,  65 files,  22.1 MB   mostly .bmp (16.7) and .jpg
+    #   Hardware Info/ROM Archive/   21 dirs, 105 files,  62.3 MB   .upk (27.5), .bz2 (14.3), .jpg
+    #   together                     38 dirs, 170 files,  84.4 MB
+    #
+    # EXACT AND NOT ESTIMATED: the listings carry no size column, so every one of the 170 files
+    # was asked with a HEAD. 0 failed. 208 requests in total, which is less than a thousandth of
+    # what Jumper Reference would spend, so there was no reason to sample.
+    #
+    # Taking these two is therefore cheap in both senses. It is still a decision -- delete the two
+    # lines below -- because it widens what this archive claims to be.
     #
     # Delete a line to take that branch. The eight below are the top level; the three after them
     # are inside Hardware Info/.
