@@ -371,6 +371,39 @@ def section_candidates(mod, quiet, pacer):
     return drift
 
 
+def already_recorded(mod, name):
+    """-> a short note naming the table that already explains a dead base, or "".
+
+    EVERY FINDING THIS SECTION PRODUCED ON 2026-10-02 WAS ALREADY WRITTEN DOWN. Eight archives were
+    flagged; four are the UNPACKED trees taken out of somebody else's tar, one is FROZEN with the
+    date its host closed, two are EXTERNAL salvages that exist BECAUSE the origin is gone -- and the
+    eighth was this tool being wrong about a port. Not one needed moving anywhere.
+
+    A list like that is worse than an empty one. It reads as eight discoveries, and the next step
+    after "the host is gone" is to move the archive into FROZEN and stop looking -- which would
+    have re-recorded what the register already said, or buried a live host. The owner had to say
+    "careful, I unpacked things in three or four archives" before any of it was noticed.
+
+    So the register gets consulted before a verdict is printed. Same shape as the UNPACKED note in
+    find-sitemaps.py, for the same reason: a hazard recorded next to one tool is not a check on the
+    next one.
+    """
+    for table in ("UNPACKED", "FROZEN", "EXTERNAL", "RETIRED"):
+        if name in getattr(mod, table, {}):
+            return "  [documented in %s]" % table
+    return ""
+
+
+def ports_for(base):
+    """-> the ports worth asking THIS base about. (80, 443) unless the base names its own.
+
+    A network probe cannot be unit-tested; a decision about which ports to probe can, and this is
+    the decision that went wrong. See the comment at the call site for what it cost.
+    """
+    explicit = urllib.parse.urlsplit(base).port
+    return (explicit,) if explicit else (80, 443)
+
+
 def section_bases(mod, quiet, pacer):
     """Does every archive's OWN base URL still work? -> the number that no longer does.
 
@@ -410,21 +443,36 @@ def section_bases(mod, quiet, pacer):
             print("  %-24s no host in the base URL: %s" % (name, base))
             bad += 1
             continue
+        # A BASE MAY NAME ITS OWN PORT, and asking 80 and 443 about such a host answers a question
+        # nobody asked. rwth-aachen-ftp is registered on
+        # `http://john.ccac.rwth-aachen.de:8000/ftp/` and this check called it "NOTHING LISTENING
+        # on 80 or 443 (refusal, or the host is gone)" on 2026-10-02 -- while port 8000 was open
+        # and `GET /ftp/` answered 200. A LIVE HOST DECLARED DEAD, by a tool written the same day
+        # to find dead hosts, and the next step after such a verdict is to move the archive into
+        # FROZEN and stop looking.
+        #
+        # With an explicit port there is also nothing for scheme_drift to say: drift means "the
+        # other of 80/443 answers", and a host on 8000 has no other.
+        ports = ports_for(base)
+        explicit = ports[0] if len(ports) == 1 else None
         pacer.wait(host_of(base))
-        got = reach(host)
-        drift = scheme_drift(got)
+        got = reach(host, ports=ports)
+        drift = None if explicit else scheme_drift(got)
         want = "https" if base.startswith("https") else "http"
         if got["dns"] is not None:
-            print("  %-24s DNS FAILS: %s" % (name, got["dns"]))
+            print("  %-24s DNS FAILS: %s%s" % (name, got["dns"], already_recorded(mod, name)))
             bad += 1
         elif drift and drift != want:
-            print("  %-24s SCHEME DRIFT: registered %s, but port %d is shut and %s answers"
-                  % (name, want, 80 if want == "http" else 443, drift))
+            print("  %-24s SCHEME DRIFT: registered %s, but port %d is shut and %s answers%s"
+                  % (name, want, 80 if want == "http" else 443, drift,
+                     already_recorded(mod, name)))
             bad += 1
         elif all(v is not None for v in got["ports"].values()):
             # BOTH PORTS SHUT IS NOT A DRIFT and must not be reported as one. It is the shape of a
             # host refusing this address -- openpa reads exactly this -- or of one that is gone.
-            print("  %-24s NOTHING LISTENING on 80 or 443 (refusal, or the host is gone)" % name)
+            print("  %-24s NOTHING LISTENING on %s (refusal, or the host is gone)%s"
+                  % (name, "port %d" % explicit if explicit else "80 or 443",
+                     already_recorded(mod, name)))
             bad += 1
         elif not quiet:
             print("  %-24s ok" % name)
