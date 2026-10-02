@@ -1675,8 +1675,9 @@ from common import (COMPLETE_MARKER, INDEX_FILE, MIN_FREE_BYTES, ROOT_MARKER, SU
                     comparable_path, hash_tree, http_date, http_open, human,
                     iter_tree, local_path, long_path, looks_like_a_document,
                     looks_like_a_loop,
-                    parse_listing, read_index, read_marker, resolution_base,
-                    same_path_plus_slash, scan_tree, write_index,
+                    parse_listing, read_index, read_manifests, read_marker,
+                    resolution_base,
+                    same_path_plus_slash, scan_tree, write_index, write_manifests,
                     write_marker as common_write_marker)
 
 # The mirror tree: the directory that holds one subdirectory per archive. Deliberately NOT
@@ -7275,14 +7276,36 @@ def build_index(name, workers, force=False, interval=10.0):
             todo.append((rel, full, st.st_size, st.st_mtime_ns))
             todo_bytes += st.st_size
 
+    # THE WEAKER MANIFESTS, UPDATED FROM BOTH EXITS OF THIS FUNCTION. Written as one closure
+    # because the first version put it only on the hashing path, and the run that needs it most is
+    # the one with NOTHING to hash: a deleted file left `.sha1sum`, `.md5sum` and `.sfv` naming it
+    # while `.sha256sum` correctly dropped it. The comment four lines below had already said why --
+    # "a stale manifest listing files that no longer exist is worse than none" -- about the sums
+    # file, for three manifests that did not exist when it was written.
+    def update_manifests(fresh):
+        kept = read_manifests(root)
+        kept.update(fresh or {})
+        # `rows` IS the tree, so a path missing from it has left and falls out here.
+        have = {rel: got for rel, got in kept.items() if rel in rows}
+        write_manifests(root, have)
+        short = len(rows) - len(have)
+        if short:
+            # SAID, NOT HIDDEN. Until the one-time full pass has run, most archives carry sha256
+            # and nothing else, and a manifest covering part of a tree must not read as covering
+            # all of it.
+            print("  %-24s %6d of %d files carry the weaker digests -- --index-force once to "
+                  "complete them" % (name, len(have), len(rows)), flush=True)
+
     total = len(rows) + len(todo)
     if not todo:
         # Nothing to hash. Still rewrite when the tree lost files or an output is missing --
         # a stale manifest listing files that no longer exist is worse than none.
         if rows == old and os.path.exists(idx_path) and os.path.exists(sums_path):
+            update_manifests(None)
             print("  %-24s %6d files, unchanged" % (name, total), flush=True)
             return total
         write_index(idx_path, sums_path, rows)
+        update_manifests(None)
         print("  %-24s %6d files, nothing to hash, index rewritten"
               % (name, total), flush=True)
         return total
@@ -7290,9 +7313,18 @@ def build_index(name, workers, force=False, interval=10.0):
     print("  %-24s %6d files, %d carried over, %d to hash (%s)"
           % (name, total, len(rows), len(todo), human(todo_bytes)), flush=True)
 
+    # THE WEAKER DIGESTS COME OUT OF THE SAME READ, and the ones already on disk are read back
+    # rather than forgotten. An index run hashes only what changed -- that is what makes a re-run
+    # cost a stat of the tree instead of a read of it -- so the files it carries over have no sha1,
+    # md5 or crc32 in hand. Writing the manifests from this run's results alone would shrink them
+    # to whatever happened to be re-hashed, and the first incremental run after the one-time full
+    # pass would have discarded nearly all of it.
+    fresh = {}
     done, done_bytes, failed, elapsed = hash_tree(
         todo, rows, workers, interval,
-        checkpoint=lambda: write_index(idx_path, sums_path, rows))
+        checkpoint=lambda: write_index(idx_path, sums_path, rows), digests=fresh)
+
+    update_manifests(fresh)
 
     print("  %-24s %6d files indexed, %d hashed in %dm%02ds (%.0f MB/s)"
           % (name, len(rows), done, elapsed // 60, elapsed % 60,

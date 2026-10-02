@@ -33,7 +33,7 @@ import sys
 import time
 import zlib
 
-from common import human, load_mirror
+from common import human, load_mirror, read_sfv
 
 CHUNK = 1 << 22       # 4 MB; on an 85 GB file the read size matters more than for small ones
 
@@ -56,27 +56,12 @@ def crc32(path, progress=None):
     return "%08X" % (c & 0xFFFFFFFF), read
 
 
-def parse_sfv(path):
-    """-> [(filename, expected crc)] .
-
-    Lines beginning with `;` are comments -- RHash puts the size and mtime there, which is useful
-    to a human and is deliberately not parsed as authority here. The data line is
-    `<name> <8 hex digits>`, and the name may contain spaces, so split from the RIGHT.
-    """
-    out = []
-    for line in io.open(path, encoding="utf-8", errors="replace"):
-        line = line.strip()
-        if not line or line.startswith(";"):
-            continue
-        parts = line.rsplit(None, 1)
-        if len(parts) != 2 or len(parts[1]) != 8:
-            continue
-        try:
-            int(parts[1], 16)
-        except ValueError:
-            continue
-        out.append((parts[0].replace("\\", "/"), parts[1].upper()))
-    return out
+# parse_sfv LIVED HERE UNTIL 2026-10-02 and is now common.read_sfv, because this collection
+# started WRITING .sfv files as well as reading other people's: mirror.py --index emits one per
+# archive beside .sha1sum and .md5sum. A format whose reader sits in one file and whose writer sits
+# in another is a format with two opinions, and the one that matters -- that a filename may contain
+# spaces, so the split is from the RIGHT -- is exactly the kind that gets re-derived differently.
+# `common.sfv_line` is the writer, `common.read_sfv` the reader, and a test round-trips the pair.
 
 
 def retired_in(root):
@@ -126,7 +111,7 @@ def main():
         sys.exit("no such file: %s" % args.sfv)
     root = args.root or os.path.dirname(os.path.abspath(args.sfv))
 
-    entries = parse_sfv(args.sfv)
+    entries = read_sfv(args.sfv)
     if not entries:
         sys.exit("no usable lines in %s -- is it really an .sfv?" % args.sfv)
     print("  %s: %d entries, checking against %s" % (args.sfv, len(entries), root), flush=True)

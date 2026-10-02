@@ -4550,16 +4550,122 @@ class TestNothingShadowsTheLibrary(unittest.TestCase):
         self.assertEqual(found, known,
                          "a tool started or stopped reusing a library name -- say which and why")
 
+class TestDateText(unittest.TestCase):
+    """parse_date's inverse, and the one thing every comparison of a parsed date must go through.
+
+    WHY IT EXISTS: a listing date carries no time zone, so the epoch it becomes depends on the
+    machine reading it. Pinning that epoch is a test of the reader's time zone. This did take down
+    the Python CI job on three consecutive merges to main.
+    """
+
+    def test_it_is_the_inverse_of_parse_date(self):
+        for text in ("2024-01-01 00:00", "12-Jan-2011 09:22", "2011-01-12 09:22",
+                     "2009-Feb-06 10:16"):
+            self.assertEqual(common.date_text(common.parse_date(text)),
+                             common.date_text(common.parse_date(text)))
+
+    def test_the_round_trip_returns_the_same_calendar_minute(self):
+        """The property that makes it usable in a comparison: what went in comes back out."""
+        self.assertEqual(common.date_text(common.parse_date("2024-01-01 00:00")),
+                         "2024-01-01 00:00")
+        self.assertEqual(common.date_text(common.parse_date("12-Jan-2011 09:22")),
+                         "2011-01-12 09:22")
+
+    def test_seconds_are_dropped_because_a_listing_has_none(self):
+        """DATE_FORMATS accepts %H:%M:%S; the text form is minute precision either way."""
+        self.assertEqual(common.date_text(common.parse_date("12-Jan-2011 09:22:33")),
+                         "2011-01-12 09:22")
+
+    def test_None_becomes_an_empty_string_and_not_1970(self):
+        """parse_date returns None for a date it cannot hold. A column wants a blank there."""
+        self.assertEqual(common.date_text(None), "")
+        self.assertEqual(common.date_text(common.parse_date("01-Jan-1900 00:00")), "")
+
+    def test_zero_is_a_date_and_not_a_missing_one(self):
+        """0 is falsy and is still an instant. A truthiness test here would print "" for it."""
+        self.assertNotEqual(common.date_text(0), "")
+
+    def test_it_survives_a_summer_date_as_well_as_a_winter_one(self):
+        """mktime applies the offset in force ON THAT DATE, so a DST boundary is where a
+        hand-rolled conversion goes wrong."""
+        for text in ("2024-01-15 12:00", "2024-07-15 12:00"):
+            self.assertEqual(common.date_text(common.parse_date(text)), text)
+
+    def test_it_is_exported(self):
+        self.assertIn("date_text", common.__all__)
+
+
+class TestNoTestPinsAnAbsoluteEpoch(unittest.TestCase):
+    """THE RATCHET. One test file pinned a timestamp and the CI was red for five days.
+
+    A sweep is only as good as the day it is run, and this one was run twice: common_test.py met
+    the problem on 2026-09-17, fixed itself, and wrote a docstring naming parse_listing_test.py as
+    the file that had got it wrong -- which stayed wrong until 2026-10-02, when three merges to
+    main failed in a row on exactly that line.
+
+    WHAT IS FORBIDDEN is a literal in the range a recent date falls in, in CODE. Comments are
+    stripped first, because the incident is worth naming in prose and the number is part of the
+    story. Byte counts land in the same range and are exempted BY NAME, with a reason, the same
+    shape as privacy-test.ALLOWED -- an exception nobody can re-judge later is a hole.
+    """
+
+    # value -> why it is not a date
+    ALLOWED = {
+        "1000000000": "one billion BYTES, in the parse_size and human round-trip cases",
+        "1073741824": "1 GiB in bytes -- the binary-vs-decimal case, a size and not an instant",
+    }
+
+    def test_no_test_file_carries_a_bare_recent_timestamp(self):
+        here = os.path.dirname(os.path.abspath(__file__))
+        # 2001-09-09 to 2033-05-18: wide enough to catch anything written as "now", narrow enough
+        # that a byte count has to be suspiciously round to land in it.
+        epochs = re.compile(r"(?<![0-9])(1[0-9]{9})(?![0-9])")
+        found = {}
+        for name in sorted(os.listdir(here)):
+            if not name.endswith(".py") or "test" not in name:
+                continue
+            with io.open(os.path.join(here, name), encoding="utf-8") as fh:
+                lines = fh.read().splitlines()
+            for n, line in enumerate(lines, 1):
+                code = line.split("#", 1)[0]
+                for hit in epochs.findall(code):
+                    if hit in self.ALLOWED:
+                        continue
+                    found.setdefault("%s:%d" % (name, n), hit)
+        self.assertEqual(found, {},
+                         "a test pinned an absolute timestamp. A listing date has no time zone, "
+                         "so the epoch depends on the machine: compare through common.date_text "
+                         "instead, or add the value to ALLOWED with a reason if it is not a date")
+
+    def test_the_allowances_are_still_present_and_still_needed(self):
+        """An exemption for a value nobody uses any more is a hole left standing open."""
+        here = os.path.dirname(os.path.abspath(__file__))
+        blob = ""
+        for name in sorted(os.listdir(here)):
+            if name.endswith(".py") and "test" in name:
+                with io.open(os.path.join(here, name), encoding="utf-8") as fh:
+                    blob += fh.read()
+        for value in self.ALLOWED:
+            self.assertIn(value, blob, "ALLOWED names %s and no test uses it" % value)
+
+
 class TestParseDate(unittest.TestCase):
     """Every claim parse_date's docstring makes, executable. It had no test of its own.
 
     NOT PINNED AS AN EPOCH NUMBER. time.mktime reads local time, so an absolute constant here
     would fail by the machine's time zone -- parse_listing_test.py's first draft did exactly that
     and was wrong by eight hours. Each answer is compared through the same localtime it came from.
+
+    AND THE HELPER THAT DOES THAT NOW LIVES IN THE LIBRARY, as common.date_text. It was two lines
+    here, and two lines is exactly small enough to be written again badly somewhere else: this
+    docstring named parse_listing_test.py as the file that had got it wrong, the fix was applied
+    HERE, and the line it described stayed as it was until the GitHub runner failed on it three
+    merges in a row. A note about another file is not a check on it, and a private helper cannot
+    be reused by the test that needs it most.
     """
 
     def back(self, epoch):
-        return time.strftime("%Y-%m-%d %H:%M", time.localtime(epoch))
+        return common.date_text(epoch)
 
     def test_every_format_the_table_lists_is_read(self):
         # DATE_FORMATS is the promise; this is it kept, one entry at a time.

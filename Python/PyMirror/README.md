@@ -64,6 +64,7 @@ notice, than the ways it fails loudly. Most of this file is about the second thi
 | `common_test.py` | `unittest` over `common.py`, and every case is a mistake one of the copies actually made: a trailing dot surviving `long_path`, a relative path reaching `exists`, `human` being decimal while `parse_size` is binary, the agent not beginning `Mozilla/`, one own-files set. It also asserts that `mirror.py` resolves these to *this* module rather than to a copy of its own |
 | `wedge_test.py` | the termination tests for `mirror.py` |
 | `gone-record-test.py` | the twenty-two cases for `.mirror-gone`, the per-archive note of what the source answered 404 or 410 to. A 404 creates no file, so a list diffed against the tree names the same dead path every session — three sessions asked openpa for the same GIF, and those names sort to the front, so they were the first requests of a budget worth a few dozen. The tests pin what may **not** go in: not a timeout, and not 403 or 401, which say we may not have it rather than that it is gone |
+| `manifests-test.py` | the forty-five cases for the four checksums per file. Two pin the formats — an `.sfv` writes `<path> <hash>` where `sha256sum` writes `<hash> *<path>`, and getting that backwards produces a file that still looks like an `.sfv` and verifies nothing — and the rest pin what the wiring got wrong twice: an incremental run must not shrink the manifests to whatever it happened to re-hash, and a deleted file must fall out even on the path where there is nothing to hash. It also gives `sfv-verify.py` its first test, the day its parser moved into the library |
 | `exclude-honoured-test.py` | the nine cases proving a URL list cannot carry what `EXCLUDE` refuses — at both ends, because a list is a file and may come from anywhere. Built from whatever patterns the register happens to hold, so they state a property rather than a fixture. The first one tested is the *over*-refusal: `risc/images/` is not `images/`, and a file wrongly refused never appears anywhere for anyone to miss |
 | `give-up-test.py` | the ten cases for `--give-up`, the rule that abandons a run whose host has stopped answering. Two of them are the point: forty consecutive 404s must **not** stop a run, because a status is the server talking and a hand-written site full of dead links is exactly what this collection mirrors. Written after a crawl spent twenty-six minutes asking a host that had gone quiet, and recorded nine subtrees as lost that were never truly asked for |
 | `parse_listing_test.py` | the listing-parser tests. They check **both** directions: that the newer link and image forms are found, and that the size and date columns a real index carries are still read correctly |
@@ -395,6 +396,40 @@ thing anyone should do — so the warning is suppressed and the reason printed i
 anyway, and wrote down nine lost subtrees that were nothing of the kind.
 
 ## Checksums
+
+Four per file, written beside each other and never instead of one another:
+
+| file | algorithm | who else speaks it |
+|---|---|---|
+| `.sha256sum` | SHA-256 | **ours** — the one a verification decides on |
+| `.sha1sum` | SHA-1 | Backblaze B2 records one per file (`X-Bz-Content-Sha1`) |
+| `.md5sum` | MD5 | the Internet Archive publishes one for every file in an item |
+| `.sfv` | CRC32 | RAR and ZIP store one per member; there is no `crc32sum(1)`, `.sfv` is the format |
+
+**The three weaker ones are not there for strength.** They are there because the parties who could
+give a second opinion about these bytes do not speak SHA-256. Measured on this collection's own
+`IA-METADATA.json`: md5 present on 204 of 204 files, crc32 and sha1 on 203, **sha256 on none**. An
+index of SHA-256 alone cannot be compared with the Internet Archive for a single file — and the
+Archive is where this collection looks when an origin is gone.
+
+**The cost is one read and no wall clock.** Measured on a 470 MB file with the disk out of the
+picture: SHA-256 alone runs at 1551 MB/s, all four together at 309 MB/s, against a disk that
+delivers 208 MB/s cold. Four digests still outrun the disk, so the pass stays disk-bound; MD5 is
+the expensive one at 658 MB/s and is what takes the headroom from 2.8× down to 1.5×. The real
+price is the one full re-read — about five and a half hours for 4.02 TB — which is why it is worth
+doing once, properly, and then not touching the files again.
+
+The names are the tools' own, so `sha1sum -c .sha1sum` works unchanged and OpenHashTab, QuickSFV
+and TeraCopy read all three without being told anything. An archive that outlives these scripts is
+still verifiable with what a system already has.
+
+**The CSV index keeps its four columns.** Widening it would break every reader of the 113 indexes
+already on disk, for three values no verification here decides on — and a standard-format manifest
+is readable without these scripts, which a fifth CSV column would not be.
+
+**An empty manifest is not written at all.** `md5sum -c` over zero lines reports success, and a
+clean zero that reads as a verification is the shape this collection distrusts most. An absent
+file says "not done yet".
 
 Each mirror carries two more files next to the marker:
 
