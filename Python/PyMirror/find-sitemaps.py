@@ -62,6 +62,13 @@ IS_INDEX = re.compile(r"<sitemapindex", re.I)
 GZIP_MAGIC = bytes([0x1F, 0x8B])
 
 
+# TWO SITEMAPS SAY NOTHING ABOUT OUR SUBTREE, measured on 2026-10-02 so nobody spends the 20
+# requests again: ps-2.kev009.com's 5 parts name 219 412 urls and ibm-openxl-docs' 15 name 103 965,
+# and EVERY ONE of both lies outside the registered base -- the second is ibm.com's per-locale
+# hreflang set, not the openxl docs tree. A whole-host sitemap under an archive fenced to one
+# branch is a non-finding, and it reads as 323 377 entries until the base is applied.
+
+
 # A SOURCE THAT SERVES UNPACKED PACKAGES makes `MISSING` read 20x too high, and this tool cannot
 # tell on its own. ftp.nice.ch publishes the contents of every NeXT package beside the package,
 # under a directory named `_<package>/`, so its sitemap names 94 729 files where the archive holds
