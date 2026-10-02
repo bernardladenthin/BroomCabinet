@@ -4685,18 +4685,41 @@ class TestParseDate(unittest.TestCase):
         self.assertEqual(self.back(common.parse_date("12-Jan-2011 09:22:33")),
                          self.back(common.parse_date("12-Jan-2011 09:22")))
 
-    def test_A_DATE_THE_PLATFORM_CANNOT_HOLD_IS_NONE_NOT_ZERO(self):
-        """The defect this function was repaired for, on 2026-09-23.
+    def test_A_PRE_EPOCH_DATE_IS_NONE_NOT_ZERO_AND_NOT_NEGATIVE(self):
+        """The defect this function was repaired for, on 2026-09-23 -- and its sequel.
 
-        time.mktime raises OverflowError for any date outside the platform's time_t -- and
-        `01-Jan-1900 00:00` is enough. A listing of genuinely old files is exactly where such a
-        date appears, and the crawler died on one in the PRODUCER thread, which has no handler
-        of its own. Catching only ValueError was the bug; the same shape as parse_size's.
+        time.mktime raises OverflowError for a date outside the platform's time_t, and the crawler
+        died on one in the PRODUCER thread, which has no handler of its own. Catching only
+        ValueError was the original bug; the same shape as parse_size's.
 
-        None, not 0: the caller then stamps the file with nothing rather than with 1970.
+        BUT THE NAME OF THIS TEST USED TO BE "THE PLATFORM CANNOT HOLD", AND THAT WAS A WINDOWS
+        SENTENCE. `01-Jan-1900 00:00` raises OverflowError on Windows and returns -2208988800.0 on
+        Linux, so this case asserted the behaviour of the machine it was written on and went red
+        the first time CI ran it on 3.14 -- the same shape as the time-zone defect of the same
+        week. parse_date now rejects a negative result explicitly, on every platform, so what is
+        pinned here is the RULE and not an error type.
+
+        None, not 0 and not a negative: the caller then stamps the file with nothing rather than
+        with 1970 or with something no filesystem will take. Measured before the change: of
+        1 802 057 rows across every index in this collection, NONE carries an mtime before 1970,
+        and the oldest is 1977-06-08.
         """
-        self.assertIsNone(common.parse_date("01-Jan-1900 00:00"))
-        self.assertIsNone(common.parse_date("01-Jan-1800 00:00"))
+        for text in ("01-Jan-1900 00:00", "01-Jan-1800 00:00", "01-Jan-1969 00:00"):
+            self.assertIsNone(common.parse_date(text), text)
+
+    def test_AND_A_DATE_JUST_AFTER_THE_EPOCH_IS_STILL_A_DATE(self):
+        """The boundary from the other side: a floor set a day too high drops real dates silently.
+
+        `02-Jan-1970` AND NOT `01-Jan-1970`, deliberately, and the reason is worth stating rather
+        than hiding behind a convenient choice. parse_date reads a listing date as LOCAL time, so
+        midnight on 1 January 1970 is NEGATIVE in every zone east of UTC and this rule rejects it
+        there. That is a real edge and it is accepted: a listing showing the epoch's own midnight
+        is a default value, not a fact about a file, and of the 1 802 057 rows in this collection
+        the oldest is 1977.
+        """
+        self.assertEqual(common.date_text(common.parse_date("02-Jan-1970 00:00")),
+                         "1970-01-02 00:00")
+        self.assertIsNotNone(common.parse_date("01-Jan-1971 00:00"))
 
     def test_and_it_raises_nothing_at_all(self):
         # A parser in a producer thread must return, never raise, whatever the page holds.
