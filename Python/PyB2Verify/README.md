@@ -57,11 +57,51 @@ bucket that holds nothing but a copy of `checksums/b2/`:
 
     python b2verify.py verify-b2 --download --threads 16 --resume --config b2.properties
 
-Before the first B2 request the tool checks, within 15 seconds, that a TLS handshake with the B2
-API completes. A data-centre network can pass TCP to Backblaze and still drop the handshake; without
-this check b2sdk retries for minutes and the run sits silent. Copy `checksums/b2/` back afterwards: it now carries the time of each successful check, and a
+Copy `checksums/b2/` back afterwards: it now carries the time of each successful check, and a
 real SHA-1 for every file that was confirmed through its ETag. Use a key of its own on that
 machine, read-only, and revoke it when the run is done.
+
+Before the first B2 request the tool checks, within 15 seconds, that a TLS handshake with the B2
+API completes. Without that check b2sdk retries a dead connection for minutes and the run sits
+silent — which is exactly what happened the first time this was tried from a data centre.
+
+### TCP connects but TLS to B2 never completes
+
+That machine reached every B2 storage endpoint by TCP, in every region, and no TLS handshake ever
+finished — while other HTTPS sites, including Backblaze's own web site, worked. It was not DNS, not
+the CA bundle, not the TLS version and not the key: the handshake timed out with certificate
+checking switched off, and with any server name.
+
+A packet capture during one attempt shows the cause:
+
+    tcpdump -n -i <interface> host <B2 address>
+    openssl s_client -connect <B2 address>:443 -servername <B2 host name>
+
+    > SYN, mss 8960                          the interface had jumbo frames (MTU 9000)
+    < SYN-ACK, mss 1460
+    > ClientHello, 219 bytes                 acknowledged by B2
+    < seq 4345:4955, 610 bytes               only the LAST piece of B2's reply arrives;
+                                             bytes 1-4344, three full 1500-byte packets, never do
+
+A **path-MTU black hole**: a hop on the way back carries less than 1500 bytes, and the "fragmentation
+needed" message that would make B2 send smaller packets never reaches it. Sites behind large CDNs
+work because those send smaller packets anyway; B2's storage servers do not.
+
+The fix is to make the client *announce* a smaller segment size in its SYN, so that B2 sends small
+packets from the start. On the system where this was found (AIX 7.3), what did and did not work:
+
+| attempt | result |
+|---|---|
+| `setsockopt(TCP_MAXSEG)` in the client | ignored for the SYN |
+| a route with its own MTU (`route add ... -mtu 1400`) | limits only what is *sent*; the SYN still announces the interface MTU |
+| per-interface `ifconfig <if> tcp_mssdflt 1360` alone | ignored while path-MTU discovery is on |
+| `ifconfig <if> tcp_mssdflt 1360` **and** `no -o tcp_pmtu_discover=0` | **works**: SYN announces 1360, the handshake completes |
+
+Both settings are runtime-only and are undone with `no -o tcp_pmtu_discover=1` and
+`ifconfig <if> tcp_mssdflt 0`. Lowering the interface MTU to 1400 should work as well, but touches
+all traffic on that interface. On Linux the equivalent knob is the per-route `advmss`
+(`ip route add <B2 network> via <gateway> advmss 1360`), or an MSS clamp in the firewall — not
+tested here.
 
 ## Two sides, two indexes, one comparison
 
