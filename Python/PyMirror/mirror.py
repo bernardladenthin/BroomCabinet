@@ -2322,7 +2322,18 @@ ARCHIVES = [
     # base and are dropped -- measured, after a run that fetched the 61 index pages, reported
     # `61 files, 0 failed` and marked the archive COMPLETE over a tree missing 99.4 % of itself.
     # The base must be spelled the way the source spells its own links.
-    ("dreamlandbbs-os2", "http://www.dreamlandbbs.com/gfd/"),
+    # https SINCE 2026-10-02, AND THE RECORD BELOW IT WAS WRONG FOR FIVE DAYS BECAUSE OF THE
+    # SCHEME. Registered as `http://` on 2026-09-27, which was right when it was written. The host
+    # has since closed port 80: every request went to a shut door and timed out at 21.2 s, three
+    # times across five days, and all three were written down as a rate-limit penalty -- see
+    # MIN_INTERVAL["dreamlandbbs-os2"], where the mistake is now marked as one.
+    #
+    # ONE CALL OF common.reach SETTLED IT:  TCP 80 timed out, TCP 443 open in 0.0 s.
+    #
+    # Nothing was refusing anything. 5 648 files and 14.05 GB were reachable the whole time, and
+    # `https://.../gfd/apparc/index.html` answered 200 in 1.3 s from this machine on the first try.
+    # recheck-decisions.py --only bases now watches every archive's base for exactly this.
+    ("dreamlandbbs-os2", "https://www.dreamlandbbs.com/gfd/"),
 
     # The other half of the same host. Measured 2026-09-27 before it was added: 37 files,
     # 381.64 MB, 12 pages, every size read off the listings, no failures and no cap reached.

@@ -146,6 +146,7 @@ __all__ = [
     "read_marker", "write_marker", "marker_text", "MARKER_COLUMN",
     "iter_tree", "scan_tree", "hash_tree", "HASH_BATCH",
     "http_open", "http_get", "http_try", "head_size", "unverified_context",
+    "site_prefixes", "under_site", "reach", "scheme_drift",
     "quote_url", "Pacer", "Backoff", "Patience", "local_failure", "UNREACHED",
     "GONE_FILE", "GONE_STATUS", "read_gone", "record_gone",
     "declared_length", "DECLARES_ITS_LENGTH",
@@ -1223,6 +1224,55 @@ def is_child_link(href, allow_up=False):
     return True
 
 
+def site_prefixes(base):
+    """-> every spelling of `base` that means the same site, longest first.
+
+    TWO TOOLS FOUND THE SAME BUG IN ONE DAY, which is why this is in the library and not in either
+    of them. A page or a sitemap names its own files with a spelling the register did not use, a
+    plain `startswith` reads that as a foreign host, and the result is a CLEAN ZERO -- the answer
+    this collection distrusts most, because it looks like a finding.
+
+      find-sitemaps.py, 2026-10-02   ardent-tool is registered as https://ardent-tool.com/ and its
+                                     sitemap writes https://www.ardent-tool.com/ -- all 2430
+                                     entries counted OUTSIDE THE BASE, the archive reported as
+                                     MISSING 0. A clean bill of health from comparing a site with
+                                     itself and finding no overlap.
+      pages-to-urllist.py, same day  a page writing https where the base says http had its own
+                                     files counted as somebody else's.
+
+    THE APEX AND `www.` ARE DIFFERENT NAMES AND THE SAME SITE. recheck-decisions.py's docstring
+    already says so for a different purpose -- `crynwr.com` resolves while `www.crynwr.com` does
+    not -- so one spelling existing says nothing about the other. The scheme is folded for the
+    neighbouring reason: a site that moved to https still carries http links, or the reverse.
+
+    LONGEST FIRST, so a caller cutting a prefix off a url cuts at the DEEPEST spelling that
+    matches. Against a base of `/` and a base of `/a/` for the same host, the shorter one would
+    otherwise win and leave `a/` glued to the front of every relative path.
+
+    WHAT IT DOES NOT DO is guess at other hosts. A mirror served under two unrelated names is a
+    fact about that mirror, and belongs in the register where somebody wrote it down.
+    """
+    parts = urllib.parse.urlsplit(base)
+    hosts = {parts.netloc}
+    hosts.add(parts.netloc[4:] if parts.netloc.startswith("www.") else "www." + parts.netloc)
+    out = {urllib.parse.urlunsplit((scheme, host, parts.path, "", ""))
+           for scheme in ("http", "https") for host in hosts}
+    return tuple(sorted(out, key=len, reverse=True))
+
+
+def under_site(url, base):
+    """-> the path of `url` below `base` when it is the same site, else None.
+
+    The companion to site_prefixes: one call instead of a loop every caller writes again. None and
+    the empty string are different answers -- `base` itself gives "", a foreign host gives None --
+    so a caller can tell "the site's own root" from "not this site" without re-testing.
+    """
+    for prefix in site_prefixes(base):
+        if url.startswith(prefix):
+            return url[len(prefix):]
+    return None
+
+
 def same_path_plus_slash(url, final):
     """True when `final` is `url` with a trailing slash added -- IGNORING an http/https flip.
 
@@ -2248,6 +2298,85 @@ def is_transport(exc, retry_status=RETRY_STATUS):
     if isinstance(exc, urllib.error.HTTPError):
         return exc.code in retry_status
     return isinstance(exc, (urllib.error.URLError, TimeoutError, ConnectionError, OSError))
+
+
+def reach(host, ports=(80, 443), timeout=15, resolve=None, connect=None):
+    """Where does a connection to `host` actually stop? -> {"ip", "dns", "ports": {port: err}}
+
+    `dns` is None when the name resolved and the error text when it did not. Each entry in `ports`
+    is None when the TCP handshake completed and the error text when it did not. Nothing above the
+    handshake is attempted: this answers "is anything listening", and HTTP is http_try's job.
+
+    WHY THE LAYERS HAVE TO BE SEPARATE, measured on dreamlandbbs.com, 2026-09-27 to 2026-10-02.
+    Every request to that host timed out at 21.2 s, three times across five days, and all three
+    times it was written into the register as a rate-limit penalty -- "the host said so within a
+    minute", "the timer is stable, so the rule behind it is untouched", "leave it alone for days".
+    One call of this function says what it actually was:
+
+        DNS: www.dreamlandbbs.com -> 62.163.18.65
+        TCP 80:  timed out after 15.0s
+        TCP 443: open in 0.0s
+
+    Port 80 shut, 443 open. The host had moved to HTTPS and the archive's base said `http://`, so
+    every request went to a closed port and hung -- which is indistinguishable from a block IF the
+    only instrument is an HTTP request. The misreading was not careless; it was unequipped.
+
+    AND IT KILLS A TEMPTING WRONG ANSWER. Changing the User-Agent was proposed twice during those
+    five days. A header cannot matter when the handshake never completes, and this is the function
+    that shows that rather than asserting it.
+
+    `resolve` and `connect` ARE PARAMETERS SO THIS CAN BE TESTED, which a network probe otherwise
+    cannot be. They default to the real socket calls; a test passes fakes and pins the readings
+    that produced a wrong diagnosis in the first place.
+    """
+    resolve = resolve or socket.gethostbyname
+    out = {"ip": None, "dns": None, "ports": {}}
+    try:
+        out["ip"] = resolve(host)
+    except Exception as exc:                                   # noqa: BLE001
+        out["dns"] = str(exc) or type(exc).__name__
+        return out
+
+    def _connect(h, port, t):
+        sock = socket.socket()
+        sock.settimeout(t)
+        try:
+            sock.connect((h, port))
+        finally:
+            sock.close()
+
+    connect = connect or _connect
+    for port in ports:
+        try:
+            connect(host, port, timeout)
+            out["ports"][port] = None
+        except Exception as exc:                               # noqa: BLE001
+            out["ports"][port] = str(exc) or type(exc).__name__
+    return out
+
+
+def scheme_drift(result, ports=(80, 443)):
+    """-> the scheme a host now wants, when exactly one of its two ports answers, else None.
+
+    "https" when 80 is shut and 443 answers, "http" for the reverse. None when both answer, when
+    neither does, or when DNS failed -- because then the ports say nothing about a scheme and a
+    guess would be the same kind of invention this exists to replace.
+
+    THE DISTINCTION IT MAKES IS BETWEEN A STALE RECORD AND A REFUSAL. A base URL was correct on the
+    day it was written; a site that later closes port 80 has not refused anybody. Reading the
+    second as the first costs days of waiting for a block that was never there -- it cost five.
+    """
+    if result.get("dns") is not None:
+        return None
+    plain, secure = ports
+    got = result.get("ports", {})
+    if plain not in got or secure not in got:
+        return None
+    if got[plain] is not None and got[secure] is None:
+        return "https"
+    if got[secure] is not None and got[plain] is None:
+        return "http"
+    return None
 
 
 def host_of(url):

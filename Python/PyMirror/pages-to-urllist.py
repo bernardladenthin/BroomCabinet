@@ -53,14 +53,33 @@ import sys
 import urllib.parse
 
 from common import (MIRROR_ROOT, BOOKKEEPING_FILES, IMG_SRC, LINK_ODD_RE, exists, load_mirror,
-                    looks_like_a_page, relative_to)
+                    looks_like_a_page, relative_to, under_site)
 
 # Both are the library's, written out here character for character until 2026-09-23.
 HREF = LINK_ODD_RE
 IMG = IMG_SRC
 
-SKIP = ("http://", "https://", "//", "#", "mailto:", "javascript:", "data:", "?", "ftp://",
-        "tel:", "about:", "file:")
+# SCHEMES AND SHAPES THAT ARE NOT A FILE ON THIS SITE. `http://`, `https://` and `//` are NOT
+# here, and their absence is the whole point of this comment.
+#
+# THEY WERE HERE UNTIL 2026-10-02 AND COST AN ENTIRE ARCHIVE. A page that links its own files by
+# their full address -- `http://host/gfd/area/file.zip` rather than `file.zip` -- is not linking
+# offsite, and skipping every absolute URL threw away exactly those. dreamlandbbs-os2 is written
+# by MBSE, which spells out the host on every single file link, and this tool reported
+#
+#     61 stored pages read, 2 targets named ... 0 FILES NAMED AND NOT ON DISK
+#
+# over an archive holding 61 index pages and not one of the ~6 000 files they name. A clean zero,
+# which is the one answer this collection has learned to distrust. The register already carried
+# the hazard, beside that archive's own HTML_CRAWL entry: "MBSE writes every file link as
+# http://www.dreamlandbbs.com/gfd/<area>/<file>". The CRAWLER was fixed for it; the harvester kept
+# its own private skip-list and was not.
+#
+# WHAT DECIDES OFFSITE IS THE BASE, NOT THE SPELLING, and the loop below already does that test:
+# every target is resolved and then compared against the archive's base, with anything outside
+# counted separately. Dropping absolute URLs here did the same job a second time and got it wrong,
+# because `http://` says nothing about which host follows it.
+SKIP = ("#", "mailto:", "javascript:", "data:", "?", "tel:", "about:", "file:")
 
 
 def refusals(here, archive):
@@ -150,10 +169,16 @@ def main():
     patterns, excluded_by = refusals(here, args.archive)
     files, dirs, outside, refused = [], [], 0, []
     for url in sorted(named):
-        if not url.startswith(base):
+        # THE SAME SITE UNDER ANOTHER SPELLING IS STILL THE SAME SITE. A plain startswith on the
+        # registered base reads https where the register said http -- or the apex where the page
+        # says www -- as a foreign host, and the archive then looks complete because nothing
+        # overlapped. common.under_site folds both; see its docstring for the two tools that
+        # needed it on the same day.
+        cut = under_site(url, base)
+        if cut is None:
             outside += 1
             continue
-        rel = urllib.parse.unquote(url[len(base):])
+        rel = urllib.parse.unquote(cut)
         if not rel or rel.endswith("/"):
             continue
         # The archive's own EXCLUDE, applied with the crawler's own comparison rather than a
@@ -169,7 +194,13 @@ def main():
         if os.path.isdir(local):
             dirs.append(rel)
             continue
-        files.append(url)
+        # WRITTEN IN THE REGISTERED BASE'S SPELLING, not the page's. Once the same site under
+        # another scheme or host spelling is accepted as its own -- see under_site -- the raw url
+        # may say https where the register says http, and manifest-fetch.py tests its list against
+        # `--base` and would report every one of them as OUTSIDE THE BASE and skip it. Accepting a
+        # second spelling on the way in while emitting it on the way out moves the rejection one
+        # tool further along instead of removing it.
+        files.append(base + urllib.parse.quote(rel, safe="/"))
 
     print("  %s: %d stored pages read, %d targets named" % (args.archive, pages, len(named)))
     print("     %d outside the archive" % outside)
