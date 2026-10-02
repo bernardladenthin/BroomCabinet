@@ -5325,7 +5325,13 @@ class TestHttpTry(unittest.TestCase):
         # gives -- a request that never raises and keeps "the server said no" apart from "nobody
         # answered" -- and reading that distinction from `body` instead of `status` was a live
         # defect in it for one afternoon. See its own comment.
-        self.assertEqual(uses, ["ask-the-source.py", "reachability-probe.py",
+        # find-sitemaps.py asks every archive's host for robots.txt and then for one sitemap. Both
+        # requests are questions whose interesting answers are the negative ones -- no robots.txt,
+        # HTTP 404, nothing listening -- and a raise on any of them would end a survey of a hundred
+        # hosts at the first awkward one. It also needs the distinction http_try keeps: a 404 means
+        # this host publishes no sitemap and is a result, while a timeout means ask again another
+        # day and must not be written down as "none".
+        self.assertEqual(uses, ["ask-the-source.py", "find-sitemaps.py", "reachability-probe.py",
                                 "recheck-decisions.py"])
         self.assertEqual(keeps, ["manifest-fetch.py", "mediawiki.py", "mirror.py",
                                  "redbooks-fetch.py", "subset-refetch.py",

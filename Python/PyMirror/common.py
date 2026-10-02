@@ -145,6 +145,7 @@ __all__ = [
     "iter_tree", "scan_tree", "hash_tree", "HASH_BATCH",
     "http_open", "http_get", "http_try", "head_size", "unverified_context",
     "quote_url", "Pacer", "Backoff", "Patience",
+    "GONE_FILE", "GONE_STATUS", "read_gone", "record_gone",
     "declared_length", "DECLARES_ITS_LENGTH",
     "ZIP_TAIL", "ZIP_EOCD", "ZIP_CD_ENTRY", "ZIP64_MARK", "ISO_PVD_AT",
     "load_peer", "load_mirror", "source_url", "HTTP_FACE", "find_tool", "split_archive",
@@ -532,6 +533,18 @@ def iter_files(root, own_files=None):
 COMPLETE_MARKER = ".mirror-complete"        # a run finished with nothing outstanding
 INDEX_FILE = ".mirror-index.csv"            # per archive: path, size, mtime, sha256
 SUMS_FILE = ".sha256sum"                    # the same digests in sha256sum(1) format
+# Per archive: the paths a URL-LIST fetch asked for and the server answered 404 or 410 to.
+# Measured 2026-10-02: images/dcsscr4.gif had been asked for THREE TIMES across three sessions
+# and answered the same way each time. A 404 creates no file, so the path stays "absent", and a
+# list built by diffing names against the tree names it again every session. Worse than the waste
+# -- the dead names sort to the FRONT of these lists (dcss*, sna*), so they are the first requests
+# a session spends, at a host that grants a session only a few dozen.
+GONE_FILE = ".mirror-gone"
+# THE TWO STATUSES THAT MEAN "THIS SOURCE DOES NOT HAVE IT", and deliberately not mirror.py's
+# PERMANENT, which also holds 401 and 403. Those two say we may not HAVE it, which is a different
+# fact and one a configuration change can reverse; writing them into a gone-record would turn a
+# permissions decision into a claim about existence.
+GONE_STATUS = frozenset((404, 410))
 PROVENANCE_FILE = "PROVENANCE.md"           # where the archive came from, written by hand
 CATALOGUE_FILE = "CATALOGUE.md"             # generated for the whole tree from the markers
 # Placed at a tree's root by hand. It marks a directory as "this is the tree" for a bare run
@@ -598,6 +611,10 @@ OWN_FILES = frozenset({
     # which has NO completion marker. Zero of the 107 markers on disk was written against a tree
     # holding this name, so excluding it cannot make one disagree with its own tree.
     "FILLED-FROM.md",
+    # IN THE NARROW SET BY THE SAME MEASUREMENT AS THE TWO ABOVE, and it is the easiest case of
+    # the three: the name is new as of 2026-10-02, so ZERO of the markers on disk was written
+    # against a tree holding it, and excluding it cannot put a marker at odds with its own tree.
+    GONE_FILE,
 })
 
 # BOOKKEEPING_FILES is what a tool may skip when it only wants CONTENT -- an auditor, a lister, a
@@ -616,6 +633,64 @@ BOOKKEEPING_FILES = frozenset(OWN_FILES | {
     "EXTRACTED-FROM.md",        # this tree was unpacked from that archive
     "SHA256SUMS",               # written by the one-off fetchers, in sha256sum(1) form
 })                              # STILL-MISSING.txt is inherited from OWN_FILES, see there
+
+
+def read_gone(archive_dir):
+    """-> {relative path: the date it was last answered 404} from the archive's GONE_FILE.
+
+    WHAT THIS IS FOR. A url list is built by diffing names a page mentions against names on disk.
+    A file the server no longer has fails that diff for ever: nothing arrives, so nothing changes,
+    so the next list names it again. Three sessions in a row asked openpa.net for
+    images/dcsscr4.gif and got three 404s, and those requests came out of a budget that runs to a
+    few dozen -- the dead names sort to the front, so they were spent first.
+
+    IT IS A NOTE, NOT A VERDICT, and the date is there to keep it one. This collection already
+    learned what a closed question costs: LOST and FROZEN exist to stop anyone looking again, and
+    recheck-decisions.py exists because a host comes back and nothing on disk changes when it
+    does. So the record says WHEN, a caller may ignore it, and nothing here deletes or hides a
+    name -- it only stops it being asked for by default.
+
+    ONLY 404 AND 410 BELONG IN IT. Not a timeout, which says nothing about the file; not 403 or
+    401, which say we may not have it rather than that it is gone -- and those can be switched off
+    by the day's configuration. Collapsing any of them into "gone" is the exact mistake http_try's
+    docstring exists to prevent, one level further on.
+    """
+    out = {}
+    path = os.path.join(archive_dir, GONE_FILE)
+    if not exists(path):
+        return out
+    with io.open(long_path(path), encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            # `<date> <status> <path>`; the path may hold spaces, the first two fields may not.
+            parts = line.split(" ", 2)
+            if len(parts) == 3:
+                out[parts[2]] = parts[0]
+    return out
+
+
+def record_gone(archive_dir, rel, status, when=None):
+    """Append one path the server answered 404 or 410 to. -> True if it was written.
+
+    Appends rather than rewrites: the file is a log of answers and the DATES are the part a
+    re-check needs. A path already in it is not written twice -- three identical lines would say
+    nothing a single line plus its date does not.
+    """
+    if int(status) not in GONE_STATUS:
+        return False
+    if rel in read_gone(archive_dir):
+        return False
+    path = os.path.join(archive_dir, GONE_FILE)
+    fresh = not exists(path)
+    with io.open(long_path(path), "a", encoding="utf-8", newline="\n") as fh:
+        if fresh:
+            fh.write("# Paths this archive's source answered 404 or 410 to, and the date it did.\n"
+                     "# NOT a statement that the bytes are gone from the world -- only that this\n"
+                     "# source does not serve them. Re-askable on purpose; see read_gone().\n")
+        fh.write("%s %s %s\n" % (when or time.strftime("%Y-%m-%d"), int(status), rel))
+    return True
 
 
 # DOES AN ARCHIVE BEGIN HERE? Either file answers yes, and two clients were each assembling this

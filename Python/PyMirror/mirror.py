@@ -4047,6 +4047,31 @@ DRIVERS_OUT_SUB = (
 #                             Crystal, Weitek P9100, Creatix, Adaptec -- the target era exactly.
 # A directory named "unsorted" reads like leftovers. Here it is the opposite.
 
+# ITS OWN SITEMAP FOUND 32 PAGES THE CRAWL NEVER SAW, 2026-10-02, and it is the first time any
+# COMPLETE marker in this collection was checked against something other than our own method.
+# find-sitemaps.py read https://ardent-tool.com/sitemap.xml -- declared in robots.txt, 2430
+# entries -- and 32 of them were absent here. Not excluded (`incoming/` is the only pattern), not
+# among the 42 permanent-404 the marker records, and NOT in unreached branches: the directories
+# were held in full. Apricot/prodcode had td,te,tf,tg.html and lacked jp,np,qf,qp,sb.html; SSA had
+# 4-G and 4-I and lacked 4-D; complex/ had 270 entries and lacked its own index.html. So the crawl
+# stood inside those directories and these pages are LINKED BY NOTHING.
+#
+# All 32 answered 200. None was a 404, none an error page -- they are ordinary articles, "Qi 300
+# (Jupiter)", "SSA Adapter 4-D", "Processor Complex". Fetched by url list at 2 s, marker restated,
+# --verify UNCHANGED at 25733 files.
+#
+# WHAT IT MEANS FOR EVERY OTHER MARKER, said here because this is the register and not a log: each
+# one rests on link-following, and so does measure-remote.py, which is why a measurement cannot
+# close this gap -- it rediscovers the same reach at one HEAD per file. A sitemap is the operator's
+# statement rather than ours, for two requests. 7 of 104 archives publish one; the other 97 have no
+# such check available and their markers say only "everything we could find".
+#
+# STILL OPEN HERE, and deliberately not acted on: a harvest of the 1866 stored pages names 1617
+# files the tree lacks. 1434 are `?v=2` cache-busting variants of files already held -- the site
+# writes both spellings -- which leaves 183 candidates. ardent-tool is also the archive that once
+# carried 15 478 links the old parser could not see and lost nothing at all, so these 183 are a
+# question and not a figure.
+
 EXCLUDE = {
     "ardent-tool": ("incoming/",),
 
@@ -4204,7 +4229,30 @@ EXCLUDE = {
     #
     # WRITTEN AND REMOVED TWICE BEFORE THIS, both times because an exclusion for an archive that
     # does not exist is a dangling key archive-tables-test.py rejects.
-    "openpa": ("images/", "systems/images/"),
+    #
+    # AND REVERSED BY THE OWNER ON 2026-10-01. Everything above stays as written, because it is
+    # what was decided on 2026-09-26 and acted on for five days; the entry below it is gone. His
+    # position: this is not a robot but a browser, mirroring privately, once, with no
+    # redistribution -- so the wildcard group is not read as binding here. That is his call on his
+    # own collection and his own relationship with the host, and it is recorded rather than
+    # argued, as the 2026-09-26 position was.
+    #
+    # WHAT THE REVERSAL COSTS, so nobody has to rediscover it: 580 files (229 under images/, 351
+    # under systems/images/), named by pages already on disk and therefore known for zero
+    # requests. Total bytes UNKNOWN -- the 2026-09-27 measurement of 492 files / 47.80 MB was
+    # taken WITH these paths excluded, so the floor says nothing about them. [The "~60 requests a
+    # day" this paragraph originally used for planning was wrong by a factor of six -- see the
+    # MIN_INTERVAL note. 300 of the 580 came in one session the same evening.]
+    #
+    # WHAT WAS NOT DONE, AND WHY IT WOULD NOT HAVE WORKED EITHER. A browser User-Agent and a
+    # rotating agent string were asked for on the same day and are not here. The block on this
+    # host is at the TRANSPORT layer: WinError 10060 is a dropped SYN, so no HTTP request reaches
+    # the server at all and no header we send can be read. The distinguishing measurement is
+    # already in this file -- a KNOWN-GOOD held page times out identically to anything else once
+    # the block is on, which is how we know it is host-wide and not about particular URLs. It
+    # meters the address, not the agent. Beyond that, mirror/1.0 is the only way an operator can
+    # tell who we are and reach us, and the rule two tables down is the collection's own: "not
+    # another user agent. Route-shopping around a block is the thing this collection does not do."
 
 
     # SIXTEEN FILES THE SERVER EXECUTES INSTEAD OF SERVING -- .py, .php AND .pl, every one
@@ -6017,6 +6065,35 @@ MIN_INTERVAL = {
     # figure in this table can buy more of them. The pace is not the lever; the only lever is how
     # many requests a session spends and on what.
     #
+    # ^^ THAT PARAGRAPH IS WRONG AND IS KEPT BECAUSE OF HOW IT WAS GOT WRONG. On 2026-10-01 this
+    # host answered 371 CONSECUTIVE REQUESTS WITHOUT ONE FAILURE -- 64 by hand, then 307 of a
+    # 568-url list at 61 s -- before it stopped. Six times the ceiling asserted above.
+    #
+    # THE ERROR WAS NOT THE NUMBER, IT WAS THE WORD "DAY". Two crawls were cut off after about 60
+    # requests each, which is a true observation; "therefore the budget is 60 a day" is an
+    # explanation, and it was written in the voice of a measurement. The sentence that did the
+    # damage is the one that sounds most careful -- "two measurements a day apart agreeing this
+    # closely are not a host having a bad day". They agreed because they were the same experiment
+    # run twice, and a repeated experiment confirms repeatability, not the reason. Both were
+    # CRAWLS. Nothing had ever counted requests of another shape until the list runs did.
+    #
+    # WHAT IS MEASURED NOW, and stated as narrowly as the measurements allow:
+    #
+    #   371 url-list requests in one day   fine, 0 failures, 61 s apart        2026-10-01
+    #    41 url-list requests in 6 minutes fine, 0 failures, ~7 per minute     2026-10-01
+    #    ~60 crawl requests                cut off, twice, five minutes in     09-29, 09-30
+    #
+    # So it is not the count and not the rate. What differs is WHAT IS ASKED FOR: a crawl fetches
+    # pages and directory listings, a list fetches static files. That is a hypothesis with one
+    # distinguishing experiment left -- run a crawl AFTER a clean list run; if the crawl is cut
+    # off while the list was not, the shape of the request is the variable. Until that is done,
+    # "we do not know" is the honest entry, and it replaces an entry that claimed to know.
+    #
+    # ONE COINCIDENCE WORTH RECORDING WITHOUT A THEORY ATTACHED. dialectronics stopped at 377
+    # requests; this host stopped at 371. Two unrelated one-person servers within 2 % of each
+    # other suggests a common default -- fail2ban or a hoster's rule -- rather than two decisions.
+    # Not acted on, because two points are two points; written down so a third can be compared.
+    #
     # SO THE URL LIST IS THE INSTRUMENT FOR THIS ARCHIVE AND THE CRAWL IS NOT. A crawl spends its
     # whole budget re-walking pages already on disk -- 181 of the 184 it touched were skips --
     # while the url list spent 9 requests and got 9 files. --trust-index removes the DOWNLOADS
@@ -6027,6 +6104,57 @@ MIN_INTERVAL = {
     # them: a failure here is three retries against a ~40 s timeout, so ~2 minutes, and six of
     # those is twelve minutes of knocking. Use --give-up 2 on this host. The default stays 6
     # because the cost of a failure is a property of the run, not of the register.
+    #
+    # 2026-10-01: 40 FILES IN TWO URL-LIST RUNS, 0 FAILED, AND THE BAN LIFTS FASTER THAN FEARED.
+    # Probe after only 12 hours -> HTTP 200 in 0.2 s. Then the prepared list: 16 documents first
+    # (html, txt, pdf -- the substance, and each page names further links so the next harvest is
+    # better for having them), then the 24 images. 4.6 + 1.6 MB, one 404, nothing failed. The
+    # archive is at 233 files / 14 MB against a floor of 492 / 47.80 MB.
+    #
+    # THAT IS THE METHOD FOR THIS HOST, SETTLED OVER FOUR DAYS: probe once, spend a MEASURED LIST
+    # of a few dozen urls, stop. Three crawls were cut off after five minutes each; three
+    # url-list runs took 9, 16 and 24 files with not one failure. Same host, same pace, same day
+    # in two of the cases -- the difference is that a crawl spends its budget re-walking pages
+    # that are already on disk.
+    #
+    # THE ONE 404 IS WORTH ITS OWN PARAGRAPH, because it is a hole in EXCLUDE that no rule of
+    # ours is wrong about. pa-risc_fabrication.html carries
+    #
+    #     <a href="mages/hp_ns-1_1987.jpg"><img src="images/hp_ns-1_1987.jpg" ...></a>
+    #
+    # -- the author's own typo, the `i` lost from the href while the img src beside it is right.
+    # `images/hp_ns-1_1987.jpg` is refused by EXCLUDE and by robots.txt; `mages/...` is not,
+    # because an exclusion is a PATH PREFIX and that path does not have the prefix. So a typo on
+    # somebody else's page produced a request for a resource we are forbidden to ask for, under a
+    # name we are allowed to ask for, and nothing in this file was wrong at any point.
+    #
+    # NOTHING IS BEING CHANGED ABOUT IT, AND THAT IS A DECISION RATHER THAN AN OVERSIGHT.
+    # robots.txt disallows /images/; it does not disallow /mages/, and inventing a near-miss rule
+    # -- refuse anything one edit away from an excluded prefix -- would have this collection
+    # guessing at intent where the standard speaks about paths. The server answered 404, which is
+    # the settled and correct answer, and no byte was taken. What is left is the knowledge that
+    # if this site HAD served /mages/ as a second copy of /images/, we would have fetched it with
+    # a clean conscience. Worth knowing; not worth a heuristic.
+    #
+    # 2026-10-01, THE EVENING RUN, AND THE FIRST TIME THE GUARD WAS THE ONE THAT STOPPED A RUN.
+    # 568 urls at 61 s -- 61 and not 60 on the owner's reasoning, that a 60 s delay can drift two
+    # requests into one 60-second accounting bucket while 61 s cannot. After 5.2 hours:
+    #
+    #     DONE fetched 300, gone from the source 5, failed 2, 29.6 MB
+    #     STOPPED: 2 requests in a row went unanswered (URLError)
+    #     261 of 568 urls were never tried. Nothing here says they are gone.
+    #
+    # COMPARE 2026-09-29 LINE BY LINE, because that is what the work in between bought: that run
+    # kept asking for twenty-six minutes after the host went quiet, was ended by hand, and wrote
+    # nine directories into the record as lost subtrees that had never been unreadable. This one
+    # stopped itself after two silences, said how many urls it had NOT tried, and said that
+    # nothing follows from that about whether they exist. Exit 1, no marker.
+    #
+    # THE ARCHIVE IS AT 556 FILES / 45 MB, which also corrects something unspoken: the measured
+    # floor of 492 files / 47.80 MB was taken with images/ and systems/images/ excluded, so it
+    # described the smaller half. The images are the bulk of this archive, not a supplement to it.
+    # 261 urls remain, 0 of the 300 fetched were error pages wearing an image name, no .part was
+    # left behind.
     "openpa": 5.0,
 
     # 0.3 s WAS WRONG AND THE HOST SAID SO WITHIN A MINUTE. The reasoning was that a BBS

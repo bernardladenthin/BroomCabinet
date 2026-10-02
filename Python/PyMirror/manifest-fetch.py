@@ -30,8 +30,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from common import (COMPLETE_MARKER, MIRROR_ROOT, Pacer, Patience, exists, host_of, http_get,
-                    load_mirror,
+from common import (COMPLETE_MARKER, GONE_FILE, MIRROR_ROOT, Pacer, Patience, exists,
+                    host_of, http_get,
+                    load_mirror, read_gone, record_gone,
                     read_marker, scan_tree)
 from common import write_marker as common_write_marker
 
@@ -114,6 +115,13 @@ def main():
                          "report. Off by default because a top-up of a CRAWLED archive must "
                          "leave mirror.py's own marker alone, and this refuses to overwrite "
                          "one that is already there.")
+    ap.add_argument("--ask-gone-again", action="store_true",
+                    help="ask for the paths this archive's " + GONE_FILE + " records as 404 or "
+                         "410. Off by default: three sessions in a row spent their first "
+                         "requests on the same dead names, because a 404 creates no file and so "
+                         "a list diffed against the tree names it again every time. On, because "
+                         "a host comes back and nothing on disk changes when it does -- the "
+                         "record keeps the DATE so this flag has something to mean")
     ap.add_argument("--give-up", type=int, default=5, metavar="N",
                     help="stop after N CONSECUTIVE requests that got no answer at all "
                          "(default 5). A 404 is an answer and resets the count -- see "
@@ -187,6 +195,23 @@ def main():
         if len(refused) > 5:
             print("     ... and %d more" % (len(refused) - 5))
 
+    # PATHS THIS SOURCE HAS ALREADY SAID IT DOES NOT HAVE. Skipped before the on-disk test, not
+    # after, because the on-disk test is exactly what cannot tell them apart: a 404 leaves no
+    # file, so "absent from the tree" is true of a file that is gone and of a file never asked
+    # for. Measured 2026-10-02 on openpa: images/dcsscr4.gif asked three times, answered the
+    # same way three times, and these names sort to the front -- dcss*, sna* -- so they were the
+    # first requests of a session the host grants a few dozen of.
+    gone = {} if args.ask_gone_again else read_gone(base_dir)
+    skipped_gone = [r for r in named if r in gone]
+    if skipped_gone:
+        print("  %d path(s) skipped: %s records them as 404/410. --ask-gone-again to ask anyway."
+              % (len(skipped_gone), GONE_FILE))
+        for r in skipped_gone[:5]:
+            print("     %s   (%s)" % (r, gone[r]))
+        if len(skipped_gone) > 5:
+            print("     ... and %d more" % (len(skipped_gone) - 5))
+        named = [r for r in named if r not in gone]
+
     todo = [r for r in named
             if not exists(os.path.join(base_dir, r.replace("/", os.sep)))]
     print("  %s: the %s names %d paths under %s, %d are missing"
@@ -233,7 +258,12 @@ def main():
             # arrived. A manifest full of files the mirror never kept is a long run of these and
             # must be allowed to finish -- it is the answer to the question being asked.
             patience.answered()
-            print("  GONE HTTP %s  %s" % (e.code, rel), flush=True)
+            # AND THE ANSWER IS WRITTEN DOWN, for 404 and 410 only; record_gone refuses the rest.
+            # Without this the same question is asked again next session, and there is no cheaper
+            # place to put the answer than beside the files it is about.
+            noted = record_gone(base_dir, rel, e.code)
+            print("  GONE HTTP %s  %s%s" % (e.code, rel, "" if noted else "  (already noted)"),
+                  flush=True)
             continue
         except Exception as exc:                               # noqa: BLE001
             failed += 1

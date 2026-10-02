@@ -97,13 +97,16 @@ class TestRestating(unittest.TestCase):
 
     def test_AND_SO_ARE_THE_NUMBERS_IT_MOVED_AWAY_FROM(self):
         # Without them the chain back to the crawl is broken: the file would claim a count with
-        # no way to see what it used to claim.
+        # no way to see what it used to claim. The wording changed on 2026-10-02, when one note
+        # became a list of repairs; both figures are still there and now so is the one it moved TO,
+        # which is what makes a second entry readable as a continuation rather than a replacement.
         t = Tree(files=[("a.bin", b"x" * 7)],
                  marker={"archive": "an-archive", "files": "444", "bytes": "999"})
         try:
             rm.restate(t.root, t.archive, "a repair", apply_it=True, report=quiet)
             text = t.text()
-            self.assertIn("from 444 files and 999 bytes", text)
+            self.assertIn("444 -> 1 files", text)
+            self.assertIn("999 -> 7 bytes", text)
         finally:
             t.close()
 
@@ -158,12 +161,19 @@ class TestRestating(unittest.TestCase):
         finally:
             t.close()
 
-    def test_restating_twice_does_not_stack_two_notes(self):
-        """One note, the newest -- and the cost of that, recorded rather than glossed over.
+    def test_restating_twice_keeps_both_repairs_under_one_heading(self):
+        """ONE heading, EVERY repair -- and this test used to assert the opposite.
 
-        Two stacked notes would make the file read as if two repairs were outstanding. The price
-        is that only ONE hop back is kept: after a second restate the crawl's original figure is
-        no longer in the file. The test asserts the loss so nobody discovers it by needing it.
+        Until 2026-10-02 the prose was rebuilt from the newest reason alone, and this case pinned
+        the resulting loss: `assertNotIn("first repair")`, with a docstring explaining that only
+        one hop back survived "so nobody discovers it by needing it". Somebody then needed it.
+        ardent-tool was restated a second time and the dry run showed the first repair -- 25 files
+        recovered from a stored directory page -- gone from the preview, and the crawl's own
+        figure of 25608 with it.
+
+        Two stacked HEADINGS would still be wrong, for the reason the old docstring gave: the file
+        would read as though two repairs were outstanding. One heading over a list says what
+        actually happened.
         """
         t = Tree(files=[("a.bin", b"x" * 7)],
                  marker={"archive": "an-archive", "files": "1", "bytes": "10"})
@@ -174,12 +184,61 @@ class TestRestating(unittest.TestCase):
             rm.restate(t.root, t.archive, "second repair", apply_it=True, report=quiet)
             text = t.text()
             self.assertEqual(text.count(rm.RESTATED), 1)
+            self.assertIn("first repair", text)
             self.assertIn("second repair", text)
-            self.assertNotIn("first repair", text)
-            self.assertIn("from 1 files and 7 bytes", text)      # the first restate's result
-            self.assertNotIn("from 1 files and 10 bytes", text)  # the crawl's, now gone
+            # Oldest first, so reading downwards follows the tree forwards.
+            self.assertLess(text.index("first repair"), text.index("second repair"))
+            # And the chain reaches back past the first repair to what the crawl left.
+            self.assertIn("10 -> 7 bytes", text)
         finally:
             t.close()
+
+    def test_a_third_repair_does_not_drop_the_first(self):
+        """The list has to survive being read back, not just written once."""
+        t = Tree(files=[("a.bin", b"x" * 7)],
+                 marker={"archive": "an-archive", "files": "1", "bytes": "10"})
+        try:
+            for n, size in (("first repair", 3), ("second repair", 4), ("third repair", 5)):
+                with io.open(os.path.join(t.path, "f%d.bin" % size), "wb") as fh:
+                    fh.write(b"z" * size)
+                rm.restate(t.root, t.archive, n, apply_it=True, report=quiet)
+            text = t.text()
+            self.assertEqual(text.count(rm.RESTATED), 1)
+            for n in ("first repair", "second repair", "third repair"):
+                self.assertIn(n, text)
+            self.assertEqual(text.count(rm.ENTRY), 3)
+        finally:
+            t.close()
+
+    def test_a_marker_from_before_the_list_keeps_its_one_paragraph(self):
+        """The shape that existed on disk when this changed must not be thrown away.
+
+        Every restated marker in the collection on 2026-10-02 carried the old one-paragraph form.
+        If the first list-aware restate dropped it, the change would have caused exactly the loss
+        it was made to prevent.
+        """
+        t = Tree(files=[("a.bin", b"x" * 7)],
+                 marker={"archive": "an-archive", "files": "1", "bytes": "10"})
+        try:
+            old_shape = (
+                "This mirror is complete.\n\n"
+                "%s: the two figures above were moved after the crawl that wrote this file,\n"
+                "from 1 files and 99 bytes, by a deliberate repair:\n"
+                "a repair done the old way\n"
+                "`completed` above is still the crawl's date, not the repair's.\n" % rm.RESTATED)
+            self.assertEqual(rm.earlier_entries(old_shape), ["a repair done the old way"])
+            with io.open(os.path.join(t.path, "b.bin"), "wb") as fh:
+                fh.write(b"z" * 3)
+            rm.restate(t.root, t.archive, "the new one", apply_it=True, report=quiet)
+            text = t.text()
+            self.assertIn("the new one", text)
+        finally:
+            t.close()
+
+    def test_no_restated_block_means_no_earlier_entries(self):
+        self.assertEqual(rm.earlier_entries("archive x\n\nThis mirror is complete.\n"), [])
+        self.assertEqual(rm.earlier_entries(""), [])
+        self.assertEqual(rm.earlier_entries(None), [])
 
     def test_the_bookkeeping_files_do_not_count(self):
         """scan_tree's rule, pinned here because this tool writes the number it produces.

@@ -19,7 +19,7 @@ and what to record when one is found, belongs to the caller -- that judgement is
 to make on somebody else's behalf.
 """
 
-__all__ = ["OUR_AGENT_NAMES", "robots_groups", "robots_verdict"]
+__all__ = ["OUR_AGENT_NAMES", "robots_groups", "robots_verdict", "sitemaps"]
 
 # ---------------------------------------------------------------------------------- robots
 #
@@ -33,6 +33,41 @@ __all__ = ["OUR_AGENT_NAMES", "robots_groups", "robots_verdict"]
 # whatever else it says. Passed as a parameter so a caller asking on behalf of something else can
 # say so, rather than reading this file's answer and believing it is their own.
 OUR_AGENT_NAMES = ("claudebot", "anthropic-ai", "anthropic", "claude-web", "claude-searchbot")
+
+
+def sitemaps(text):
+    """-> the Sitemap: URLs a robots.txt declares, in order, without repeats.
+
+    WHY A CRAWLER SHOULD WANT THIS. A sitemap is the OPERATOR'S OWN STATEMENT of what the site
+    consists of, and that is a different kind of evidence from anything a crawl can produce. A
+    crawl -- and measure-remote.py, which crawls -- discovers what is LINKED; a sitemap is what
+    the person publishing it says is there. Comparing the two is how a mirror stops being "every
+    file we could find" and becomes "every file the source lists".
+
+    MEASURED 2026-10-02 ON openpa.net, which is why this function exists. Five days of crawling
+    and harvesting had produced 679 files and no way to say whether that was all of them. The
+    sitemap named 168 internal paths and the mirror held 168 of 168 -- the page side of the
+    archive settled, for ONE REQUEST, by the operator rather than by our own link-following. A
+    measurement run would have cost one HEAD per file and told us only what we already knew.
+
+    SITEMAP IS NOT INSIDE A GROUP, and that is the one parsing subtlety. It is a file-level
+    directive: it belongs to the host, not to the `User-agent` block it happens to sit under, and
+    reading it as part of a group would attach somebody else's sitemap to somebody else's agent.
+    robots_groups() therefore cannot answer this and the line is read on its own.
+
+    AND ITS ABSENCE PROVES NOTHING. openpa.net declares no Sitemap: at all and serves
+    /sitemap.xml perfectly well. So a caller that finds nothing here still has one cheap guess
+    left; see find-sitemaps.py, which makes exactly that guess and no more.
+    """
+    out = []
+    for raw_line in (text or "").splitlines():
+        line = raw_line.split("#")[0].strip()
+        # Case-insensitive on the KEY only -- a URL is case-sensitive after the host.
+        if line[:8].lower() == "sitemap:":
+            url = line[8:].strip()
+            if url and url not in out:
+                out.append(url)
+    return out
 
 
 def robots_groups(text):
