@@ -1992,17 +1992,17 @@ ARCHIVES = [
     ("infania-unixos2", "http://ftpmirror.infania.net/sites/unixos2.org/"),
     # ibm-redbooks -- see PROVENANCE.md in the archive.
     ("ibm-redbooks", "https://www.redbooks.ibm.com/"),
-    # agilent-ftp-2009 -- see PROVENANCE.md in the archive.
+    # agilent-ftp-2009 -- UNPACKED, see UNPACKED below and PROVENANCE.md in the archive.
     ("agilent-ftp-2009", "ftp://ftp.agilent.com/pub/callpub/"),
-    # hp-alphaserver-2008 -- see PROVENANCE.md in the archive.
+    # hp-alphaserver-2008 -- UNPACKED, see UNPACKED below and PROVENANCE.md in the archive.
     ("hp-alphaserver-2008", "http://h18002.www1.hp.com/"),
-    # hp-openvms-2008 -- see PROVENANCE.md in the archive.
+    # hp-openvms-2008 -- UNPACKED, see UNPACKED below and PROVENANCE.md in the archive.
     ("hp-openvms-2008", "http://h71000.www7.hp.com/"),
-    # hp-labs-2007 -- see PROVENANCE.md in the archive.
+    # hp-labs-2007 -- UNPACKED, see UNPACKED below and PROVENANCE.md in the archive.
     ("hp-labs-2007", "http://www.hpl.hp.com/"),
-    # dec-ftp-2006 -- see PROVENANCE.md in the archive.
+    # dec-ftp-2006 -- UNPACKED, see UNPACKED below and PROVENANCE.md in the archive.
     ("dec-ftp-2006", "ftp://ftp.digital.com/pub/"),
-    # next-68k-org -- see PROVENANCE.md in the archive.
+    # next-68k-org -- UNPACKED, see UNPACKED below and PROVENANCE.md in the archive.
     ("next-68k-org", "http://next.68k.org/"),
     # AIX5-IA64 -- see PROVENANCE.md in the archive.
     ("AIX5-IA64", "https://github.com/johnsonjh/AIX5-IA64"),
@@ -2430,6 +2430,28 @@ ARCHIVES = [
 #
 # This is also the project's own premise arriving: an archive run by one person, with no
 # successor, that went away before it was copied.  [2026-08-29]
+
+
+# TREES THAT WERE UNPACKED, so no comparison with a source can ever come out even. Each of these
+# was taken out of a container -- a tar inside bitsavers' mirrors/ -- rather than fetched file by
+# file, so the mirror holds MORE files than the origin ever served individually. A tool that diffs
+# a sitemap, a listing or a harvest against the tree will find a surplus here, and that surplus is
+# the point rather than a defect.
+#
+# Written down because it was nearly mis-reported: on 2026-10-02 the base-URL check flagged four of
+# these six as "DNS FAILS" or "nothing listening", which is true, documented in FROZEN, and exactly
+# what a frozen origin looks like. The register knew; the tool did not, and neither did I until the
+# owner said so.  [2026-10-02]
+UNPACKED = {
+    "next-68k-org": "a tar inside bitsavers' mirrors/, 2026-09-07",
+    "dec-ftp-2006": "a tar inside bitsavers' mirrors/, 2026-09-07",
+    "hp-labs-2007": "a tar inside bitsavers' mirrors/, 2026-09-07",
+    "hp-openvms-2008": "a tar inside bitsavers' mirrors/, 2026-09-07",
+    "hp-alphaserver-2008": "a tar inside bitsavers' mirrors/, 2026-09-07",
+    "agilent-ftp-2009": "a tar inside bitsavers' mirrors/, 2026-09-07",
+}
+
+
 FROZEN = {
     "aixtools": "download.aixtools.net is gone -- /tools/ answers 404 rather than 403, and the "
                 "domain is parked. Recovered from the Internet Archive 2026-08-29; a re-run "
@@ -2908,8 +2930,20 @@ CANDIDATES = [
      "the archive is reachable only via the ftp. hostname. robots.txt 404. R11: one person's "
      "server, one connection -- the first 22.2 GB took 19h27m."),
     ("nice-next", "https://ftp.nice.ch/pub/next/", "TAKEN 2026-09-17",
-     "NO LONGER A CANDIDATE -- 4 539 files / 1.32 GB. The byte estimate of ~1.3 GB was right "
+     "NO LONGER A CANDIDATE -- 4 540 files / 1.32 GB. The byte estimate of ~1.3 GB was right "
      "and the file count of 7 245 was not; a listing counts entries, a fetch counts files. "
+     "CHECKED AGAINST THE OPERATOR'S OWN SITEMAP on 2026-10-02, by following the 4 parts of "
+     "its index, and the count stands: ONE README was genuinely absent "
+     "(developer/languages/c/_gcc-i386.2.7.2.3.3.README.html, 7 793 bytes, fetched; its "
+     "sibling for 2.8.1.2 was already here). The sitemap names 94 729 files under this base "
+     "against 4 539 held, AND THAT GAP IS NOT A GAP: ftp.nice.ch serves the UNPACKED contents "
+     "of every package beside the package itself, under a directory named _<package>/. "
+     "93 081 of the 93 085 apparently-missing paths resolve to a .tar.gz held here in packed "
+     "form, with ZERO packages unaccounted for; the other 4 were that one README listed four "
+     "times. A 20x shortfall read as the collection's largest open item for about an hour "
+     "before the paths were looked at -- the sampling that produced it drew the "
+     "alphabetically first match per directory, which put every sample in 00INFO/_DESC/ and "
+     "told us nothing about the trees the number came from. "
      "THE MUNICH PEANUTS ARCHIVE, surviving under the NiCE NeXT User Group name. "
      "peanuts.leo.org no longer resolves and this collection next-68k-org is FROZEN. Covers "
      "NeXTSTEP on HP PA-RISC and SPARC as well as m68k; /pub/next/developer/ is the toolchain "

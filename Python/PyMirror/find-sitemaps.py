@@ -36,6 +36,7 @@ files (158 urls, 156 of them answered 404). It also honours DO_NOT_FETCH and rob
 this collection has decided not to touch is not touched for this either.
 """
 import argparse
+import gzip
 import io
 import os
 import re
@@ -53,9 +54,42 @@ LOC = re.compile(r"<loc>\s*([^<\s]+)\s*</loc>", re.I)
 # Four archives were reported as "publishes a readable sitemap" on the strength of a status code.
 # A soft 404 is the oldest trap in this collection; status 200 is not evidence of anything.
 IS_SITEMAP = re.compile(r"<(?:urlset|sitemapindex)", re.I)
-# A sitemap index points at further sitemaps rather than at pages. Reported, not followed: each
-# one is another request, and the decision to spend it belongs to a person.
+# A sitemap index points at further sitemaps rather than at pages. Reported, and followed only when
+# asked: each part is another request, and 42 of them is a decision rather than a detail.
 IS_INDEX = re.compile(r"<sitemapindex", re.I)
+# A gzipped part, recognised by its MAGIC and not by `.gz` -- ftp.zx.net.nz serves
+# `_ftp_sitemap_part_aa.txt.gz` and a server is free to decompress on the way out.
+GZIP_MAGIC = bytes([0x1F, 0x8B])
+
+
+# A SOURCE THAT SERVES UNPACKED PACKAGES makes `MISSING` read 20x too high, and this tool cannot
+# tell on its own. ftp.nice.ch publishes the contents of every NeXT package beside the package,
+# under a directory named `_<package>/`, so its sitemap names 94 729 files where the archive holds
+# 4 540 -- and 93 081 of the difference resolve to a .tar.gz held here in packed form, with zero
+# packages unaccounted for. One README was genuinely missing.
+#
+# So a large MISSING count on a software-archive host is a question and not a finding: look at the
+# PATHS before believing the number. The inverse of UNPACKED in mirror.py, where the surplus is on
+# our side.  [2026-10-02]
+
+
+def read_sitemap(body):
+    """-> the urls one sitemap part lists, whatever shape it arrives in.
+
+    THREE SHAPES, ALL MET IN ONE AFTERNOON. ftp.nice.ch's parts are XML with <loc>; ftp.zx.net.nz's
+    are GZIPPED PLAIN TEXT, one url per line, which the sitemaps standard permits and no <loc>
+    regex will ever find; bretjohnson.us's are XML again. A reader that knows only the first
+    silently returns nothing for the second -- another clean zero.
+    """
+    if body[:2] == GZIP_MAGIC:
+        body = gzip.decompress(body)
+    text = body.decode("utf-8", "replace")
+    locs = LOC.findall(text)
+    if locs:
+        return locs
+    # A TEXT SITEMAP IS JUST URLS, so anything else on a line makes it not one.
+    return [ln.strip() for ln in text.splitlines()
+            if ln.strip().startswith(("http://", "https://")) and " " not in ln.strip()]
 
 
 def held_paths(archive_dir):
@@ -122,7 +156,7 @@ def fetch(url, limit=4 * 1024 * 1024):
     return status, body.decode("utf-8", "replace") if body else ""
 
 
-def look(name, base, archive_dir, mirror, save=False, pacer=None):
+def look(name, base, archive_dir, mirror, save=False, pacer=None, follow=0):
     """Two requests at most for one archive. -> a one-line verdict string."""
     host = host_of(base)
     if mirror and mirror.blocked_host(base):
@@ -163,26 +197,47 @@ def look(name, base, archive_dir, mirror, save=False, pacer=None):
     if patterns and mirror.is_excluded(rel_for_exclude, patterns, name):
         return "%-24s SKIPPED -- EXCLUDE[%r] covers the sitemap path" % (name, name)
     note = ""
+    # AN UNPACKED TREE CANNOT COME OUT EVEN, so say so on the line rather than leaving a reader to
+    # read a surplus as a defect. Six archives were taken out of a tar instead of fetched file by
+    # file; see UNPACKED in mirror.py.
+    if mirror and name in getattr(mirror, "UNPACKED", {}):
+        note = "  [UNPACKED tree -- holds more than the source served; a surplus is expected]"
     if robots_text:
         verdict, why = robots_verdict(robots_text, urllib.parse.urlsplit(url).path)
         if verdict != "OPEN":
-            note = "  [robots: %s -- %s]" % (verdict, why)
+            note += "  [robots: %s -- %s]" % (verdict, why)
     if pacer:
         pacer.wait(host)
     status, text = fetch(url)
     if not isinstance(status, int):
-        return "%-24s no answer (%s)" % (name, status)
+        # THE NOTE BELONGS HERE MOST OF ALL. A frozen, unpacked origin not answering is the
+        # documented state, and a line that says only "no answer" invites somebody to chase it.
+        return "%-24s no answer (%s)%s" % (name, status, note)
     if status != 200:
-        return "%-24s none (HTTP %s, %s)" % (name, status, how)
+        return "%-24s none (HTTP %s, %s)%s" % (name, status, how, note)
     if not IS_SITEMAP.search(text):
         head = " ".join(text[:60].split())
         return ("%-24s NOT A SITEMAP -- HTTP 200 but no <urlset>/<sitemapindex>: %r (%s)"
                 % (name, head, how))
     if IS_INDEX.search(text):
-        n = len(LOC.findall(text))
-        return "%-24s SITEMAP INDEX, %d further sitemaps -- not followed (%s)" % (name, n, how)
-
-    locs = LOC.findall(text)
+        parts = LOC.findall(text)
+        if not follow:
+            return ("%-24s SITEMAP INDEX, %d further sitemaps -- not followed, pass --follow-index "
+                    "(%s)%s" % (name, len(parts), how, note))
+        # ONE PACED REQUEST PER PART, and the cap is there because an index is somebody else's
+        # number: 42 parts for one archive is already more than this survey spends on most hosts.
+        locs = []
+        for part in parts[:follow]:
+            if pacer:
+                pacer.wait(host)
+            st, body = http_try(part, timeout=120, limit=64 * 1024 * 1024)[:2]
+            if not (isinstance(st, int) and st == 200 and body):
+                print("     part %s -> %s" % (part[-40:], st), flush=True)
+                continue
+            locs.extend(read_sitemap(body))
+        how += ", %d of %d parts followed" % (min(follow, len(parts)), len(parts))
+    else:
+        locs = LOC.findall(text)
     inside, outside, pageish, dirish = internal(locs, base.rstrip("/") + "/", archive_dir)
     missing = sorted(inside - held_paths(archive_dir)) if os.path.isdir(archive_dir) else []
     saved = ""
@@ -211,6 +266,11 @@ def main():
     ap.add_argument("--delay", type=float, default=2.0,
                     help="seconds between two requests to the SAME host (default 2). Unrelated "
                          "hosts do not wait for each other")
+    ap.add_argument("--follow-index", type=int, default=0, metavar="N",
+                    help="follow up to N parts of a sitemap INDEX. Off by default: 12 archives "
+                         "publish one and ftp.zx.net.nz's has 42 parts, so this is a decision "
+                         "about somebody else's bandwidth rather than a detail. Following them is "
+                         "what found nice-next short by 94 690 files")
     ap.add_argument("--save", action="store_true",
                     help="store each sitemap found as sitemap.xml inside its archive. It is "
                          "content the source serves, so it belongs with the rest of it -- and a "
@@ -231,7 +291,7 @@ def main():
     pacer = Pacer(args.delay)
     for name, base in todo:
         line = look(name, base, os.path.join(args.root, name), mirror, save=args.save,
-                    pacer=pacer)
+                    pacer=pacer, follow=args.follow_index)
         print("  " + line, flush=True)
         if "entries," in line:
             found += 1

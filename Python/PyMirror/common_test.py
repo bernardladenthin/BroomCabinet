@@ -4613,6 +4613,15 @@ class TestNoTestPinsAnAbsoluteEpoch(unittest.TestCase):
     ALLOWED = {
         "1000000000": "one billion BYTES, in the parse_size and human round-trip cases",
         "1073741824": "1 GiB in bytes -- the binary-vs-decimal case, a size and not an instant",
+        # SOMEBODY ELSE'S IDENTIFIERS, and the first ones this guard caught that are neither a
+        # date nor a size. bretjohnson.us publishes 42 165 sitemap urls of the shape /1000032207 --
+        # CMS page ids -- and three of them stand in harvest-test.py as the fixture for "a bare
+        # number is a page and not a file". They are exempt because they are not numbers this
+        # project chose; narrowing the PATTERN to let them through would have cost the guard its
+        # reach over every genuine ten-digit epoch.
+        "1000032207": "a bretjohnson.us CMS page id, from its sitemap",
+        "1000200018": "a bretjohnson.us CMS page id, from its sitemap",
+        "1000591577": "a bretjohnson.us CMS page id, from its sitemap",
     }
 
     def test_no_test_file_carries_a_bare_recent_timestamp(self):

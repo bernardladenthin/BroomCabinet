@@ -156,6 +156,55 @@ class ARecordFileIsNotContent(unittest.TestCase):
             shutil.rmtree(d, ignore_errors=True)
 
 
+class AnUnpackedTreeIsRecordedWhereTheMirrorIs(unittest.TestCase):
+    """Six archives were taken out of a tar rather than fetched file by file.
+
+    WHY IT HAD TO BE WRITTEN DOWN. On 2026-10-02 the new base-URL check flagged four of the six as
+    "DNS FAILS" or "nothing listening on 80 or 443" -- all true, all documented in FROZEN, and all
+    exactly what a frozen origin looks like. Nothing in the tooling connected the two, and the
+    owner had to say "careful, I unpacked things in three or four archives" before it was noticed.
+
+    The consequence is not cosmetic: an unpacked tree holds MORE files than its origin ever served
+    individually, so every comparison of a sitemap, a listing or a harvest against it finds a
+    surplus. A reader who does not know that reads the surplus as a defect.
+    """
+
+    MIRROR = load("mirror")
+
+    def test_the_table_exists_and_names_real_archives(self):
+        names = {n for n, _u in self.MIRROR.ARCHIVES}
+        self.assertTrue(self.MIRROR.UNPACKED)
+        for key in self.MIRROR.UNPACKED:
+            self.assertIn(key, names, key)
+
+    def test_every_one_gives_a_reason(self):
+        """A table of bare names would need somebody to remember what it meant."""
+        for key, why in self.MIRROR.UNPACKED.items():
+            self.assertTrue(why.strip(), key)
+
+    def test_each_is_also_FROZEN(self):
+        """Not a rule, a measurement: all six origins went away, which is why they were unpacked
+        out of somebody else's container in the first place. If one ever is not, that is worth
+        noticing rather than asserting away."""
+        for key in self.MIRROR.UNPACKED:
+            self.assertIn(key, self.MIRROR.FROZEN, key)
+
+    def test_the_registration_line_says_so_too(self):
+        """Where the mirror is ENTERED is where somebody looks first."""
+        with io.open(os.path.join(HERE, "mirror.py"), encoding="utf-8") as fh:
+            src = fh.read()
+        for key in self.MIRROR.UNPACKED:
+            self.assertIn("# %s -- UNPACKED" % key, src, key)
+
+    def test_a_tool_that_compares_against_a_source_says_so(self):
+        """find-sitemaps.py is the first such tool; the note must survive on the path a frozen
+        origin actually takes, which is "no answer" and not a sitemap report."""
+        with io.open(os.path.join(HERE, "find-sitemaps.py"), encoding="utf-8") as fh:
+            src = fh.read()
+        self.assertIn("UNPACKED", src)
+        self.assertIn('no answer (%s)%s', src)
+
+
 class AUrlListIsJudgedBySiteAndNotBySpelling(unittest.TestCase):
     """manifest-fetch.py, the third tool to need common.under_site."""
 
