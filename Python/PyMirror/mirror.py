@@ -2297,6 +2297,11 @@ ARCHIVES = [
     ("square7-vintage", "http://vintagecomputers.square7.ch/Vintage/"),
     # biblionik-bull -- see PROVENANCE.md in the archive.
     ("biblionik-bull", "http://www.biblionik.fr/Info/Bull/SOLAR/"),
+    # ITS COMPLETE MARKER IS HAND-SET, the only one here -- 821 files, 66.3 MB, --verify
+    # UNCHANGED. A real crawl was not possible: countless attempts, and the request budget for
+    # this host is spent. Sitemap covered 168/168 and the harvest at a fixed point; the marker
+    # file itself carries the full caveat.
+    #
     # ONLY THE ARTICLES -- see EXCLUDE["openpa"] for the robots.txt rule that binds us and the
     # one that does not. Measured 2026-09-27 to a floor of 492 files / 47.80 MB.
     #
@@ -4209,8 +4214,10 @@ EXCLUDE = {
         "SERVERGHOST%20Builds/",
         "Software/",
         "Hardware%20Info/Jumper%20Reference/",
-        "Hardware%20Info/OEMINFO/",
-        "Hardware%20Info/ROM%20Archive/",
+        # OEMINFO/ and ROM Archive/ were HERE until 2026-10-02 and are now taken: 170 files,
+        # 84.4 MB, 38 directories. They were excluded on the reputation of the branch above
+        # rather than on a measurement of their own -- see the note above for what each one
+        # actually weighs. Jumper Reference/ stays out, and its reason is unchanged.
     ),
 
     "iommu": (
