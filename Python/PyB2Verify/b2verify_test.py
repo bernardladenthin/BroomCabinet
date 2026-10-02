@@ -15,7 +15,9 @@ from __future__ import annotations
 import contextlib
 import io
 import os
+import socket
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -40,6 +42,63 @@ def damage(path: Path) -> None:
     data[len(data) // 2] ^= 0xFF
     path.write_bytes(bytes(data))
     os.utime(path, ns=(st.st_atime_ns, st.st_mtime_ns))
+
+
+@contextlib.contextmanager
+def silent_server():
+    """A local port that completes TCP and then never says a word -- the failure seen on
+    2026-10-02, when a data-centre server reached B2 by TCP and no TLS handshake ever finished.
+    Nothing accepts: the kernel's listen backlog completes the TCP handshake on its own."""
+    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(8)
+    try:
+        yield ("127.0.0.1", srv.getsockname()[1])
+    finally:
+        srv.close()
+
+
+def closed_port() -> tuple[str, int]:
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return ("127.0.0.1", port)
+
+
+class PreflightTest(unittest.TestCase):
+    def test_tls_that_never_answers_fails_fast_and_says_so(self):
+        with silent_server() as target:
+            start = time.monotonic()
+            problem = b2verify.preflight(target, timeout=1.0)
+            elapsed = time.monotonic() - start
+        self.assertIsNotNone(problem)
+        self.assertIn("TLS handshake failed", problem)
+        self.assertIn("not a problem of the key", problem)
+        self.assertLess(elapsed, 5)
+
+    def test_refused_connection_is_reported(self):
+        problem = b2verify.preflight(closed_port(), timeout=1.0)
+        self.assertIsNotNone(problem)
+        self.assertIn("cannot connect", problem)
+
+    def test_a_b2_command_stops_with_a_message_instead_of_hanging(self):
+        with tempfile.TemporaryDirectory() as tmp, silent_server() as target:
+            config = Path(tmp) / "b2.properties"
+            config.write_text("keyId=x\napplicationKey=y\n", encoding="utf-8")
+            saved = b2verify.PREFLIGHT_TARGET, b2verify.PREFLIGHT_TIMEOUT
+            b2verify.PREFLIGHT_TARGET, b2verify.PREFLIGHT_TIMEOUT = target, 1.0
+            try:
+                start = time.monotonic()
+                # hash-b2 talks to B2 first thing; verify-b2 would stop earlier, at the missing
+                # checksum file, and never reach the network.
+                code, out = run("hash-b2", "example-bucket", "--config", str(config), "--no-report")
+                elapsed = time.monotonic() - start
+            finally:
+                b2verify.PREFLIGHT_TARGET, b2verify.PREFLIGHT_TIMEOUT = saved
+        self.assertEqual(code, 2, out)
+        self.assertIn("B2 is not reachable from this machine", out)
+        self.assertLess(elapsed, 5)
 
 
 class CommandTest(unittest.TestCase):
@@ -136,6 +195,36 @@ class CommandTest(unittest.TestCase):
         self.assertIn("restorable from B2", out)
         report = (self.tmp / "state" / "reports" / "example-bucket.local.md").read_text(encoding="utf-8")
         self.assertIn("| Checksum differs | 1 |", report)
+
+    def test_b2_side_commands_need_no_local_root(self):
+        # A machine that holds only the checksum files: no localRoot, no data.
+        self.write_b2_checksums()
+        self.cmd("hash-local", "example-bucket", "--no-report")
+        self.config.write_text(f"keyId=x\napplicationKey=y\nstateDir={(self.tmp / 'state').as_posix()}\n",
+                               encoding="utf-8")
+        code, out = self.cmd("compare", "example-bucket", "--no-report")
+        self.assertEqual(code, 0, out)
+        self.assertIn("checksum identical: 3", out)
+        for command in ("verify-b2", "hash-b2"):
+            args = b2verify.build_parser().parse_args([command, "--config", str(self.config)])
+            ctx = b2verify.Context(args)  # must not refuse the configuration
+            self.assertIsNone(ctx.local_root)
+            self.assertEqual(ctx.local_dirs(), set())
+
+    def test_configuration_with_a_byte_order_mark(self):
+        self.write_b2_checksums()
+        self.cmd("hash-local", "example-bucket", "--no-report")
+        text = self.config.read_text(encoding="utf-8")
+        self.config.write_bytes(b"\xef\xbb\xbf" + text.encode("utf-8"))  # as Notepad / PowerShell write it
+        code, out = self.cmd("compare", "example-bucket", "--no-report")
+        self.assertEqual(code, 0, out)
+
+    def test_local_commands_refuse_a_missing_local_root(self):
+        self.config.write_text("keyId=x\napplicationKey=y\n", encoding="utf-8")
+        for command in ("hash-local", "verify-local", "check"):
+            code, out = self.cmd(command, "example-bucket", "--no-report")
+            self.assertEqual(code, 2, f"{command}: {out}")
+            self.assertIn("'localRoot' is missing", out)
 
     def test_own_state_inside_local_root_is_no_bucket(self):
         data = self.tmp / "data"

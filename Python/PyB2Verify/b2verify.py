@@ -46,7 +46,8 @@ variable B2VERIFY_CONFIG. It holds the credentials, so it must never be committe
 
     keyId=<application key id>              a READ-ONLY key is enough and is recommended
     applicationKey=<application key>
-    localRoot=D:/backup                     one directory per bucket below it
+    localRoot=D:/backup                     one directory per bucket below it; needed only by
+                                            check, hash-local and verify-local
     stateDir=D:/backup-state                optional; default: the directory of the config file
     reportDir=D:/backup-state/reports       optional; default: <stateDir>/reports
     exclude=Thumbs.db,desktop.ini,*.lnk     optional; glob patterns, never compared
@@ -65,6 +66,8 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import socket
+import ssl
 import sys
 import threading
 import time
@@ -85,6 +88,7 @@ SKIP_DIRS = {"__pycache__"}
 # The placeholder the B2 web interface creates for an empty folder.
 B2_FOLDER_PLACEHOLDER = ".bzEmpty"
 COMMANDS = ("check", "hash-local", "hash-b2", "verify-local", "verify-b2", "compare")
+LOCAL_COMMANDS = {"check", "hash-local", "verify-local"}
 
 
 def fail(msg: str) -> None:
@@ -96,7 +100,9 @@ def load_properties(path: Path) -> dict[str, str]:
     if not path.is_file():
         fail(f"configuration not found: {path}")
     props: dict[str, str] = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
+    # utf-8-sig: Notepad and PowerShell's `Set-Content -Encoding utf8` write a byte order mark,
+    # which would otherwise turn the first key into "﻿keyId" and report it as missing.
+    for line in path.read_text(encoding="utf-8-sig").splitlines():
         line = line.strip()
         if not line or line.startswith(("#", "!")):
             continue
@@ -104,7 +110,7 @@ def load_properties(path: Path) -> dict[str, str]:
         if sep < 0:
             continue
         props[line[:sep].strip()] = line[sep + 1:].strip()
-    for key in ("keyId", "applicationKey", "localRoot"):
+    for key in ("keyId", "applicationKey"):
         if not props.get(key):
             fail(f"'{key}' is missing in {path}")
     return props
@@ -115,6 +121,39 @@ def split_list(value: str) -> list[str]:
 
 
 # --------------------------------------------------------------------------- B2 and S3
+
+# Where the preflight knocks, and how long it waits. Module-level so a test can point it at a
+# local socket that accepts and never answers.
+PREFLIGHT_TARGET = ("api.backblazeb2.com", 443)
+PREFLIGHT_TIMEOUT = 15.0
+
+
+def preflight(target: tuple[str, int] | None = None, timeout: float | None = None) -> str | None:
+    """-> None when a TLS handshake with the B2 API succeeds in time, else what went wrong.
+
+    WHY THIS EXISTS. On 2026-10-02 a machine in a data centre reached B2 by TCP but never
+    completed a TLS handshake -- with any host name, while every other site worked: the path to
+    Backblaze's addresses was broken. b2sdk retries such a connection with long timeouts, so the
+    tool sat silent for minutes with no CPU in use and no word on the console. Fifteen seconds
+    and one sentence are a better answer than that, especially on a machine nobody watches.
+    """
+    host, port = target or PREFLIGHT_TARGET
+    timeout = PREFLIGHT_TIMEOUT if timeout is None else timeout
+    start = time.monotonic()
+    try:
+        sock = socket.create_connection((host, port), timeout=timeout)
+    except OSError as e:
+        return f"cannot connect to {host}:{port} ({e.__class__.__name__}: {e})"
+    try:
+        with ssl.create_default_context().wrap_socket(sock, server_hostname=host):
+            return None
+    except OSError as e:  # includes TimeoutError and ssl.SSLError
+        return (f"TCP to {host}:{port} works, but the TLS handshake failed after "
+                f"{time.monotonic() - start:.0f} s ({e.__class__.__name__}). The network path to "
+                f"B2 is broken or filtered here; this is not a problem of the key or the checksums.")
+    finally:
+        sock.close()
+
 
 def new_b2_api(key_id: str, app_key: str):
     # IMPORTED HERE AND NOT AT THE TOP, so that `--help` works without the dependencies installed.
@@ -366,7 +405,13 @@ class Context:
             fail(f"no configuration: pass --config FILE or set {CONFIG_ENV}")
         config_path = Path(config).resolve()
         self.props = load_properties(config_path)
-        self.local_root = Path(self.props["localRoot"])
+        # ONLY THE COMMANDS THAT READ THE DISK NEED A LOCAL ROOT. hash-b2, verify-b2 and compare
+        # work on the bucket and the checksum files alone -- which is what lets a download-heavy
+        # verify-b2 run on a machine in a data centre that holds nothing but those files.
+        root = self.props.get("localRoot")
+        if not root and args.command in LOCAL_COMMANDS:
+            fail(f"'localRoot' is missing in {config_path} ({args.command} reads the local files)")
+        self.local_root = Path(root) if root else None
         self.state_dir = Path(self.props.get("stateDir") or config_path.parent)
         self.checksum_dir = self.state_dir / "checksums"
         self.report_dir = Path(args.report_dir or self.props.get("reportDir") or self.state_dir / "reports")
@@ -392,6 +437,11 @@ class Context:
     @property
     def api(self):
         if self._api is None:
+            # Once, in the main thread, before b2sdk is even imported: every worker thread gets
+            # its connection only after this has passed.
+            problem = preflight()
+            if problem:
+                fail(f"B2 is not reachable from this machine: {problem}")
             self._api = new_b2_api(self.props["keyId"], self.props["applicationKey"])
         return self._api
 
@@ -431,6 +481,8 @@ class Context:
         "reports") missed every other name -- and `hash-local` without arguments then indexed the
         reports as if they were a bucket. So the configured paths are compared, not the names.
         """
+        if self.local_root is None:
+            return set()
         own = {p.resolve() for p in (self.checksum_dir, self.report_dir)}
         names = set()
         for d in self.local_root.iterdir():
