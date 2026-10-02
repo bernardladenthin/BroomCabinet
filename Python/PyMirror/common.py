@@ -722,6 +722,18 @@ BOOKKEEPING_FILES = frozenset(OWN_FILES | {
     "RENAMED.txt",              # names changed to be storable, and what they were
     "SYMLINKS.txt",             # links the source had and a copy cannot
     "EXTRACTED-FROM.md",        # this tree was unpacked from that archive
+    # WHICH FILES A FRAGMENT-COPY REMOVAL TOOK, and why each was the same document as its
+    # neighbour. Added 2026-10-02, when the tool's own docstring was found to call it "the same
+    # reasoning as RENAMED.txt beside an extracted tree" while the name was in NEITHER set -- so it
+    # was being counted as content by every auditor. Four archives carry one: ardent-tool,
+    # gsi-collection, ibm-aix and ps-2.kev009.com.
+    #
+    # THE WIDE SET ONLY, exactly like RENAMED.txt above it, and that choice is what makes this safe
+    # to add today. iter_tree and therefore every marker skip the NARROW set; putting the name
+    # there would move four markers by one file each, and the four were rewritten from the tree
+    # hours ago and agree with it. Here it changes what an auditor reads and nothing a marker
+    # claims.
+    "FRAGMENT-COPIES-REMOVED.txt",
     "SHA256SUMS",               # written by the one-off fetchers, in sha256sum(1) form
 })                              # STILL-MISSING.txt is inherited from OWN_FILES, see there
 
@@ -3940,23 +3952,38 @@ def parse_date(text):
     """Listing date -> epoch seconds, or None. Minute precision, which is what the index gives.
 
     OverflowError IS CAUGHT ALONGSIDE ValueError, and it is not a theoretical case. time.mktime
-    raises it for any date the platform's time_t cannot hold -- `01-Jan-1900 00:00` is enough --
-    and a listing of genuinely old files is exactly where such a date appears. Found on
-    2026-09-23 by parsing the collection's own stored pages: the crawler died on one, in the
-    producer thread, which has no handler of its own. The same shape as parse_size's overflow,
-    two functions apart.
+    raises it for a date the platform's time_t cannot hold, and a listing of genuinely old files
+    is exactly where such a date appears. Found on 2026-09-23 by parsing the collection's own
+    stored pages: the crawler died on one, in the producer thread, which has no handler of its own.
+    The same shape as parse_size's overflow, two functions apart.
 
     A date that cannot be represented is NOT a date of zero. None means "the index gave one and
     this cannot hold it", and the caller then stamps the file with nothing rather than with 1970.
+
+    AND "THE PLATFORM CANNOT HOLD IT" WAS A WINDOWS SENTENCE, which this docstring stated as a
+    general one until 2026-10-02. `01-Jan-1900 00:00` raises OverflowError on Windows and returns
+    -2208988800.0 on Linux, so the answer depended on which machine asked -- and the CI caught it
+    only because two tests had pinned the Windows reading. The same shape as the time-zone defect
+    of the same week: a test encoding the behaviour of the machine it was written on.
+
+    SO A PRE-EPOCH DATE IS NOW None EVERYWHERE, by an explicit test rather than by whichever error
+    the platform happens to raise. That keeps the promise the paragraph above makes -- a date that
+    cannot be stamped portably is not a date -- and it makes the two platforms agree.
+
+    MEASURED BEFORE CHANGING IT, because this alters what a listing turns into: 1 802 057 rows
+    across every index in the collection, and NOT ONE carries an mtime before 1970. The oldest is
+    1977-06-08. Nothing held here depends on a negative timestamp, and on these sources a date
+    before 1970 is a default or a corruption rather than a fact about a file.
     """
     text = (text or "").strip()
     if not text or text == "-":
         return None
     for fmt in DATE_FORMATS:
         try:
-            return time.mktime(time.strptime(text, fmt))
+            when = time.mktime(time.strptime(text, fmt))
         except (ValueError, OverflowError):
             continue
+        return None if when < 0 else when
     return None
 
 

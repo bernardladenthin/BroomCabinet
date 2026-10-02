@@ -1,0 +1,237 @@
+#!/usr/bin/env python3
+
+# SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+r"""Three corrections of 2026-10-02, each pinned so it cannot come back.
+
+None of the three was found by a test. Each was found by reading what a tool had just written and
+not believing it, which is the opposite of a ratchet -- hence this file.
+
+  1. A REPAIR RECORDED UNDER THE WRONG DATE. remove-fragment-copies.py had "2026-09-13" written
+     into two strings: the day it was authored. A removal performed on 2026-10-02 was therefore
+     recorded in an archive's own marker as having happened three weeks earlier. The marker is what
+     somebody reads in a year, and `completed` beside it is deliberately NOT touched precisely so
+     that the two dates mean different things -- which makes a wrong second date worse than none.
+
+  2. A RECORD FILE COUNTED AS CONTENT. FRAGMENT-COPIES-REMOVED.txt was in neither bookkeeping set,
+     while the tool's own docstring calls it "the same reasoning as RENAMED.txt beside an extracted
+     tree" -- and RENAMED.txt is in the wide set. Four archives carry one.
+
+  3. THE SAME SITE UNDER ANOTHER SPELLING, FOR THE THIRD TIME IN ONE DAY. manifest-fetch.py still
+     tested its url list against the base with a plain startswith. The first list that met it was
+     zx-sgi-freeware-old's: the sitemap writes https, the archive is registered on http, and all
+     4 404 urls were reported OUTSIDE THE BASE. The run ended "0 paths, 0 missing, DONE fetched 0"
+     -- a clean zero that read as nothing to do. pages-to-urllist.py and find-sitemaps.py had both
+     been fixed hours earlier; this one was overlooked.
+
+No network. Everything happens in a temporary directory.
+"""
+import datetime
+import importlib.util
+import io
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import common  # noqa: E402
+
+
+def load(name):
+    path = os.path.join(HERE, name + ".py")
+    spec = importlib.util.spec_from_file_location(name.replace("-", "_"), path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+FRAGMENTS = load("remove-fragment-copies")
+
+
+class ARepairIsDatedWhenItHappened(unittest.TestCase):
+
+    def test_today_is_today(self):
+        self.assertEqual(FRAGMENTS.today(), datetime.date.today().isoformat())
+
+    def run_a_removal(self):
+        """Build an archive with one fragment duplicate, remove it, -> (marker text, record text).
+
+        TESTED THROUGH THE BEHAVIOUR AND NOT THE SOURCE, after two source-reading attempts failed
+        for reasons that had nothing to do with the defect: the first searched the whole file and
+        tripped over the incident named in a comment, the second stripped comments by splitting on
+        '#' -- and every string this tool writes CONTAINS a '#'. A test that inspects source text
+        fails on how the source is written. This one fails only if the wrong date is written.
+        """
+        root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        archive = "tvsat-cpc710"
+        base = os.path.join(root, archive)
+        os.makedirs(base)
+        for name in ("page.html", "page.html#anchor"):
+            with io.open(os.path.join(base, name), "wb") as fh:
+                fh.write(b"the same bytes")
+        with io.open(os.path.join(base, common.COMPLETE_MARKER), "w", encoding="utf-8") as fh:
+            fh.write("archive       %s\nfiles         2\nbytes         28\n\nprose.\n" % archive)
+        subprocess.run(
+            [sys.executable, os.path.join(HERE, "remove-fragment-copies.py"),
+             "--root", root, "--archive", archive, "--delete"],
+            capture_output=True, text=True, cwd=HERE)
+        out = []
+        for name in (common.COMPLETE_MARKER, "FRAGMENT-COPIES-REMOVED.txt"):
+            p = os.path.join(base, name)
+            with io.open(p, encoding="utf-8") as fh:
+                out.append(fh.read())
+        return out
+
+    def test_the_marker_and_the_record_both_carry_TODAY(self):
+        """Two strings carried the constant, and fixing one would have left the other lying --
+        which is what happened on the first attempt here: one substitution was asserted and two
+        were not, so they failed silently and the tool went on writing 2026-09-13."""
+        marker, record = self.run_a_removal()
+        today = datetime.date.today().isoformat()
+        self.assertIn("REMOVED %s:" % today, marker)
+        self.assertIn("removed %s because" % today, record)
+
+    def test_and_neither_carries_the_old_constant(self):
+        for text in self.run_a_removal():
+            self.assertNotIn("2026-09-13", text)
+
+    def test_the_duplicate_really_went_and_the_document_stayed(self):
+        """A date test over a removal that did not happen would pass on nothing."""
+        marker, record = self.run_a_removal()
+        self.assertIn("page.html#anchor", record)
+        self.assertIn("-> page.html", record)
+        self.assertIn("1 files saved under a URL fragment", marker)
+
+    def test_the_marker_counts_the_record_it_just_wrote(self):
+        """Not an oversight -- the convention. A marker goes through the NARROW own-file set, and
+        RENAMED.txt, SYMLINKS.txt and EXTRACTED-FROM.md are all in the WIDE one only, so every
+        archive's marker counts its own hand-written notes as content. ardent-tool's 25 818 does.
+        This test exists because the first draft asserted `files 1` and was wrong about the
+        collection rather than about the tool.
+        """
+        marker, _record = self.run_a_removal()
+        self.assertIn("files         2", marker)     # page.html + the record
+        self.assertNotIn("bytes         28", marker)  # rewritten from the tree, not left stale
+
+
+class ARecordFileIsNotContent(unittest.TestCase):
+
+    NAME = "FRAGMENT-COPIES-REMOVED.txt"
+
+    def test_an_auditor_skips_it(self):
+        self.assertIn(self.NAME, common.BOOKKEEPING_FILES)
+
+    def test_a_marker_does_NOT(self):
+        """THE WIDE SET ONLY, and this is the assertion that makes the change safe. Markers go
+        through iter_tree, which skips the NARROW set; adding the name there would move four
+        markers by one file each -- and those four were rewritten from the tree the same day and
+        agree with it."""
+        self.assertNotIn(self.NAME, common.OWN_FILES)
+
+    def test_it_sits_beside_the_precedent_it_was_argued_from(self):
+        """RENAMED.txt is the shape the tool's docstring appeals to. If that one ever moved to the
+        narrow set, this one's reasoning would have moved with it."""
+        self.assertIn("RENAMED.txt", common.BOOKKEEPING_FILES)
+        self.assertNotIn("RENAMED.txt", common.OWN_FILES)
+
+    def test_a_tree_walk_still_counts_it_and_an_audit_does_not(self):
+        d = tempfile.mkdtemp()
+        try:
+            for name in ("real.bin", self.NAME):
+                with io.open(os.path.join(d, name), "wb") as fh:
+                    fh.write(b"x")
+            counted = sorted(rel for rel, _f in common.iter_tree(d))
+            audited = sorted(rel for rel, _f in
+                             common.iter_tree(d, own_files=common.BOOKKEEPING_FILES))
+            self.assertEqual(counted, [self.NAME, "real.bin"])
+            self.assertEqual(audited, ["real.bin"])
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+
+
+class AUrlListIsJudgedBySiteAndNotBySpelling(unittest.TestCase):
+    """manifest-fetch.py, the third tool to need common.under_site."""
+
+    ARCHIVE = "tvsat-cpc710"        # registered name; --archive is checked against the register
+    BASE = "http://www.example.invalid/pub/"
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        os.makedirs(os.path.join(self.root, self.ARCHIVE))
+        self.list = os.path.join(self.root, "urls.txt")
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def fetch(self, *urls):
+        with io.open(self.list, "w", encoding="utf-8") as fh:
+            for u in urls:
+                fh.write(u + "\n")
+        out = subprocess.run(
+            [sys.executable, os.path.join(HERE, "manifest-fetch.py"),
+             "--root", self.root, "--archive", self.ARCHIVE, "--base", self.BASE,
+             "--url-list", self.list, "--dry-run"],
+            capture_output=True, text=True, cwd=HERE)
+        return out.stdout + out.stderr
+
+    def test_the_zx_case_itself(self):
+        """https in the list, http in the register. All 4 404 urls were lost to this."""
+        out = self.fetch("https://www.example.invalid/pub/a/x.zip")
+        self.assertIn("names 1 paths", out)
+        self.assertNotIn("OUTSIDE THE BASE", out)
+
+    def test_the_apex_spelling_too(self):
+        out = self.fetch("http://example.invalid/pub/a/y.zip")
+        self.assertIn("names 1 paths", out)
+
+    def test_a_foreign_host_is_STILL_refused(self):
+        """The check must still refuse what it was written to refuse."""
+        out = self.fetch("http://somewhere.else.invalid/pub/a/z.zip")
+        self.assertIn("OUTSIDE THE BASE", out)
+        self.assertIn("names 0 paths", out)
+
+    def test_a_lookalike_host_is_refused(self):
+        out = self.fetch("http://www.example.invalid.evil.test/pub/a/z.zip")
+        self.assertIn("OUTSIDE THE BASE", out)
+
+    def test_the_same_host_above_the_base_is_refused(self):
+        """`/other/` is this site and is not under `/pub/`."""
+        out = self.fetch("http://www.example.invalid/other/z.zip")
+        self.assertIn("OUTSIDE THE BASE", out)
+
+    def test_the_path_is_cut_at_the_base_and_not_at_the_host(self):
+        """A url accepted under a second spelling must still map to the right local path."""
+        out = self.fetch("https://example.invalid/pub/deep/down/w.zip")
+        self.assertIn("deep/down/w.zip", out)
+
+
+class AllThreeToolsShareOneRule(unittest.TestCase):
+    """One rule, one implementation. Three private copies were how it got written wrong twice."""
+
+    TOOLS = ("manifest-fetch.py", "pages-to-urllist.py", "find-sitemaps.py")
+
+    def test_each_uses_the_library_helper(self):
+        for name in self.TOOLS:
+            with io.open(os.path.join(HERE, name), encoding="utf-8") as fh:
+                src = fh.read()
+            self.assertIn("under_site", src, name)
+
+    def test_and_none_still_tests_a_base_with_a_bare_startswith(self):
+        """The shape that was wrong in all three. A match here is not proof of a defect, but it is
+        the line worth looking at, so it fails loudly rather than drifting back in."""
+        for name in self.TOOLS:
+            with io.open(os.path.join(HERE, name), encoding="utf-8") as fh:
+                code = [ln.split("#", 1)[0] for ln in fh.read().splitlines()]
+            for n, line in enumerate(code, 1):
+                self.assertNotIn("startswith(base", line, "%s:%d" % (name, n))
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=1)
