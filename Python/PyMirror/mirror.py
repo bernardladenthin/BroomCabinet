@@ -2250,6 +2250,28 @@ ARCHIVES = [
     # zx-alphant-nt -- see PROVENANCE.md in the archive.
     ("zx-alphant-nt", "http://ftp.zx.net.nz/pub/archive/ftp.alphant.com/"),
     # zx-sgi-freeware-old -- see PROVENANCE.md in the archive.
+    # ITS HAND-WRITTEN MARKER IS SHORT BY 4 404 FILES, found 2026-10-02 by the operator's own
+    # sitemap and not by anything of ours. ftp.zx.net.nz declares a sitemap INDEX in robots.txt
+    # whose 27 parts are gzipped TEXT lists -- 1 319 587 paths for the whole site, 5.8 MB
+    # compressed, one request each. Bucketed by base, seven of the eight zx-* archives agree with
+    # it within single digits. This one does not:
+    #
+    #     inventory 5 699   held 1 295   MISSING 4 404
+    #
+    # AND THE MARKER'S REASONING IS WHAT MADE IT INVISIBLE. It explains, correctly, that cd-1/ to
+    # cd-4/ answer 404 and always will, and then concludes "WHAT IS HERE IS COMPLETE: source/
+    # (1 288 files), beta/ (2), and the five HTML pages -- everything zx actually serves under this
+    # path." The missing files are in none of those four directories. They are in Inst/ (2 570),
+    # fw-6.2/ (691), Installable/ (486), Dist/ (333) and fw-5.3/ (177) -- directories the root HTML
+    # page does not link, so a crawl that follows links could never reach them. A true explanation
+    # of four dead links drew attention away from five live directories.
+    #
+    # THEY ARE SERVED. Three sampled by hand answered HTTP 200. Total bytes unknown: a text sitemap
+    # carries no sizes, and the 0.944 GB in the marker is what the 1 295 held files weigh.
+    #
+    # NOT FETCHED, and the marker is left exactly as written. Correcting a completion claim is a
+    # decision about somebody else's server and about this collection's own record, and both belong
+    # to a person. The pace is already set at 1.5 s with two workers below.
     ("zx-sgi-freeware-old", "http://ftp.zx.net.nz/pub/archive/sgi-freeware-old/"),
     # zx-be-os -- see PROVENANCE.md in the archive.
     ("zx-be-os", "http://ftp.zx.net.nz/pub/archive/ftp.be.com/"),
