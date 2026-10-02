@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# The configuration holds a B2 key and belongs outside this repository. Should one be copied
+# here for a quick test anyway, it must not be committable by accident.
+*.properties
+# Local state of a run started from this directory: checksums of private files, reports, a venv.
+checksums/
+reports/
+.venv/
