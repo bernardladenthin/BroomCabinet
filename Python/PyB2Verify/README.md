@@ -37,7 +37,8 @@ The configuration is a properties file **outside this repository**; it holds the
 
     keyId=<application key id>
     applicationKey=<application key>
-    localRoot=D:/backup                     one directory per bucket below it
+    localRoot=D:/backup                     one directory per bucket below it; needed only by
+                                            check, hash-local and verify-local
     stateDir=D:/backup-state                optional; default: the directory of this file
     reportDir=D:/backup-state/reports       optional; default: <stateDir>/reports
     exclude=Thumbs.db,desktop.ini,*.lnk     optional; glob patterns that are never compared
@@ -45,7 +46,22 @@ The configuration is a properties file **outside this repository**; it holds the
     ignoreDirs=scratch                      optional; directories below localRoot that are no bucket
 
 The checksum and report directories may live inside `localRoot`; they are recognised by their
-configured path and never taken for a bucket. Pass the file with `--config FILE`, or set `B2VERIFY_CONFIG` once in a small wrapper script.
+configured path and never taken for a bucket. Pass the file with `--config FILE`, or set
+`B2VERIFY_CONFIG` once in a small wrapper script.
+
+### Verifying B2 from somewhere else
+
+`hash-b2`, `verify-b2` and `compare` need no local data and no `localRoot` — only the key and the
+checksum files. So the download-heavy `verify-b2 --download` can run on a machine close to the
+bucket that holds nothing but a copy of `checksums/b2/`:
+
+    python b2verify.py verify-b2 --download --threads 16 --resume --config b2.properties
+
+Before the first B2 request the tool checks, within 15 seconds, that a TLS handshake with the B2
+API completes. A data-centre network can pass TCP to Backblaze and still drop the handshake; without
+this check b2sdk retries for minutes and the run sits silent. Copy `checksums/b2/` back afterwards: it now carries the time of each successful check, and a
+real SHA-1 for every file that was confirmed through its ETag. Use a key of its own on that
+machine, read-only, and revoke it when the run is done.
 
 ## Two sides, two indexes, one comparison
 
