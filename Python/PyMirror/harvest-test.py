@@ -36,6 +36,7 @@ absolute link to another host is counted outside, and neither decision is made f
 
 No network. Pages are written into a temporary directory.
 """
+import gzip
 import io
 import os
 import shutil
@@ -272,6 +273,133 @@ class TheCountsAgreeWithTheList(unittest.TestCase):
                      "a/have.zip": "x"})
         self.h = h.run()
         self.assertEqual(self.h.rels(), ["a/lack.zip"])
+
+
+class ASitemapArrivesInThreeShapes(unittest.TestCase):
+    """read_sitemap, in find-sitemaps.py. All three shapes were met within one afternoon.
+
+    WHY IT IS A FUNCTION AT ALL. On 2026-10-02 the four remaining sitemap INDEXES were followed by
+    hand, in a throwaway script, because the tool reported an index and declined to follow it. The
+    script knew one shape -- XML with <loc> -- and it also skipped the tool's page/file/directory
+    classification. Both omissions produced a wrong number in the same run:
+
+        bretjohnson        40896 named under the base, 50 held, MISSING 40896
+
+    and the 40 896 are CMS pages called `1000032207`, not files. internal() would have counted them
+    as pageish; the hand-written loop never called it. THE DEFECT WAS IN THE HAND-WRITTEN SCRIPT
+    AND NOT IN THE TOOL -- which is the argument for the tool doing the following, so that one
+    classification serves every caller.
+
+    The gzipped-plain-text shape is the one that could have produced another clean zero: ftp.zx.net.nz
+    publishes `_ftp_sitemap_part_aa.txt.gz`, and no <loc> regex will ever find anything in it.
+    """
+
+    def setUp(self):
+        self.fs = common.load_peer("find-sitemaps.py", "_find_sitemaps", HERE)
+
+    XML = """<?xml version="1.0"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://example.org/pub/a.tardist</loc></url>
+  <url><loc>https://example.org/pub/b.txt</loc></url>
+</urlset>
+"""
+
+    TEXT = """https://example.org/pub/a.tardist
+https://example.org/pub/b.txt
+"""
+
+    def test_xml_with_loc_elements(self):
+        got = self.fs.read_sitemap(self.XML.encode("utf-8"))
+        self.assertEqual(got, ["https://example.org/pub/a.tardist",
+                               "https://example.org/pub/b.txt"])
+
+    def test_plain_text_one_url_per_line(self):
+        """The standard permits it and ftp.zx.net.nz uses it. No <loc> to find."""
+        self.assertNotIn("<loc", self.TEXT)
+        got = self.fs.read_sitemap(self.TEXT.encode("utf-8"))
+        self.assertEqual(got, ["https://example.org/pub/a.tardist",
+                               "https://example.org/pub/b.txt"])
+
+    def test_GZIPPED_plain_text_which_is_what_zx_actually_serves(self):
+        got = self.fs.read_sitemap(gzip.compress(self.TEXT.encode("utf-8")))
+        self.assertEqual(got, ["https://example.org/pub/a.tardist",
+                               "https://example.org/pub/b.txt"])
+
+    def test_gzipped_xml_too(self):
+        got = self.fs.read_sitemap(gzip.compress(self.XML.encode("utf-8")))
+        self.assertEqual(len(got), 2)
+
+    def test_gzip_IS_RECOGNISED_BY_MAGIC_AND_NOT_BY_THE_NAME(self):
+        """read_sitemap is handed bytes and never sees the url, deliberately.
+
+        A server may decompress on the way out, so `part_aa.txt.gz` can arrive as plain text; and
+        a part with no `.gz` in its name can arrive gzipped under Content-Encoding. The bytes are
+        the only thing that knows.
+        """
+        self.assertEqual(self.fs.GZIP_MAGIC, bytes([0x1F, 0x8B]))
+        plain_despite_the_name = self.fs.read_sitemap(self.TEXT.encode("utf-8"))
+        self.assertEqual(len(plain_despite_the_name), 2)
+
+    def test_a_line_that_is_not_just_a_url_is_not_an_entry(self):
+        """A text sitemap is urls and nothing else, so prose containing one does not count."""
+        prose = """see https://example.org/pub/a.tardist for details
+https://example.org/pub/b.txt
+# https://example.org/pub/c.txt
+"""
+        self.assertEqual(self.fs.read_sitemap(prose.encode("utf-8")),
+                         ["https://example.org/pub/b.txt"])
+
+    def test_an_empty_part_gives_an_empty_list_and_does_not_raise(self):
+        self.assertEqual(self.fs.read_sitemap(b""), [])
+
+
+class AnIndexIsFollOwedOnlyWhenAsked(unittest.TestCase):
+    """42 parts for one archive is a decision about somebody else's bandwidth, not a detail."""
+
+    def test_the_flag_exists_and_defaults_to_off(self):
+        out = subprocess.run([sys.executable, os.path.join(HERE, "find-sitemaps.py"), "--help"],
+                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                             universal_newlines=True).stdout
+        self.assertIn("--follow-index", out)
+        self.assertIn("Off by default", out)
+
+    def test_without_the_flag_the_line_says_how_to_follow(self):
+        """A report that only says "not followed" leaves the reader to find the flag."""
+        with io.open(os.path.join(HERE, "find-sitemaps.py"), encoding="utf-8") as fh:
+            src = fh.read()
+        self.assertIn("pass --follow-index", src)
+
+
+class NumericCmsPagesAreNotFiles(unittest.TestCase):
+    """The bretjohnson defect, pinned on the classifier that the hand-written loop bypassed.
+
+    bretjohnson.us lists 40 896 urls of the shape `/1000032207` -- a CMS page id. They answer 200
+    with `text/html` and NO Content-Length. Counting them as files turned an archive of 50 held
+    files into one "missing 40 896", which is the same category error that ibm-redbooks produced
+    earlier the same day.
+    """
+
+    def setUp(self):
+        self.fs = common.load_peer("find-sitemaps.py", "_find_sitemaps", HERE)
+        self.tmp = tempfile.mkdtemp(prefix="pymirror-cms-")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_a_bare_number_is_pageish(self):
+        base = "https://bretjohnson.us/"
+        locs = [base + "1000032207", base + "100037841", base + "1000591577"]
+        inside, outside, pageish, dirish = self.fs.internal(locs, base, self.tmp)
+        self.assertEqual(pageish, 3)
+        self.assertEqual(len(inside), 0)
+
+    def test_and_a_real_filename_beside_them_still_is_one(self):
+        """The rule must not simply refuse everything -- that would hide real gaps."""
+        base = "https://bretjohnson.us/"
+        locs = [base + "1000032207", base + "programs/setup.zip"]
+        inside, outside, pageish, dirish = self.fs.internal(locs, base, self.tmp)
+        self.assertEqual(pageish, 1)
+        self.assertEqual(sorted(inside), ["programs/setup.zip"])
 
 
 if __name__ == "__main__":

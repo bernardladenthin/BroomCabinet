@@ -56,7 +56,7 @@ MIRROR = load("mirror")
 # a new one has to be added here on purpose -- discovery would silently skip whatever it missed.
 KEYED_BY_ARCHIVE = ("SEEDS", "HTML_CRAWL", "MIN_INTERVAL", "WORKERS_BY_ARCHIVE",
                     "TIMEOUT_BY_ARCHIVE", "EXCLUDE", "RETIRED", "FROZEN",
-                    "NEEDS_CASE_SENSITIVE")
+                    "NEEDS_CASE_SENSITIVE", "UNPACKED")
 
 
 def known_archives():
