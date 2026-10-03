@@ -77,6 +77,16 @@ HELD                                    files      size   note
                                                           under the name dhe-rs6000 was removed
                                                           2026-09-04 -- see its PROVENANCE
   ardent-tool                          25 608    22.0 GB  board-level RS/6000 detail
+  dreamlandbbs-os2                      7 744    18.9 GB  Dreamland BBS's OS/2 file areas, the
+                                                          GFD collection: 59 MBSE areas of OS/2
+                                                          shareware. Reachable all along -- it was
+                                                          registered on http:// while the host had
+                                                          moved to HTTPS, so three probes hung on a
+                                                          shut port 80 and were read as a rate
+                                                          limit. Needed SIX fetch rounds: each
+                                                          area's index.html is itself a file, so
+                                                          every layer fetched named the next --
+                                                          5 330, then 1 521, 395, 113, 5, 0
   somuchstuff-pdp8                    110 572    19.2 GB  Vince Slyngstad's PDP-8 archive: 2.3 GB
                                                           DEC library, 2.2 GB DECUS, 962 MB MAINDEC
                                                           field diagnostics, scans up to 143 MB
@@ -6272,7 +6282,19 @@ MIN_INTERVAL = {
     # 21 s on a page and a zip. Same reading as openpa above and for the same reason -- the timer
     # is stable, so the rule behind it is untouched, and a day is not the "days" this note asks
     # for. Both probes cost one request each and are logged in logs/probe-2026-09-28.log.
-    "dreamlandbbs-os2": 4.0,
+    #
+    # EVERY SENTENCE ABOVE DESCRIBES A CLOSED PORT, not a rate limit. The archive was registered on
+    # `http://` and this host had moved to HTTPS, so all three probes and both earlier fetches went
+    # to port 80 and hung -- 21.2 s, stable, which is exactly what a shut port looks like and
+    # exactly what a penalty timer looks like with an HTTP request as the only instrument. The base
+    # was corrected to `https://` on 2026-10-02 and common.reach() now exists to tell the two
+    # apart. See its docstring: this host is the measurement in it.
+    #
+    # SO 4.0 IS KEPT HERE AS THE RECORD AND NOT AS THE RULE. Measured 2026-10-02/03 over the real
+    # fetch: 0.2 s, one worker, 7 748 files and 18.87 GB in about twelve hours across six rounds,
+    # 0 failures and 0 timeouts. The crawl that earns this archive its marker runs at 0.5 s --
+    # slower than what was measured to work, far faster than a figure derived from a misdiagnosis.
+    "dreamlandbbs-os2": 0.5,
 
 }
 # ONE PACER FOR THE RUN, shared by every worker. This was six lines of lock-and-arithmetic here

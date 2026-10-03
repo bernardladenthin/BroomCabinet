@@ -83,7 +83,24 @@ def restate(root, archive, reason, apply_it=False, report=say):
     report("  %-22s %d -> %d files, %s -> %s"
            % (archive, old[0], new[0], human(old[1]), human(new[1])))
     if old == new:
+        # AND THE REASON IS DROPPED ON THE FLOOR -- said plainly, because this returned quietly
+        # until 2026-10-03 and the caller had every reason to think the text had been recorded.
+        # It happened on dreamlandbbs-os2: the crawler had just written a correct marker, so the
+        # figures already agreed, and the --reason explaining that twelve hours of fetching across
+        # six rounds lay behind a "0h00m" duration went nowhere. It was caught by reading the file
+        # afterwards, not by this tool.
+        #
+        # STILL NOT WRITTEN, deliberately: this tool moves `files` and `bytes` and appends the
+        # reason for having moved them. A marker whose figures did not move has nothing for it to
+        # restate, and inventing an append here would let it edit prose on any marker at any time
+        # -- which is the authority it was explicitly not given. See the refusal to invent a
+        # marker that does not exist, directly above. What was missing was the SENTENCE, not the
+        # behaviour.
         report("  %-22s already agrees with the tree" % "")
+        if reason:
+            report("  %-22s REASON NOT WRITTEN -- nothing moved, so there is nothing to restate."
+                   % "")
+            report("  %-22s Put it in the marker by hand, or beside the archive." % "")
         return (old, new)
 
     fields["files"] = str(new[0])

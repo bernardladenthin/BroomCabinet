@@ -734,6 +734,13 @@ BOOKKEEPING_FILES = frozenset(OWN_FILES | {
     # hours ago and agree with it. Here it changes what an auditor reads and nothing a marker
     # claims.
     "FRAGMENT-COPIES-REMOVED.txt",
+    # HOW-THIS-ARRIVED.md -- the provenance note beside a marker whose own figures are true but
+    # whose `duration` hides the work. dreamlandbbs-os2 has the first: its crawl took three
+    # minutes because twelve hours of fetching across six rounds came first, and that history
+    # belongs somewhere a reader of the marker will find it. Wide set only, like the two above,
+    # so an auditor skips it while the marker still counts it -- which is the collection's
+    # convention for an archive's hand-written notes.  [2026-10-03]
+    "HOW-THIS-ARRIVED.md",
     "SHA256SUMS",               # written by the one-off fetchers, in sha256sum(1) form
 })                              # STILL-MISSING.txt is inherited from OWN_FILES, see there
 
