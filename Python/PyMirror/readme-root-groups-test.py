@@ -52,7 +52,8 @@ DEFAULT_ANCHOR = DEFAULT_PHRASE + " --"
 
 WORDS = {2: "Two", 8: "Eight", 24: "Twenty-four", 25: "Twenty-five",
          26: "Twenty-six", 27: "Twenty-seven", 28: "Twenty-eight",
-         29: "Twenty-nine", 30: "Thirty", 31: "Thirty-one", 32: "Thirty-two"}
+         29: "Twenty-nine", 30: "Thirty", 31: "Thirty-one", 32: "Thirty-two",
+         33: "Thirty-three"}
 
 
 def groups():

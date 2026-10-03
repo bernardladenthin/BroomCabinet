@@ -30,6 +30,7 @@ No network. Everything happens in a temporary directory.
 """
 import datetime
 import importlib.util
+import ast
 import io
 import os
 import shutil
@@ -131,8 +132,8 @@ class ARecordFileIsNotContent(unittest.TestCase):
     untested, so the loop is the test.
     """
 
-    NAMES = ("FRAGMENT-COPIES-REMOVED.txt", "HOW-THIS-ARRIVED.md", "RENAMED.txt",
-             "SYMLINKS.txt", "EXTRACTED-FROM.md")
+    NAMES = ("FRAGMENT-COPIES-REMOVED.txt", "HOW-THIS-ARRIVED.md", "CONVERGED.md",
+             "RENAMED.txt", "SYMLINKS.txt", "EXTRACTED-FROM.md")
 
     def test_an_auditor_skips_every_one(self):
         for name in self.NAMES:
@@ -173,6 +174,72 @@ class ARecordFileIsNotContent(unittest.TestCase):
         marker whose figures did not move -- which is why a separate file was needed at all."""
         self.assertIn("HOW-THIS-ARRIVED.md", common.BOOKKEEPING_FILES)
         self.assertNotIn("HOW-THIS-ARRIVED.md", common.OWN_FILES)
+
+
+class NoToolBuildsARelativePathWithTheNormalisingHelper(unittest.TestCase):
+    """os.path.relpath NORMALISES, and normalising strips a trailing dot.
+
+    THE COLLECTION HOLDS 33 SUCH FILES -- 21 in bitsavers, 8 in ibiblio-historic-linux, 3 in
+    zx-kednos-vms, 1 in fsck-ibm-other -- and they are on disk with their dot because mirror.py
+    writes through the long-path form, which keeps the name. common.relative_to keeps it too.
+    os.path.relpath does not:
+
+        os.path.relpath   -> 'pub/misc/bliss/dbit/bliss11/readme'
+        common.relative_to-> 'pub/misc/bliss/dbit/bliss11/readme.'
+
+    WHAT IT COST. find-sitemaps.py built its "what do we hold" set with the raw helper, so the
+    completeness check LIED: zx-kednos-vms holds `readme.`, 256 bytes, and the operator's own
+    sitemap naming `readme.` read as MISSING. A check that reports a held file as absent is worse
+    than no check before an archive is frozen into something that is never modified again.
+
+    AND THE HAZARD WAS ALREADY WRITTEN DOWN FOUR TIMES -- in mirror.py beside iter_tree, in
+    common.relative_to's own docstring, in ia-item-fetch.py and in page-extensions.py, each
+    naming this exact defect -- while THREE call sites still had it, one of them in b2-pack.py,
+    the tool that writes the permanent archive. Fifth time this week that a hazard recorded
+    beside one tool was no check on the next, which is the argument for a test rather than
+    another comment.
+    """
+
+    def tools(self):
+        for name in sorted(os.listdir(HERE)):
+            if name.endswith(".py") and "test" not in name:
+                with io.open(os.path.join(HERE, name), encoding="utf-8") as fh:
+                    yield name, fh.read()
+
+    def test_no_tool_calls_os_path_relpath_in_code(self):
+        """PARSED, NOT GREPPED, and the first draft of this case proves why: it stripped `#`
+        comments and then flagged all FOUR docstrings that describe the defect -- including
+        common.relative_to's own. Prose about a hazard is worth keeping; a text search cannot
+        tell it from the hazard. The same mistake was made on 2026-10-02 in a test that tried to
+        read source for a date, and for the same reason."""
+        offenders = {}
+        for name, src in self.tools():
+            for node in ast.walk(ast.parse(src, name)):
+                if not isinstance(node, ast.Attribute) or node.attr != "relpath":
+                    continue
+                owner = node.value
+                if (isinstance(owner, ast.Attribute) and owner.attr == "path"
+                        and isinstance(owner.value, ast.Name) and owner.value.id == "os"):
+                    offenders["%s:%d" % (name, node.lineno)] = "os.path.relpath"
+        self.assertEqual(offenders, {},
+                         "use common.relative_to: os.path.relpath normalises and strips a "
+                         "trailing dot, and 33 files in this collection end in one")
+
+    def test_the_library_helper_really_keeps_a_trailing_dot(self):
+        """The ratchet is only worth having if what it points at is correct."""
+        # NO DRIVE LETTER: relative_to is string work and needs none, and privacy-test.py
+        # rightly refuses one in a source file.
+        base = os.path.join("mirror", "an-archive")
+        full = os.path.join(base, "sub", "readme.")
+        self.assertEqual(common.relative_to(base, full), "sub/readme.")
+        self.assertTrue(os.path.relpath(full, base).endswith("readme"))
+
+    def test_and_it_still_agrees_with_relpath_on_an_ordinary_name(self):
+        """A replacement that differs everywhere would be a different bug."""
+        base = os.path.join("mirror", "an-archive")
+        full = os.path.join(base, "sub", "file.zip")
+        self.assertEqual(common.relative_to(base, full), "sub/file.zip")
+        self.assertEqual(os.path.relpath(full, base).replace(os.sep, "/"), "sub/file.zip")
 
 
 class ToolsConnectToTheHostTheBaseNamesAndPaceOnTheFoldedOne(unittest.TestCase):

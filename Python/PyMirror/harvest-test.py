@@ -402,5 +402,131 @@ class NumericCmsPagesAreNotFiles(unittest.TestCase):
         self.assertEqual(sorted(inside), ["programs/setup.zip"])
 
 
+class AQueryMeansItIsNotAFile(unittest.TestCase):
+    """The rule common.is_child_link has carried since the crawler was written, finally applied
+    here: "a query -- on a generated index it is a sort order, not a file".
+
+    WHAT IT COST. pages-to-urllist.py reported
+
+        ardent-tool: 1 562 FILES NAMED AND NOT ON DISK
+
+    while THREE files were outstanding. A headline figure wrong by three orders of magnitude
+    cannot be used to decide anything, and this tool's whole job is to answer "is this archive
+    complete" before it is packed into something that can never be changed.
+
+    MEASURED RATHER THAN ASSUMED, which is the only reason the rule is this one. Of the 1 443
+    entries that survived every other filter:
+
+        type=FB&url=https://...   1 330   Facebook share buttons
+        type=DM&url=https://...      76   direct-message share buttons
+        file=../2_21/ENGLISH/...     15   a CGI document reader
+        lang=en_US&page=...           8
+        v=3, v=2                      5   actual cache-busters
+
+    Not one of the first 1 429 is a file, and no filtering downstream could have made them into
+    one. My own first guess -- that these were cache-busters and the fix was to strip queries more
+    broadly -- would have collapsed 15 distinct CGI documents into a single name.
+    """
+
+    def test_a_share_button_is_not_a_file(self):
+        h = Harvest({"index.html": page("share.html?type=FB&url=https://www.example.invalid/x")})
+        try:
+            self.assertEqual(h.run().rels(), [])
+        finally:
+            h.close()
+
+    def test_a_cgi_reader_is_not_a_file_either(self):
+        """It names a different document per query, so its query cannot be dropped -- and what it
+        names is a CGI response rather than a file in this tree."""
+        h = Harvest({"index.html": page("reader.html?file=../2_21/ENGLISH/7677TRUS.INF&section=33")})
+        try:
+            self.assertEqual(h.run().rels(), [])
+        finally:
+            h.close()
+
+    def test_BUT_A_CACHE_BUSTER_ON_AN_IMAGE_IS_STILL_THE_FILE(self):
+        """The one exception, and strip_cache_buster carries its safety margin: the query goes
+        only when what precedes it ends in a static IMAGE extension."""
+        h = Harvest({"index.html": page("photos/board.jpg?v=3")})
+        try:
+            self.assertEqual(h.run().rels(), ["photos/board.jpg"])
+        finally:
+            h.close()
+
+    def test_and_a_query_on_a_script_name_keeps_it_and_is_dropped(self):
+        """`img.php?id=5` names a different picture per query. Stripping it would fetch one file
+        and call it every image on the page."""
+        h = Harvest({"index.html": page("img.php?id=5")})
+        try:
+            self.assertEqual(h.run().rels(), [])
+        finally:
+            h.close()
+
+    def test_an_ordinary_name_is_untouched(self):
+        """The rule must not be so eager that it drops the archive."""
+        h = Harvest({"index.html": page("area/file.zip", "doc/manual.pdf")})
+        try:
+            self.assertEqual(h.run().rels(), ["area/file.zip", "doc/manual.pdf"])
+        finally:
+            h.close()
+
+
+class WhatTheSourceAlreadyAnswered404For(unittest.TestCase):
+    """.mirror-gone, consulted so a dead name is not reported as outstanding for ever.
+
+    Without it the same paths are offered after every fetch, and the next run asks a stranger's
+    server the same question again. ardent-tool carries 87 of them; together with the query rule
+    above they were the whole gap between a headline figure of 1 562 and the true 0.
+
+    AND THE FIRST WIRING OF THIS READ THE WRONG DIRECTORY -- read_gone(here), the script's own
+    folder, instead of read_gone(root), the archive's. It returned {} for every archive and
+    filtered nothing, exactly as if the feature were absent. Found by checking one path by hand
+    that the tool still listed while .mirror-gone named it.
+    """
+
+    def gone_for(self, h, rels):
+        with io.open(os.path.join(h.dir, common.GONE_FILE), "w",
+                     encoding="utf-8", newline="\n") as fh:
+            fh.write("# what the source answered 404 for\n")
+            for rel in rels:
+                fh.write("2026-10-03 404 %s\n" % rel)
+
+    def test_a_recorded_404_is_not_offered_again(self):
+        h = Harvest({"index.html": page("dead.zip", "alive.zip")})
+        try:
+            self.gone_for(h, ["dead.zip"])
+            h.run()
+            self.assertEqual(h.rels(), ["alive.zip"])
+        finally:
+            h.close()
+
+    def test_and_the_count_is_said_out_loud(self):
+        """A filter nobody can see is a filter nobody can check."""
+        h = Harvest({"index.html": page("dead.zip", "alive.zip")})
+        try:
+            self.gone_for(h, ["dead.zip"])
+            h.run()
+            self.assertIn("already answered 404 by the source", h.text)
+            self.assertIn(common.GONE_FILE, h.text)
+        finally:
+            h.close()
+
+    def test_no_gone_file_changes_nothing(self):
+        h = Harvest({"index.html": page("a.zip")})
+        try:
+            h.run()
+            self.assertEqual(h.rels(), ["a.zip"])
+            self.assertNotIn("already answered 404", h.text)
+        finally:
+            h.close()
+
+    def test_it_reads_the_ARCHIVE_directory_and_not_the_script_directory(self):
+        """The wiring mistake, pinned where it happened."""
+        with io.open(os.path.join(HERE, "pages-to-urllist.py"), encoding="utf-8") as fh:
+            src = fh.read()
+        self.assertIn("read_gone(root)", src)
+        self.assertNotIn("read_gone(here)", src)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

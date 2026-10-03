@@ -50,7 +50,7 @@ import os
 import subprocess
 import sys
 
-from common import (INDEX_FILE, MIRROR_ROOT, find_tool, human, read_index, say,
+from common import (INDEX_FILE, MIRROR_ROOT, find_tool, human, read_index, relative_to, say,
                     split_archive)
 
 # THE VOLUME SIZE IS THE OWNER'S, and it is validated against real discs rather than derived
@@ -511,7 +511,13 @@ def empty_directories(root, archive, unit):
     for dirpath, dirnames, filenames in os.walk(base):
         if filenames or dirnames:
             continue
-        rel = os.path.relpath(dirpath, base).replace("\\", "/")
+        # relative_to AND NOT os.path.relpath, which NORMALISES and strips a trailing dot.
+        # No empty directory in the collection ends in one today -- measured 2026-10-03,
+        # zero of them -- so this is a latent case rather than a live one. It is changed
+        # anyway because this tool writes the archive that is never modified again, and
+        # four other files in this directory already carry a comment about this exact
+        # defect while three call sites still had it.
+        rel = relative_to(base, dirpath)
         if rel != "." and unit.claims(archive, rel):
             out.append(archive + "/" + rel)
     return sorted(out)

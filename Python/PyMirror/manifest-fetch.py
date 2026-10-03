@@ -30,7 +30,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from common import (COMPLETE_MARKER, GONE_FILE, MIRROR_ROOT, Pacer, Patience, exists,
+from common import (COMPLETE_MARKER, GONE_FILE, GONE_STATUS, MIRROR_ROOT, Pacer, Patience, exists,
                     host_of, http_get,
                     load_mirror, local_failure, read_gone, record_gone, under_site,
                     read_marker, scan_tree)
@@ -273,8 +273,30 @@ def main():
             # Without this the same question is asked again next session, and there is no cheaper
             # place to put the answer than beside the files it is about.
             noted = record_gone(base_dir, rel, e.code)
-            print("  GONE HTTP %s  %s%s" % (e.code, rel, "" if noted else "  (already noted)"),
-                  flush=True)
+            # TWO REASONS FOR A FALSE, AND THEY ARE NOT THE SAME FACT. record_gone returns False
+            # both when the path is already in the file AND when it REFUSES the status code --
+            # only 404 and 410 go in. Printing "(already noted)" for the second said the answer
+            # was on record when nothing had been written at all.
+            #
+            # MET ON 2026-10-03: zx-kednos-vms/pub/kednos/vax/pli038.zip is named by the source's
+            # own sitemap and answers 403. The fetch said "(already noted)", the archive has no
+            # .mirror-gone, and the only record of that 403 is a PERMFAIL line in
+            # logs/errors-zx-kednos-vms.txt dated 2026-09-10. So every future survey reports the
+            # file as outstanding and asks that server for it again.
+            #
+            # WHETHER A 403 BELONGS IN .mirror-gone IS NOT THIS LINE'S DECISION. The file records
+            # what is GONE; a 403 is the operator refusing, which is a different answer and may
+            # not be permanent. Widening GONE_STATUS would change the meaning of a record that
+            # data has already been written against, and the register's rule for that is explicit.
+            # What this fixes is only the report.
+            if noted:
+                why = ""
+            elif int(e.code) in GONE_STATUS:
+                why = "  (already noted)"
+            else:
+                why = "  (NOT recorded -- only %s go in %s)" % (
+                    "/".join(str(c) for c in sorted(GONE_STATUS)), GONE_FILE)
+            print("  GONE HTTP %s  %s%s" % (e.code, rel, why), flush=True)
             continue
         except Exception as exc:                               # noqa: BLE001
             failed += 1

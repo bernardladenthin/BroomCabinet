@@ -44,6 +44,7 @@ import sys
 import urllib.parse
 
 from common import (MIRROR_ROOT, BOOKKEEPING_FILES, Pacer, exists, host_of, http_try,
+                    read_gone, relative_to,
                     load_mirror, long_path, under_site)
 from robots import robots_verdict, sitemaps
 
@@ -100,14 +101,20 @@ def read_sitemap(body):
 
 
 def held_paths(archive_dir):
-    """-> the relative paths this archive holds, bookkeeping excluded."""
+    """-> the relative paths this archive holds, bookkeeping excluded.
+
+    common.relative_to AND NOT os.path.relpath, which NORMALISES and therefore strips a trailing
+    dot. This function used the raw one and the check it feeds then LIED about held files:
+    zx-kednos-vms holds `pub/misc/bliss/dbit/bliss11/readme.` -- 256 bytes, written through the
+    long-path form that keeps the name -- and os.path.relpath reported it as `readme`, so
+    the operator's sitemap naming `readme.` read as MISSING.
+    """
     out = set()
     for dirpath, _dirs, names in os.walk(archive_dir):
         for name in names:
             if name in BOOKKEEPING_FILES or name.startswith("."):
                 continue
-            rel = os.path.relpath(os.path.join(dirpath, name), archive_dir)
-            out.add(rel.replace(os.sep, "/"))
+            out.add(relative_to(archive_dir, os.path.join(dirpath, name)))
     return out
 
 
@@ -256,7 +263,15 @@ def look(name, base, archive_dir, mirror, save=False, pacer=None, follow=0):
     else:
         locs = LOC.findall(text)
     inside, outside, pageish, dirish = internal(locs, base.rstrip("/") + "/", archive_dir)
-    missing = sorted(inside - held_paths(archive_dir)) if os.path.isdir(archive_dir) else []
+    # MINUS WHAT THE SOURCE HAS ALREADY REFUSED, the same subtraction pages-to-urllist.py
+    # needed on 2026-10-03 and for the same reason. A sitemap may name a path the server
+    # then answers 403 or 404 for -- zx-kednos-vms/pub/kednos/vax/pli038.zip is in its own
+    # sitemap and returns 403 -- and reporting it as outstanding for ever asks a stranger's
+    # server the same question on every survey. .mirror-gone is the record of that answer.
+    missing = []
+    if os.path.isdir(archive_dir):
+        refused = read_gone(archive_dir)
+        missing = sorted(inside - held_paths(archive_dir) - set(refused))
     saved = ""
     if save and os.path.isdir(archive_dir):
         dest = os.path.join(archive_dir, "sitemap.xml")

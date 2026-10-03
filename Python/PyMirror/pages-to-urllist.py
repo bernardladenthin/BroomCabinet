@@ -52,8 +52,8 @@ import os
 import sys
 import urllib.parse
 
-from common import (MIRROR_ROOT, BOOKKEEPING_FILES, IMG_SRC, LINK_ODD_RE, exists, load_mirror,
-                    looks_like_a_page, relative_to, under_site)
+from common import (MIRROR_ROOT, BOOKKEEPING_FILES, IMG_SRC, LINK_ODD_RE, GONE_FILE, exists, load_mirror,
+                    looks_like_a_page, read_gone, relative_to, strip_cache_buster, under_site)
 
 # Both are the library's, written out here character for character until 2026-09-23.
 HREF = LINK_ODD_RE
@@ -162,12 +162,41 @@ def main():
                     # its own first entity and leaves a bare ampersand, which looks like a file.
                     # This tool found that defect in mirror.py and must not carry it itself.
                     h = html.unescape((a or b or c).strip()).split("#")[0]
+                    # A QUERY MEANS THIS IS NOT A FILE ON THIS SITE, which common.is_child_link
+                    # has said since the crawler was written -- "on a generated index it is a sort
+                    # order, not a file" -- and which this tool never applied. It cost the headline
+                    # figure its meaning: ardent-tool reported 1 562 FILES NAMED AND NOT ON DISK
+                    # with THREE actually outstanding, and MEASURING the 1 443 that survived the
+                    # other filters settled what they were:
+                    #
+                    #   type=FB&url=https://...   1 330   Facebook share buttons
+                    #   type=DM&url=https://...      76   direct-message share buttons
+                    #   file=../2_21/ENGLISH/...     15   a CGI document reader
+                    #   lang=en_US&page=...           8
+                    #   v=3, v=2                      5   actual cache-busters
+                    #
+                    # Not one of the first 1 429 is a file, and no amount of filtering downstream
+                    # could have made them into one. THE CACHE-BUSTER IS THE ONE EXCEPTION, and
+                    # strip_cache_buster carries the safety margin: the query goes only when what
+                    # precedes it ends in a static IMAGE extension, where it cannot be selecting
+                    # anything. `reader.html?file=...` names a different document per query and
+                    # keeps its query -- and is then dropped by the line below, which is right,
+                    # because what it names is a CGI response and not a file in this tree.
+                    h = strip_cache_buster(h)
+                    if "?" in h:
+                        continue
                     if not h or h.lower().startswith(SKIP):
                         continue
                     named.setdefault(urllib.parse.urljoin(here_url, h), here_url)
 
     patterns, excluded_by = refusals(here, args.archive)
-    files, dirs, outside, refused = [], [], 0, []
+    # WHAT THE SOURCE HAS ALREADY ANSWERED 404 FOR. Without this the same dead names are reported
+    # as outstanding after every fetch, for ever: ardent-tool carries 95 of them and they were the
+    # rest of the gap between its headline figure and its real one. .mirror-gone is the record a
+    # fetch writes when the source says the file is gone -- treating it as still-missing asks a
+    # stranger's server the same question again on every run.
+    gone = read_gone(root)
+    files, dirs, outside, refused, dead = [], [], 0, [], []
     for url in sorted(named):
         # THE SAME SITE UNDER ANOTHER SPELLING IS STILL THE SAME SITE. A plain startswith on the
         # registered base reads https where the register said http -- or the apex where the page
@@ -189,6 +218,9 @@ def main():
         local = os.path.join(root, *[p for p in rel.split("/") if p])
         if exists(local):
             continue
+        if rel in gone:
+            dead.append(rel)
+            continue
         # A directory linked without its slash is not a file. If the directory is here, the
         # crawler already walked it; asking for the bare name only earns a redirect.
         if os.path.isdir(local):
@@ -205,6 +237,9 @@ def main():
     print("  %s: %d stored pages read, %d targets named" % (args.archive, pages, len(named)))
     print("     %d outside the archive" % outside)
     print("     %d directory links without a trailing slash (already walked)" % len(dirs))
+    if dead:
+        print("     %d already answered 404 by the source (in %s) -- not counted below"
+              % (len(dead), GONE_FILE))
     if refused:
         # SAID BEFORE THE HEADLINE FIGURE, not after it. The count below is what the next command
         # would fetch, and a reader who sees only that number cannot tell it was ever narrowed.

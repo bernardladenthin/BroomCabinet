@@ -759,6 +759,11 @@ BOOKKEEPING_FILES = frozenset(OWN_FILES | {
     # so an auditor skips it while the marker still counts it -- which is the collection's
     # convention for an archive's hand-written notes.  [2026-10-03]
     "HOW-THIS-ARRIVED.md",
+    # THE ROUNDS converge.py NEEDED, written into the archive it closed. Same shape and same
+    # set as the two names above, and registered here because the test for the new tool
+    # asserted it and failed -- which is the third time a record file has been introduced
+    # without a home. The wide set only, so an auditor skips it while the marker counts it.
+    "CONVERGED.md",
     "SHA256SUMS",               # written by the one-off fetchers, in sha256sum(1) form
 })                              # STILL-MISSING.txt is inherited from OWN_FILES, see there
 

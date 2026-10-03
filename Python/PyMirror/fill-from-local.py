@@ -63,7 +63,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import (MIRROR_ROOT, copy_new_file, exists, failed_urls, human, load_mirror,
-                    local_path, long_path, say, sha256_file)
+                    local_path, long_path, relative_to, say, sha256_file)
 
 # Where mirror.py writes what it gave up on. One file per archive, under the collection's logs.
 ERRORS = os.path.join("logs", "errors-%s.txt")
@@ -237,7 +237,10 @@ def main(argv=None):
         say("  filled %-58s %10s" % (rel[:58], human(written)), log)
 
     if filled:
-        record(archive_dir, os.path.relpath(source, args.root), filled, log)
+        # relative_to, not os.path.relpath: relpath normalises and a trailing dot is lost.
+        # What this writes is a RECORD of where each filled file came from, and a record
+        # naming a path that does not exist is worse than none.
+        record(archive_dir, relative_to(args.root, source), filled, log)
     say("\n%d filled, %d unusable, %d skipped"
         % (len(filled), len(failed), len(rows) - len(can)), log)
     say("THE INDEX IS NOW STALE. Rebuild it with:\n"
