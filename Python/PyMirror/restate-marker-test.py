@@ -263,5 +263,77 @@ class TestRestating(unittest.TestCase):
         self.assertIn("--reason", err.getvalue())
 
 
+class WhenNothingMovesTheReasonIsLOSTAndItSaysSo(unittest.TestCase):
+    """The silent no-op, found on 2026-10-03 by reading a file rather than by being told.
+
+    dreamlandbbs-os2 had just earned a marker from a completed crawl, so its figures already
+    agreed with the tree -- which is exactly what a freshly earned marker looks like. restate was
+    then called with a --reason explaining that the marker's "duration 0h00m" hid twelve hours of
+    fetching across six rounds. It printed "already agrees with the tree", returned, and dropped
+    the text. Nothing said so, and the reason would have been believed recorded.
+
+    WHAT IS PINNED HERE IS THE SENTENCE, NOT A NEW BEHAVIOUR. This tool moves `files` and `bytes`
+    and appends why they moved; a marker whose figures did not move has nothing for it to restate,
+    and letting it append prose to any marker at any time is the authority it was deliberately
+    refused -- the same refusal as not inventing a marker that does not exist. The fix is that it
+    now says what it is not doing.
+    """
+
+    AGREES = {"archive": "an-archive", "files": "1", "bytes": "7"}
+
+    def run_it(self, reason, apply_it=True):
+        t = Tree(files=[("a.bin", b"x" * 7)], marker=dict(self.AGREES))
+        said = []
+        try:
+            before = t.text()
+            out = rm.restate(t.root, t.archive, reason, apply_it=apply_it, report=said.append)
+            return t, before, t.text(), chr(10).join(said), out
+        finally:
+            t.close()
+
+    def test_the_figures_already_agree_so_the_file_is_untouched(self):
+        _t, before, after, _said, out = self.run_it("a reason that goes nowhere")
+        self.assertEqual(before, after)
+        self.assertEqual(out, ((1, 7), (1, 7)))
+
+    def test_AND_THE_REASON_IS_NOWHERE_IN_IT(self):
+        """The case itself: the text really is lost, and the test says so out loud."""
+        _t, _before, after, _said, _out = self.run_it("twelve hours across six rounds")
+        self.assertNotIn("twelve hours across six rounds", after)
+
+    def test_BUT_IT_SAYS_THE_REASON_WAS_NOT_WRITTEN(self):
+        """Losing the text is defensible. Losing it in silence is not."""
+        _t, _b, _a, said, _out = self.run_it("twelve hours across six rounds")
+        self.assertIn("REASON NOT WRITTEN", said)
+        self.assertIn("already agrees with the tree", said)
+
+    def test_and_it_says_where_to_put_it_instead(self):
+        """A refusal that names no alternative gets worked around."""
+        _t, _b, _a, said, _out = self.run_it("some history")
+        self.assertIn("by hand", said)
+
+    def test_no_such_line_when_no_reason_was_given(self):
+        """The message must only appear when something was actually dropped."""
+        for reason in ("", None):
+            _t, _b, _a, said, _out = self.run_it(reason)
+            self.assertNotIn("REASON NOT WRITTEN", said, repr(reason))
+
+    def test_it_still_appears_on_a_dry_run(self):
+        """--apply is about writing. Whether the reason would be kept is the same either way, and
+        learning it only after committing to --apply is learning it too late."""
+        _t, _b, _a, said, _out = self.run_it("some history", apply_it=False)
+        self.assertIn("REASON NOT WRITTEN", said)
+
+    def test_a_marker_whose_figures_DO_move_still_carries_its_reason(self):
+        """The guard must not have turned the normal path off."""
+        t = Tree(files=[("a.bin", b"x" * 100)],
+                 marker={"archive": "an-archive", "files": "1", "bytes": "10"})
+        try:
+            rm.restate(t.root, t.archive, "this one must survive", apply_it=True, report=quiet)
+            self.assertIn("this one must survive", t.text())
+        finally:
+            t.close()
+
+
 if __name__ == "__main__":
     unittest.main()
