@@ -1688,7 +1688,7 @@ from common import (COMPLETE_MARKER, INDEX_FILE, MIN_FREE_BYTES, ROOT_MARKER, SU
                     comparable_path, hash_tree, http_date, http_open, human,
                     iter_tree, local_path, long_path, looks_like_a_document,
                     looks_like_a_loop,
-                    parse_listing, read_index, read_manifests, read_marker,
+                    manifest_coverage, parse_listing, read_index, read_manifests, read_marker,
                     resolution_base,
                     same_path_plus_slash, scan_tree, write_index, write_manifests,
                     write_marker as common_write_marker)
@@ -7572,6 +7572,24 @@ def verify(name):
     else:
         print("     Index: %d files, %+d against the tree -- `--index` catches it up"
               % (len(idx), len(idx) - n))
+
+    # AND WHAT THE OTHER THREE MANIFESTS ACTUALLY COVER, which nothing checked until 2026-10-03.
+    # nice-next held an index of 4 540 files, a .sha256sum of 4 540, and a .sha1sum, .md5sum and
+    # .sfv of ONE LINE EACH -- an incremental run wrote them from the single file it had re-hashed.
+    # A manifest covering one file looks exactly like a manifest covering all of them, and
+    # `md5sum -c` over it reports success.
+    #
+    # NOT PART OF `ok`, deliberately. This function answers "is the tree still what the marker
+    # says", and a thin manifest is a gap in our own bookkeeping rather than a change in the
+    # archive -- making it fail would turn every pre-digest archive into a MISMATCH and bury the
+    # finding this pass exists for. It is printed, and `--index-force` is the repair.
+    cover = manifest_coverage(root)
+    thin = sorted(a for a, c in cover.items() if c != n)
+    if thin:
+        print("     Manifests: %s -- `--index-force` once completes them"
+              % ", ".join("%s covers %d of %d" % (a, cover[a], n) for a in thin))
+    else:
+        print("     Manifests: all four cover the tree")
     return ok
 
 
