@@ -26,6 +26,7 @@ Each is self-contained and standard-library only unless its own README says othe
 |---------|--------------|
 | [`PyMirror/`](Python/PyMirror/README.md) | Mirrors whole HTTP archives and rsync modules, keeps a checksum index current as a side effect, and answers questions about what the copy actually holds. |
 | [`PySweeper/`](Python/PySweeper/README.md) | Empties a working directory from a per-file inventory that records *why*, and refuses anything the inventory no longer describes. |
+| [`PyFixity/`](Python/PyFixity/README.md) | Checksums for a directory tree in one read — SHA-256, SHA-1, MD5, CRC32 — kept current in an index, written as the manifests OpenHashTab and `sha256sum -c` read, and re-read later to catch silent damage. |
 | [`PyB2Verify/`](Python/PyB2Verify/README.md) | Proves that local directories and their Backblaze B2 buckets hold the same bytes, and re-reads either side against its own checksums to catch silent damage. Read-only towards B2; needs `b2sdk` and `boto3`. |
 | [`PyImageResizer/`](Python/PyImageResizer/README.md) | Image-processing toolkit with three subcommands; every one previews by default and needs `--execute` to touch a file. |
 | [`PyWebcamRecorder/`](Python/PyWebcamRecorder/README.md) | Screenshots one element of a webcam page at intervals to build a time-lapse. |
