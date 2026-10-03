@@ -44,6 +44,7 @@ import sys
 import urllib.parse
 
 from common import (MIRROR_ROOT, BOOKKEEPING_FILES, Pacer, exists, host_of, http_try,
+                    relative_to,
                     load_mirror, long_path, under_site)
 from robots import robots_verdict, sitemaps
 
@@ -100,14 +101,20 @@ def read_sitemap(body):
 
 
 def held_paths(archive_dir):
-    """-> the relative paths this archive holds, bookkeeping excluded."""
+    """-> the relative paths this archive holds, bookkeeping excluded.
+
+    common.relative_to AND NOT os.path.relpath, which NORMALISES and therefore strips a trailing
+    dot. This function used the raw one and the check it feeds then LIED about held files:
+    zx-kednos-vms holds `pub/misc/bliss/dbit/bliss11/readme.` -- 256 bytes, written through the
+    long-path form that keeps the name -- and os.path.relpath reported it as `readme`, so
+    the operator's sitemap naming `readme.` read as MISSING.
+    """
     out = set()
     for dirpath, _dirs, names in os.walk(archive_dir):
         for name in names:
             if name in BOOKKEEPING_FILES or name.startswith("."):
                 continue
-            rel = os.path.relpath(os.path.join(dirpath, name), archive_dir)
-            out.add(rel.replace(os.sep, "/"))
+            out.add(relative_to(archive_dir, os.path.join(dirpath, name)))
     return out
 
 
