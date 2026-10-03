@@ -88,10 +88,10 @@ python wedge_test.py
 Every path is a parameter, and `mirror.py` in particular has **no default root** -- the subject of
 the next section.
 
-The tools added later relax this. **Thirty-two of them** default `--root` to `Q:\mirror` --
+The tools added later relax this. **Thirty-three of them** default `--root` to `Q:\mirror` --
 `autoindex-tls-broken.py`, `b2-cluster.py`, `b2-pack.py`, `blogger-sitemap.py`, `case-collision-recover.py`,
 `containment.py`,
-`corpus-coverage.py`, `crawl-gap-audit.py`, `extract-container-tar.py`, `fill-from-local.py`, `find-html-imposters.py`, `find-sitemaps.py`,
+`converge.py`, `corpus-coverage.py`, `crawl-gap-audit.py`, `extract-container-tar.py`, `fill-from-local.py`, `find-html-imposters.py`, `find-sitemaps.py`,
 `holes-run.py`, `holes-vs-source.py`, `http-subset-fetch.py`, `ia-item-fetch.py`,
 `index-vs-tree.py`, `iso-second-opinion.py`, `manifest-fetch.py`,
 `nginx-autoindex-gallery.py`, `page-extensions.py`,
@@ -107,7 +107,7 @@ The tools added later relax this. **Thirty-two of them** default `--root` to `Q:
 `reachability-probe.py`, `unpacked-vs-archive.py` — because none of them walks the collection.
 `ask-the-source.py` is the clearest case: it reads recorded lengths from a table and bytes from a
 URL, and a `--root` it never used would be an invitation to believe it had checked something on
-disk. 32 + 8 + 2 + 8 = **50 scripts with an argument parser**, which is the whole set.
+disk. 33 + 8 + 2 + 8 = **51 scripts with an argument parser**, which is the whole set.
 
 They are maintenance tools for one collection rather than general-purpose fetchers, and the trade
 is deliberate -- but it is a trade. This paragraph named three tools for a while, then kept naming

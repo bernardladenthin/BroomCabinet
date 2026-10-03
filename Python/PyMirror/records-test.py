@@ -131,8 +131,8 @@ class ARecordFileIsNotContent(unittest.TestCase):
     untested, so the loop is the test.
     """
 
-    NAMES = ("FRAGMENT-COPIES-REMOVED.txt", "HOW-THIS-ARRIVED.md", "RENAMED.txt",
-             "SYMLINKS.txt", "EXTRACTED-FROM.md")
+    NAMES = ("FRAGMENT-COPIES-REMOVED.txt", "HOW-THIS-ARRIVED.md", "CONVERGED.md",
+             "RENAMED.txt", "SYMLINKS.txt", "EXTRACTED-FROM.md")
 
     def test_an_auditor_skips_every_one(self):
         for name in self.NAMES:
