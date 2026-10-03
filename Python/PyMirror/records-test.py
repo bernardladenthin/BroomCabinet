@@ -37,6 +37,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import urllib.parse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -154,6 +155,68 @@ class ARecordFileIsNotContent(unittest.TestCase):
             self.assertEqual(audited, ["real.bin"])
         finally:
             shutil.rmtree(d, ignore_errors=True)
+
+
+class ToolsConnectToTheHostTheBaseNamesAndPaceOnTheFoldedOne(unittest.TestCase):
+    """host_of() folds `www.` away. That is right for PACING and wrong for CONNECTING.
+
+    Two archives share one operator when one is spelled `example.org` and the other
+    `www.example.org`, and they should share one rate -- that is what the folding is for. But the
+    folded name NEED NOT EXIST. Five archives here are registered on a `www.` host whose apex does
+    not resolve at all: cmu-shadow, rs6000-microcode, crashing-org-www, sun3arc and
+    dreamlandbbs-os2.
+
+    THE SAME DEFECT, IN TWO TOOLS, FOUND A DAY APART. recheck-decisions.py had it and was fixed on
+    2026-10-02 with the reason written into its source. find-sitemaps.py had it too and was not
+    looked at, so on 2026-10-03 it reported
+
+        dreamlandbbs-os2   no answer (URLError)
+
+    for an archive whose robots.txt answers a clean 404 -- it had asked `dreamlandbbs.com`, which
+    does not resolve. Five archives carried a false verdict. None of the five turned out to
+    publish a sitemap, so nothing was hidden, but the verdicts were untrue.
+
+    This test exists because fixing one tool and writing a careful comment in it is not a check on
+    the next tool. A rule that two files have to follow belongs in a test that reads both.
+    """
+
+    TOOLS = ("find-sitemaps.py", "recheck-decisions.py")
+
+    def source(self, name):
+        with io.open(os.path.join(HERE, name), encoding="utf-8") as fh:
+            return fh.read()
+
+    def test_each_tool_connects_to_the_hostname_from_the_base(self):
+        for name in self.TOOLS:
+            self.assertIn("urlsplit(base).hostname", self.source(name), name)
+
+    def test_and_none_of_them_connects_to_the_folded_name(self):
+        """`host_of(base)` may appear -- for pacing -- but never as the thing a url is built from.
+
+        The check is textual and therefore coarse; it is a ratchet against the exact shape that
+        failed twice, not a proof. What failed was a root url interpolated from the folded name.
+        """
+        for name in self.TOOLS:
+            src = self.source(name)
+            for bad in ('"%s://%s/" % (urllib.parse.urlsplit(base).scheme, host_of(base))',
+                        'urlsplit(base).scheme, host_of(base))'):
+                self.assertNotIn(bad, src, "%s builds a url from the folded host" % name)
+
+    def test_the_folded_name_is_still_what_paces(self):
+        """Dropping the folding would be the opposite mistake: two spellings of one operator
+        hammering the same machine, which is the shape that has cost this collection two hosts."""
+        for name in self.TOOLS:
+            self.assertIn("host_of(base)", self.source(name), name)
+
+    def test_the_five_archives_this_was_found_on_still_have_a_www_base(self):
+        """If one of them is ever re-registered on its apex, this case stops meaning anything --
+        better that it says so by failing than that it keeps passing for the wrong reason."""
+        mirror = load("mirror")
+        bases = dict(mirror.ARCHIVES)
+        for name in ("cmu-shadow", "rs6000-microcode", "crashing-org-www", "sun3arc",
+                     "dreamlandbbs-os2"):
+            self.assertIn(name, bases)
+            self.assertTrue(urllib.parse.urlsplit(bases[name]).hostname.startswith("www."), name)
 
 
 class AnUnpackedTreeIsRecordedWhereTheMirrorIs(unittest.TestCase):

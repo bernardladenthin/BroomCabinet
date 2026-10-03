@@ -165,7 +165,17 @@ def fetch(url, limit=4 * 1024 * 1024):
 
 def look(name, base, archive_dir, mirror, save=False, pacer=None, follow=0):
     """Two requests at most for one archive. -> a one-line verdict string."""
-    host = host_of(base)
+    # TWO HOSTS, ON PURPOSE. host_of() FOLDS `www.` AWAY so that an apex and a www spelling share
+    # one rate -- right for pacing, wrong for connecting, because the folded name need not exist.
+    # dreamlandbbs-os2 is registered on `https://www.dreamlandbbs.com/gfd/`; `dreamlandbbs.com`
+    # without the www does not resolve at all, so this tool asked a host that is not there and
+    # reported "no answer (URLError)" for an archive whose robots.txt answers a clean 404.
+    #
+    # THE SAME DEFECT WAS FIXED IN recheck-decisions.py ON 2026-10-02 and written up there, one
+    # day before it was found here. A hazard recorded next to one tool is not a check on the next
+    # one -- the third time that sentence has had to be written this week.  [2026-10-03]
+    host = urllib.parse.urlsplit(base).hostname
+    pace_key = host_of(base)
     if mirror and mirror.blocked_host(base):
         return "%-24s SKIPPED -- the host is in DO_NOT_FETCH" % name
 
@@ -176,7 +186,7 @@ def look(name, base, archive_dir, mirror, save=False, pacer=None, follow=0):
     # shape that has cost this collection two hosts. The pacer is keyed by host, so unrelated
     # hosts never wait for one another.
     if pacer:
-        pacer.wait(host)
+        pacer.wait(pace_key)
     status, robots_text = fetch(root + "robots.txt", limit=256 * 1024)
     declared = sitemaps(robots_text) if isinstance(status, int) and status == 200 else []
 
@@ -214,7 +224,7 @@ def look(name, base, archive_dir, mirror, save=False, pacer=None, follow=0):
         if verdict != "OPEN":
             note += "  [robots: %s -- %s]" % (verdict, why)
     if pacer:
-        pacer.wait(host)
+        pacer.wait(pace_key)
     status, text = fetch(url)
     if not isinstance(status, int):
         # THE NOTE BELONGS HERE MOST OF ALL. A frozen, unpacked origin not answering is the
@@ -236,7 +246,7 @@ def look(name, base, archive_dir, mirror, save=False, pacer=None, follow=0):
         locs = []
         for part in parts[:follow]:
             if pacer:
-                pacer.wait(host)
+                pacer.wait(pace_key)
             st, body = http_try(part, timeout=120, limit=64 * 1024 * 1024)[:2]
             if not (isinstance(st, int) and st == 200 and body):
                 print("     part %s -> %s" % (part[-40:], st), flush=True)
