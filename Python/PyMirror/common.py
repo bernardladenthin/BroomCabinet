@@ -172,7 +172,7 @@ __all__ = [
     "OWN_FILES", "is_own_file", "BOOKKEEPING_FILES", "is_bookkeeping_file",
     "COMPLETE_MARKER", "INDEX_FILE", "SUMS_FILE", "PROVENANCE_FILE", "CATALOGUE_FILE",
     "DIGESTS", "digests_of_file", "crc32_text", "MANIFEST_FILES",
-    "SHA1_FILE", "MD5_FILE", "SFV_FILE", "write_manifests", "read_manifests", "read_sfv", "read_sums", "sfv_line",
+    "SHA1_FILE", "MD5_FILE", "SFV_FILE", "write_manifests", "read_manifests", "manifest_coverage", "read_sfv", "read_sums", "sfv_line",
     "MIRROR_ROOT",
     "ROOT_MARKER", "ARCHIVE_MARKERS", "archive_root",
     "COLLECTION_INDEX", "COLLECTION_SUMS",
@@ -3566,6 +3566,33 @@ def read_manifests(archive_dir, want=("sha1", "md5", "crc32")):
         for rel, value in pairs:
             out.setdefault(rel, {})[algo] = value
     return out
+
+
+def manifest_coverage(archive_dir, want=DIGESTS):
+    """-> {algorithm: how many files that archive's manifest covers}. 0 for one not written yet.
+
+    A MANIFEST COVERING ONE FILE LOOKS EXACTLY LIKE A MANIFEST COVERING ALL OF THEM, and
+    `md5sum -c` over it reports success. That is the whole reason this exists.
+
+    FOUND ON 2026-10-03, AND NOT BY A TOOL. nice-next carried an index of 4 540 files and a
+    .sha256sum of 4 540 -- and a .sha1sum, .md5sum and .sfv of ONE LINE EACH. A single README had
+    been fetched the day before and an INCREMENTAL index run wrote the three weaker manifests from
+    just that file: the read-back in read_manifests above cannot carry over digests that were never
+    there, and those three manifests did not exist yet. build_index does print "N of M files carry
+    the weaker digests" when it notices, and that line was printed, and nobody acted on it.
+
+    WHAT HID IT AFTERWARDS was a check of my own that asked whether the four files EXIST. All 113
+    archives answered yes, including this one. Existence is not coverage, and a count of lines
+    would have said so in the same second.
+    """
+    cover = {}
+    for algo in want:
+        path = os.path.join(archive_dir, MANIFEST_FILES[algo])
+        if algo == "crc32":
+            cover[algo] = len(read_sfv(path))
+        else:
+            cover[algo] = len(read_sums(path))
+    return cover
 
 
 def read_sfv(path):
