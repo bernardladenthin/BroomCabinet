@@ -188,11 +188,14 @@ HELD                                    files      size   note
   ia-bull-aix433-2005                     200   0.981 GB  Bull freeware for AIX 4.3.3, April 2005.
                                                           NO COMPILERS, though its own TOC names
                                                           three. Do not trust its 00_MD5.txt
-  zx-sgi-freeware-old                   1 295   0.944 GB  the retired SGI Freeware tree: IRIX
-                                                          tardist packages. Measured 2.40 GB and
-                                                          fetched 0.944 GB -- measure-remote counts
-                                                          what listings NAME, and this one names
-                                                          404s
+  zx-sgi-freeware-old                   5 702   6.677 GB  the retired SGI Freeware tree: IRIX
+                                                          tardist packages. Held 0.944 GB until
+                                                          2026-10-03, when the operator's own
+                                                          sitemap named 4 404 more files: the 2.40 GB
+                                                          measurement had been dismissed as inflated
+                                                          by 404 links and was in fact a FLOOR, too
+                                                          low by 4.28 GB. Now closed exactly against
+                                                          that inventory, 5 699 of 5 699
   filibeto-aix-lib                        174   0.841 GB  AIX manual sets IBM dropped
   crashing-org                          7 231   0.745 GB  gate.crashing.org, the PowerPC kernel
                                                           developers' own machine. ~benh/ holds G5
@@ -2297,7 +2300,7 @@ ARCHIVES = [
     ("square7-vintage", "http://vintagecomputers.square7.ch/Vintage/"),
     # biblionik-bull -- see PROVENANCE.md in the archive.
     ("biblionik-bull", "http://www.biblionik.fr/Info/Bull/SOLAR/"),
-    # ITS COMPLETE MARKER IS HAND-SET, the only one here -- 821 files, 66.3 MB, --verify
+    # ITS COMPLETE MARKER IS HAND-SET -- 821 files, 66.3 MB, --verify
     # UNCHANGED. A real crawl was not possible: countless attempts, and the request budget for
     # this host is spent. Sitemap covered 168/168 and the harvest at a fixed point; the marker
     # file itself carries the full caveat.
