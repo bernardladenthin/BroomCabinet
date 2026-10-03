@@ -89,9 +89,9 @@ nothing. Neither is written.
 
 Hashing a tree and checking it again is what `PyB2Verify` does for its local side and what
 `PyMirror` does for its archives, each with its own code. This project exists so that the logic
-lives in one place: `PyB2Verify` moves its local side onto this library next, adding only the part
-layouts B2 reports, and `PyMirror` can follow — its manifests already have the same names and
-formats, and its index the same leading columns.
+lives in one place. `PyB2Verify` builds its local side on this library, adding only the part
+layouts B2 reports; `PyMirror` can follow — its manifests already have the same names and formats,
+and its index the same leading columns.
 
 ## Tests
 

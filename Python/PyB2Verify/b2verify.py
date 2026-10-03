@@ -7,28 +7,33 @@
 r"""Check that local directories and their Backblaze B2 buckets hold the same bytes -- and keep
 checking, on both sides, that they still do. Nothing is ever uploaded, changed or deleted in B2.
 
-Each directory below `localRoot` belongs to the bucket of the same name. Checksums are kept in two
-tab-separated files per bucket, one per side, so that each side can be re-indexed or re-read on
-its own and compared later:
+Each directory below `localRoot` belongs to the bucket of the same name. The LOCAL side is
+PyFixity (../PyFixity): one read gives SHA-256, SHA-1, MD5, CRC32 and, for files B2 holds in parts,
+the S3 ETag; the result is an index plus the manifests .sha256sum .sha1sum .md5sum .sfv at the
+root of each bucket directory, which OpenHashTab and `sha256sum -c` read and which are uploaded
+with the data. This tool adds the B2 side and the comparison:
 
-    <stateDir>/checksums/local/<bucket>.tsv     written by hash-local, read by verify-local
-    <stateDir>/checksums/b2/<bucket>.tsv        written by hash-b2,    read by verify-b2
+    <stateDir>/checksums/local/<bucket>.csv     PyFixity's index, written by hash-local
+    <stateDir>/checksums/b2/<bucket>.tsv        what B2 states, written by hash-b2
     <stateDir>/reports/<bucket>*.md             one Markdown report per bucket and check
 
 COMMANDS
     check [bucket ...]          live: names and sizes, local tree against the bucket listing
         --mtime                 also compare modification times
-    hash-b2 [bucket ...]        record what B2 states: SHA-1, else S3 ETag and part sizes
+    hash-b2 [bucket ...]        record what B2 states: SHA-1, else S3 ETag and part sizes;
+                                lists uploads a dropped connection left open
         --download-unknown      download and hash files that have neither
-    hash-local [bucket ...]     bring the local checksums up to date (only what changed)
+    hash-local [bucket ...]     bring the local index up to date (only what changed) and write
+                                the manifests; part sizes from hash-b2 add the ETag in the same read
         --force                 re-read everything; a saved checksum is NEVER silently replaced
                                 when size and mtime are unchanged -- that is reported as damage
-    verify-local [bucket ...]   re-read local files and compare them with the saved checksums
+    verify-local [bucket ...]   re-read local files against the index, and say for each damaged
+                                file whether the copy in B2 can restore it
         --quick                 names, sizes and times only; read nothing
     verify-b2 [bucket ...]      compare the current bucket listing with the saved checksums
         --download              also stream every file from B2, hash it and compare it with what
                                 B2's metadata states -- straight from the network, no temp files
-    compare [bucket ...]        saved local checksums against saved B2 checksums, 1:1
+    compare [bucket ...]        local index against saved B2 checksums, 1:1
 
 VERIFICATION RUNS (verify-local, verify-b2 --download, hash-b2 --download-unknown)
     --threads N                 files in parallel (default: local 1, B2 4)
@@ -55,9 +60,9 @@ variable B2VERIFY_CONFIG. It holds the credentials, so it must never be committe
     ignoreDirs=scratch                      optional; directories below localRoot that are no bucket
                                             (stateDir and reportDir are recognised by themselves)
 
-WHY THE ETAG MATTERS. B2 has no SHA-1 for most files uploaded in parts. Their S3 ETag is the MD5 of
-the part MD5s; hash-b2 fetches it with the part sizes, and hash-local cuts the local file the same
-way. Run hash-b2 BEFORE hash-local, so the part sizes are known when the local file is read.
+The four manifests are uploaded with the data but are not compared: they describe a bucket rather
+than belong to it. A local checksum file of the first version (<bucket>.tsv) is moved onto the
+index on first use, without reading anything; the next hash-local then adds the new digests.
 
 Exit status: 0 everything matches / done, 1 differences found, 2 error.
 """
@@ -74,13 +79,11 @@ import time
 from pathlib import Path
 from typing import Iterator
 
-from b2lib import (CONTENT_VS_META, NOW_VS_SAVED, READ_CHUNK, YES, Diff, FileEntry, FileFilter,
-                   SnapshotSaver, VerifyPlan, b2_state, basename, checksums_match, classify_unfinished,
-                   compare, copy_entry,
-                   expected_from_metadata, fmt_ms, fmt_size, hash_chunks, hash_file, is_excluded,
-                   is_multipart_etag, load_previous, local_state, make_index, new_meta, norm, now_ts,
-                   parse_size, plan_verification, read_file_chunks, read_snapshot, run_parallel,
-                   scan_local, total)
+from b2lib import (B2_NOW_VS_SAVED, CONTENT_VS_META, LOCAL_VS_B2, YES, FileEntry, SnapshotSaver,
+                   b2_state, classify_unfinished, copy_entry, expected_from_metadata, is_root_manifest, load_previous, local_state, migrate_local_tsv, new_meta,
+                   read_snapshot)
+
+import fixity  # importable once b2lib has put ../PyFixity on the path
 
 CONFIG_ENV = "B2VERIFY_CONFIG"
 # Directories below localRoot that are never a bucket. Hidden ones (".venv", ...) are skipped too,
@@ -102,7 +105,7 @@ def load_properties(path: Path) -> dict[str, str]:
         fail(f"configuration not found: {path}")
     props: dict[str, str] = {}
     # utf-8-sig: Notepad and PowerShell's `Set-Content -Encoding utf8` write a byte order mark,
-    # which would otherwise turn the first key into "﻿keyId" and report it as missing.
+    # which would otherwise turn the first key into "\ufeffkeyId" and report it as missing.
     for line in path.read_text(encoding="utf-8-sig").splitlines():
         line = line.strip()
         if not line or line.startswith(("#", "!")):
@@ -198,7 +201,7 @@ class S3Info:
         h = self._head(bucket, e, part=1)
         etag = h["ETag"].strip('"')
         count = h.get("PartsCount")
-        if not count or not is_multipart_etag(etag):
+        if not count or not fixity.is_multipart_etag(etag):
             return etag, [e.size]
         first = h["ContentLength"]
         rest = e.size - first * (count - 1)
@@ -215,7 +218,7 @@ def b2_chunks(bucket, file_id: str) -> Iterator[bytes]:
     """A B2 file's content as a stream, from the network straight into the hasher. No temp file."""
     response = bucket.download_file_by_id(file_id).response
     try:
-        yield from response.iter_content(READ_CHUNK)
+        yield from response.iter_content(fixity.READ_CHUNK)
     finally:
         response.close()
 
@@ -223,7 +226,7 @@ def b2_chunks(bucket, file_id: str) -> Iterator[bytes]:
 def unfinished_uploads(bucket) -> list[str] | None:
     """Names of the bucket's unfinished large-file uploads; None if the bucket cannot be asked."""
     try:
-        return sorted(norm(f.file_name) for f in bucket.list_unfinished_large_files())
+        return sorted(fixity.norm(f.file_name) for f in bucket.list_unfinished_large_files())
     except Exception as e:  # never let a side report stop the actual check
         print(f"  note: cannot list unfinished uploads ({e})")
         return None
@@ -247,12 +250,15 @@ def unfinished_report(unfinished: list[str] | None, present: set[str]) -> list[s
 
 
 def scan_remote(bucket, excludes: list[str]) -> list[FileEntry]:
+    """The bucket's current files, without the folder placeholders, the permanent exclusions and
+    the four manifests at its root."""
     files: list[FileEntry] = []
     for fv, _folder in bucket.ls(latest_only=True, recursive=True):
         if fv.action != "upload":  # hidden or deleted versions are not files
             continue
-        name = norm(fv.file_name)
-        if basename(name) == B2_FOLDER_PLACEHOLDER or is_excluded(name, excludes):
+        name = fixity.norm(fv.file_name)
+        if (fixity.basename(name) == B2_FOLDER_PLACEHOLDER or is_root_manifest(name)
+                or fixity.is_excluded(name, excludes)):
             continue
         sha1 = fv.get_content_sha1()
         files.append(FileEntry(name, fv.size, fv.mod_time_millis, sha1=sha1,
@@ -262,33 +268,40 @@ def scan_remote(bucket, excludes: list[str]) -> list[FileEntry]:
 
 # --------------------------------------------------------------------------- output
 
-def checksum_pair(lf: FileEntry, rf: FileEntry) -> tuple[str, str, str]:
-    if lf.sha1 and rf.sha1:
-        return "SHA-1", lf.sha1, rf.sha1
-    return "ETag", lf.etag or "", rf.etag or ""
+def checksum_pair(a, b) -> tuple[str, str, str]:
+    """The digest a comparison used, with both sides' values, for display."""
+    used = fixity.checksums_match(a, b)[1] or "etag"
+    if used == "size":
+        return "size", str(a.size), str(b.size)
+    return used, getattr(a, used, None) or "", getattr(b, used, None) or ""
 
 
-def unknown_reason(lf: FileEntry, rf: FileEntry) -> str:
-    if not rf.sha1 and not rf.etag:
+def unknown_reason(a, b) -> str:
+    if not getattr(b, "sha1", None) and not getattr(b, "etag", None) and not getattr(b, "sha256", None):
         return "no checksum recorded (hash-b2, or --download-unknown)"
-    if rf.etag and not rf.sha1 and lf.parts != rf.parts:
+    if getattr(b, "etag", None) and not getattr(b, "sha1", None) and a.parts != b.parts:
         return "part MD5s missing (run hash-local again after hash-b2)"
     return "checksum missing (run hash-local)"
 
 
-def describe_duplicate(key: str, ls: list[FileEntry], rs: list[FileEntry], d: Diff) -> str:
-    parts = [f"{d.labels.left} {e.path} ({fmt_size(e.size)})" for e in ls]
-    parts += [f"{d.labels.right} {e.path} ({fmt_size(e.size)})" for e in rs]
+def describe_duplicate(key: str, ls: list, rs: list, d: fixity.Diff) -> str:
+    parts = [f"{d.labels.left} {e.path} ({fixity.fmt_size(e.size)})" for e in ls]
+    parts += [f"{d.labels.right} {e.path} ({fixity.fmt_size(e.size)})" for e in rs]
     return f"{key}: " + "; ".join(parts)
 
 
-def print_diff(name: str, d: Diff, limit: int, check_sum: bool) -> None:
+def identical_text(d: fixity.Diff) -> str:
+    used = ", ".join(f"{k} {v}" for k, v in sorted(d.ok.items()))
+    return f"{d.identical}" + (f"  ({used})" if used else "")
+
+
+def print_diff(name: str, d: fixity.Diff, limit: int, check_sum: bool) -> None:
     lb = d.labels
     status = "DIFFERENCES" if d.has_differences() else "in sync"
     mode = ", flat" if d.flat else ""
     print(f"\n=== {name}: {status}  ({lb.left} {d.left_count} files, {lb.right} {d.right_count} files{mode})")
     if check_sum:
-        print(f"  checksum identical: {d.sha1_ok + d.etag_ok}  (SHA-1 {d.sha1_ok}, ETag/part MD5 {d.etag_ok})")
+        print(f"  checksum identical: {identical_text(d)}")
         if d.skipped:
             print(f"  not read (checked recently): {d.skipped}")
 
@@ -304,17 +317,18 @@ def print_diff(name: str, d: Diff, limit: int, check_sum: bool) -> None:
         if limit and len(rows) > limit:
             print(f"    ... and {len(rows) - limit} more (--limit 0 shows all)")
 
-    section(f"{lb.only_left}, {total(d.only_left)}", [f"+ {e.path}" for e in d.only_left])
-    section(f"{lb.only_right}, {total(d.only_right)}", [f"- {e.path}" for e in d.only_right])
+    size = fixity.fmt_size
+    section(f"{lb.only_left}, {fixity.total(d.only_left)}", [f"+ {e.path}" for e in d.only_left])
+    section(f"{lb.only_right}, {fixity.total(d.only_right)}", [f"- {e.path}" for e in d.only_right])
     section("size differs",
-            [f"~ {a.path}  {lb.left} {fmt_size(a.size)} / {lb.right} {fmt_size(b.size)}" + note(a.path)
-             for a, b in d.size])
+            [f"~ {a.path}  {lb.left} {size(a.size)} / {lb.right} {size(b.size)}" + note(a.path) for a, b in d.size])
     section("modification time differs",
-            [f"~ {a.path}  {lb.left} {fmt_ms(a.mtime_ms)} / {lb.right} {fmt_ms(b.mtime_ms)}" for a, b in d.mtime])
+            [f"~ {a.path}  {lb.left} {fixity.fmt_ns(a.mtime_ns)} / {lb.right} {fixity.fmt_ns(b.mtime_ns)}"
+             for a, b in d.mtime])
     section("checksum differs", [f"! {a.path}  ({checksum_pair(a, b)[0]})" + note(a.path) for a, b in d.checksum])
     section("read or download error", [f"X {a.path}  ({d.notes.get(a.path, '')})" for a, _b in d.errors])
     section("checksum not checkable",
-            [f"? {a.path}  ({fmt_size(a.size)}, {d.notes.get(a.path) or unknown_reason(a, b)})"
+            [f"? {a.path}  ({size(a.size)}, {d.notes.get(a.path) or unknown_reason(a, b)})"
              for a, b in d.checksum_unknown])
     section("name occurs more than once (not compared)",
             [f"* {describe_duplicate(k, ls, rs, d)}" for k, ls, rs in d.duplicates])
@@ -324,14 +338,14 @@ def md_cell(text: str) -> str:
     return text.replace("|", "\\|")
 
 
-def write_markdown(path: Path, title: str, d: Diff, options: list[str], info: list[str]) -> None:
-    lb = d.labels
+def write_markdown(path: Path, title: str, d: fixity.Diff, options: list[str], info: list[str]) -> None:
+    lb, size, total = d.labels, fixity.fmt_size, fixity.total
     status = "differences found" if d.has_differences() else "in sync"
     out = [
         f"# {title}",
         "",
         f"- **Status:** {status}",
-        f"- **Checked:** {now_ts()}",
+        f"- **Checked:** {fixity.now_ts()}",
         *info,
         f"- **Mode:** {'flat (file names only, directories ignored)' if d.flat else 'with directory structure'}",
         f"- **Compared:** {', '.join(['name', 'size'] + options)}",
@@ -346,8 +360,8 @@ def write_markdown(path: Path, title: str, d: Diff, options: list[str], info: li
     if "modification time" in options:
         out.append(f"| Modification time differs | {len(d.mtime)} | |")
     if "checksum" in options:
-        out.append(f"| Checksum identical (SHA-1) | {d.sha1_ok} | |")
-        out.append(f"| Checksum identical (ETag/part MD5) | {d.etag_ok} | |")
+        for used, count in sorted(d.ok.items()):
+            out.append(f"| Checksum identical ({used}) | {count} | |")
         if d.skipped:
             out.append(f"| Not read (checked recently) | {d.skipped} | |")
         out.append(f"| Checksum differs | {len(d.checksum)} | |")
@@ -366,49 +380,31 @@ def write_markdown(path: Path, title: str, d: Diff, options: list[str], info: li
         out.extend("| " + " | ".join(md_cell(c) for c in row) + " |" for row in rows)
 
     table(lb.only_left, ["File", "Size", "Modified"],
-          [[f"`{e.path}`", fmt_size(e.size), fmt_ms(e.mtime_ms)] for e in d.only_left])
+          [[f"`{e.path}`", size(e.size), fixity.fmt_ns(e.mtime_ns)] for e in d.only_left])
     table(lb.only_right, ["File", "Size", "Modified"],
-          [[f"`{e.path}`", fmt_size(e.size), fmt_ms(e.mtime_ms)] for e in d.only_right])
+          [[f"`{e.path}`", size(e.size), fixity.fmt_ns(e.mtime_ns)] for e in d.only_right])
     table("Size differs", ["File", lb.left, lb.right, "Note"],
-          [[f"`{a.path}`", fmt_size(a.size), fmt_size(b.size), d.notes.get(a.path, "")] for a, b in d.size])
+          [[f"`{a.path}`", size(a.size), size(b.size), d.notes.get(a.path, "")] for a, b in d.size])
     table("Modification time differs", ["File", lb.left, lb.right],
-          [[f"`{a.path}`", fmt_ms(a.mtime_ms), fmt_ms(b.mtime_ms)] for a, b in d.mtime])
+          [[f"`{a.path}`", fixity.fmt_ns(a.mtime_ns), fixity.fmt_ns(b.mtime_ns)] for a, b in d.mtime])
     table("Checksum differs", ["File", "Size", "Kind", lb.left, lb.right, "Note"],
-          [[f"`{a.path}`", fmt_size(a.size), *(lambda k, x, y: (k, f"`{x}`", f"`{y}`"))(*checksum_pair(a, b)),
+          [[f"`{a.path}`", size(a.size), *(lambda k, x, y: (k, f"`{x}`", f"`{y}`"))(*checksum_pair(a, b)),
             d.notes.get(a.path, "")] for a, b in d.checksum])
     table("Read or download error", ["File", "Size", "Error"],
-          [[f"`{a.path}`", fmt_size(a.size), d.notes.get(a.path, "")] for a, _b in d.errors])
+          [[f"`{a.path}`", size(a.size), d.notes.get(a.path, "")] for a, _b in d.errors])
     table("Checksum not checkable", ["File", "Size", "Reason"],
-          [[f"`{a.path}`", fmt_size(a.size), d.notes.get(a.path) or unknown_reason(a, b)]
+          [[f"`{a.path}`", size(a.size), d.notes.get(a.path) or unknown_reason(a, b)]
            for a, b in d.checksum_unknown])
     table("Name occurs more than once (not compared)", ["Name", lb.left, lb.right],
           [[f"`{k}`",
-            "<br>".join(f"`{e.path}` ({fmt_size(e.size)})" for e in ls),
-            "<br>".join(f"`{e.path}` ({fmt_size(e.size)})" for e in rs)] for k, ls, rs in d.duplicates])
+            "<br>".join(f"`{e.path}` ({size(e.size)})" for e in ls),
+            "<br>".join(f"`{e.path}` ({size(e.size)})" for e in rs)] for k, ls, rs in d.duplicates])
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(out) + "\n", encoding="utf-8")
 
 
-class Progress:
-    """One line per finished file in a (parallel) run. Called from the main thread only."""
-
-    def __init__(self, total_files: int, total_bytes: int) -> None:
-        self.n, self.total_files, self.total_bytes = 0, total_files, total_bytes
-        self.bytes, self.start = 0, time.monotonic()
-
-    def step(self, status: str, e: FileEntry) -> None:
-        self.n += 1
-        self.bytes += e.size
-        print(f"  [{self.n}/{self.total_files}] {status:<9} {fmt_size(e.size):>9}  {e.path}", flush=True)
-
-    def summary(self) -> str:
-        secs = time.monotonic() - self.start
-        speed = f", {fmt_size(self.bytes / secs)}/s" if secs > 1 else ""
-        return f"{fmt_size(self.bytes)} in {secs:.0f} s{speed}"
-
-
-def plan_text(plan: VerifyPlan, flt: FileFilter) -> list[str]:
+def plan_text(plan: fixity.VerifyPlan, flt: fixity.FileFilter) -> list[str]:
     info = [f"- **Run started:** {plan.run_start}" + (" (resumed)" if plan.resumed else "")]
     if plan.cutoff:
         info.append(f"- **Only files not checked since:** {plan.cutoff}")
@@ -453,13 +449,13 @@ class Context:
         self._thread = threading.local()
 
     @staticmethod
-    def _build_filter(args) -> FileFilter:
+    def _build_filter(args) -> fixity.FileFilter:
         try:
-            return FileFilter(
+            return fixity.FileFilter(
                 include=getattr(args, "include", None) or [],
                 exclude=getattr(args, "exclude", None) or [],
-                min_size=parse_size(args.min_size) if getattr(args, "min_size", None) else None,
-                max_size=parse_size(args.max_size) if getattr(args, "max_size", None) else None)
+                min_size=fixity.parse_size(args.min_size) if getattr(args, "min_size", None) else None,
+                max_size=fixity.parse_size(args.max_size) if getattr(args, "max_size", None) else None)
         except (ValueError, re.error) as e:
             fail(f"invalid selection: {e}")
 
@@ -489,11 +485,30 @@ class Context:
             self._s3 = S3Info(self.api, self.props["keyId"], self.props["applicationKey"])
         return self._s3
 
-    def snapshot_path(self, side: str, bucket: str) -> Path:
-        return self.checksum_dir / side / f"{bucket}.tsv"
+    def snapshot_path(self, bucket: str) -> Path:
+        """What B2 states about a bucket (written by hash-b2)."""
+        return self.checksum_dir / "b2" / f"{bucket}.tsv"
 
-    def snapshot_names(self, *sides: str) -> list[str]:
-        return sorted({p.stem for side in sides for p in (self.checksum_dir / side).glob("*.tsv")})
+    def local_index(self, bucket: str) -> Path:
+        """PyFixity's index of the local bucket directory. A first-version `<bucket>.tsv` beside it
+        is moved onto it here, once, without reading any file."""
+        index = self.checksum_dir / "local" / f"{bucket}.csv"
+        legacy = index.with_suffix(".tsv")
+        if not index.is_file() and legacy.is_file():
+            root = self.local_root / bucket if self.local_root else None
+            if root is None or not root.is_dir():
+                fail(f"{legacy} needs the local directory once to move onto the new index")
+            adopted, dropped = migrate_local_tsv(legacy, index, root, self.excludes)
+            print(f"  moved {legacy.name} onto {index.name}: {adopted} entries adopted, "
+                  f"{dropped} to be read again; the next hash-local adds SHA-256, MD5 and CRC32")
+        return index
+
+    def b2_names(self) -> list[str]:
+        return sorted(p.stem for p in (self.checksum_dir / "b2").glob("*.tsv"))
+
+    def local_names(self) -> list[str]:
+        d = self.checksum_dir / "local"
+        return sorted({p.stem for p in d.glob("*.csv")} | {p.stem for p in d.glob("*.tsv")})
 
     def threads(self, default: int) -> int:
         return getattr(self.args, "threads", None) or default
@@ -530,7 +545,7 @@ class Context:
             print(f"note: cannot list buckets ({e}); using the local directories")
             return self.local_dirs()
 
-    def report(self, name: str, diff: Diff, options: list[str], info: list[str],
+    def report(self, name: str, diff: fixity.Diff, options: list[str], info: list[str],
                suffix: str = "", title: str = "") -> None:
         if self.filter.active() and not any(i.startswith("- **Selection:**") for i in info):
             info = info + [f"- **Selection:** {self.filter.describe()}"]
@@ -539,6 +554,12 @@ class Context:
             md = self.report_dir / f"{name}{suffix}.md"
             write_markdown(md, title or name, diff, options, info)
             print(f"  -> {md}")
+
+
+def local_files(ctx: Context, name: str) -> list[fixity.Entry]:
+    """The local bucket directory as it is now, without manifests, index and exclusions."""
+    root = ctx.local_root / name
+    return fixity.scan_tree(root, ctx.excludes, fixity.own_files(root, ctx.local_index(name)))
 
 
 def cmd_check(ctx: Context) -> int:
@@ -558,16 +579,15 @@ def cmd_check(ctx: Context) -> int:
     for name in sorted(names):
         flat = ctx.is_flat(name)
         print(f"\nchecking {name}{' (flat)' if flat else ''} ...", flush=True)
-        local_path = ctx.local_root / name
-        if not local_path.is_dir():
-            print(f"  local directory missing: {local_path}")
+        if not (ctx.local_root / name).is_dir():
+            print(f"  local directory missing: {ctx.local_root / name}")
             any_diff = True
             continue
         bucket = ctx.api.get_bucket_by_name(name)
-        local = ctx.filter.apply(scan_local(local_path, ctx.excludes))
+        local = ctx.filter.apply(local_files(ctx, name))
         remote = ctx.filter.apply(scan_remote(bucket, ctx.excludes))
-        diff = compare(local, remote, flat, check_mtime=args.mtime,
-                       mtime_tolerance_ms=int(args.mtime_tolerance * 1000))
+        diff = fixity.compare(local, remote, flat, check_mtime=args.mtime,
+                              mtime_tolerance_ns=int(args.mtime_tolerance * 1e9), labels=LOCAL_VS_B2)
         ctx.report(name, diff, options, ["- **Source:** live (local tree and B2 listing)"])
         any_diff |= diff.has_differences()
 
@@ -575,15 +595,16 @@ def cmd_check(ctx: Context) -> int:
     return 1 if any_diff else 0
 
 
-def b2_part_layouts(ctx: Context, name: str, flat: bool) -> dict[str, tuple[list[int], bool]]:
+def b2_part_layouts(ctx: Context, name: str) -> fixity.Layouts:
     """From checksums/b2: files with an ETag but no SHA-1 -> (part sizes, multipart)."""
-    path = ctx.snapshot_path("b2", name)
+    path = ctx.snapshot_path(name)
     if not path.is_file():
         return {}
-    layouts = {}
+    flat = ctx.is_flat(name)
+    layouts: fixity.Layouts = {}
     for e in read_snapshot(path)[1]:
         if not e.sha1 and e.etag and e.parts:
-            layouts[basename(e.path) if flat else e.path] = (e.parts, is_multipart_etag(e.etag))
+            layouts[fixity.basename(e.path) if flat else e.path] = (e.parts, fixity.is_multipart_etag(e.etag))
     return layouts
 
 
@@ -591,64 +612,28 @@ def cmd_hash_local(ctx: Context) -> int:
     names = ctx.args.buckets or sorted(ctx.local_dirs())
     any_damage = False
     for name in names:
-        local_path = ctx.local_root / name
-        if not local_path.is_dir():
-            print(f"\n{name}: local directory missing ({local_path})")
+        root = ctx.local_root / name
+        if not root.is_dir():
+            print(f"\n{name}: local directory missing ({root})")
             continue
-        flat = ctx.is_flat(name)
-        out = ctx.snapshot_path("local", name)
-        prev_meta, prev = load_previous(out)
-        layouts = b2_part_layouts(ctx, name, flat)
-        entries = scan_local(local_path, ctx.excludes)
-        todo: list[tuple[FileEntry, list[int] | None, bool]] = []
-        for e in entries:
-            parts, multipart = layouts.get(basename(e.path) if flat else e.path, (None, False))
-            if parts and sum(parts) != e.size:
-                parts = None  # the size differs, so the file differs anyway
-            p = prev.get(e.path)
-            same_file = bool(p and p.sha1 and p.size == e.size and p.mtime_ms == e.mtime_ms)
-            if same_file:
-                e.verified = p.verified
-            if same_file and not ctx.args.force and (not parts or (p.etag and p.parts == parts)):
-                e.sha1, e.etag, e.parts = p.sha1, p.etag, p.parts
-            else:
-                todo.append((e, parts, multipart))
-        todo_bytes = sum(e.size for e, _p, _m in todo)
-        with_parts = sum(1 for _e, p, _m in todo if p)
-        print(f"\n{name}: {len(entries)} files, {len(entries) - len(todo)} unchanged, "
-              f"{len(todo)} to hash ({fmt_size(todo_bytes)}, {with_parts} of them with part MD5s for the ETag)",
-              flush=True)
-        if not layouts and not ctx.snapshot_path("b2", name).is_file():
+        print(flush=True)
+        index = ctx.local_index(name)
+        layouts = b2_part_layouts(ctx, name)
+        if not layouts and not ctx.snapshot_path(name).is_file():
             print("  note: no B2 checksums yet - large files without a SHA-1 in B2 become checkable "
                   "after 'hash-b2' and another 'hash-local'.")
-
-        saver = SnapshotSaver(out, new_meta(name, "local", prev_meta), entries, keep=lambda e: e.sha1)
-        start, done_bytes = time.monotonic(), 0
-        damaged: list[FileEntry] = []
-        try:
-            for i, (e, parts, multipart) in enumerate(todo, 1):
-                print(f"  [{i}/{len(todo)}] {fmt_size(e.size):>9}  {e.path}", flush=True)
-                sha1, etag = hash_file(e.abs_path, parts, multipart)
-                p = prev.get(e.path)
-                if p and p.sha1 and p.size == e.size and p.mtime_ms == e.mtime_ms and p.sha1 != sha1:
-                    # Same size, same mtime, different bytes: keep the saved checksum and say so.
-                    print(f"    DAMAGE? saved {p.sha1}, read {sha1} - the saved checksum is kept")
-                    e.sha1, e.etag, e.parts, e.verified = p.sha1, p.etag, p.parts, ""
-                    damaged.append(e)
-                else:
-                    e.sha1, e.etag, e.parts, e.verified = sha1, etag, parts, now_ts()
-                done_bytes += e.size
-                saver.maybe_save()
-        finally:
-            saver.save(complete=all(e.sha1 for e in entries))
-        secs = time.monotonic() - start
-        speed = f", {fmt_size(done_bytes / secs)}/s" if secs > 1 else ""
-        print(f"  -> {out}  ({secs:.0f} s{speed})")
-        if damaged:
+        key = fixity.basename if ctx.is_flat(name) else (lambda p: p)
+        r = fixity.update_index(root, index, ctx.excludes, layouts, key, ctx.args.force,
+                                out=lambda line: print(line, flush=True))
+        print(f"  -> {index}  ({r.summary}){'' if r.complete else '  INCOMPLETE'}")
+        for manifest, what in r.manifests.items():
+            print(f"  {manifest}: {what}")
+        if r.damaged:
             any_damage = True
-            print(f"  WARNING: {len(damaged)} file(s) with different content at the same size and time "
-                  f"(possible silent damage). Details and the state in B2: verify-local {name}")
-            for e in damaged:
+            print(f"  WARNING: {len(r.damaged)} file(s) with different content at the same size and time "
+                  f"(possible silent damage); the saved checksums were kept. Details and the state in "
+                  f"B2: verify-local {name}")
+            for e, _new in r.damaged:
                 print(f"    ! {e.path}")
     return 1 if any_damage else 0
 
@@ -656,7 +641,7 @@ def cmd_hash_local(ctx: Context) -> int:
 def cmd_hash_b2(ctx: Context) -> int:
     names = ctx.args.buckets or sorted(ctx.remote_buckets())
     for name in names:
-        out = ctx.snapshot_path("b2", name)
+        out = ctx.snapshot_path(name)
         prev_meta, prev = load_previous(out)
         print(f"\n{name}: listing B2 ...", flush=True)
         bucket = ctx.api.get_bucket_by_name(name)
@@ -671,7 +656,8 @@ def cmd_hash_b2(ctx: Context) -> int:
         need_etag = [e for e in entries if not e.sha1 and not e.etag]
         print(f"  {len(entries)} files: {sum(1 for e in entries if e.sha1)} with SHA-1, "
               f"{sum(1 for e in entries if not e.sha1 and e.etag)} with ETag, "
-              f"{len(need_etag)} without a checksum ({fmt_size(sum(e.size for e in need_etag))})", flush=True)
+              f"{len(need_etag)} without a checksum ({fixity.fmt_size(sum(e.size for e in need_etag))})",
+              flush=True)
         for line in unfinished_report(unfinished_uploads(bucket), {e.path for e in entries}):
             print(f"  {line}")
 
@@ -679,7 +665,7 @@ def cmd_hash_b2(ctx: Context) -> int:
         finished = False
         try:
             for i, e in enumerate(need_etag, 1):
-                print(f"  [{i}/{len(need_etag)}] ETag {fmt_size(e.size):>9}  {e.path}", flush=True)
+                print(f"  [{i}/{len(need_etag)}] ETag {fixity.fmt_size(e.size):>9}  {e.path}", flush=True)
                 try:
                     e.etag, e.parts = ctx.s3.etag_and_parts(name, e)
                     e.source = "s3"
@@ -688,10 +674,13 @@ def cmd_hash_b2(ctx: Context) -> int:
                 saver.maybe_save()
             unknown = [e for e in entries if not e.sha1 and not e.etag]
             if ctx.args.download_unknown and unknown:
-                progress = Progress(len(unknown), sum(e.size for e in unknown))
+                progress = fixity.Progress(len(unknown), sum(e.size for e in unknown),
+                                           out=lambda line: print(line, flush=True))
 
                 def work(e: FileEntry, stop: threading.Event) -> str:
-                    return hash_chunks(b2_chunks(ctx.thread_bucket(name), e.file_id), stop=stop)[0]
+                    digests = fixity.hash_chunks(b2_chunks(ctx.thread_bucket(name), e.file_id),
+                                                 stop=stop, want=("sha1",))[0]
+                    return digests["sha1"]
 
                 def done(e: FileEntry, sha1: str | None, err: Exception | None) -> None:
                     if err:
@@ -702,7 +691,7 @@ def cmd_hash_b2(ctx: Context) -> int:
                         progress.step("SHA-1", e)
                     saver.maybe_save()
 
-                run_parallel(unknown, work, ctx.threads(4), done)
+                fixity.run_parallel(unknown, work, ctx.threads(4), done)
                 print(f"  downloaded and hashed: {progress.summary()}")
             elif unknown:
                 print(f"  {len(unknown)} file(s) still without a checksum (--download-unknown hashes them)")
@@ -713,97 +702,54 @@ def cmd_hash_b2(ctx: Context) -> int:
     return 0
 
 
-def add_b2_notes(ctx: Context, diff: Diff, name: str, info: list[str]) -> None:
+def add_b2_notes(ctx: Context, diff: fixity.Diff, name: str, info: list[str]) -> None:
     """For every local checksum difference, say whether the copy in B2 is still intact."""
     flat = ctx.is_flat(name)
-    bp = ctx.snapshot_path("b2", name)
+    bp = ctx.snapshot_path(name)
     idx = None
     if bp.is_file():
         bmeta, bentries = read_snapshot(bp)
-        idx = make_index(bentries, flat)
+        idx = fixity.make_index(bentries, flat)
         info.append(f"- **B2 checksums (for the notes):** {saved_info(bmeta)}")
     for now, saved in diff.checksum:
-        kind = ("size and time unchanged - silent damage?" if now.mtime_ms == saved.mtime_ms
+        kind = ("size and time unchanged - silent damage?" if now.mtime_ns == saved.mtime_ns
                 else "the file was modified (new modification time)")
-        cands = None if idx is None else idx.get(basename(saved.path) if flat else saved.path, [])
+        cands = None if idx is None else idx.get(fixity.basename(saved.path) if flat else saved.path, [])
         diff.notes[now.path] = f"{kind}; {b2_state(now, saved, cands)}"
 
 
 def cmd_verify_local(ctx: Context) -> int:
-    """Local files against checksums/local: new, gone, changed, damaged."""
-    names = ctx.args.buckets or ctx.snapshot_names("local")
+    """Local files against PyFixity's index: new, gone, changed, damaged."""
+    names = ctx.args.buckets or ctx.local_names()
     if not names:
         print("no local checksums yet - run 'hash-local' first.")
         return 2
     any_diff = False
     for name in names:
-        sp, local_path = ctx.snapshot_path("local", name), ctx.local_root / name
-        if not sp.is_file() or not local_path.is_dir():
-            print(f"\n{name}: {'checksum file' if not sp.is_file() else 'local directory'} missing")
+        root = ctx.local_root / name
+        if not root.is_dir():
+            print(f"\n{name}: local directory missing")
             any_diff = True
             continue
-        meta, all_saved = read_snapshot(sp)
-        saved = ctx.filter.apply([e for e in all_saved if not is_excluded(e.path, ctx.excludes)])
-        by_path = {e.path: e for e in saved}
-        current = ctx.filter.apply(scan_local(local_path, ctx.excludes))
-        print(f"\nverifying {name} locally against the saved checksums ({saved_info(meta)}) ...", flush=True)
-        info = [f"- **Saved checksums:** {saved_info(meta)}"]
-        errors: dict[str, str] = {}
-        if not ctx.args.quick:
-            # Only files of unchanged size are read; new, gone or resized ones are reported anyway.
-            pairs = {e.path: (e, by_path[e.path]) for e in current
-                     if e.path in by_path and by_path[e.path].size == e.size}
-            plan = plan_verification([p for _e, p in pairs.values()], meta, ctx.args.resume, ctx.args.older_than)
-            for p in plan.skipped:
-                e = pairs[p.path][0]
-                e.sha1, e.skipped = p.sha1, True
-            if plan.resumed:
-                print(f"  resuming the run of {plan.run_start}")
-            todo = [pairs[p.path] for p in plan.todo]
-            print(f"  reading {len(todo)} files ({fmt_size(sum(e.size for e, _p in todo))}) on "
-                  f"{ctx.threads(1)} thread(s), {len(plan.skipped)} skipped ...", flush=True)
-            meta["verify_start"] = plan.run_start
-            saver = SnapshotSaver(sp, meta, all_saved, complete_key="verify_complete")
-            progress = Progress(len(todo), sum(e.size for e, _p in todo))
-
-            def work(pair: tuple[FileEntry, FileEntry], stop: threading.Event):
-                e, p = pair
-                # Known part sizes are hashed along, so a difference can be judged against B2's ETag.
-                parts = p.parts if p.etag else None
-                return hash_chunks(read_file_chunks(e.abs_path), parts,
-                                   bool(p.etag and is_multipart_etag(p.etag)), stop)
-
-            def done(pair: tuple[FileEntry, FileEntry], result, err: Exception | None) -> None:
-                e, p = pair
-                if err:
-                    errors[e.path] = f"read error: {err}"
-                    p.verified = ""
-                    progress.step("ERROR", e)
-                else:
-                    e.sha1, e.etag, _size = result
-                    e.parts = p.parts if p.etag else None
-                    ok = e.sha1 == p.sha1
-                    # A failed file loses its timestamp, so every later run reads it again.
-                    p.verified = now_ts() if ok else ""
-                    progress.step("OK" if ok else "MISMATCH", e)
-                saver.maybe_save()
-
-            finished = False
-            try:
-                run_parallel(todo, work, ctx.threads(1), done)
-                finished = True
-            finally:
-                saver.save(complete=finished)
-            print(f"  read: {progress.summary()}")
-            info += plan_text(plan, ctx.filter)
-        diff = compare(current, saved, flat=False, check_mtime=True, mtime_tolerance_ms=0,
-                       check_sum=not ctx.args.quick, labels=NOW_VS_SAVED)
-        diff.attach_errors(errors)
-        if diff.checksum:
-            add_b2_notes(ctx, diff, name, info)
+        index = ctx.local_index(name)
+        if not index.is_file():
+            print(f"\n{name}: no local index - run 'hash-local {name}' first")
+            any_diff = True
+            continue
+        state = fixity.read_state(index)
+        print(f"\nverifying {name} locally against its index ({saved_info(state)}) ...", flush=True)
+        r = fixity.verify_tree(root, index, ctx.excludes, ctx.filter, ctx.args.quick, ctx.args.resume,
+                               ctx.args.older_than, ctx.threads(1), out=lambda line: print(line, flush=True))
+        info = [f"- **Local index:** {saved_info(state)}"]
+        if r.summary:
+            print(f"  read: {r.summary}")
+        if r.plan:
+            info += plan_text(r.plan, ctx.filter)
+        if r.diff.checksum:
+            add_b2_notes(ctx, r.diff, name, info)
         options = ["modification time"] + ([] if ctx.args.quick else ["checksum"])
-        ctx.report(name, diff, options, info, suffix=".local", title=f"{name} - local against saved checksums")
-        any_diff |= diff.has_differences()
+        ctx.report(name, r.diff, options, info, suffix=".local", title=f"{name} - local against its index")
+        any_diff |= r.diff.has_differences()
     print("\nresult:", "differences found." if any_diff else "nothing changed.")
     return 1 if any_diff else 0
 
@@ -814,22 +760,22 @@ def verify_b2_content(ctx: Context, name: str, meta: dict[str, str], all_saved: 
     current_ids = {e.path: e.file_id for e in current}
     # Only files that still exist in B2 exactly as recorded in checksums/b2.
     candidates = [p for p in saved if current_ids.get(p.path) == p.file_id]
-    plan = plan_verification(candidates, meta, ctx.args.resume, ctx.args.older_than)
+    plan = fixity.plan_verification(candidates, meta, ctx.args.resume, ctx.args.older_than)
     threads = ctx.threads(4)
     print(f"\nverifying the content of {name} in B2: {len(plan.todo)} files "
-          f"({fmt_size(sum(p.size for p in plan.todo))}) on {threads} thread(s), {len(plan.skipped)} skipped"
+          f"({fixity.fmt_size(sum(p.size for p in plan.todo))}) on {threads} thread(s), {len(plan.skipped)} skipped"
           + (f" (resuming the run of {plan.run_start})" if plan.resumed else ""), flush=True)
     meta["verify_start"] = plan.run_start
-    saver = SnapshotSaver(ctx.snapshot_path("b2", name), meta, all_saved, complete_key="verify_complete")
-    progress = Progress(len(plan.todo), sum(p.size for p in plan.todo))
+    saver = SnapshotSaver(ctx.snapshot_path(name), meta, all_saved, complete_key="verify_complete")
+    progress = fixity.Progress(len(plan.todo), sum(p.size for p in plan.todo), out=lambda line: print(line, flush=True))
     content: dict[str, FileEntry] = {p.path: copy_entry(p, skipped=True) for p in plan.skipped}
     errors: dict[str, str] = {}
     expected = {p.path: expected_from_metadata(p) for p in plan.todo + plan.skipped}
 
     def work(p: FileEntry, stop: threading.Event):
         parts = p.parts if p.etag else None
-        return hash_chunks(b2_chunks(ctx.thread_bucket(name), p.file_id), parts,
-                           bool(p.etag and is_multipart_etag(p.etag)), stop)
+        return fixity.hash_chunks(b2_chunks(ctx.thread_bucket(name), p.file_id), parts,
+                                  bool(p.etag and fixity.is_multipart_etag(p.etag)), stop, want=("sha1",))
 
     def done(p: FileEntry, result, err: Exception | None) -> None:
         if err:
@@ -837,33 +783,34 @@ def verify_b2_content(ctx: Context, name: str, meta: dict[str, str], all_saved: 
             content[p.path] = copy_entry(p, sha1=None, etag=None)
             progress.step("ERROR", p)
         else:
-            sha1, etag, size = result
-            content[p.path] = got = FileEntry(p.path, size, p.mtime_ms, sha1, etag, p.parts if p.etag else None)
-            match = checksums_match(got, expected[p.path])
+            digests, etag, size = result
+            content[p.path] = got = FileEntry(p.path, size, p.mtime_ms, digests["sha1"], etag,
+                                              p.parts if p.etag else None)
+            match = fixity.checksums_match(got, expected[p.path])[0]
             if match and not p.sha1:
-                p.sha1 = sha1  # a real SHA-1, confirmed by the ETag -> comparable by SHA-1 from now on
+                p.sha1 = digests["sha1"]  # a real SHA-1, confirmed by the ETag -> comparable by SHA-1 from now on
             # A failed file loses its timestamp, so every later run downloads it again.
-            p.verified = now_ts() if match else ""
+            p.verified = fixity.now_ts() if match else ""
             progress.step({True: "OK", False: "MISMATCH", None: "UNKNOWN"}[match], p)
         saver.maybe_save()
 
     finished = False
     try:
-        run_parallel(plan.todo, work, threads, done)
+        fixity.run_parallel(plan.todo, work, threads, done)
         finished = True
     finally:
         saver.save(complete=finished)
     print(f"  read: {progress.summary()}")
 
-    diff = compare([content[p] for p in expected if p in content], list(expected.values()),
-                   flat=False, check_sum=True, labels=CONTENT_VS_META)
+    diff = fixity.compare([content[p] for p in expected if p in content], list(expected.values()),
+                          check_sum=True, labels=CONTENT_VS_META)
     diff.attach_errors(errors)
     if diff.checksum or diff.size:
-        local_sp = ctx.snapshot_path("local", name)
+        local_index = ctx.checksum_dir / "local" / f"{name}.csv"
         flat = ctx.is_flat(name)
-        idx = make_index(read_snapshot(local_sp)[1], flat) if local_sp.is_file() else None
+        idx = fixity.make_index(fixity.read_index(local_index), flat) if local_index.is_file() else None
         for got, _exp in diff.checksum + diff.size:
-            cands = None if idx is None else idx.get(basename(got.path) if flat else got.path, [])
+            cands = None if idx is None else idx.get(fixity.basename(got.path) if flat else got.path, [])
             diff.notes[got.path] = f"B2 content does not match the B2 metadata; {local_state(got, cands)}"
     info = [f"- **B2 checksums:** {saved_info(meta)}", f"- **Threads:** {threads}"] + plan_text(plan, ctx.filter)
     ctx.report(name, diff, ["checksum"], info, suffix=".b2-content", title=f"{name} - B2 content against B2 metadata")
@@ -872,19 +819,20 @@ def verify_b2_content(ctx: Context, name: str, meta: dict[str, str], all_saved: 
 
 def cmd_verify_b2(ctx: Context) -> int:
     """The current B2 listing against checksums/b2; with --download also the content."""
-    names = ctx.args.buckets or ctx.snapshot_names("b2")
+    names = ctx.args.buckets or ctx.b2_names()
     if not names:
         print("no B2 checksums yet - run 'hash-b2' first.")
         return 2
     any_diff = False
     for name in names:
-        sp = ctx.snapshot_path("b2", name)
+        sp = ctx.snapshot_path(name)
         if not sp.is_file():
             print(f"\n{name}: checksum file missing ({sp})")
             any_diff = True
             continue
         meta, all_saved = read_snapshot(sp)
-        saved = ctx.filter.apply([e for e in all_saved if not is_excluded(e.path, ctx.excludes)])
+        saved = ctx.filter.apply([e for e in all_saved
+                                  if not fixity.is_excluded(e.path, ctx.excludes) and not is_root_manifest(e.path)])
         print(f"\nverifying {name} in B2 against the saved checksums ({saved_info(meta)}) ...", flush=True)
         bucket = ctx.api.get_bucket_by_name(name)
         listing = scan_remote(bucket, ctx.excludes)
@@ -902,7 +850,7 @@ def cmd_verify_b2(ctx: Context) -> int:
         if unfinished:
             info.append(f"- **Unfinished uploads:** {unfinished[0]}")
             info += [f"  - {line.strip()}" for line in unfinished[1:]]
-        diff = compare(current, saved, flat=False, check_sum=True, labels=NOW_VS_SAVED)
+        diff = fixity.compare(current, saved, check_sum=True, labels=B2_NOW_VS_SAVED)
         ctx.report(name, diff, ["checksum"], info, suffix=".b2", title=f"{name} - B2 against saved checksums")
         any_diff |= diff.has_differences()
         if ctx.args.download:
@@ -915,31 +863,35 @@ def cmd_compare(ctx: Context) -> int:
     if ctx.args.buckets:
         names = ctx.args.buckets
     else:
-        names = ctx.snapshot_names("local", "b2")
+        names = sorted(set(ctx.local_names()) | set(ctx.b2_names()))
         if not names:
             print("no checksums yet - run 'hash-b2' and 'hash-local' first.")
             return 2
 
     any_diff = False
     for name in names:
-        lp, rp = ctx.snapshot_path("local", name), ctx.snapshot_path("b2", name)
+        lp = ctx.checksum_dir / "local" / f"{name}.csv"
+        if not lp.is_file() and lp.with_suffix(".tsv").is_file():
+            lp = ctx.local_index(name)  # moves a first-version file onto the index
+        rp = ctx.snapshot_path(name)
         missing = [f"{p} missing ({cmd})" for p, cmd in ((lp, "hash-local"), (rp, "hash-b2")) if not p.is_file()]
         if missing:
             print(f"\n{name}: " + "; ".join(missing))
             any_diff = True
             continue
-        lmeta, local = read_snapshot(lp)
+        lstate = fixity.read_state(lp)
         rmeta, remote = read_snapshot(rp)
-        local = ctx.filter.apply([e for e in local if not is_excluded(e.path, ctx.excludes)])
-        remote = ctx.filter.apply([e for e in remote if not is_excluded(e.path, ctx.excludes)])
+        local = ctx.filter.apply([e for e in fixity.read_index(lp) if not fixity.is_excluded(e.path, ctx.excludes)])
+        remote = ctx.filter.apply([e for e in remote
+                                   if not fixity.is_excluded(e.path, ctx.excludes) and not is_root_manifest(e.path)])
         flat = ctx.is_flat(name)
         print(f"\ncomparing checksums of {name}{' (flat)' if flat else ''} ...")
         info = []
-        for label, meta in (("local", lmeta), ("B2", rmeta)):
+        for label, meta in (("local", lstate), ("B2", rmeta)):
             line = saved_info(meta)
             print(f"  {label} as of: {line}")
             info.append(f"- **{label} as of:** {line}")
-        diff = compare(local, remote, flat, check_sum=True)
+        diff = fixity.compare(local, remote, flat, check_sum=True, labels=LOCAL_VS_B2)
         ctx.report(name, diff, ["checksum"], info)
         any_diff |= diff.has_differences()
 
@@ -976,20 +928,20 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("check", parents=[common, selection], help="live: names and sizes")
     p.add_argument("--mtime", action="store_true", help="also compare modification times")
     p.add_argument("--mtime-tolerance", type=float, default=2.0, help="tolerance for --mtime in seconds")
-    p = sub.add_parser("hash-local", parents=[common], help="bring the local checksums up to date")
+    p = sub.add_parser("hash-local", parents=[common], help="update the local index and write the manifests")
     p.add_argument("--force", action="store_true", help="re-read every file, not only changed ones")
     p = sub.add_parser("hash-b2", parents=[common], help="record what B2 states (SHA-1, else S3 ETag)")
     p.add_argument("--download-unknown", action="store_true",
                    help="download and hash files without any checksum (costs download traffic)")
     p.add_argument("--threads", type=int, metavar="N", help="parallel downloads (default 4)")
     p = sub.add_parser("verify-local", parents=[common, selection, verify],
-                       help="re-read local files against checksums/local")
+                       help="re-read local files against the local index")
     p.add_argument("--quick", action="store_true", help="names, sizes and times only; read nothing")
     p = sub.add_parser("verify-b2", parents=[common, selection, verify],
                        help="B2 against checksums/b2; with --download also the content")
     p.add_argument("--download", action="store_true",
                    help="stream the content from B2 and check it against the B2 metadata (costs download traffic)")
-    sub.add_parser("compare", parents=[common, selection], help="saved local against saved B2 checksums")
+    sub.add_parser("compare", parents=[common, selection], help="local index against saved B2 checksums")
     return ap
 
 
