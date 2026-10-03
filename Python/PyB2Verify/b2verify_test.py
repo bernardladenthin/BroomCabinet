@@ -25,6 +25,7 @@ from pathlib import Path
 
 import b2lib as lib
 import b2verify
+import fixity
 
 
 def run(*argv: str) -> tuple[int, str]:
@@ -174,11 +175,11 @@ class CommandTest(unittest.TestCase):
         """What hash-b2 would have recorded: SHA-1 for two files, only an ETag for the big one."""
         entries = []
         for rel in ("a.bin", "sub/b.bin"):
-            sha1, _ = lib.hash_file(self.bucket / rel)
+            sha1 = fixity.hash_file(self.bucket / rel)[0]["sha1"]
             entries.append(lib.FileEntry(rel, (self.bucket / rel).stat().st_size, 0,
                                          sha1="0" * 40 if rel == broken else sha1, source="b2"))
         parts = [1000, 1000, 500]
-        _, etag = lib.hash_file(self.bucket / "big.bin", parts, True)
+        _, etag = fixity.hash_file(self.bucket / "big.bin", parts, True)
         entries.append(lib.FileEntry("big.bin", 2500, 0, etag=etag, parts=parts, source="s3"))
         meta = lib.new_meta("example-bucket", "b2") | {"complete": lib.YES}
         lib.write_snapshot(self.checksums / "b2" / "example-bucket.tsv", meta, entries)
@@ -202,11 +203,11 @@ class CommandTest(unittest.TestCase):
         self.write_b2_checksums()
         code, out = self.cmd("hash-local", "example-bucket", "--no-report")
         self.assertEqual(code, 0, out)
-        self.assertIn("1 of them with part MD5s", out)  # the ETag file is cut like B2 cut it
+        self.assertIn("1 with part MD5s", out)  # the ETag file is cut like B2 cut it
 
         code, out = self.cmd("compare", "example-bucket", "--no-report")
         self.assertEqual(code, 0, out)
-        self.assertIn("checksum identical: 3  (SHA-1 2, ETag/part MD5 1)", out)
+        self.assertIn("checksum identical: 3  (etag 1, sha1 2)", out)
 
         self.write_b2_checksums(broken="a.bin")
         code, out = self.cmd("compare", "example-bucket", "--no-report")
@@ -228,15 +229,16 @@ class CommandTest(unittest.TestCase):
     def test_silent_damage_is_found_and_the_good_checksum_is_kept(self):
         self.write_b2_checksums()
         self.cmd("hash-local", "example-bucket", "--no-report")
-        saved_before = (self.checksums / "local" / "example-bucket.tsv").read_text(encoding="utf-8")
+        index = self.checksums / "local" / "example-bucket.csv"
+        good = {e.path: e.sha256 for e in fixity.read_index(index)}
         damage(self.bucket / "a.bin")
 
         code, out = self.cmd("hash-local", "example-bucket", "--no-report", "--force")
         self.assertEqual(code, 1, out)
         self.assertIn("DAMAGE?", out)
-        saved_after = (self.checksums / "local" / "example-bucket.tsv").read_text(encoding="utf-8")
-        sha1_line = [ln for ln in saved_before.splitlines() if ln.endswith("\ta.bin")][0].split("\t")[2]
-        self.assertIn(sha1_line, saved_after)  # the damaged bytes did not replace the good checksum
+        # the damaged bytes did not replace the good checksum, neither in the index nor in the manifest
+        self.assertEqual({e.path: e.sha256 for e in fixity.read_index(index)}, good)
+        self.assertEqual(fixity.read_sums(self.bucket / ".sha256sum")["a.bin"], good["a.bin"])
 
         code, out = self.cmd("verify-local", "example-bucket")
         self.assertEqual(code, 1, out)
@@ -288,8 +290,38 @@ class CommandTest(unittest.TestCase):
 
         code, out = self.cmd("hash-local", "--no-report")  # no bucket named: every local directory
         self.assertEqual(code, 0, out)
-        written = sorted(p.name for p in (data / "state" / "checksums" / "local").glob("*.tsv"))
-        self.assertEqual(written, ["example-bucket.tsv"])
+        written = sorted(p.name for p in (data / "state" / "checksums" / "local").glob("*.csv"))
+        self.assertEqual(written, ["example-bucket.csv"])
+
+    def test_manifests_are_written_into_the_bucket_and_never_compared(self):
+        self.write_b2_checksums()
+        code, out = self.cmd("hash-local", "example-bucket", "--no-report")
+        self.assertEqual(code, 0, out)
+        for name in (".sha256sum", ".sha1sum", ".md5sum", ".sfv"):
+            self.assertTrue((self.bucket / name).is_file(), name)
+        self.assertEqual(set(fixity.read_sums(self.bucket / ".md5sum")), {"a.bin", "sub/b.bin", "big.bin"})
+        # Uploaded with the data, the manifests show up in B2 too -- and are left out on both sides.
+        meta, entries = lib.read_snapshot(self.checksums / "b2" / "example-bucket.tsv")
+        entries.append(lib.FileEntry(".sha1sum", 99, 0, sha1="f" * 40, source="b2"))
+        lib.write_snapshot(self.checksums / "b2" / "example-bucket.tsv", meta, entries)
+        code, out = self.cmd("compare", "example-bucket", "--no-report")
+        self.assertEqual(code, 0, out)
+        self.assertIn("Local 3 files, B2 3 files", out)
+
+    def test_a_first_version_checksum_file_is_moved_onto_the_index(self):
+        self.write_b2_checksums()
+        old = []
+        for rel in ("a.bin", "sub/b.bin", "big.bin"):
+            st = (self.bucket / rel).stat()
+            old.append(lib.FileEntry(rel, st.st_size, st.st_mtime_ns // 1_000_000,
+                                     fixity.hash_file(self.bucket / rel)[0]["sha1"], source="local"))
+        lib.write_snapshot(self.checksums / "local" / "example-bucket.tsv", {"created": "x"}, old)
+        code, out = self.cmd("hash-local", "example-bucket", "--no-report")
+        self.assertEqual(code, 0, out)
+        self.assertIn("3 entries adopted", out)
+        self.assertTrue((self.checksums / "local" / "example-bucket.tsv.migrated").is_file())
+        self.assertTrue(all(e.has_all_digests() for e in fixity.read_index(self.checksums / "local" / "example-bucket.csv")))
+        self.assertEqual(self.cmd("compare", "example-bucket", "--no-report")[0], 0)
 
     def test_verify_local_skips_what_was_checked_recently(self):
         self.cmd("hash-local", "example-bucket", "--no-report")

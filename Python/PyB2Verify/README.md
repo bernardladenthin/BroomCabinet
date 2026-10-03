@@ -16,13 +16,20 @@ These tools answer both, and **never upload, change or delete anything in B2**.
 | | |
 |---|---|
 | `b2verify.py` | the command line: index each side, compare them, re-read either side against its index |
-| `b2lib.py` | the rules: selection, stream hashing, checksum files, comparison, run planning. No network, no third-party package |
-| `b2lib_test.py` | covers `b2lib.py`, including an S3 ETag reference implementation and a path longer than 300 characters |
+| `b2lib.py` | the B2 side without the network: what B2 states about a file, its checksum file, how a difference is explained, unfinished uploads, and the one-time move of first-version local checksums onto PyFixity |
+| `b2lib_test.py` | covers `b2lib.py`, including that move — adopted without reading, and damage since then still reported |
 | `b2verify_test.py` | drives `hash-local`, `verify-local` and `compare` end to end through the real command line, on a throwaway tree with a flipped byte |
 | `privacy_test.py` | refuses drive letters, keys, e-mail addresses and home directories in this project |
 
-Needs `b2sdk` and `boto3` (`requirements.txt`) for the commands that talk to B2. `--help`, the
-library and every test run on the standard library alone.
+**The local side is [PyFixity](../PyFixity/README.md)**, imported from beside this project: one read
+of each file gives SHA-256, SHA-1, MD5, CRC32 and — with the part sizes `hash-b2` recorded — the S3
+ETag; the result is PyFixity's index and the manifests `.sha256sum .sha1sum .md5sum .sfv` at the
+root of each bucket directory, which OpenHashTab and `sha256sum -c` read. The manifests are
+uploaded with the data; both sides of every comparison leave them out, because they describe a
+bucket rather than belong to it.
+
+Needs `b2sdk` and `boto3` (`requirements.txt`) for the commands that talk to B2. `--help`, both
+libraries and every test run on the standard library alone.
 
 ## Setup
 
@@ -117,9 +124,15 @@ Each side is indexed on its own, so either can be refreshed or re-read without t
 
     python b2verify.py check                      quick and live: names and sizes only
 
-Everything lands in `<stateDir>/checksums/{local,b2}/<bucket>.tsv` — plain tab-separated text with
-size, modification time, SHA-1, ETag, part sizes, the time of the last successful check and the
-relative path — and in one Markdown report per bucket and check.
+What B2 states lands in `<stateDir>/checksums/b2/<bucket>.tsv` (size, time, SHA-1, ETag, part
+sizes, file id, last check); the local side in PyFixity's index `<stateDir>/checksums/local/<bucket>.csv`
+(all four digests, ETag, part sizes, last check) plus the four manifests in the bucket directory;
+and every check writes one Markdown report per bucket.
+
+A local `<bucket>.tsv` from the first version of this tool is moved onto the index the first time
+it is needed, **without reading any file**: an entry is adopted while the file keeps its recorded
+size and time. It has only SHA-1, so the next `hash-local` reads every file once more to add SHA-256,
+MD5 and CRC32 — checking the old SHA-1 on the way. The old file stays as `<bucket>.tsv.migrated`.
 
 Run `hash-b2` **before** `hash-local`: the part sizes come from B2, and the local file is cut the
 same way while it is read anyway.
