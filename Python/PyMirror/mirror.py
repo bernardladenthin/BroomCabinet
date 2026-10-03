@@ -7819,11 +7819,44 @@ def _main_after_guards(args, todo):
         print("indexing %s  (%d hash threads)\n"
               % (", ".join(n for n, _ in todo), args.hash_workers), flush=True)
         t0 = time.time()
+        # ONE ARCHIVE'S FAILURE IS NOT THE RUN'S, and the branch directly below already said so
+        # about --verify: "one unverifiable archive used to end the run and leave every later
+        # mirror unchecked". The same sentence was never applied here.
+        #
+        # IT COST A SEVEN-HOUR RUN ON 2026-10-03. The collection-wide four-digest pass reached
+        # archive 54 of 113 and died with WinError 5 on os.replace of ibm-redbooks' index --
+        # a file another process had open for reading. Everything hashed stayed hashed, but the
+        # 56 archives after it never got their sha1, md5 and crc32, and a traceback was the only
+        # report. A transient lock on Windows -- a reader, a backup, an indexer -- must not be
+        # able to do that.
+        #
+        # OSError ONLY, not Exception: a permission error, a full volume or a vanished directory
+        # is a fact about one archive, while anything else is a defect in this program and
+        # should still stop it.
+        broken = []
         for name, _ in todo:
-            build_index(name, args.hash_workers, force=args.index_force,
-                        interval=args.interval)
+            try:
+                build_index(name, args.hash_workers, force=args.index_force,
+                            interval=args.interval)
+            except OSError as e:
+                broken.append((name, e))
+                print("  %-24s FAILED -- %s" % (name, e), flush=True)
+                print("  %-24s the run continues; this archive keeps the index it had"
+                      % "", flush=True)
         print("\ndone in %dm%02ds" % ((time.time() - t0) // 60, (time.time() - t0) % 60),
               flush=True)
+        if broken:
+            # NAMED AGAIN AT THE END, because the line above scrolls past in a run this long,
+            # and a non-zero exit so a script cannot read a partial pass as a complete one.
+            print("\n%d archive(s) did NOT get an index:" % len(broken), flush=True)
+            for name, e in broken:
+                print("    %-24s %s" % (name, e), flush=True)
+            # sys.exit AND NOT `return 1`, which is what this first said and which did
+            # nothing at all: the entry point is `main()` and not `sys.exit(main())`, so
+            # every return value from here is discarded and the process always exited 0.
+            # --verify two branches down calls sys.exit directly for exactly this reason.
+            # The test caught it; reading the code did not.
+            sys.exit(1)
         return
 
     if args.verify:

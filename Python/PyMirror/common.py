@@ -708,6 +708,24 @@ OWN_FILES = frozenset({
     SFV_FILE,
 })
 
+# AND EVERY ONE OF THEM AGAIN WITH `.tmp`, because write_index writes `<name>.tmp` and then renames
+# it -- and a run that dies between the two leaves the `.tmp` behind. On 2026-10-03 the
+# collection-wide four-digest run died on exactly that step, with WinError 5, and left
+# `ibm-redbooks/.mirror-index.csv.tmp` on disk. That file was in NEITHER set, so a marker and every
+# auditor would have counted 331 KB of our own scratch as content in that archive.
+#
+# DERIVED RATHER THAN LISTED, so a manifest added later is covered by arriving. The suffix is NOT
+# added to PARTIAL_SUFFIXES, which would have been the shorter change and the wrong one: a mirrored
+# archive is free to contain a real file called something.tmp, and this collection exists to keep
+# such files rather than to hide them. Only OUR OWN write targets are named here.  [2026-10-03]
+# THE UNION IS TYPE-PRESERVING ON PURPOSE: `a | b` takes the type of the LEFT operand, so a
+# frozenset stays frozen and -- if contract-mutations.py turns the literal above into a
+# plain set -- the result stays MUTABLE and the guard still bites. Written as
+# `frozenset(OWN_FILES | ...)` first, which re-froze the mutation and silently turned the
+# rule "an exported set made mutable again" into decoration. The mutation report caught it
+# the same minute, which is the whole reason that script exists.
+OWN_FILES = OWN_FILES | frozenset(name + ".tmp" for name in OWN_FILES)
+
 # BOOKKEEPING_FILES is what a tool may skip when it only wants CONTENT -- an auditor, a lister, a
 # duplicate hunter. It is a superset, and being wider is the safe direction here: a file wrongly
 # skipped is one an auditor does not report on, while a file wrongly read as content is hashed
