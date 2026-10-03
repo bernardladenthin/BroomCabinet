@@ -169,6 +169,7 @@ A whole collection is better verified in portions — one bucket per night with 
 | buckets uploaded without directories | `flatBuckets` / `--flat` compares file names only and reports a name that occurs twice instead of guessing |
 | folders created in the B2 web interface | the `.bzEmpty` placeholder is not a file and is ignored |
 | a B2 file replaced by a new upload | B2 files are immutable; a new file id means new content, so nothing is carried over from the old one |
+| an upload cut off by a dropped connection | a multi-part upload stays open in B2: its parts are stored and billed, but it appears in no listing. `hash-b2` and `verify-b2` list them, as *leftover* when a finished file of that name exists and *NOT IN B2* when none does. A read-only key cannot cancel them; a lifecycle rule on the bucket ("cancel unfinished large files after N days") can |
 
 ## Tests
 

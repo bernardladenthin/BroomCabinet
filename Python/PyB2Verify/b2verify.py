@@ -75,7 +75,8 @@ from pathlib import Path
 from typing import Iterator
 
 from b2lib import (CONTENT_VS_META, NOW_VS_SAVED, READ_CHUNK, YES, Diff, FileEntry, FileFilter,
-                   SnapshotSaver, VerifyPlan, b2_state, basename, checksums_match, compare, copy_entry,
+                   SnapshotSaver, VerifyPlan, b2_state, basename, checksums_match, classify_unfinished,
+                   compare, copy_entry,
                    expected_from_metadata, fmt_ms, fmt_size, hash_chunks, hash_file, is_excluded,
                    is_multipart_etag, load_previous, local_state, make_index, new_meta, norm, now_ts,
                    parse_size, plan_verification, read_file_chunks, read_snapshot, run_parallel,
@@ -217,6 +218,32 @@ def b2_chunks(bucket, file_id: str) -> Iterator[bytes]:
         yield from response.iter_content(READ_CHUNK)
     finally:
         response.close()
+
+
+def unfinished_uploads(bucket) -> list[str] | None:
+    """Names of the bucket's unfinished large-file uploads; None if the bucket cannot be asked."""
+    try:
+        return sorted(norm(f.file_name) for f in bucket.list_unfinished_large_files())
+    except Exception as e:  # never let a side report stop the actual check
+        print(f"  note: cannot list unfinished uploads ({e})")
+        return None
+
+
+def unfinished_report(unfinished: list[str] | None, present: set[str]) -> list[str]:
+    """Lines for the console and the report; empty when there is nothing unfinished.
+
+    Uploads interrupted by a dropped connection do not show up in any listing, yet their parts are
+    stored and billed. A read-only key cannot cancel them; a lifecycle rule on the bucket
+    ("cancel unfinished large files after N days") or a key with write access can.
+    """
+    if not unfinished:
+        return []
+    leftovers, missing = classify_unfinished(unfinished, present)
+    lines = [f"{len(unfinished)} unfinished large-file upload(s) - stored and billed until cancelled "
+             f"(a lifecycle rule on the bucket can do that; a read-only key cannot):"]
+    lines += [f"  NOT IN B2: {n}  (no finished file of that name)" for n in missing]
+    lines += [f"  leftover:  {n}  (a finished file of that name exists)" for n in leftovers]
+    return lines
 
 
 def scan_remote(bucket, excludes: list[str]) -> list[FileEntry]:
@@ -645,6 +672,8 @@ def cmd_hash_b2(ctx: Context) -> int:
         print(f"  {len(entries)} files: {sum(1 for e in entries if e.sha1)} with SHA-1, "
               f"{sum(1 for e in entries if not e.sha1 and e.etag)} with ETag, "
               f"{len(need_etag)} without a checksum ({fmt_size(sum(e.size for e in need_etag))})", flush=True)
+        for line in unfinished_report(unfinished_uploads(bucket), {e.path for e in entries}):
+            print(f"  {line}")
 
         saver = SnapshotSaver(out, new_meta(name, "b2", prev_meta), entries)
         finished = False
@@ -857,16 +886,24 @@ def cmd_verify_b2(ctx: Context) -> int:
         meta, all_saved = read_snapshot(sp)
         saved = ctx.filter.apply([e for e in all_saved if not is_excluded(e.path, ctx.excludes)])
         print(f"\nverifying {name} in B2 against the saved checksums ({saved_info(meta)}) ...", flush=True)
-        current = ctx.filter.apply(scan_remote(ctx.api.get_bucket_by_name(name), ctx.excludes))
+        bucket = ctx.api.get_bucket_by_name(name)
+        listing = scan_remote(bucket, ctx.excludes)
+        current = ctx.filter.apply(listing)
         # B2 files are immutable: the same file id means the same content.
         by_path = {e.path: e for e in saved}
         for e in current:
             p = by_path.get(e.path)
             if not e.sha1 and p and p.file_id == e.file_id:
                 e.sha1, e.etag, e.parts = p.sha1, p.etag, p.parts
+        info = [f"- **Saved checksums:** {saved_info(meta)}"]
+        unfinished = unfinished_report(unfinished_uploads(bucket), {e.path for e in listing})
+        for line in unfinished:
+            print(f"  {line}")
+        if unfinished:
+            info.append(f"- **Unfinished uploads:** {unfinished[0]}")
+            info += [f"  - {line.strip()}" for line in unfinished[1:]]
         diff = compare(current, saved, flat=False, check_sum=True, labels=NOW_VS_SAVED)
-        ctx.report(name, diff, ["checksum"], [f"- **Saved checksums:** {saved_info(meta)}"],
-                   suffix=".b2", title=f"{name} - B2 against saved checksums")
+        ctx.report(name, diff, ["checksum"], info, suffix=".b2", title=f"{name} - B2 against saved checksums")
         any_diff |= diff.has_differences()
         if ctx.args.download:
             any_diff |= verify_b2_content(ctx, name, meta, all_saved, saved, current)
