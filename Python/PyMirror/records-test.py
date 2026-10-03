@@ -123,38 +123,56 @@ class ARepairIsDatedWhenItHappened(unittest.TestCase):
 
 
 class ARecordFileIsNotContent(unittest.TestCase):
+    """An archive's hand-written notes: skipped by auditors, counted by markers.
 
-    NAME = "FRAGMENT-COPIES-REMOVED.txt"
+    OVER ALL OF THEM AND NOT ONE BY NAME, because the list grows. FRAGMENT-COPIES-REMOVED.txt was
+    added on 2026-10-02 and HOW-THIS-ARRIVED.md on 2026-10-03 -- the second with no test at all
+    until it was looked for. A class pinned to a single NAME invites the next addition to be
+    untested, so the loop is the test.
+    """
 
-    def test_an_auditor_skips_it(self):
-        self.assertIn(self.NAME, common.BOOKKEEPING_FILES)
+    NAMES = ("FRAGMENT-COPIES-REMOVED.txt", "HOW-THIS-ARRIVED.md", "RENAMED.txt",
+             "SYMLINKS.txt", "EXTRACTED-FROM.md")
 
-    def test_a_marker_does_NOT(self):
-        """THE WIDE SET ONLY, and this is the assertion that makes the change safe. Markers go
-        through iter_tree, which skips the NARROW set; adding the name there would move four
-        markers by one file each -- and those four were rewritten from the tree the same day and
-        agree with it."""
-        self.assertNotIn(self.NAME, common.OWN_FILES)
+    def test_an_auditor_skips_every_one(self):
+        for name in self.NAMES:
+            self.assertIn(name, common.BOOKKEEPING_FILES, name)
 
-    def test_it_sits_beside_the_precedent_it_was_argued_from(self):
-        """RENAMED.txt is the shape the tool's docstring appeals to. If that one ever moved to the
-        narrow set, this one's reasoning would have moved with it."""
+    def test_a_marker_counts_every_one(self):
+        """THE WIDE SET ONLY, and this is the assertion that makes each addition safe. Markers go
+        through iter_tree, which skips the NARROW set; putting a name there would move every
+        marker of every archive carrying that file by one, and those markers agree with their
+        trees today."""
+        for name in self.NAMES:
+            self.assertNotIn(name, common.OWN_FILES, name)
+
+    def test_the_precedent_they_were_all_argued_from_still_holds(self):
+        """RENAMED.txt is the shape each tool's docstring appeals to. If it ever moved to the
+        narrow set, the reasoning behind the others would have moved with it."""
         self.assertIn("RENAMED.txt", common.BOOKKEEPING_FILES)
         self.assertNotIn("RENAMED.txt", common.OWN_FILES)
 
-    def test_a_tree_walk_still_counts_it_and_an_audit_does_not(self):
+    def test_a_tree_walk_counts_them_and_an_audit_does_not(self):
         d = tempfile.mkdtemp()
         try:
-            for name in ("real.bin", self.NAME):
+            for name in ("real.bin",) + self.NAMES:
                 with io.open(os.path.join(d, name), "wb") as fh:
                     fh.write(b"x")
             counted = sorted(rel for rel, _f in common.iter_tree(d))
             audited = sorted(rel for rel, _f in
                              common.iter_tree(d, own_files=common.BOOKKEEPING_FILES))
-            self.assertEqual(counted, [self.NAME, "real.bin"])
+            self.assertEqual(counted, sorted(("real.bin",) + self.NAMES))
             self.assertEqual(audited, ["real.bin"])
         finally:
             shutil.rmtree(d, ignore_errors=True)
+
+    def test_the_one_that_prompted_the_loop_is_really_registered(self):
+        """HOW-THIS-ARRIVED.md, beside dreamlandbbs-os2's marker: its crawl took three minutes
+        because twelve hours of fetching came first, and `duration 0h00m` says the first and hides
+        the second. The note carries that history, and restate-marker.py refuses to put prose in a
+        marker whose figures did not move -- which is why a separate file was needed at all."""
+        self.assertIn("HOW-THIS-ARRIVED.md", common.BOOKKEEPING_FILES)
+        self.assertNotIn("HOW-THIS-ARRIVED.md", common.OWN_FILES)
 
 
 class ToolsConnectToTheHostTheBaseNamesAndPaceOnTheFoldedOne(unittest.TestCase):
