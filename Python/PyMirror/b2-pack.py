@@ -267,9 +267,13 @@ UNITS = (
          "repacked when it is.",
          DEFAULTS.with_(method=5, dictionary="1g")),
 
-    Unit("aix-opensource", ["oss4aix.org", "rwth-aachen-ftp"],
-         "218 GB that is 100 % rpm. Stored rather than compressed: there is nothing to win and "
-         "-m0 turns the longest packing job in the plan into a copy.",
+    Unit("aix-opensource", ["oss4aix.org"],
+         "208 GB that is 100 % rpm. Stored rather than compressed: there is nothing to win and "
+         "-m0 turns the longest packing job in the plan into a copy. "
+         "`rwth-aachen-ftp` LEFT ON 2026-10-03 and the unit's own sentence is why: this one is "
+         "all rpm, and that archive held none -- 41 % exe, 25 % zip, 17 % pdf -- so it was being "
+         "stored under a rule written for somebody else's content. It shared 0.00 GB with this "
+         "unit and 6.30 GB with ibm-pc-hardware, where it now is.",
          DEFAULTS.with_(method=0)),
 
     Unit("aix-media", ["fsck-aix-media", "fsck-aix-apps"],
@@ -303,18 +307,28 @@ UNITS = (
          "for that to be free.",
          DEFAULTS.with_(method=5, dictionary="512m")),
 
-    Unit("ibm-pc-hardware", ["ps-2.kev009.com", "ardent-tool", "mcamafia"],
-         "364 GB of PS/2 and RS/6000 hardware material -- pccbbs alone is 248 GB. They share "
+    Unit("ibm-pc-hardware", ["ps-2.kev009.com", "ardent-tool", "mcamafia", "rwth-aachen-ftp"],
+         "374 GB of PS/2 and RS/6000 hardware material -- pccbbs alone is 248 GB. They share "
          "5.81 GB of identical files and the same subject. `mcamafia` joined on 2026-09-26: "
          "170 MB of Peter Wendt's own PS/2 technical-reference scans, the same subject as "
          "ardent-tool and very likely overlapping it. It belongs beside the archive it may "
          "duplicate rather than in another unit, where the duplication would be paid for twice; "
-         "`b2-cluster.py` reports how much is actually shared."),
+         "`b2-cluster.py` reports how much is actually shared. "
+         "`rwth-aachen-ftp` JOINED ON 2026-10-03, moved out of aix-opensource, and four separate "
+         "readings agreed: it shared 0.00 GB with its old unit and 6.30 GB here -- 62 % of its "
+         "own 10.16 GB, 8 490 files of it with ps-2.kev009.com alone; its content profile is "
+         "41 % exe / 25 % zip / 17 % pdf against ps-2's 26 % iso / 26 % exe / 12 % pdf, while the "
+         "unit it sat in is 100 % rpm and stored BECAUSE of that; and somebody after PS/2 "
+         "material had to open two archives to get it. 59 % of that archive is contained in "
+         "ps-2.kev009.com."),
 
     Unit("ibm-os2-other", ["fsck-ibm-other", "os2bbs", "zx-hobbes-os2", "infania-unixos2",
                            "dreamlandbbs-os2"],
-         "126 GB of IBM's non-AIX world: OS/2, OS/400, and the two OS/2 file collections, which "
-         "share 1.83 GB with each other."),
+         "144 GB of IBM's non-AIX world: OS/2, OS/400, and THREE OS/2 file collections. The "
+         "1.83 GB of identical files is between os2bbs and zx-hobbes-os2; `dreamlandbbs-os2` "
+         "grew from almost nothing to 18.85 GB on 2026-10-03 and shares only 0.07 GB with "
+         "either, which was worth measuring rather than assuming -- two OS/2 shareware "
+         "collections that barely overlap. It is here for the subject, not for the duplicates."),
 
     # ---------------------------------------------------------------- bitsavers, split by its own
     # top level. The cut follows the rsync tree, so a re-fetch touches a KNOWN subset of units --
@@ -355,7 +369,9 @@ UNITS = (
 
     # ---------------------------------------------------------------- by platform
     Unit("sgi", ["irixnet-ftp", "zx-sgi-freeware-old", "sgidepot"],
-         "55 GB of IRIX. The fsck.technology SGI tree stays in `fsck-vendors`; see the note there "
+         "61 GB of IRIX -- 55 GB until 2026-10-03, when zx-sgi-freeware-old went from 0.94 GB to "
+         "6.68 GB: its hand-written marker had claimed complete while the operator's own sitemap "
+         "named 4 404 more files. The fsck.technology SGI tree stays in `fsck-vendors`; see the note there "
          "-- 105 GB would have to move to join it, and one host per unit keeps re-fetches "
          "simple. `sgidepot` joined on 2026-09-26: 497 MB of Ian Mapleson's own writing, "
          "including his HTML re-typesetting of the Indigo2 Technical Report. Its European "
