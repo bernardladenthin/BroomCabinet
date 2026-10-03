@@ -535,6 +535,18 @@ def local_state(content: FileEntry, candidates: list[FileEntry] | None) -> str:
             else "local file differs from the B2 content -> check it, re-upload if it is good")
 
 
+def classify_unfinished(unfinished: list[str], present: set[str]) -> tuple[list[str], list[str]]:
+    """Unfinished large-file uploads -> (leftovers, missing), each sorted and without repeats.
+
+    A dropped connection during a multi-part upload leaves the upload open in B2: its parts are
+    stored and billed, but the file never appears in a listing. A LEFTOVER has a finished file of
+    the same name beside it -- the upload was retried and completed, and the abandoned parts only
+    cost storage. A MISSING one has no finished file of that name: that file is not in B2 at all.
+    """
+    names = set(unfinished)
+    return sorted(names & present), sorted(names - present)
+
+
 # --------------------------------------------------------------------------- verification runs
 
 @dataclass

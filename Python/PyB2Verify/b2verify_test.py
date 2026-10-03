@@ -18,6 +18,8 @@ import os
 import socket
 import tempfile
 import time
+import types
+import unicodedata
 import unittest
 from pathlib import Path
 
@@ -106,6 +108,46 @@ class PreflightTest(unittest.TestCase):
         self.assertEqual(code, 2, out)
         self.assertIn("B2 is not reachable from this machine", out)
         self.assertLess(elapsed, 5)
+
+
+class FakeBucket:
+    """Stands in for a b2sdk bucket: only what unfinished_uploads() asks of it."""
+
+    def __init__(self, names=(), error: Exception | None = None):
+        self.names, self.error = list(names), error
+
+    def list_unfinished_large_files(self):
+        if self.error:
+            raise self.error
+        return [types.SimpleNamespace(file_name=n, file_id=f"id{i}") for i, n in enumerate(self.names)]
+
+
+class UnfinishedUploadsTest(unittest.TestCase):
+    def test_interrupted_uploads_are_named_and_classified(self):
+        # Seen on 2026-10-04: dropped connections during an upload left four multi-part uploads
+        # open. They appear in no listing, yet their parts are stored and billed.
+        decomposed = unicodedata.normalize("NFD", "Videos/Überblick.mp4")
+        bucket = FakeBucket(["Videos/retried.mp4", decomposed])
+        names = b2verify.unfinished_uploads(bucket)
+        self.assertEqual(names, ["Videos/retried.mp4", "Videos/Überblick.mp4"])  # sorted, NFC
+
+        lines = b2verify.unfinished_report(names, present={"Videos/retried.mp4"})
+        self.assertIn("2 unfinished large-file upload(s)", lines[0])
+        self.assertIn("lifecycle rule", lines[0])
+        self.assertEqual(len(lines), 3)
+        self.assertTrue(lines[1].strip().startswith("NOT IN B2: Videos/Überblick.mp4"))
+        self.assertTrue(lines[2].strip().startswith("leftover:  Videos/retried.mp4"))
+
+    def test_nothing_to_report(self):
+        self.assertEqual(b2verify.unfinished_report(b2verify.unfinished_uploads(FakeBucket()), set()), [])
+
+    def test_a_refused_listing_does_not_stop_the_check(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            names = b2verify.unfinished_uploads(FakeBucket(error=PermissionError("listFiles missing")))
+        self.assertIsNone(names)
+        self.assertIn("cannot list unfinished uploads", out.getvalue())
+        self.assertEqual(b2verify.unfinished_report(names, set()), [])
 
 
 class CommandTest(unittest.TestCase):

@@ -347,6 +347,17 @@ class StateTest(unittest.TestCase):
         self.assertIn("not present", lib.local_state(content, []))
 
 
+class UnfinishedUploadsTest(unittest.TestCase):
+    def test_leftover_versus_missing(self):
+        unfinished = ["b/retried.mp4", "a/never.mp4", "b/retried.mp4"]  # retried twice, one never finished
+        leftovers, missing = lib.classify_unfinished(unfinished, present={"b/retried.mp4", "c/other.mp4"})
+        self.assertEqual(leftovers, ["b/retried.mp4"])
+        self.assertEqual(missing, ["a/never.mp4"])
+
+    def test_nothing_unfinished(self):
+        self.assertEqual(lib.classify_unfinished([], {"x"}), ([], []))
+
+
 class PlanVerificationTest(unittest.TestCase):
     NOW = datetime(2026, 10, 2, 12, 0, 0)
     ENTRIES = [F("never", 1, 0), F("old", 1, 0, verified="2026-06-01 00:00:00"),
