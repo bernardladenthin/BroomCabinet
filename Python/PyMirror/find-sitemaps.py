@@ -44,7 +44,7 @@ import sys
 import urllib.parse
 
 from common import (MIRROR_ROOT, BOOKKEEPING_FILES, Pacer, exists, host_of, http_try,
-                    relative_to,
+                    read_gone, relative_to,
                     load_mirror, long_path, under_site)
 from robots import robots_verdict, sitemaps
 
@@ -263,7 +263,15 @@ def look(name, base, archive_dir, mirror, save=False, pacer=None, follow=0):
     else:
         locs = LOC.findall(text)
     inside, outside, pageish, dirish = internal(locs, base.rstrip("/") + "/", archive_dir)
-    missing = sorted(inside - held_paths(archive_dir)) if os.path.isdir(archive_dir) else []
+    # MINUS WHAT THE SOURCE HAS ALREADY REFUSED, the same subtraction pages-to-urllist.py
+    # needed on 2026-10-03 and for the same reason. A sitemap may name a path the server
+    # then answers 403 or 404 for -- zx-kednos-vms/pub/kednos/vax/pli038.zip is in its own
+    # sitemap and returns 403 -- and reporting it as outstanding for ever asks a stranger's
+    # server the same question on every survey. .mirror-gone is the record of that answer.
+    missing = []
+    if os.path.isdir(archive_dir):
+        refused = read_gone(archive_dir)
+        missing = sorted(inside - held_paths(archive_dir) - set(refused))
     saved = ""
     if save and os.path.isdir(archive_dir):
         dest = os.path.join(archive_dir, "sitemap.xml")
