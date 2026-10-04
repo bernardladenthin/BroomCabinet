@@ -81,7 +81,7 @@ from typing import Iterator
 
 from b2lib import (B2_NOW_VS_SAVED, CONTENT_VS_META, LOCAL_VS_B2, YES, FileEntry, SnapshotSaver,
                    b2_state, classify_unfinished, copy_entry, expected_from_metadata, is_root_manifest, load_previous, local_state, migrate_local_tsv, new_meta,
-                   read_snapshot)
+                   read_snapshot, stale_b2_hint)
 
 import fixity  # importable once b2lib has put ../PyFixity on the path
 
@@ -892,6 +892,10 @@ def cmd_compare(ctx: Context) -> int:
             print(f"  {label} as of: {line}")
             info.append(f"- **{label} as of:** {line}")
         diff = fixity.compare(local, remote, flat, check_sum=True, labels=LOCAL_VS_B2)
+        hint = stale_b2_hint(diff, rmeta.get("created"))
+        if hint:
+            print(f"  hint: {hint}")
+            info.append(f"- **Hint:** {hint}")
         ctx.report(name, diff, ["checksum"], info)
         any_diff |= diff.has_differences()
 

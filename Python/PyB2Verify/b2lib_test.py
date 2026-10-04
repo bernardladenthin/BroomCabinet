@@ -136,6 +136,45 @@ class StateTest(unittest.TestCase):
         self.assertIn("not present", lib.local_state(content, []))
 
 
+class StaleB2HintTest(unittest.TestCase):
+    CREATED = "2026-10-01 21:25:44"
+
+    @staticmethod
+    def ns(ts: str) -> int:
+        from datetime import datetime
+        return int(datetime.strptime(ts, lib.TS_FORMAT).timestamp() * 1e9)
+
+    def diff(self, *local_mtimes: str) -> fixity.Diff:
+        d = fixity.Diff(flat=False)
+        d.only_left = [fixity.Entry(f"f{i}", 1, self.ns(t)) for i, t in enumerate(local_mtimes)]
+        return d
+
+    def test_newer_local_files_point_to_a_stale_b2_record(self):
+        hint = lib.stale_b2_hint(self.diff("2026-10-03 12:00:00", "2026-10-03 12:05:00", "2020-01-01 00:00:00"),
+                                 self.CREATED)
+        self.assertIn("2 differing local file(s) are newer", hint)
+        self.assertIn("hash-b2", hint)
+
+    def test_size_and_checksum_differences_count_too(self):
+        d = fixity.Diff(flat=False)
+        newer = fixity.Entry("x", 1, self.ns("2026-10-02 00:00:00"))
+        d.size = [(newer, F("x", 2, 0))]
+        self.assertIn("1 differing local file(s)", lib.stale_b2_hint(d, self.CREATED))
+
+    def test_the_same_second_and_unknown_checksums_do_not_count(self):
+        same_second = self.diff("2026-10-01 21:25:44")  # the record keeps whole seconds
+        self.assertIsNone(lib.stale_b2_hint(same_second, self.CREATED))
+        d = fixity.Diff(flat=False)
+        d.checksum_unknown = [(fixity.Entry("x", 1, self.ns("2026-10-03 00:00:00")), F("x", 1, 0))]
+        self.assertIsNone(lib.stale_b2_hint(d, self.CREATED))  # local part MD5s missing, not a stale B2
+
+    def test_no_hint_when_nothing_is_newer_or_nothing_is_known(self):
+        self.assertIsNone(lib.stale_b2_hint(self.diff("2020-01-01 00:00:00"), self.CREATED))
+        self.assertIsNone(lib.stale_b2_hint(self.diff(), self.CREATED))
+        self.assertIsNone(lib.stale_b2_hint(self.diff("2026-10-03 12:00:00"), None))
+        self.assertIsNone(lib.stale_b2_hint(self.diff("2026-10-03 12:00:00"), "not a date"))
+
+
 class UnfinishedUploadsTest(unittest.TestCase):
     def test_leftover_versus_missing(self):
         leftovers, missing = lib.classify_unfinished(["b/r.mp4", "a/n.mp4", "b/r.mp4"], {"b/r.mp4", "c"})
