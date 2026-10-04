@@ -251,6 +251,33 @@ def classify_unfinished(unfinished: list[str], present: set[str]) -> tuple[list[
     return sorted(names & present), sorted(names - present)
 
 
+def stale_b2_hint(diff: fixity.Diff, b2_created: str | None) -> str | None:
+    """A hint when the saved B2 checksums are probably older than what was uploaded since.
+
+    compare works on what hash-b2 recorded, not on the live bucket. A file uploaded after that
+    shows up as 'only local' (or as a size or checksum difference) although it is in B2 by now --
+    seen on 2026-10-04, when two newly uploaded files were reported missing against a B2 record
+    three days old. If a local file on the differing side is NEWER than the B2 record, that is the
+    likely explanation, and the cheap fix is another hash-b2 before believing the difference.
+    """
+    if not b2_created:
+        return None
+    try:
+        # The record keeps whole seconds, so the moment it was made lies anywhere in that second:
+        # a file is "newer" only from the next second on.
+        created_ns = int(datetime.strptime(b2_created, TS_FORMAT).timestamp() * 1e9) + 1_000_000_000
+    except ValueError:
+        return None
+    # Only what an upload since would explain: missing in B2, or different there. 'Not checkable'
+    # means the LOCAL part MD5s are missing, which no new hash-b2 changes.
+    local_side = list(diff.only_left) + [a for a, _b in diff.size + diff.checksum]
+    newer = [e for e in local_side if e.mtime_ns > created_ns]
+    if not newer:
+        return None
+    return (f"the B2 checksums are from {b2_created}; {len(newer)} differing local file(s) are newer than "
+            f"that - probably uploaded since. Run hash-b2 for this bucket before trusting the difference.")
+
+
 def fmt_ms(ms: int) -> str:
     return datetime.fromtimestamp(ms / 1000).strftime(TS_FORMAT)
 

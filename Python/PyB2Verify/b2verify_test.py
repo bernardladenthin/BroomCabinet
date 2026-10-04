@@ -323,6 +323,29 @@ class CommandTest(unittest.TestCase):
         self.assertTrue(all(e.has_all_digests() for e in fixity.read_index(self.checksums / "local" / "example-bucket.csv")))
         self.assertEqual(self.cmd("compare", "example-bucket", "--no-report")[0], 0)
 
+    def test_compare_hints_at_a_stale_b2_record(self):
+        # Seen on 2026-10-04: files uploaded after the last hash-b2 were reported missing in B2.
+        self.write_b2_checksums()
+        meta, entries = lib.read_snapshot(self.checksums / "b2" / "example-bucket.tsv")
+        meta["created"] = "2020-01-01 00:00:00"  # the B2 record is old ...
+        lib.write_snapshot(self.checksums / "b2" / "example-bucket.tsv", meta, entries)
+        (self.bucket / "new-upload.bin").write_bytes(b"uploaded after the last hash-b2")  # ... this file is new
+        self.cmd("hash-local", "example-bucket", "--no-report")
+        code, out = self.cmd("compare", "example-bucket")
+        self.assertEqual(code, 1, out)
+        self.assertIn("+ new-upload.bin", out)
+        self.assertIn("1 differing local file(s) are newer", out)
+        self.assertIn("Run hash-b2", out)
+        report = (self.tmp / "state" / "reports" / "example-bucket.md").read_text(encoding="utf-8")
+        self.assertIn("**Hint:**", report)
+
+    def test_no_stale_hint_when_the_b2_record_is_current(self):
+        self.cmd("hash-local", "example-bucket", "--no-report")
+        self.write_b2_checksums()  # written now, after every local file
+        code, out = self.cmd("compare", "example-bucket", "--no-report")
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("hint:", out)
+
     def test_verify_local_skips_what_was_checked_recently(self):
         self.cmd("hash-local", "example-bucket", "--no-report")
         code, out = self.cmd("verify-local", "example-bucket", "--no-report", "--older-than", "1")

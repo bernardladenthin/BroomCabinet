@@ -137,6 +137,10 @@ MD5 and CRC32 — checking the old SHA-1 on the way. The old file stays as `<buc
 Run `hash-b2` **before** `hash-local`: the part sizes come from B2, and the local file is cut the
 same way while it is read anyway.
 
+`compare` works on what `hash-b2` recorded, not on the live bucket — so after an upload, run
+`hash-b2` again first. When a differing local file is newer than the B2 record, `compare` says so:
+*the B2 checksums are from …; N differing local file(s) are newer than that — run hash-b2*.
+
 ## Large files have no SHA-1 in B2, and still get checked
 
 A file uploaded in parts usually carries no SHA-1 at all. Its S3 ETag is the MD5 of the
