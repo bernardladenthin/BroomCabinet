@@ -31,7 +31,7 @@ import urllib.parse
 import urllib.request
 
 from common import (COMPLETE_MARKER, GONE_FILE, GONE_STATUS, MIRROR_ROOT, Pacer, Patience,
-                    content_root, exists,
+                    content_root, exists, local_path, safe_name,
                     host_of, http_get,
                     load_mirror, local_failure, read_gone, record_gone, under_site,
                     read_marker, scan_tree)
@@ -237,8 +237,13 @@ def main():
             print("     ... and %d more" % (len(skipped_gone) - 5))
         named = [r for r in named if r not in gone]
 
+    # THE SECOND HALF OF THE SAME DEFECT, found by a test written for the first. This tested the
+    # RAW name while the file was written through safe_name(), so every file whose name had to be
+    # made storable was judged missing and FETCHED AGAIN on every run -- gsi-collection's
+    # `Aster*x_3.1.0.50_pcf_font_problem` is stored as `Aster_x_...`, and this line would have
+    # asked that server for it for ever.
     todo = [r for r in named
-            if not exists(os.path.join(base_dir, r.replace("/", os.sep)))]
+            if not exists(os.path.join(base_dir, *[safe_name(q) for q in r.split("/") if q]))]
     print("  %s: the %s names %d paths under %s, %d are missing"
           % (args.archive, "URL list" if args.url_list else "manifest",
              len(named), args.prefix, len(todo)), flush=True)
@@ -266,7 +271,21 @@ def main():
     stopped = None
     for rel in todo:
         url = base_url + "/".join(urllib.parse.quote(p) for p in rel.split("/"))
-        out = os.path.join(base_dir, rel.replace("/", os.sep))
+        # common.local_path AND NOT A JOIN OF OUR OWN. This line read
+        #
+        #     out = os.path.join(base_dir, rel.replace("/", os.sep))
+        #
+        # until 2026-10-04, which skips safe_name() and therefore every character NTFS forbids.
+        # gsi-collection names a file `Aster*x_3.1.0.50_pcf_font_problem` -- `%2A` in the url --
+        # and this tool died on it with an UNHANDLED OSError, Errno 22, after 3 788 of 3 789
+        # candidates had been dealt with.
+        #
+        # THE CRASH IS THE SMALLER HALF. mirror.py stores that file as `Aster_x_...` because it
+        # goes through local_path; this tool would have stored it under the raw name wherever the
+        # filesystem allowed one. Two tools disagreeing about where a file belongs is how an
+        # archive ends up holding the same document twice under two spellings, and how a
+        # completeness check then reports one of them missing for ever.
+        out = local_path(base_dir, base_url, url)
         # WAITED ONCE BEFORE THE REQUEST rather than in each of the three branches below. Every
         # one of them -- fetched, 404, failed -- had its own sleep, because every one of them
         # cost the server a request; asking before covers all three and cannot be forgotten in a

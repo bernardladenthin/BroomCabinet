@@ -27,6 +27,7 @@ written: of 1 814 446 indexed files, ZERO have a name of that shape.
 
 NO NETWORK AND NO COLLECTION.
 """
+import ast
 import io
 import os
 import shutil
@@ -172,6 +173,75 @@ class AnExtensionWithNothingInFrontOfItIsNotAName(unittest.TestCase):
             for rel in rows:
                 self.assertFalse(common.is_extension_only(rel), name + "/" + rel)
         self.assertGreater(checked, 1000000, "the indexes look unexpectedly small")
+
+
+class AStorableNameIsNotAMissingFile(unittest.TestCase):
+    """The existence check has to ask for the name the file was WRITTEN under.
+
+    gsi-collection's source names a file `Aster*x_3.1.0.50_pcf_font_problem`. NTFS forbids `*`,
+    so safe_name() stores it as `Aster_x_...` -- and the completeness check asked for the raw name,
+    found nothing, and reported a held file as outstanding. Every file whose name had to be changed
+    to be written was reported that way on every single run.
+
+    AND manifest-fetch.py BUILT ITS OWN PATH, which is the worse half of the same defect: it died
+    on that name with an unhandled OSError (Errno 22) after 3 788 of 3 789 candidates. Had the
+    filesystem allowed the raw name anywhere, it would have stored the file where mirror.py never
+    looks -- two tools disagreeing about where a document belongs.
+
+    THE FIRST FIX WAS WRONG AND THE MEASUREMENT CAUGHT IT. Using common.local_path to re-derive
+    the path threw away under_site's folding: that function cuts `base_url` off the url literally,
+    and dreamlandbbs-os2's pages say http:// where the register says https://. Its figure went
+    from 0 to 7 694, and six other archives broke with it. safe_name is applied to the ALREADY
+    FOLDED relative path instead.
+    """
+
+    def test_safe_name_is_what_decides_where_a_file_lives(self):
+        self.assertEqual(common.safe_name("Aster*x_3.1.0"), "Aster_x_3.1.0")
+        for bad in "<>:\"|?*":
+            self.assertNotIn(bad, common.safe_name("a" + bad + "b"))
+
+    def test_the_harvester_tests_the_storable_name(self):
+        with io.open(os.path.join(HERE, "pages-to-urllist.py"), encoding="utf-8") as fh:
+            src = fh.read()
+        self.assertIn("safe_name(q) for q in rel.split", src)
+
+    def test_and_NOT_by_re_deriving_the_path_from_the_url(self):
+        """local_path would undo under_site's folding. Pinned because it was the obvious fix and
+        it broke seven archives' figures."""
+        with io.open(os.path.join(HERE, "pages-to-urllist.py"), encoding="utf-8") as fh:
+            src = fh.read()
+        self.assertNotIn("local = local_path(", src)
+
+    def test_the_fetcher_uses_the_library_and_not_its_own_join(self):
+        """PARSED, NOT GREPPED. The first draft searched the text and failed on the COMMENT that
+        quotes the old line -- the same mistake the os.path.relpath ratchet made two days ago, and
+        for the same reason: prose about a defect is worth keeping and a text search cannot tell
+        it from the defect.
+
+        AND THE PARSE FOUND A SECOND LIVE ONE the text search had hidden: the `todo` list was also
+        testing raw names, so every file stored under a made-storable name was judged missing and
+        FETCHED AGAIN on every run."""
+        with io.open(os.path.join(HERE, "manifest-fetch.py"), encoding="utf-8") as fh:
+            src = fh.read()
+        self.assertIn("out = local_path(base_dir, base_url, url)", src)
+        bad = []
+        for node in ast.walk(ast.parse(src, "manifest-fetch.py")):
+            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                    and node.func.attr == "replace" and len(node.args) == 2):
+                continue
+            first, second = node.args
+            if (isinstance(first, ast.Constant) and first.value == "/"
+                    and isinstance(second, ast.Attribute) and second.attr == "sep"):
+                bad.append(node.lineno)
+        self.assertEqual(bad, [], "a path is still built by replacing / with os.sep instead of "
+                                  "going through safe_name or local_path")
+
+    def test_local_path_and_safe_name_agree_on_a_forbidden_character(self):
+        """The two routes must land on the same name or the disagreement is back."""
+        base = "https://example.org/"
+        url = base + "d/Aster%2Ax_1.0"
+        got = common.local_path(os.path.join("mirror", "an-archive"), base, url)
+        self.assertTrue(got.endswith(os.path.join("d", "Aster_x_1.0")), got)
 
 
 if __name__ == "__main__":

@@ -53,7 +53,8 @@ import sys
 import urllib.parse
 
 from common import (MIRROR_ROOT, BOOKKEEPING_FILES, IMG_SRC, LINK_ODD_RE, GONE_FILE,
-                    REFUSED_FILE, content_root, exists, is_extension_only, load_mirror,
+                    REFUSED_FILE, content_root, exists, is_extension_only,
+                    load_mirror, safe_name,
                     looks_like_a_page, read_gone, read_refused, relative_to,
                     strip_cache_buster, under_site)
 
@@ -232,7 +233,22 @@ def main():
         if excluded_by and excluded_by(rel, patterns, args.archive):
             refused.append(rel)
             continue
-        local = os.path.join(tree, *[p for p in rel.split("/") if p])
+        # safe_name PER SEGMENT, because a file stored under a made-storable name is not
+        # missing. gsi-collection holds `Aster*x_3.1.0.50_pcf_font_problem` as `Aster_x_...` --
+        # NTFS forbids `*` -- and this check asked for the raw name, found nothing, and reported
+        # a held file as outstanding. Every file whose name had to be changed to be written was
+        # reported that way on every run.
+        #
+        # NOT common.local_path, WHICH WAS THE FIRST ATTEMPT AND WAS WRONG. That function derives
+        # the relative path by cutting `base_url` off the url LITERALLY, and `rel` here has
+        # already been folded by under_site -- dreamlandbbs-os2's pages say http:// where the
+        # register says https://. Re-deriving threw the folding away and the figure for that one
+        # archive went from 0 to 7 694. Measured before committing, which is the only reason it
+        # is not in the history.
+        #
+        # THE URL EMITTED BELOW IS STILL THE SOURCE'S OWN SPELLING. Only the existence test uses
+        # the storable form; a fetcher must ask the server for the name the server has.
+        local = os.path.join(tree, *[safe_name(q) for q in rel.split("/") if q])
         if exists(local):
             continue
         if rel in gone or rel in refused_before:
