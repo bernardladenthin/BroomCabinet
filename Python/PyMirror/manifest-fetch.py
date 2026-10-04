@@ -31,6 +31,7 @@ import urllib.parse
 import urllib.request
 
 from common import (COMPLETE_MARKER, GONE_FILE, GONE_STATUS, MIRROR_ROOT, Pacer, Patience,
+                    RENAMED_FILE, long_path, record_renamed,
                     answered_as_a_directory, blocking_parent, content_root, exists,
                     http_open, local_path,
                     relative_to, safe_name,
@@ -131,6 +132,13 @@ def main():
                          "common.Patience. A url-list has no person watching it, and "
                          "31 urls at a 120 s timeout is an hour of knocking on a door "
                          "that is already shut; that is how two hosts were lost.")
+    ap.add_argument("--free-blockers", action="store_true",
+                    help="when a FILE occupies a directory this list needs, rename it to "
+                         "<name>.html and make room. Off by default because it MOVES a file "
+                         "already on disk. The owner's rule is that files win: ps-2.kev009.com "
+                         "had `Intel` as a 4 901-byte listing page blocking 20 datasheets, and "
+                         "`Intel.html` beside them costs only a name nobody typed. Every move is "
+                         "written to RENAMED.txt")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
@@ -273,6 +281,12 @@ def main():
     # PATHS THE SERVER ANSWERED AS DIRECTORIES. Not failures and not content: the body is a
     # listing, and storing it under the bare name is how 2 416 files were lost once already.
     directories = []
+    # PAGES STORED AS <name>.html BECAUSE THE SOURCE ANSWERED THEM AS DIRECTORIES. Counted apart
+    # from `ok`: a file arrived, but under a name the source did not use.
+    renamed = []
+    # BLOCKERS MOVED OUT OF THE WAY, only with --free-blockers. Kept apart from `renamed` because
+    # one is a file that arrived and one is a file that was already here.
+    freed = []
     # WHAT DECIDES TO STOP. Not a count of failures -- a count of SILENCES in a row; see
     # common.Patience for why a 404 must reset it and why summing them would get both cases
     # backwards. `stopped` survives the loop so the summary can say the list was not finished.
@@ -306,6 +320,20 @@ def main():
         # second address would be route-shopping, and a router restarted for nothing, while that
         # server answered 200 throughout.
         blocker = blocking_parent(out)
+        if blocker and args.free_blockers:
+            # THE SAME DECISION APPLIED TO WHAT IS ALREADY ON DISK: files win, so the page in the
+            # way is renamed to <name>.html and the directory can be made. BEHIND A FLAG because
+            # this MOVES A FILE somebody already has, and a fetch that quietly rearranges an
+            # archive is not a fetch anybody can audit. Without the flag the path is reported and
+            # left alone.
+            moved = blocker + ".html"
+            if not exists(moved):
+                os.replace(long_path(blocker), long_path(moved))
+                rel_b = relative_to(base_dir, blocker)
+                record_renamed(base_dir, rel_b, rel_b + ".html",
+                               "it occupied the directory its own contents need", source=base_url)
+                freed.append((rel_b, rel_b + ".html"))
+                blocker = None
         if blocker:
             unstorable.append((rel, relative_to(base_dir, blocker)))
             continue
@@ -323,7 +351,25 @@ def main():
                 body = resp.read()
                 _headers = resp.headers
             if answered_as_a_directory(url, final):
-                directories.append((rel, final))
+                # FILES WIN, AND THE PAGE IS KEPT BESIDE THEM. The owner's decision on 2026-10-04,
+                # and the trade it settles: `Intel` as a 4 901-byte listing made 20 datasheets
+                # unstorable, while `Intel.html` beside them costs a name nobody typed. The listing
+                # is also the one page whose content the directory itself already carries.
+                #
+                # THE RENAME IS RECORDED, which is the whole difference between a rename and a
+                # quiet loss: the source called it `Intel` and only RENAMED.txt says so.
+                page = out + ".html"
+                if exists(page):
+                    directories.append((rel, final))
+                    continue
+                os.makedirs(os.path.dirname(page), exist_ok=True)
+                with io.open(long_path(page), "wb") as fh:
+                    fh.write(body)
+                record_renamed(base_dir, rel, rel + ".html",
+                               "the source answered it as a directory", source=base_url)
+                renamed.append((rel, rel + ".html"))
+                patience.answered()
+                total += len(body)
                 continue
         except urllib.error.HTTPError as e:
             # A manifest describes the ORIGINAL. A 404 here means the file did not survive the
@@ -387,6 +433,16 @@ def main():
 
     print("  DONE fetched %d, gone from the source %d, failed %d, %.1f MB"
           % (ok, gone, failed, total / 1e6))
+    if freed:
+        print("  %d file(s) MOVED out of the way (--free-blockers), recorded in %s:"
+              % (len(freed), RENAMED_FILE))
+        for a, b in freed:
+            print("     %-46s -> %s" % (a[:44], b[-46:]))
+    if renamed:
+        print("  %d page(s) the server answered AS A DIRECTORY, stored as <name>.html so the "
+              "files beneath them are not blocked. Recorded in %s." % (len(renamed), RENAMED_FILE))
+        for a, b in renamed[:6]:
+            print("     %-46s -> %s" % (a[:44], b[-46:]))
     if directories:
         print("  %d path(s) the server answered AS A DIRECTORY -- redirected to the same name "
               "with a trailing slash. The body is a listing and was NOT stored; a file there "
