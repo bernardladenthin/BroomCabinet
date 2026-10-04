@@ -42,12 +42,21 @@ class Fake(object):
         self.layers = list(layers)
         self.harvests = 0
         self.fetches = 0
+        self.probes = 0
         self.said = []
 
     def outstanding(self, _root, _archive, _out):
         n = self.layers[self.harvests] if self.harvests < len(self.layers) else 0
         self.harvests += 1
-        return n, "  %d FILES NAMED AND NOT ON DISK" % n
+        urls = ["http://x.invalid/f%d" % i for i in range(n)]
+        return n, urls, "  %d FILES NAMED AND NOT ON DISK" % n
+
+    def probe(self, urls, _delay, pacer=None, report=None):
+        """Every candidate is fetchable unless a case says otherwise. The probe has its own tests;
+        these cases are about the SHAPE OF THE HISTORY, and a fake that answered 404 here would
+        make every one of them a test of the probe instead."""
+        self.probes += 1
+        return {"get": list(urls), "gone": [], "refused": []}
 
     def fetch(self, _archive, _base, _list, _delay, _give_up, report=None):
         self.fetches += 1
@@ -57,21 +66,30 @@ class Fake(object):
         self.said.append(msg)
 
     def run(self, max_rounds=8, min_gain=1, go=True):
-        return CONVERGE.converge("root", "an-archive", "http://x.invalid/", 0.0,
-                                 max_rounds, min_gain, 1, go, report=self.report)
+        """A TEMPORARY ROOT AND NOT THE STRING "root". converge() creates `<root>/logs/` for its
+        per-round url lists, so a relative name made that directory INSIDE THE SOURCE TREE and
+        five files of test debris were committed on 2026-10-04 before anybody looked at the diff.
+        A test that writes where it is run from is a test that pollutes whatever runs it."""
+        self.root = tempfile.mkdtemp(prefix="converge-run-")
+        try:
+            return CONVERGE.converge(self.root, "an-archive", "http://x.invalid/", 0.0,
+                                     max_rounds, min_gain, 1, go, report=self.report)
+        finally:
+            shutil.rmtree(self.root, ignore_errors=True)
 
     def text(self):
         return "\n".join(self.said)
 
 
 def patched(fake, fn):
-    """Run fn with converge.py's two steps replaced. Restored afterwards, always."""
-    o_out, o_fetch = CONVERGE.outstanding, CONVERGE.fetch
-    CONVERGE.outstanding, CONVERGE.fetch = fake.outstanding, fake.fetch
+    """Run fn with converge.py's three steps replaced. Restored afterwards, always."""
+    saved = (CONVERGE.outstanding, CONVERGE.probe, CONVERGE.fetch)
+    CONVERGE.outstanding, CONVERGE.probe, CONVERGE.fetch = (
+        fake.outstanding, fake.probe, fake.fetch)
     try:
         return fn()
     finally:
-        CONVERGE.outstanding, CONVERGE.fetch = o_out, o_fetch
+        CONVERGE.outstanding, CONVERGE.probe, CONVERGE.fetch = saved
 
 
 class ItRunsUntilNothingIsNamed(unittest.TestCase):
@@ -143,7 +161,7 @@ class AnUnREADABLEFigureIsNotZero(unittest.TestCase):
         class Mute(Fake):
             def outstanding(self, _root, _archive, _out):
                 self.harvests += 1
-                return None, "something went wrong and no figure was printed"
+                return None, [], "something went wrong and no figure was printed"
 
         f = Mute([0])
         history = patched(f, f.run)
@@ -239,6 +257,176 @@ class TheRealWiring(unittest.TestCase):
             self.assertEqual(p.returncode, 0, out)
         finally:
             shutil.rmtree(root, ignore_errors=True)
+
+
+class AskBeforeFetching(unittest.TestCase):
+    """probe(), the step that turns a list of candidates into three different facts.
+
+    MEASURED OVER THREE BATCHES on 2026-10-03/04: of 1 607 outstanding paths, 1 202 answered 404 --
+    pages naming files their own server no longer has. Fetching each costs a full request and an
+    error page to discard; asking costs a header.
+
+        infania-os-history   54 outstanding, 54 x 404
+        somuchstuff-pdp8    480 outstanding, 480 x 404
+        dialectronics       158 outstanding, 158 x 404
+        seds-frommert       118 outstanding, 115 x 404 + 3 x 403
+
+    THE SAVING IS NOT THE HEAD, IT IS NOT REPEATING IT. A 404 learned here is written straight into
+    .mirror-gone, because a HEAD is the source answering and that file holds what the source
+    answered. Going back with a GET for a second opinion would spend the 1 202 requests this step
+    exists to avoid.
+
+    NO NETWORK: http_open is replaced in converge.py's own namespace, which is where
+    `from common import ...` binds it.
+    """
+
+    def setUp(self):
+        self.real = CONVERGE.http_open
+        self.asked = []
+
+    def tearDown(self):
+        CONVERGE.http_open = self.real
+
+    def fake(self, answers):
+        """answers: {url-suffix: status or Exception}."""
+        import contextlib
+        import urllib.error
+
+        @contextlib.contextmanager
+        def open_it(url, timeout=None, method=None):
+            self.asked.append((url, method))
+            want = answers[url]
+            if isinstance(want, type) and issubclass(want, Exception):
+                raise want("nope")
+            if want != 200:
+                raise urllib.error.HTTPError(url, want, "no", {}, None)
+
+            class R(object):
+                status = want
+            yield R()
+
+        CONVERGE.http_open = open_it
+
+    def test_it_splits_into_fetchable_gone_and_refused(self):
+        urls = ["u/a", "u/b", "u/c", "u/d"]
+        self.fake({"u/a": 200, "u/b": 404, "u/c": 410, "u/d": 403})
+        got = CONVERGE.probe(urls, 0.0, report=lambda _m: None)
+        self.assertEqual(got["get"], ["u/a"])
+        self.assertEqual([c for _u, c in got["gone"]], [404, 410])
+        self.assertEqual([c for _u, c in got["refused"]], [403])
+
+    def test_IT_ASKS_WITH_HEAD(self):
+        """A GET would download the error page this step exists to avoid."""
+        self.fake({"u/a": 404})
+        CONVERGE.probe(["u/a"], 0.0, report=lambda _m: None)
+        self.assertEqual(self.asked, [("u/a", "HEAD")])
+
+    def test_A_TIMEOUT_IS_NOT_GONE(self):
+        """Our side of the wire, or a host having a bad minute. Writing it into .mirror-gone would
+        record our own trouble as the source's answer -- and develooper-hpux answered 503 on one
+        probe and 404 on the next, which is exactly why these are kept apart."""
+        self.fake({"u/a": TimeoutError})
+        got = CONVERGE.probe(["u/a"], 0.0, report=lambda _m: None)
+        self.assertEqual(got["gone"], [])
+        self.assertEqual(got["get"], [])
+        self.assertEqual(len(got["refused"]), 1)
+
+    def test_a_500_is_refused_and_not_gone(self):
+        """bretjohnson.us/forum answers 500 and record_gone takes 404 and 410 only."""
+        self.fake({"u/a": 500})
+        got = CONVERGE.probe(["u/a"], 0.0, report=lambda _m: None)
+        self.assertEqual([c for _u, c in got["refused"]], [500])
+
+    def test_only_404_and_410_are_treated_as_gone(self):
+        """The set is the library's, not a second copy written here."""
+        self.assertEqual(set(common.GONE_STATUS), {404, 410})
+
+    def test_an_empty_list_asks_nothing(self):
+        self.fake({})
+        got = CONVERGE.probe([], 0.0, report=lambda _m: None)
+        self.assertEqual((got["get"], got["gone"], got["refused"]), ([], [], []))
+        self.assertEqual(self.asked, [])
+
+
+class NothingFetchableStopsTheRoundEarly(unittest.TestCase):
+    """seds-frommert: 118 candidates, 115 gone and 3 refused, and not one GET worth making.
+
+    BEFORE THIS the round fetched anyway, the figure did not move, and the gain brake noticed one
+    harvest later -- so a list of nothing but dead links cost a wasted fetch pass. Five paths in
+    the collection are permanent refusals that record_gone cannot hold, and each used to cost that.
+    """
+
+    def test_the_source_says_so(self):
+        with io.open(os.path.join(HERE, "converge.py"), encoding="utf-8") as fh:
+            src = fh.read()
+        self.assertIn("nothing here is fetchable", src)
+        self.assertIn('if not asked["get"]:', src)
+
+    def test_the_probe_runs_before_the_fetch(self):
+        """Order matters and a comment is not an order. The call to probe() must come first."""
+        with io.open(os.path.join(HERE, "converge.py"), encoding="utf-8") as fh:
+            src = fh.read()
+        self.assertLess(src.index("asked = probe("), src.index("got = fetch("))
+
+
+class AFigureWithoutAListIsABrokenHarvest(unittest.TestCase):
+    """The false closure of 2026-10-04, pinned.
+
+    pages-to-urllist.py announced "3789 FILES NAMED AND NOT ON DISK" for gsi-collection and then
+    DIED printing a sample path its Windows console could not encode -- before writing the url
+    file. This loop read the figure, found no urls, and reported "nothing here is fetchable".
+
+    HAD THE FIGURE BEEN 0 IT WOULD HAVE CLAIMED A FIXED POINT. The same shape as every other clean
+    zero here: an answer that looks like a finding because the thing that should have spoken said
+    nothing at all. Two defects were fixed -- the tool now writes its product before printing its
+    courtesies -- and this case is the one that stops the loop believing a figure it cannot act on.
+    """
+
+    def test_a_count_with_no_urls_stops_the_run(self):
+        class Mute(Fake):
+            def outstanding(self, _root, _archive, _out):
+                self.harvests += 1
+                return 3789, [], "  3789 FILES NAMED AND NOT ON DISK"
+
+        f = Mute([3789])
+        history = patched(f, f.run)
+        self.assertEqual(history, [])
+        self.assertEqual(f.probes, 0)
+        self.assertEqual(f.fetches, 0)
+
+    def test_and_it_says_the_harvest_is_broken_rather_than_empty(self):
+        class Mute(Fake):
+            def outstanding(self, _root, _archive, _out):
+                self.harvests += 1
+                return 3789, [], "  3789 FILES NAMED AND NOT ON DISK"
+
+        f = Mute([3789])
+        patched(f, f.run)
+        self.assertIn("wrote NO url list", f.text())
+        self.assertIn("broken harvest, not an empty one", f.text())
+        self.assertNotIn("nothing here is fetchable", f.text())
+
+    def test_a_count_of_zero_with_no_urls_is_STILL_a_fixed_point(self):
+        """The honest empty case must survive the guard: a closed archive names nothing and
+        therefore writes nothing, and that is the answer the whole tool exists to reach."""
+        f = Fake([0])
+        history = patched(f, f.run)
+        self.assertEqual(history, [(1, 0, 0)])
+        self.assertIn("FIXED POINT", f.text())
+
+    def test_the_tool_writes_its_list_before_printing_samples(self):
+        """The other half of the fix, in the other file: the product cannot be destroyed by the
+        courtesy. Order matters and a comment is not an order."""
+        with io.open(os.path.join(HERE, "pages-to-urllist.py"), encoding="utf-8") as fh:
+            src = fh.read()
+        write_at = src.index('io.open(args.out, "w"')
+        print_at = src.index("for u in files[:12]:")
+        self.assertLess(write_at, print_at)
+
+    def test_and_that_printing_cannot_raise_on_an_undisplayable_path(self):
+        with io.open(os.path.join(HERE, "pages-to-urllist.py"), encoding="utf-8") as fh:
+            src = fh.read()
+        self.assertIn('encode(enc, "replace")', src)
 
 
 if __name__ == "__main__":

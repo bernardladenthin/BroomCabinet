@@ -13,3 +13,8 @@ __pycache__/
 # that window would take both: a mutated library, and a stray copy explaining nothing.
 # Seen on 2026-09-25, when two runs overlapped and `git status` showed exactly that pair.
 *.mutating
+
+# converge.py writes its per-round url lists to <root>/logs/. A test that passed a relative
+# root once created this inside the source tree and five files were committed before the diff
+# was read -- see converge-test.py. Ignored so the next slip is invisible rather than permanent.
+Python/PyMirror/root/

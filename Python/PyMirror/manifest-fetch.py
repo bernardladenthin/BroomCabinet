@@ -30,7 +30,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from common import (COMPLETE_MARKER, GONE_FILE, GONE_STATUS, MIRROR_ROOT, Pacer, Patience, exists,
+from common import (COMPLETE_MARKER, GONE_FILE, GONE_STATUS, MIRROR_ROOT, Pacer, Patience,
+                    content_root, exists,
                     host_of, http_get,
                     load_mirror, local_failure, read_gone, record_gone, under_site,
                     read_marker, scan_tree)
@@ -131,7 +132,20 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
-    base_dir = os.path.join(args.root, args.archive)
+    archive_dir = os.path.join(args.root, args.archive)
+    # WHERE THE BASE'S PATHS BELONG, which is not always the archive root. Four archives keep a
+    # HOST DIRECTORY LEVEL -- a wayback salvage and a multi-host fetch write `<host>/<path>` --
+    # and this tool wrote straight under the root.
+    #
+    # IT SPLIT AN ARCHIVE ON 2026-10-04. Four techsysadm pages landed in `techsysadm/p/` beside
+    # `techsysadm/techsysadm.blogspot.com/`, where the other 368 files live, and had to be moved
+    # by hand afterwards. A fetch that puts a file next to the tree instead of in it is worse than
+    # one that fails: the file is there, the check cannot see it, and the next survey reports it
+    # missing and fetches it again.
+    base_dir = content_root(archive_dir, args.base)
+    if base_dir != archive_dir:
+        print("  %s keeps a host directory level -- writing under %s"
+              % (args.archive, os.path.basename(base_dir)), flush=True)
     if not args.manifest and not args.url_list:
         sys.exit("give either --manifest or --url-list")
     if args.manifest and args.url_list:

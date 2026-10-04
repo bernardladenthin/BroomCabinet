@@ -5472,7 +5472,13 @@ class TestHttpTry(unittest.TestCase):
         # day and must not be written down as "none".
         self.assertEqual(uses, ["ask-the-source.py", "find-sitemaps.py", "reachability-probe.py",
                                 "recheck-decisions.py"])
-        self.assertEqual(keeps, ["manifest-fetch.py", "mediawiki.py", "mirror.py",
+        # converge.py JOINED ON 2026-10-04, and its reason is the one thing http_try cannot do:
+        # it asks HEAD. The probe step needs the STATUS and nothing else -- 200 means fetch it,
+        # 404 and 410 go straight into .mirror-gone from that answer, anything else is a refusal
+        # the record cannot hold -- and a body would be the error page the step exists to avoid
+        # downloading. 1 202 of 1 607 candidates measured on 2026-10-03/04 answered 404, so the
+        # saving is the whole point rather than a tidiness.
+        self.assertEqual(keeps, ["converge.py", "manifest-fetch.py", "mediawiki.py", "mirror.py",
                                  "redbooks-fetch.py", "subset-refetch.py",
                                  "suspect-reconsider.py"],
                          "a tool started or stopped handling HTTPError itself -- if it is new, "

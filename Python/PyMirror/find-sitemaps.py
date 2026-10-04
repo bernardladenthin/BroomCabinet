@@ -44,7 +44,7 @@ import sys
 import urllib.parse
 
 from common import (MIRROR_ROOT, BOOKKEEPING_FILES, Pacer, exists, host_of, http_try,
-                    read_gone, relative_to,
+                    content_root, read_gone, relative_to,
                     load_mirror, long_path, under_site)
 from robots import robots_verdict, sitemaps
 
@@ -262,7 +262,11 @@ def look(name, base, archive_dir, mirror, save=False, pacer=None, follow=0):
         how += ", %d of %d parts followed" % (min(follow, len(parts)), len(parts))
     else:
         locs = LOC.findall(text)
-    inside, outside, pageish, dirish = internal(locs, base.rstrip("/") + "/", archive_dir)
+    # ONE RESOLUTION FOR BOTH QUESTIONS. internal() tests paths against the tree for its
+    # directory count and the line below subtracts what is held; handing the archive root to one
+    # and the content root to the other is how two numbers on the same line start disagreeing.
+    tree = content_root(archive_dir, base)
+    inside, outside, pageish, dirish = internal(locs, base.rstrip("/") + "/", tree)
     # MINUS WHAT THE SOURCE HAS ALREADY REFUSED, the same subtraction pages-to-urllist.py
     # needed on 2026-10-03 and for the same reason. A sitemap may name a path the server
     # then answers 403 or 404 for -- zx-kednos-vms/pub/kednos/vax/pli038.zip is in its own
@@ -271,7 +275,11 @@ def look(name, base, archive_dir, mirror, save=False, pacer=None, follow=0):
     missing = []
     if os.path.isdir(archive_dir):
         refused = read_gone(archive_dir)
-        missing = sorted(inside - held_paths(archive_dir) - set(refused))
+        # content_root, because four archives keep a HOST DIRECTORY LEVEL that the
+        # registered base says nothing about -- a wayback salvage writes `<host>/<path>`.
+        # Comparing against the archive root instead reported 199 held pages of techsysadm
+        # as missing, a figure wrong by a factor of fifty. See common.content_root.
+        missing = sorted(inside - held_paths(tree) - set(refused))
     saved = ""
     if save and os.path.isdir(archive_dir):
         dest = os.path.join(archive_dir, "sitemap.xml")

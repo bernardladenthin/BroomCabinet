@@ -2310,6 +2310,15 @@ ARCHIVES = [
     ("square7-vintage", "http://vintagecomputers.square7.ch/Vintage/"),
     # biblionik-bull -- see PROVENANCE.md in the archive.
     ("biblionik-bull", "http://www.biblionik.fr/Info/Bull/SOLAR/"),
+    # AND IT STOPPED ANSWERING AGAIN ON 2026-10-04, which settles the standing instruction below
+    # rather than testing it. 19 HEAD requests at the 4 s this table asks for: the first answered,
+    # 5 gave a clean 404, and then THIRTEEN IN A ROW were URLError -- plus the one fetchable file,
+    # which also failed. Earlier the same day a single probe had answered 200 in 0.6 s. So this
+    # host tolerates a handful of requests and then goes quiet, and "leave it alone for days
+    # rather than hours" is a measurement and not a caution. The 5 are in .mirror-gone; the 13 are
+    # NOT, because a URLError is our side of the wire and recording it would write our own trouble
+    # down as the source's answer.
+    #
     # ITS COMPLETE MARKER IS HAND-SET -- 821 files, 66.3 MB, --verify
     # UNCHANGED. A real crawl was not possible: countless attempts, and the request budget for
     # this host is spent. Sitemap covered 168/168 and the harvest at a fixed point; the marker

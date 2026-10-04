@@ -52,7 +52,8 @@ import os
 import sys
 import urllib.parse
 
-from common import (MIRROR_ROOT, BOOKKEEPING_FILES, IMG_SRC, LINK_ODD_RE, GONE_FILE, exists, load_mirror,
+from common import (MIRROR_ROOT, BOOKKEEPING_FILES, IMG_SRC, LINK_ODD_RE, GONE_FILE,
+                    content_root, exists, load_mirror,
                     looks_like_a_page, read_gone, relative_to, strip_cache_buster, under_site)
 
 # Both are the library's, written out here character for character until 2026-09-23.
@@ -195,6 +196,10 @@ def main():
     # rest of the gap between its headline figure and its real one. .mirror-gone is the record a
     # fetch writes when the source says the file is gone -- treating it as still-missing asks a
     # stranger's server the same question again on every run.
+    # WHERE THE BASE'S PATHS ACTUALLY LIVE. Four archives keep a host directory level -- a wayback
+    # salvage and a multi-host fetch write `<host>/<path>` -- and comparing against the archive
+    # root instead reported 199 held pages of techsysadm as missing. See common.content_root.
+    tree = content_root(root, base)
     gone = read_gone(root)
     files, dirs, outside, refused, dead = [], [], 0, [], []
     for url in sorted(named):
@@ -215,7 +220,7 @@ def main():
         if excluded_by and excluded_by(rel, patterns, args.archive):
             refused.append(rel)
             continue
-        local = os.path.join(root, *[p for p in rel.split("/") if p])
+        local = os.path.join(tree, *[p for p in rel.split("/") if p])
         if exists(local):
             continue
         if rel in gone:
@@ -258,13 +263,31 @@ def main():
         print("     WARNING mirror.py could not be read -- NO exclusion was applied. Check the "
               "list by hand before fetching it.")
     print("     %d FILES NAMED AND NOT ON DISK" % len(files))
+
+    # THE WORK BEFORE THE COSMETICS, and the order was the other way round until 2026-10-04.
+    # Printing a sample of the paths came first, and on a Windows console that print can RAISE:
+    # gsi-collection names pages whose titles hold characters cp1252 cannot encode, and the tool
+    # died with UnicodeEncodeError after announcing "3789 FILES NAMED AND NOT ON DISK" and
+    # before writing a single url.
+    #
+    # WHAT THAT COST. converge.py read the figure, found no file to read, and reported "nothing
+    # here is fetchable" -- a false closure for an archive with 3 789 paths outstanding. The
+    # list is this tool's product and the samples are a courtesy; a courtesy must not be able
+    # to destroy the product.
+    if args.out:
+        io.open(args.out, "w", encoding="utf-8", newline="\n").write("\n".join(files) + "\n")
+
     for u in files[:12]:
-        print("        %s" % urllib.parse.unquote(u[len(base):])[:86])
+        # ENCODABLE OR NOT, THE LINE GETS PRINTED. Going through the console's own encoding
+        # with errors="replace" turns an undisplayable character into a question mark instead
+        # of an exception. Nothing downstream reads this line; the file above is what is read.
+        line = "        %s" % urllib.parse.unquote(u[len(base):])[:86]
+        enc = getattr(sys.stdout, "encoding", None) or "utf-8"
+        print(line.encode(enc, "replace").decode(enc, "replace"))
     if len(files) > 12:
         print("        ... and %d more" % (len(files) - 12))
 
     if args.out:
-        io.open(args.out, "w", encoding="utf-8", newline="\n").write("\n".join(files) + "\n")
         print("\n  written: %s" % args.out)
         print("  NEXT: manifest-fetch.py --archive %s --url-list %s --base %s --delay <seconds>"
               % (args.archive, args.out, base))
