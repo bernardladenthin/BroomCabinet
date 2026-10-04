@@ -147,7 +147,7 @@ __all__ = [
     "iter_tree", "scan_tree", "hash_tree", "HASH_BATCH",
     "http_open", "http_get", "http_try", "head_size", "unverified_context",
     "site_prefixes", "content_root", "under_site", "reach", "scheme_drift",
-    "quote_url", "Pacer", "Backoff", "Patience", "local_failure", "UNREACHED",
+    "quote_url", "Pacer", "Backoff", "Patience", "blocking_parent", "local_failure", "UNREACHED",
     "GONE_FILE", "GONE_STATUS", "read_gone", "record_gone",
     "REFUSED_FILE", "read_refused", "record_refused",
     "declared_length", "DECLARES_ITS_LENGTH",
@@ -1858,6 +1858,40 @@ class Backoff:
 # a reset: something is at that address and it declined. That is the host talking, and treating it
 # as a local fault would excuse exactly the refusal this collection must notice.
 UNREACHED = frozenset((11001, -2, -3, 10051, 101, 10065, 113, 10050, 100))
+
+
+def blocking_parent(path):
+    """-> the ancestor of `path` that is a FILE where a directory is needed, or None.
+
+    A SOURCE MAY SERVE BOTH `X` AND `X/y`; A FILESYSTEM MAY NOT. ps-2.kev009.com serves
+    `ohlandl/CPU/docs/AMD` as a page AND `ohlandl/CPU/docs/AMD/<datasheet>.pdf` beneath it. One of
+    the two can be stored and the other cannot, and which one wins is simply whichever arrived
+    first.
+
+    WHY THIS IS A FUNCTION AND NOT AN EXCEPTION HANDLER. manifest-fetch.py used to find out by
+    trying: os.makedirs raised WinError 183 ("cannot create a file when that file already
+    exists"), the generic handler counted it as a FAILURE, and Patience counted 30 of those in a
+    row as the host having gone quiet. The run abandoned ps-2.kev009.com with 2 124 fetchable
+    files untouched -- and I spent an afternoon explaining to the owner that the host had blocked
+    us, that a second address would be route-shopping, and that we should wait a day. He restarted
+    his router for nothing. The host had answered 200 the whole time.
+
+    MEASURED 2026-10-04: of 2 278 candidates, 154 were blocked and TWO files did all of it --
+    `ohlandl/CPU/docs/AMD` blocking 149 and `ohlandl/615x/AOS_43/Docs` blocking 5.
+
+    ASKED BEFORE THE REQUEST, so the source is not made to send bytes that cannot be written. The
+    register already knows this shape: 2 416 files across the collection are logged
+    "LOST (a file occupies a parent directory of this one)".
+    """
+    parts = [p for p in str(path).replace("/", os.sep).split(os.sep) if p]
+    if not parts:
+        return None
+    walk = parts[0] + os.sep if parts[0].endswith(":") else parts[0]
+    for seg in parts[1:-1]:
+        walk = os.path.join(walk, seg)
+        if isfile(walk):
+            return walk
+    return None
 
 
 def local_failure(exc):
