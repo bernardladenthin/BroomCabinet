@@ -53,8 +53,10 @@ import sys
 import urllib.parse
 
 from common import (MIRROR_ROOT, BOOKKEEPING_FILES, IMG_SRC, LINK_ODD_RE, GONE_FILE,
-                    content_root, exists, load_mirror,
-                    looks_like_a_page, read_gone, relative_to, strip_cache_buster, under_site)
+                    REFUSED_FILE, content_root, exists, is_extension_only,
+                    load_mirror, safe_name,
+                    looks_like_a_page, read_gone, read_refused, relative_to,
+                    strip_cache_buster, under_site)
 
 # Both are the library's, written out here character for character until 2026-09-23.
 HREF = LINK_ODD_RE
@@ -186,6 +188,14 @@ def main():
                     h = strip_cache_buster(h)
                     if "?" in h:
                         continue
+                    # AN EXTENSION WITH NOTHING IN FRONT OF IT IS NOT A FILENAME. Six links in
+                    # this collection are `<dir>/.html` -- typewritten's man1/ and man5/,
+                    # seds-frommert's OS2/HPFS/ and two siblings -- and every one answers 403,
+                    # which record_gone cannot hold, so they were reported outstanding for ever.
+                    # Measured before the rule was written: of 1 814 446 indexed files, ZERO have
+                    # a name of this shape. See common.is_extension_only.
+                    if is_extension_only(h):
+                        continue
                     if not h or h.lower().startswith(SKIP):
                         continue
                     named.setdefault(urllib.parse.urljoin(here_url, h), here_url)
@@ -201,6 +211,9 @@ def main():
     # root instead reported 199 held pages of techsysadm as missing. See common.content_root.
     tree = content_root(root, base)
     gone = read_gone(root)
+    # AND WHAT THE SOURCE REFUSES. Its sibling record: 403, 401 or 500 rather than 404.
+    # Six paths in this collection answer that way and were offered on every run.
+    refused_before = read_refused(root)
     files, dirs, outside, refused, dead = [], [], 0, [], []
     for url in sorted(named):
         # THE SAME SITE UNDER ANOTHER SPELLING IS STILL THE SAME SITE. A plain startswith on the
@@ -220,10 +233,25 @@ def main():
         if excluded_by and excluded_by(rel, patterns, args.archive):
             refused.append(rel)
             continue
-        local = os.path.join(tree, *[p for p in rel.split("/") if p])
+        # safe_name PER SEGMENT, because a file stored under a made-storable name is not
+        # missing. gsi-collection holds `Aster*x_3.1.0.50_pcf_font_problem` as `Aster_x_...` --
+        # NTFS forbids `*` -- and this check asked for the raw name, found nothing, and reported
+        # a held file as outstanding. Every file whose name had to be changed to be written was
+        # reported that way on every run.
+        #
+        # NOT common.local_path, WHICH WAS THE FIRST ATTEMPT AND WAS WRONG. That function derives
+        # the relative path by cutting `base_url` off the url LITERALLY, and `rel` here has
+        # already been folded by under_site -- dreamlandbbs-os2's pages say http:// where the
+        # register says https://. Re-deriving threw the folding away and the figure for that one
+        # archive went from 0 to 7 694. Measured before committing, which is the only reason it
+        # is not in the history.
+        #
+        # THE URL EMITTED BELOW IS STILL THE SOURCE'S OWN SPELLING. Only the existence test uses
+        # the storable form; a fetcher must ask the server for the name the server has.
+        local = os.path.join(tree, *[safe_name(q) for q in rel.split("/") if q])
         if exists(local):
             continue
-        if rel in gone:
+        if rel in gone or rel in refused_before:
             dead.append(rel)
             continue
         # A directory linked without its slash is not a file. If the directory is here, the
@@ -243,8 +271,8 @@ def main():
     print("     %d outside the archive" % outside)
     print("     %d directory links without a trailing slash (already walked)" % len(dirs))
     if dead:
-        print("     %d already answered 404 by the source (in %s) -- not counted below"
-              % (len(dead), GONE_FILE))
+        print("     %d already answered by the source (in %s / %s) -- not counted below"
+              % (len(dead), GONE_FILE, REFUSED_FILE))
     if refused:
         # SAID BEFORE THE HEADLINE FIGURE, not after it. The count below is what the next command
         # would fetch, and a reader who sees only that number cannot tell it was ever narrowed.
