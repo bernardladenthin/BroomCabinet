@@ -150,6 +150,7 @@ __all__ = [
     "quote_url", "Pacer", "Backoff", "Patience", "blocking_parent", "local_failure", "UNREACHED",
     "GONE_FILE", "GONE_STATUS", "read_gone", "record_gone",
     "REFUSED_FILE", "read_refused", "record_refused",
+    "RENAMED_FILE", "record_renamed",
     "declared_length", "DECLARES_ITS_LENGTH",
     "ZIP_TAIL", "ZIP_EOCD", "ZIP_CD_ENTRY", "ZIP64_MARK", "ISO_PVD_AT",
     "load_peer", "load_mirror", "source_url", "HTTP_FACE", "find_tool", "split_archive",
@@ -647,6 +648,11 @@ GONE_STATUS = frozenset((404, 410))
 # meaning of a record data has already been written against, and this register's rule for
 # that is explicit.
 REFUSED_FILE = ".mirror-refused"
+# NAMES CHANGED TO BE STORABLE, AND WHAT THEY WERE. Four archives already carry one, written
+# by extract-container-tar.py, and the format below is theirs rather than a new one: a header
+# naming the reason and the source, then `<original>` and an indented `-> <on disk>` per pair.
+# Readers exist; a second format would be a second opinion about what the tree holds.
+RENAMED_FILE = "RENAMED.txt"
 PROVENANCE_FILE = "PROVENANCE.md"           # where the archive came from, written by hand
 CATALOGUE_FILE = "CATALOGUE.md"             # generated for the whole tree from the markers
 # Placed at a tree's root by hand. It marks a directory as "this is the tree" for a bare run
@@ -789,6 +795,37 @@ BOOKKEEPING_FILES = frozenset(OWN_FILES | {
     "CONVERGED.md",
     "SHA256SUMS",               # written by the one-off fetchers, in sha256sum(1) form
 })                              # STILL-MISSING.txt is inherited from OWN_FILES, see there
+
+
+def record_renamed(archive_dir, original, stored, reason, source=None):
+    """Append one name the tree could not hold and the name it was given. -> True if written.
+
+    WHY A RENAME IS NOT A LOSS BUT AN UNRECORDED ONE IS. The bytes are kept either way; what goes
+    without this file is the knowledge that the source called the file something else, and nobody
+    can ask a question about a name they cannot see. extract-container-tar.py's own docstring puts
+    it as "RENAMED.txt is not paperwork".
+
+    ITS FORMAT IS extract-container-tar.py'S, not a new one. dec-ftp-2006 and three others already
+    carry a RENAMED.txt in that shape and there are readers for it; inventing a second layout
+    would be a second opinion about what the tree holds.
+
+    THE CASE THIS WAS ADDED FOR, 2026-10-04. A source may serve BOTH `X` and `X/y` -- a listing
+    page and the files it lists -- and a filesystem may hold only one of them. Until today
+    whichever arrived first won, which is why ps-2.kev009.com has `Harris` as a directory and had
+    `Intel` as a 4 901-byte page that made 20 datasheets unstorable. The owner's decision is that
+    FILES WIN and the page is stored beside them as `<name>.html`. That is a rename, and this is
+    where it is written down.
+    """
+    if not original or not stored or original == stored:
+        return False
+    path = os.path.join(archive_dir, RENAMED_FILE)
+    fresh = not exists(path)
+    with io.open(long_path(path), "a", encoding="utf-8", newline=chr(10)) as fh:
+        if fresh:
+            fh.write("# Names changed because NTFS cannot hold them. Original -> on disk." + chr(10))
+            fh.write("# Source: %s" % (source or "fetched by url") + chr(10) + chr(10))
+        fh.write("%s%s  -> %s   (%s)%s" % (original, chr(10), stored, reason, chr(10)))
+    return True
 
 
 def read_refused(archive_dir):
