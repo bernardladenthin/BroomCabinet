@@ -65,7 +65,7 @@ class Fake(object):
     def report(self, msg):
         self.said.append(msg)
 
-    def run(self, max_rounds=8, min_gain=1, go=True):
+    def run(self, max_rounds=8, min_gain=1, go=True, use_probe=True):
         """A TEMPORARY ROOT AND NOT THE STRING "root". converge() creates `<root>/logs/` for its
         per-round url lists, so a relative name made that directory INSIDE THE SOURCE TREE and
         five files of test debris were committed on 2026-10-04 before anybody looked at the diff.
@@ -73,7 +73,8 @@ class Fake(object):
         self.root = tempfile.mkdtemp(prefix="converge-run-")
         try:
             return CONVERGE.converge(self.root, "an-archive", "http://x.invalid/", 0.0,
-                                     max_rounds, min_gain, 1, go, report=self.report)
+                                     max_rounds, min_gain, 1, go, report=self.report,
+                                     use_probe=use_probe)
         finally:
             shutil.rmtree(self.root, ignore_errors=True)
 
@@ -427,6 +428,48 @@ class AFigureWithoutAListIsABrokenHarvest(unittest.TestCase):
         with io.open(os.path.join(HERE, "pages-to-urllist.py"), encoding="utf-8") as fh:
             src = fh.read()
         self.assertIn('encode(enc, "replace")', src)
+
+
+class TheProbeIsABetAndCanBeDeclined(unittest.TestCase):
+    """--no-probe, added 2026-10-04 on the evidence of the run that disproved the default.
+
+    THE PROBE WINS WHERE MOST CANDIDATES ARE DEAD and loses where most are real:
+
+        five archives     2 099 of 2 504 answered 404     6 098 requests saved
+        ps-2.kev009.com   4 906 of 6 098 answered 200     6 098 requests ADDED
+
+    Asking first turned 6 098 requests into 11 004 for that one archive, because every fetchable
+    candidate was then fetched anyway. manifest-fetch.py records a 404 by itself, so declining the
+    probe loses the saving and nothing else.
+
+    I PREDICTED THE OPPOSITE. Five archives in a row had been all-dead, and I told the owner
+    ps-2 would probably behave the same and need no further disk work. It answered 200 for four
+    fifths of its list.
+    """
+
+    def test_with_no_probe_everything_goes_to_the_fetcher(self):
+        f = Fake([3, 0])
+        patched(f, lambda: f.run(use_probe=False))
+        self.assertEqual(f.probes, 0)
+        self.assertEqual(f.fetches, 1)
+
+    def test_the_probe_is_still_the_default(self):
+        f = Fake([3, 0])
+        patched(f, f.run)
+        self.assertEqual(f.probes, 1)
+
+    def test_it_says_which_way_it_went(self):
+        """A run whose request count differs by a factor of two must say so in its own output."""
+        f = Fake([3, 0])
+        patched(f, lambda: f.run(use_probe=False))
+        self.assertIn("--no-probe", f.text())
+
+    def test_the_flag_exists_and_explains_the_bet(self):
+        out = subprocess.run([sys.executable, os.path.join(HERE, "converge.py"), "--help"],
+                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                             universal_newlines=True).stdout
+        self.assertIn("--no-probe", out)
+        self.assertIn("BET", out)
 
 
 if __name__ == "__main__":
