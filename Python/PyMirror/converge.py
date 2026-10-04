@@ -62,9 +62,6 @@ RECORD = "CONVERGED.md"
 # until the query rule and the .mirror-gone check landed on 2026-10-03.
 OUTSTANDING = re.compile(r"^\s*(\d+) FILES NAMED AND NOT ON DISK", re.M)
 FETCHED = re.compile(r"DONE fetched (\d+), gone from the source (\d+), failed (\d+)")
-# The fetcher's per-25-file counter, `  125/1521, 51.4 MB`. The one line worth hiding: it is
-# high-frequency by design and the round's own figures say the same thing once.
-PROGRESS = re.compile(r"^\s*\d+/\d+, [\d.]+ MB\s*$")
 
 
 def probe(urls, delay, pacer=None, report=say):
@@ -170,10 +167,21 @@ def fetch(archive, base, url_list, delay, give_up, report=say):
     # blocking us -- argued about route-shopping, advised waiting a day, and the owner restarted
     # his router for nothing. The reason was in a line this filter was discarding.
     #
-    # WHAT IS STILL HIDDEN is the per-25-file progress counter and nothing else. It is the one
-    # shape that is high-frequency by design, and the round's own figures say the same thing once.
+    # NOTHING IS HIDDEN, and the one exception this had lasted a day. The per-25-file progress
+    # counter was filtered out as "high-frequency by design" -- a claim made without looking.
+    # manifest-fetch.py prints it once per TWENTY-FIVE fetched files, so at a 2 s interval it is
+    # one line per fifty seconds: 58 lines for a list of 1 455, 270 for 6 757. About one a minute.
+    #
+    # AND IT WAS THE LINE SOMEBODY ASKED FOR. Twenty minutes into the 1 455-file run the owner
+    # asked how long it had left, and the answer had to be reconstructed by counting files on disk
+    # by modification time, because the figure the fetcher had printed was being discarded. A
+    # filter that hides the one number a reader wants is not a filter.
+    #
+    # SO THE SPECIAL CASE IS GONE RATHER THAN TUNED. Relaying everything needs no threshold, no
+    # "every Nth line", and no judgement about which list is big enough -- the fetcher already
+    # decides how often to speak, and it is not this function's business to second-guess it.
     for line in text.splitlines():
-        if not line.strip() or PROGRESS.match(line):
+        if not line.strip():
             continue
         report("      %s" % line.strip())
     found = FETCHED.search(text)
