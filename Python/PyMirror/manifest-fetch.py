@@ -326,13 +326,19 @@ def main():
             # this MOVES A FILE somebody already has, and a fetch that quietly rearranges an
             # archive is not a fetch anybody can audit. Without the flag the path is reported and
             # left alone.
-            moved = blocker + ".html"
+            # THE PAGE ENDS UP INSIDE THE DIRECTORY IT WAS BLOCKING, for the reason above: its
+            # relative links are written from there. That needs two steps, because the name has to
+            # be free before the directory can be made.
+            rel_b = relative_to(base_dir, blocker)
+            moved = os.path.join(blocker, "index.html")
             if not exists(moved):
-                os.replace(long_path(blocker), long_path(moved))
-                rel_b = relative_to(base_dir, blocker)
-                record_renamed(base_dir, rel_b, rel_b + ".html",
+                aside = blocker + ".moving"
+                os.replace(long_path(blocker), long_path(aside))
+                os.makedirs(long_path(blocker), exist_ok=True)
+                os.replace(long_path(aside), long_path(moved))
+                record_renamed(base_dir, rel_b, rel_b + "/index.html",
                                "it occupied the directory its own contents need", source=base_url)
-                freed.append((rel_b, rel_b + ".html"))
+                freed.append((rel_b, rel_b + "/index.html"))
                 blocker = None
         if blocker:
             unstorable.append((rel, relative_to(base_dir, blocker)))
@@ -358,16 +364,26 @@ def main():
                 #
                 # THE RENAME IS RECORDED, which is the whole difference between a rename and a
                 # quiet loss: the source called it `Intel` and only RENAMED.txt says so.
-                page = out + ".html"
+                # INSIDE THE DIRECTORY, NOT BESIDE IT, and the first version got that wrong.
+                # `<name>.html` in the parent CHANGES WHERE ALL THE PAGE'S RELATIVE LINKS POINT:
+                # ps-2.kev009.com's listing of /615x/AOS_43/Docs/ holds
+                # href="AOS_4.3_Volume_1.pdf", which from `AOS_43/Docs.html` resolves to
+                # `AOS_43/AOS_4.3_Volume_1.pdf` -- 404 at the source -- instead of
+                # `AOS_43/Docs/AOS_4.3_Volume_1.pdf`, which answers 200. The next harvest then
+                # asked for six paths that do not exist.
+                #
+                # `<name>/index.html` keeps the page AND its link base. Same decision -- files win
+                # and the listing is kept -- faithfully placed.
+                page = os.path.join(out, "index.html")
                 if exists(page):
                     directories.append((rel, final))
                     continue
                 os.makedirs(os.path.dirname(page), exist_ok=True)
                 with io.open(long_path(page), "wb") as fh:
                     fh.write(body)
-                record_renamed(base_dir, rel, rel + ".html",
+                record_renamed(base_dir, rel, rel + "/index.html",
                                "the source answered it as a directory", source=base_url)
-                renamed.append((rel, rel + ".html"))
+                renamed.append((rel, rel + "/index.html"))
                 patience.answered()
                 total += len(body)
                 continue
@@ -439,8 +455,9 @@ def main():
         for a, b in freed:
             print("     %-46s -> %s" % (a[:44], b[-46:]))
     if renamed:
-        print("  %d page(s) the server answered AS A DIRECTORY, stored as <name>.html so the "
-              "files beneath them are not blocked. Recorded in %s." % (len(renamed), RENAMED_FILE))
+        print("  %d page(s) the server answered AS A DIRECTORY, stored as <name>/index.html so "
+              "the files beneath them are not blocked and the page's own relative links still "
+              "resolve. Recorded in %s." % (len(renamed), RENAMED_FILE))
         for a, b in renamed[:6]:
             print("     %-46s -> %s" % (a[:44], b[-46:]))
     if directories:

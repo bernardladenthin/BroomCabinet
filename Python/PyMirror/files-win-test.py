@@ -9,17 +9,21 @@ page and `ohlandl/CPU/docs/Intel/210844-001.pdf` beneath it. Until 2026-10-04 wh
 FIRST won, which is why that archive has `Harris` as a directory -- its files came first -- and had
 `Intel` as a 4 901-byte page that made 20 datasheets unstorable.
 
-THE OWNER'S DECISION: FILES WIN, and the page is stored beside them as `<name>.html`, recorded in
+THE OWNER'S DECISION: FILES WIN, and the page is kept as `<name>/index.html`, recorded in
 RENAMED.txt. The trade is 4 901 bytes of listing against 20 PDFs, and the listing is the one page
 whose content the directory itself already carries.
 
+INSIDE THE DIRECTORY AND NOT BESIDE IT. The first version wrote `<name>.html` in the parent, which
+REINTERPRETS EVERY RELATIVE LINK THE PAGE HOLDS -- see
+test_a_directory_answer_is_stored_INSIDE_the_directory for the measurement that caught it.
+
 TWO HALVES, DELIBERATELY NOT THE SAME RISK:
 
-  a response that IS a directory    stored as <name>.html automatically. Nothing on disk changes;
-                                    a file simply arrives under a name the source did not use.
-  a file ALREADY in the way         moved to <name>.html only with --free-blockers, because a
-                                    fetch that quietly rearranges an archive is not one anybody
-                                    can audit.
+  a response that IS a directory    stored as <name>/index.html automatically. Nothing on disk
+                                    changes; a file arrives under a name the source did not use.
+  a file ALREADY in the way         moved into <name>/index.html only with --free-blockers,
+                                    because a fetch that quietly rearranges an archive is not one
+                                    anybody can audit.
 
 AND THE RENAME IS WRITTEN DOWN, which is the whole difference between a rename and a quiet loss:
 the source called it `Intel`, and only RENAMED.txt says so afterwards.
@@ -105,17 +109,37 @@ class FilesWinInTheFetcher(unittest.TestCase):
         with io.open(os.path.join(HERE, "manifest-fetch.py"), encoding="utf-8") as fh:
             return fh.read()
 
-    def test_a_directory_answer_is_STORED_as_name_html(self):
+    def test_a_directory_answer_is_stored_INSIDE_the_directory(self):
+        """`<name>/index.html` AND NOT `<name>.html`, which was the first version and was wrong.
+
+        A page one level up has ALL ITS RELATIVE LINKS REINTERPRETED. ps-2.kev009.com's listing of
+        /615x/AOS_43/Docs/ holds href="AOS_4.3_Volume_1.pdf"; from `AOS_43/Docs.html` that resolves
+        to `AOS_43/AOS_4.3_Volume_1.pdf`, which the source answers 404 for, instead of
+        `AOS_43/Docs/AOS_4.3_Volume_1.pdf`, which answers 200. The next harvest asked for six
+        paths that do not exist, and the four pages already written that day had to be moved.
+
+        The decision is unchanged -- files win and the listing is kept. Only the place was wrong.
+        """
         src = self.source()
-        self.assertIn('page = out + ".html"', src)
-        self.assertIn('record_renamed(base_dir, rel, rel + ".html"', src)
+        self.assertIn('page = os.path.join(out, "index.html")', src)
+        self.assertNotIn('page = out + ".html"', src)
+        self.assertIn('rel + "/index.html"', src)
+
+    def test_a_freed_blocker_also_ends_up_inside(self):
+        """Two steps, because the name has to be free before the directory can be made."""
+        src = self.source()
+        block = src[src.index("if blocker and args.free_blockers:"):src.index("if blocker:\n")]
+        self.assertIn('os.path.join(blocker, "index.html")', block)
+        self.assertIn(".moving", block)
+        self.assertIn("os.makedirs(", block)
 
     def test_and_it_counts_as_progress_rather_than_silence(self):
         """A page that arrived is the server answering. Leaving Patience untouched here would let
         a run of them look like the host going quiet -- the exact misreading that cost an afternoon
         on 2026-10-04."""
         src = self.source()
-        block = src[src.index('page = out + ".html"'):src.index("renamed.append(") + 400]
+        block = src[src.index('page = os.path.join(out, "index.html")'):
+                    src.index("renamed.append(") + 400]
         self.assertIn("patience.answered()", block)
 
     def test_an_existing_html_is_not_overwritten(self):
@@ -148,7 +172,7 @@ class FilesWinInTheFetcher(unittest.TestCase):
         would hide which of the two happened."""
         src = self.source()
         self.assertIn("MOVED out of the way (--free-blockers)", src)
-        self.assertIn("stored as <name>.html", src)
+        self.assertIn("stored as <name>/index.html", src)
 
 
 if __name__ == "__main__":
