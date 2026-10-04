@@ -53,25 +53,37 @@ import sys
 from common import (INDEX_FILE, MIRROR_ROOT, find_tool, human, read_index, relative_to, say,
                     split_archive)
 
-# THE VOLUME SIZE IS THE OWNER'S AND IT CHANGED ON 2026-10-04, from 24 200 000 000 to 995 000 000.
-# It now has to satisfy TWO media at once, and the smaller number satisfies both better.
+# THE VOLUME SIZE IS THE OWNER'S AND IT IS 199 MiB, MEASURED RATHER THAN RECALLED. It was
+# 24 200 000 000 bytes until 2026-10-04, then 995 000 000 for a few hours, and that middle figure
+# rested on something I had wrong.
 #
-#   BACKBLAZE B2 TAKES A VOLUME IN ONE PIECE. B2 records a SHA-1 for a file uploaded whole; a file
-#   that goes up through the large-file API is stored as parts, and the whole-file digest is then
-#   only present if the uploader thought to set `large_file_sha1`. At 995 MB every volume and every
-#   .rev file is far inside the single-part limit, so each one carries its own SHA-1 that
-#   PyB2Verify can compare against the local file -- no part sizes, no reconstructed ETag.
+#   I SAID B2 TAKES A FILE OF UP TO 5 GB IN ONE PIECE. That is the API's limit and it is not the
+#   one that binds. The owner's own PyB2Verify snapshots of his live B2 buckets settle it, and
+#   they are not named here because the privacy guard is right to want them unnamed: across twelve
+#   buckets, 2 950 files carry a whole-file SHA-1 that B2 itself reported, 2 797 carry none and
+#   are described only by an S3 ETag over their part MD5s, and the boundary between the two sets
+#   is exactly 209 715 200 bytes -- 200 MiB, the uploader's cutoff, not the API's. Several files
+#   AT 200 MiB have a SHA-1; the smallest without one is 210 621 984.
 #
-#   AND 995 000 000 FILLS AN M-DISC EXACTLY, on all three sizes, at the owner's own 99.5 % burn
-#   margin: 25 volumes on a 25 GB disc (24 875 000 000 of 24 899 485 696), 50 on a 50 GB and 100
-#   on a 100 GB. 1 000 000 000 would fit only 24 per 25 GB disc and leave 4 % of every disc empty;
-#   five million bytes less per volume buys back one disc in twenty-five.
+#   SO 995 MB WOULD HAVE BEEN UPLOADED IN PARTS, with no whole-file digest, which is the thing the
+#   size was chosen to avoid. The owner's 25 GB M-Disc RAR sets are the standing example: `sha1`
+#   empty, `parts` reading `100000000*250,4758990`, and fixity only through a rebuilt ETag.
 #
-# THE SMALL VOLUME IS ALSO WHERE THE BYTES WERE. Measured against the 24.2 GB plan: the volume
-# change alone is worth 554 GB of the 854 GB this plan saves, because `recovery_volumes_min` used
-# to waste whole 24.2 GB volumes on units too small for the 10 % fraction to reach. The regrouping
-# from nineteen units to ten, which looked like the big lever, is worth 16 GB.
-VOLUME_BYTES = 995000000
+#   AND NO LARGE FILE IN THOSE SNAPSHOTS CARRIES ONE. `large_file_sha1` in fileInfo would allow it,
+#   and two rows looked at first like proof that it happens -- one had its digest adopted from an
+#   older snapshot, the other was downloaded and hashed locally (`source=download`). Neither came
+#   from B2. The feature exists; this uploader does not use it.
+#
+# 199 MiB RATHER THAN 200, because a .rev file is slightly LARGER than the volumes it protects --
+# rar.txt says so and the 2026-09-26 measurement showed it (1 048 627 against 1 048 576). It also
+# carries a checksum per protected volume, and ibm-aix has 3 400 of them. One MiB of headroom
+# covers both and keeps every .rev under the cutoff as well.
+#
+# STILL M-DISC COMPATIBLE, WHICH IS ALL IT NEEDS TO BE: 119 volumes fill a 25 GB disc to 99.73 %
+# of the owner's own 99.5 % burn margin, 238 a 50 GB and 477 a 100 GB. The owner does not burn
+# them -- "ich brenne es nicht, es sollte nur kompatibel sein" -- so the disc is a property of the
+# size and not a plan the redundancy has to pay for. See recovery_volumes_min.
+VOLUME_BYTES = 199 * 1024 * 1024
 BD_RE_BYTES = 24220008448
 M_DISC_BD_R_BYTES = 25025314816
 # The owner's burn margins for M-Disc, as raw bytes at 99.5 % of capacity. A disc written to its
@@ -235,17 +247,29 @@ DEFAULTS = Options(
     solid=True,
     solid_per_volume=True,
     volume_bytes=VOLUME_BYTES,
-    # 3 %, DOWN FROM 10 % ON 2026-10-04, and the two switches answer different failures. -rr
-    # repairs damage INSIDE a volume -- flipped bits, a scratch -- and 3 % is WinRAR's own default
-    # and what measurements/winrar-recovery-2026-09-26.md recorded as validated. A volume that is
-    # GONE is answered by .rev instead, which is the expensive redundancy and the one worth having
-    # at scale. Paying 10 % for the cheap failure as well cost 284 GB.
-    recovery_record="3",
-    # 3, UP FROM 2 ON 2026-10-04 at the owner's request: every unit survives three lost volumes
-    # even if the 10 % fraction would ask for fewer. At 995 MB volumes a floor costs 995 MB rather
-    # than 24.2 GB, which is what made raising it affordable in the same breath as lowering -rr.
-    recovery_volumes_min=3,
-    recovery_volumes_fraction=0.10,
+    # 1 %, AND THE DIVISION OF LABOUR IS THE WHOLE ARGUMENT. -rr repairs damage INSIDE a volume;
+    # .rev replaces one that is gone. At 199 MiB, 1 % is about 2 MiB per volume, and rar.txt says
+    # a recovery record repairs slightly less than its own size in contiguous damage -- so 2 MiB
+    # covers a flipped bit, a bad sector (4 KB), or hundreds of them. Anything worse is not worth
+    # repairing in place when a whole replacement volume is 199 MiB and there are 398 of them.
+    #
+    # IT WAS 10 %, THEN 3 %, THEN THIS, in one afternoon, and each step followed the volume size
+    # down: at 24.2 GB a volume was precious and worth defending in place; at 199 MiB it is
+    # cheaper to replace than to patch. 1 % of 4 061 GB is 41 GB against 406 GB at 10 %.
+    recovery_record="1",
+    # 2 %, DOWN FROM 10 %, because the granularity changed what a percentage buys. 2 % of ibm-aix
+    # is 68 whole volumes -- against 3 under the old plan -- so this is far MORE absolute
+    # protection for a fifth of the bytes.
+    recovery_volumes_fraction=0.02,
+    # 5, AND IT NEVER BINDS: the smallest unit reaches 14 through the fraction alone. It is a
+    # guard for a unit small enough that 2 % rounds to almost nothing, and it costs nothing today.
+    #
+    # IT IS DELIBERATELY NOT A DISC'S WORTH. A 25 GB M-Disc now holds 119 volumes, so one lost
+    # disc would take 119 volumes with it and NO unit's 2 % covers that -- a floor of 119 would,
+    # at 248 GB instead of 83. The owner settled it: the discs are a compatibility property, not
+    # a copy. "ich brenne es nicht ... es reicht daher die betrachtung fuer b2", where the unit of
+    # failure is one file and 2 % answers 68 of them.
+    recovery_volumes_min=5,
     lock=True,
     # NO ENCRYPTION. The owner's decision on 2026-10-04: "da es öffentliche Daten sind brauche ich
     # kein Passwort / Verschlüsselung, lediglich ECC und recovery archive". Every archive here was
