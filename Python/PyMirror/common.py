@@ -145,7 +145,7 @@ __all__ = [
     "sums_line", "read_index", "write_index",
     "read_marker", "write_marker", "marker_text", "MARKER_COLUMN",
     "iter_tree", "scan_tree", "hash_tree", "HASH_BATCH",
-    "http_open", "http_get", "http_try", "head_size", "unverified_context",
+    "http_open", "answered_as_a_directory", "http_get", "http_try", "head_size", "unverified_context",
     "site_prefixes", "content_root", "under_site", "reach", "scheme_drift",
     "quote_url", "Pacer", "Backoff", "Patience", "blocking_parent", "local_failure", "UNREACHED",
     "GONE_FILE", "GONE_STATUS", "read_gone", "record_gone",
@@ -2267,6 +2267,30 @@ def http_get(url, timeout=120, context=None, extra_headers=None, opener=None):
     """
     with http_open(url, timeout, context, extra_headers, opener) as r:
         return r.read(), r.headers
+
+
+def answered_as_a_directory(asked, final):
+    """-> True if the server redirected a bare path to the same path WITH A TRAILING SLASH.
+
+    THAT SLASH IS THE SERVER SAYING "THIS IS A DIRECTORY", and storing the body under the bare
+    name writes a file where a directory has to go. The register already has the bill for it:
+    four impostor files of 122 077 bytes, each byte-identical to the listing it impersonates, and
+    2 416 files afterwards logged "LOST (a file occupies a parent directory of this path)".
+
+    same_path_plus_slash() answers a stricter question -- same host AND same path -- and that is
+    right for the crawler, which uses it to decide whether to walk further. It is NOT enough here:
+    ps-2.kev009.com answers `/ohlandl/CPU/docs/Intel` with a redirect to
+    `ardent-tool.com/CPU/docs/Intel/`. Different host, different path, and the trailing slash still
+    means exactly what it means. On 2026-10-04 that wrote FOUR more impostors -- Intel, AMD, IBM,
+    Cyrix -- which then made 692 datasheets unstorable.
+    #
+    THE HOST AND THE PATH ARE DELIBERATELY NOT COMPARED. A server is free to answer for another
+    name, and whether the redirect stayed on the same machine says nothing about whether what
+    came back is a directory. Only the slash does.
+    """
+    if not final or not asked:
+        return False
+    return final.endswith("/") and not asked.endswith("/")
 
 
 def http_try(url, timeout=120, limit=None, method=None, **kw):

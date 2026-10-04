@@ -31,9 +31,10 @@ import urllib.parse
 import urllib.request
 
 from common import (COMPLETE_MARKER, GONE_FILE, GONE_STATUS, MIRROR_ROOT, Pacer, Patience,
-                    blocking_parent, content_root, exists, local_path,
+                    answered_as_a_directory, blocking_parent, content_root, exists,
+                    http_open, local_path,
                     relative_to, safe_name,
-                    host_of, http_get,
+                    host_of,
                     load_mirror, local_failure, read_gone, record_gone, under_site,
                     read_marker, scan_tree)
 from common import write_marker as common_write_marker
@@ -269,6 +270,9 @@ def main():
     # source may serve both `X` and `X/y` and a filesystem may not. Counted apart from `failed`
     # and never charged to Patience, because the request never happened and could not have.
     unstorable = []
+    # PATHS THE SERVER ANSWERED AS DIRECTORIES. Not failures and not content: the body is a
+    # listing, and storing it under the bare name is how 2 416 files were lost once already.
+    directories = []
     # WHAT DECIDES TO STOP. Not a count of failures -- a count of SILENCES in a row; see
     # common.Patience for why a 404 must reset it and why summing them would get both cases
     # backwards. `stopped` survives the loop so the summary can say the list was not finished.
@@ -308,7 +312,19 @@ def main():
         pacer.wait(host_of(url))
         try:
             os.makedirs(os.path.dirname(out), exist_ok=True)
-            body, _headers = http_get(url, timeout=120)
+            # THE FINAL URL IS READ, not just the body, because a trailing slash on it is the
+            # server saying "this is a directory". See common.answered_as_a_directory: writing the
+            # body under the bare name puts a file where a directory has to go, and on 2026-10-04
+            # this tool did exactly that four times -- ps-2.kev009.com answers
+            # /ohlandl/CPU/docs/Intel with a redirect to ardent-tool.com/CPU/docs/Intel/ -- and
+            # those four impostors then made 692 datasheets unstorable.
+            with http_open(url, timeout=120) as resp:
+                final = resp.geturl()
+                body = resp.read()
+                _headers = resp.headers
+            if answered_as_a_directory(url, final):
+                directories.append((rel, final))
+                continue
         except urllib.error.HTTPError as e:
             # A manifest describes the ORIGINAL. A 404 here means the file did not survive the
             # mirroring, which is a fact about the copy and not a failure of this run.
@@ -371,6 +387,12 @@ def main():
 
     print("  DONE fetched %d, gone from the source %d, failed %d, %.1f MB"
           % (ok, gone, failed, total / 1e6))
+    if directories:
+        print("  %d path(s) the server answered AS A DIRECTORY -- redirected to the same name "
+              "with a trailing slash. The body is a listing and was NOT stored; a file there "
+              "would block everything beneath it." % len(directories))
+        for rel, final in directories[:6]:
+            print("     %-40s -> %s" % (rel[:38], final[-52:]))
     if unstorable:
         # NAMED WITH THE BLOCKER, not just counted. The useful fact is WHICH file is in the way:
         # two of them accounted for all 154 cases on ps-2.kev009.com, so the decision is about two

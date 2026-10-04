@@ -351,5 +351,75 @@ class AnUnstorablePathIsNotAFailedFetch(unittest.TestCase):
         self.assertIn("blocks %d", src)
 
 
+class ATrailingSlashIsTheServerSayingDirectory(unittest.TestCase):
+    """common.answered_as_a_directory, and the four impostors that paid for it.
+
+    ps-2.kev009.com answers `/ohlandl/CPU/docs/Intel` with a redirect to
+    `ardent-tool.com/CPU/docs/Intel/`. The slash is the server saying "this is a directory", and
+    manifest-fetch.py stored the body -- a 4 901-byte listing titled `Index of /CPU/docs/Intel` --
+    under the bare name. Four of them, Intel AMD IBM Cyrix, and those four files then made 692
+    datasheets unstorable.
+
+    THE REGISTER HAS THE BILL FOR THE SAME SHAPE ALREADY: "FOUR files of 122 077 bytes, each
+    byte-identical to the listing it impersonates", and 2 416 files afterwards logged "LOST (a
+    file occupies a parent directory of this path)". Its own comment on it: "A defect that writes
+    a plausible file is worse than one that writes nothing, because the tree looks fuller
+    afterwards."
+
+    WHY same_path_plus_slash WAS NOT ENOUGH. That function compares host AND path, which is right
+    for the crawler deciding whether to walk further. Here the redirect crosses to a DIFFERENT
+    HOST and drops a path prefix, so it answers False -- while the slash means exactly what it
+    always means. Only the slash is compared now.
+
+    AND THE 692 ARE NOT MISSING. Every one is held in the ardent-tool archive under the same
+    tail -- 692 of 692, checked -- because that is where ps-2 redirects. Nothing was lost; what
+    was created was four files that lie about what they are.
+    """
+
+    def test_a_bare_path_answered_with_a_slash_is_a_directory(self):
+        self.assertTrue(common.answered_as_a_directory(
+            "https://ps-2.kev009.com/ohlandl/CPU/docs/Intel",
+            "https://ardent-tool.com/CPU/docs/Intel/"))
+
+    def test_THE_HOST_AND_PATH_ARE_NOT_COMPARED(self):
+        """A server may answer for another name, and whether the redirect stayed on the same
+        machine says nothing about whether what came back is a directory."""
+        self.assertTrue(common.answered_as_a_directory(
+            "http://a.invalid/x", "https://totally-other.invalid/completely/else/"))
+
+    def test_an_ordinary_answer_is_not_a_directory(self):
+        self.assertFalse(common.answered_as_a_directory(
+            "https://a.invalid/f.pdf", "https://a.invalid/f.pdf"))
+
+    def test_a_redirect_that_keeps_no_slash_is_not_one(self):
+        """A plain http->https or www redirect must not be read as a directory."""
+        self.assertFalse(common.answered_as_a_directory(
+            "http://a.invalid/f.pdf", "https://www.a.invalid/f.pdf"))
+
+    def test_ASKING_FOR_A_SLASH_AND_GETTING_ONE_IS_NOT_A_SURPRISE(self):
+        """A caller that asked for a directory already knows. Returning True there would refuse
+        every legitimate listing fetch."""
+        self.assertFalse(common.answered_as_a_directory(
+            "https://a.invalid/d/", "https://a.invalid/d/"))
+
+    def test_empty_inputs_answer_False(self):
+        for asked, final in (("", "x/"), ("x", ""), (None, "x/"), ("x", None)):
+            self.assertFalse(common.answered_as_a_directory(asked, final), (asked, final))
+
+    def test_the_fetcher_reads_the_final_url_and_refuses_to_store(self):
+        with io.open(os.path.join(HERE, "manifest-fetch.py"), encoding="utf-8") as fh:
+            src = fh.read()
+        self.assertIn("resp.geturl()", src)
+        self.assertIn("answered_as_a_directory(url, final)", src)
+        self.assertIn("directories.append(", src)
+
+    def test_and_it_says_so_with_the_url_it_was_sent_to(self):
+        """Counting them hides WHICH host answered, and in this case the answer came from another
+        archive in this same collection."""
+        with io.open(os.path.join(HERE, "manifest-fetch.py"), encoding="utf-8") as fh:
+            src = fh.read()
+        self.assertIn("answered AS A DIRECTORY", src)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
