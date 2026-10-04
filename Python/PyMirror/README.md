@@ -102,12 +102,13 @@ The tools added later relax this. **Thirty-three of them** default `--root` to `
 `dokuwiki-source.py`, `mediawiki-source.py`, `pmwiki-source.py`, `restate-marker.py`,
 `wayback-salvage.py`); **two** take it without a default (`audit.py`, `mirror.py`).
 
-**And eight take no `--root` at all** — `ask-the-source.py`, `common.py`,
-`contract-mutations.py`, `measure-remote.py`, `move-mirror.py`, `pdf-identify.py`,
-`reachability-probe.py`, `unpacked-vs-archive.py` — because none of them walks the collection.
+**And nine take no `--root` at all** — `ask-the-source.py`, `common.py`,
+`contract-mutations.py`, `listing-to-urllist.py`, `measure-remote.py`, `move-mirror.py`,
+`pdf-identify.py`, `reachability-probe.py`, `unpacked-vs-archive.py` — because none of them
+walks the collection.
 `ask-the-source.py` is the clearest case: it reads recorded lengths from a table and bytes from a
 URL, and a `--root` it never used would be an invitation to believe it had checked something on
-disk. 33 + 8 + 2 + 8 = **51 scripts with an argument parser**, which is the whole set.
+disk. 33 + 8 + 2 + 9 = **52 scripts with an argument parser**, which is the whole set.
 
 They are maintenance tools for one collection rather than general-purpose fetchers, and the trade
 is deliberate -- but it is a trade. This paragraph named three tools for a while, then kept naming
