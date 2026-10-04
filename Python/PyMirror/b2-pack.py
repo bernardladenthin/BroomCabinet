@@ -4,7 +4,7 @@
 
 r"""Plan the WinRAR units that carry this collection to cold storage. Prints; does not run.
 
-WHY A PLANNER AND NOT A SCRIPT. The collection is 3.98 TB in 98 archives and 1.76 million files.
+WHY A PLANNER AND NOT A SCRIPT. The collection is 4.06 TB in 113 archives and 1.83 million files.
 Whatever packs it will be run a handful of times over years, by hand, and every run costs hours.
 A command that is printed, read and then executed is the right shape for that; a command that runs
 because a script reached line 300 is not. So `--execute` is opt-in and the default prints.
@@ -53,15 +53,31 @@ import sys
 from common import (INDEX_FILE, MIRROR_ROOT, find_tool, human, read_index, relative_to, say,
                     split_archive)
 
-# THE VOLUME SIZE IS THE OWNER'S, and it is validated against real discs rather than derived
-# here. 24 200 000 000 bytes fits a BD-RE (24 220 008 448) with about 20 MB to spare and therefore
-# also fits an M-Disc BD-R 25 GB (25 025 314 816). Using the larger BD-R figure instead would save
-# only THREE discs out of 227 across all nineteen units, because rounding up to whole volumes per
-# unit dominates -- so one number that fits both media is worth more than the 3.3 % of capacity it
-# leaves unused.
-VOLUME_BYTES = 24200000000
+# THE VOLUME SIZE IS THE OWNER'S AND IT CHANGED ON 2026-10-04, from 24 200 000 000 to 995 000 000.
+# It now has to satisfy TWO media at once, and the smaller number satisfies both better.
+#
+#   BACKBLAZE B2 TAKES A VOLUME IN ONE PIECE. B2 records a SHA-1 for a file uploaded whole; a file
+#   that goes up through the large-file API is stored as parts, and the whole-file digest is then
+#   only present if the uploader thought to set `large_file_sha1`. At 995 MB every volume and every
+#   .rev file is far inside the single-part limit, so each one carries its own SHA-1 that
+#   PyB2Verify can compare against the local file -- no part sizes, no reconstructed ETag.
+#
+#   AND 995 000 000 FILLS AN M-DISC EXACTLY, on all three sizes, at the owner's own 99.5 % burn
+#   margin: 25 volumes on a 25 GB disc (24 875 000 000 of 24 899 485 696), 50 on a 50 GB and 100
+#   on a 100 GB. 1 000 000 000 would fit only 24 per 25 GB disc and leave 4 % of every disc empty;
+#   five million bytes less per volume buys back one disc in twenty-five.
+#
+# THE SMALL VOLUME IS ALSO WHERE THE BYTES WERE. Measured against the 24.2 GB plan: the volume
+# change alone is worth 554 GB of the 854 GB this plan saves, because `recovery_volumes_min` used
+# to waste whole 24.2 GB volumes on units too small for the 10 % fraction to reach. The regrouping
+# from nineteen units to ten, which looked like the big lever, is worth 16 GB.
+VOLUME_BYTES = 995000000
 BD_RE_BYTES = 24220008448
 M_DISC_BD_R_BYTES = 25025314816
+# The owner's burn margins for M-Disc, as raw bytes at 99.5 % of capacity. A disc written to its
+# last byte is a disc that may not verify, so the volume size is checked against these and not
+# against the figures above.
+M_DISC_995 = {25: 24899485696, 50: 49800019968, 100: 99600039936}
 
 INDEX_DIR = "index"
 INDEX_SUFFIX = ".index.csv"
@@ -107,14 +123,15 @@ MEASURED_ON_THIS_MACHINE = {
     "an absolute path keeps its directories": "a file passed by absolute path is stored with every "
                                               "component below the drive letter. A work directory "
                                               "under a home directory would write the account name "
-                                              "into all nineteen archives; hence WORK_MUST_BE_FLAT.",
+                                              "into every archive; hence WORK_MUST_BE_FLAT.",
 }
 
 # WHERE THE WORK DIRECTORY MAY BE, and this is a measured constraint rather than a preference.
 # RAR stores a file given by absolute path under its whole path minus the drive letter. The unit
 # index is passed that way, so `<drive>:\some\deep\work` would appear inside every archive
 # as `some/deep/work/<unit>.index.csv` -- and one under a profile would carry the account
-# name into all nineteen. One component directly under a drive root keeps it to `work/<unit>...`.
+# name into every one of them. One component directly under a drive root keeps it to
+# `work/<unit>...`.
 WORK_MUST_BE_FLAT = 1
 PERSONAL_IN_PATH = ("users", "documents", "desktop", "appdata", "home")
 
@@ -132,8 +149,8 @@ class Options(object):
     r"""WinRAR settings, immutable. `with_()` returns a copy -- this is the whole builder.
 
     NOTHING IS DUPLICATED PER UNIT. `DEFAULTS` holds the settings that are right for two thirds of
-    the collection, and a unit names only what differs. A table of nineteen full option sets would
-    drift the moment one of them was edited; nineteen one-line overrides cannot.
+    the collection, and a unit names only what differs. A table of ten full option sets would
+    drift the moment one of them was edited; ten one-line overrides cannot.
     """
 
     FIELDS = ("archive_format", "method", "dictionary", "solid", "solid_per_volume",
@@ -208,7 +225,7 @@ class Options(object):
         return "Options(%s)" % ", ".join("%s=%r" % (f, getattr(self, f)) for f in self.FIELDS)
 
 
-# The settings that are right for most of 3.98 TB: fast, because two thirds of it cannot be
+# The settings that are right for most of 4.06 TB: fast, because two thirds of it cannot be
 # compressed anyway, but NOT stored -- `-m0` would also switch off the duplicate collapse, and the
 # duplicates are worth more than the compression.
 DEFAULTS = Options(
@@ -218,11 +235,25 @@ DEFAULTS = Options(
     solid=True,
     solid_per_volume=True,
     volume_bytes=VOLUME_BYTES,
-    recovery_record="10",
-    recovery_volumes_min=2,
+    # 3 %, DOWN FROM 10 % ON 2026-10-04, and the two switches answer different failures. -rr
+    # repairs damage INSIDE a volume -- flipped bits, a scratch -- and 3 % is WinRAR's own default
+    # and what measurements/winrar-recovery-2026-09-26.md recorded as validated. A volume that is
+    # GONE is answered by .rev instead, which is the expensive redundancy and the one worth having
+    # at scale. Paying 10 % for the cheap failure as well cost 284 GB.
+    recovery_record="3",
+    # 3, UP FROM 2 ON 2026-10-04 at the owner's request: every unit survives three lost volumes
+    # even if the 10 % fraction would ask for fewer. At 995 MB volumes a floor costs 995 MB rather
+    # than 24.2 GB, which is what made raising it affordable in the same breath as lowering -rr.
+    recovery_volumes_min=3,
     recovery_volumes_fraction=0.10,
     lock=True,
-    encrypt_headers=True,
+    # NO ENCRYPTION. The owner's decision on 2026-10-04: "da es öffentliche Daten sind brauche ich
+    # kein Passwort / Verschlüsselung, lediglich ECC und recovery archive". Every archive here was
+    # fetched from a public host, so a password would protect nothing and would add the one way
+    # this collection could become unreadable -- a lost key. The -hp machinery is kept, unused,
+    # for a unit that might one day need it; `execute()` demands a password file only if some unit
+    # asks for one.
+    encrypt_headers=False,
     extra=(),
 )
 
@@ -262,171 +293,181 @@ UNITS = (
     # ---------------------------------------------------------------- IBM, AIX and POWER
     Unit("ibm-aix", ["ibm-aix"],
          "702 GB from one live IBM host, and 51 % of it is tar and bff -- uncompressed "
-         "containers, the only large body in the collection where compression level pays. Alone "
-         "because it is the unit most likely to be re-fetched, and nothing else should be "
-         "repacked when it is.",
+         "containers, the only large body in the collection where compression level pays, which "
+         "is why it keeps -m5 -md1g while everything around it was consolidated. "
+         "STILL ALONE AFTER THE 2026-10-04 REGROUPING, and the old reason for it has expired. The "
+         "old sentence said `most likely to be re-fetched, and nothing else should be repacked "
+         "when it is` -- that argument RETIRED with B2, where nothing is repacked ever again. "
+         "What keeps it separate now is the method: folded into aix-support it would save ONE "
+         ".rev file, 995 MB, and cost 702 GB its -m5 -md1g.",
          DEFAULTS.with_(method=5, dictionary="1g")),
+
+    Unit("aix-support", ["fsck-aix-media", "fsck-aix-apps",
+                         "bull-rpms", "bull-srpms", "bullfreeware", "ia-bullfreeware",
+                         "ia-bull-toolbox-43", "ia-bull-aix433-2013", "ia-bull-aix433-2005",
+                         "biblionik-bull", "biblionik-goupil",
+                         "ibm-redbooks", "ibm-rs6000-support", "gsi-collection",
+                         "filibeto-aix-lib", "cmu-shadow", "damage-rt", "AIX5-IA64",
+                         "infania-tl1", "infania-tl2", "aixtools", "circle4",
+                         "rs6000-microcode", "aix-orphans", "aix-qemu-git", "techsysadm",
+                         "typewritten", "aixpdslib", "funet-aix", "ibm-openxl-docs",
+                         "iffly-wiki", "misterhayden", "perzl-wiki", "tvsat-cpc710",
+                         "csri-toronto"],
+         "323 GB: everything you reach for while working on AIX except the operating system "
+         "itself -- install media and applications, the whole Bull line, and all 24 documentation "
+         "sources from the Redbooks to the QEMU recipes. THE OWNER'S RULE ON 2026-10-04: `wenn "
+         "man an AIX Sachen arbeitet, entpackt man vermutlich komplett AIX, da spielen wenige GB "
+         "mehr keine Rolle`. "
+         "THREE UNITS BECAME ONE FOR THE SUBJECT AND NOT FOR THE BYTES, and the first draft of "
+         "this comment got that wrong. It claimed three recovery-volume floors collapsing into "
+         "one -- true at 24.2 GB volumes, where a floor wasted whole discs, and FALSE at 995 MB, "
+         "where the 10 % fraction decides and barely notices how many units there are. Measured: "
+         "this merge saves a single .rev file, and the whole regrouping from nineteen units to ten "
+         "is worth 16 GB of 4 581. What it really buys is what was asked for -- one unpack "
+         "instead of three. "
+         "`fsck-aix-media` and `fsck-aix-apps` are here rather than with their host "
+         "fsck.technology BECAUSE OF THE RETRIEVAL TEST: an AIX-under-QEMU project needs exactly "
+         "this, and grouping by source would make it fetch 404 GB of other vendors to reach it. "
+         "That costs 10.26 GB of duplication with fsck-vendors, paid deliberately -- it is the "
+         "price of the rule above. "
+         "THE BULL HALF HOLDS 111.46 GB OF BYTE-IDENTICAL DUPLICATES: bull-rpms is contained "
+         "100 % in bullfreeware AND 100 % in ia-bullfreeware. Sorted so the copies are adjacent, "
+         "a solid block collapses them to about 70 GB -- which is why this unit must never be "
+         "-m0, whatever its rpm share suggests. Bull closed in 2022, so that half is finished "
+         "forever. `biblionik-goupil` is the other half of the same French host, 37 files of "
+         "bootable SMT Goupil G3 images -- not Bull machines, but one server, one operator and "
+         "one risk, an EOL CentOS 7 box serving HTTP only. "
+         "-m3 IS A COMPROMISE AND NAMED AS ONE: the documentation third wants -m5 and is the only "
+         "text-rich body in the collection, the Bull third only needs the solid block that any "
+         "method above 0 provides, and the media third is already compressed. Three settings "
+         "cannot apply to one unit, so the middle one does.",
+         DEFAULTS.with_(method=3, dictionary="512m")),
 
     Unit("aix-opensource", ["oss4aix.org"],
          "208 GB that is 100 % rpm. Stored rather than compressed: there is nothing to win and "
-         "-m0 turns the longest packing job in the plan into a copy. "
+         "-m0 turns the longest packing job in the plan into a copy. NOT folded into aix-support "
+         "on 2026-10-04 although the subject is the same, because -m0 and -m3 are the difference "
+         "between a copy and a day of CPU, and this archive holds no internal duplication for a "
+         "solid block to find -- it appears in none of b2-cluster.py's sharing pairs. "
          "`rwth-aachen-ftp` LEFT ON 2026-10-03 and the unit's own sentence is why: this one is "
          "all rpm, and that archive held none -- 41 % exe, 25 % zip, 17 % pdf -- so it was being "
          "stored under a rule written for somebody else's content. It shared 0.00 GB with this "
-         "unit and 6.30 GB with ibm-pc-hardware, where it now is.",
+         "unit and 6.30 GB with ibm-pc, where it now is.",
          DEFAULTS.with_(method=0)),
 
-    Unit("aix-media", ["fsck-aix-media", "fsck-aix-apps"],
-         "87 GB of AIX install media and applications. Kept with AIX rather than with its host "
-         "fsck.technology BECAUSE OF THE RETRIEVAL TEST: an AIX-under-QEMU project needs exactly "
-         "this, and grouping by source would make it fetch 404 GB of other vendors to reach it."),
-
-    Unit("bull", ["bull-rpms", "bull-srpms", "bullfreeware", "ia-bullfreeware",
-                  "ia-bull-toolbox-43", "ia-bull-aix433-2013", "ia-bull-aix433-2005",
-                  "biblionik-bull", "biblionik-goupil"],
-         "185 GB raw holding 111.46 GB of byte-identical duplicates -- bull-rpms is contained "
-         "100 % in bullfreeware AND 100 % in ia-bullfreeware. Sorted so the copies are adjacent, "
-         "a solid block collapses them to about 70 GB. Bull closed in 2022, so this unit is "
-         "finished forever and its size costs nothing in future rebuilds. "
-         "`biblionik-goupil` joined on 2026-09-27: the other half of the same French host, "
-         "37 files of bootable SMT Goupil G3 images. Not Bull machines, but one server, one "
-         "operator and one risk -- an EOL CentOS 7 box serving HTTP only -- so they travel "
-         "together.",
+    # ---------------------------------------------------------------- IBM PC, PS/2 and OS/2
+    Unit("ibm-pc", ["ps-2.kev009.com", "ardent-tool", "mcamafia", "rwth-aachen-ftp",
+                    "fsck-ibm-other", "os2bbs", "zx-hobbes-os2", "infania-unixos2",
+                    "dreamlandbbs-os2"],
+         "530 GB of IBM personal-computer material: the PS/2 and RS/6000 hardware trees and the "
+         "OS/2 software that ran on them. Two units became one on 2026-10-04 for ONE REASON ONLY: "
+         "somebody after PS/2 material wants the machine documentation and the software for it in "
+         "the same unpack. Measured, it saves no recovery volumes at all -- 39 + 15 apart, 54 "
+         "merged -- and no duplication either, because the two halves share nothing above a "
+         "gigabyte. The subject is the whole argument, and it is enough. "
+         "THE HARDWARE HALF SHARES 16.60 GB WITH ITSELF: ardent-tool is 75 % contained in "
+         "ps-2.kev009.com, which redirects its own ohlandl/ subtree there. `mcamafia` is 170 MB of "
+         "Peter Wendt's PS/2 technical-reference scans, the same subject and very likely "
+         "overlapping. `rwth-aachen-ftp` joined on 2026-10-03 and four separate readings agreed: "
+         "0.00 GB shared with its old unit against 6.30 GB here -- 62 % of its own 10.16 GB, "
+         "8 490 files of it with ps-2.kev009.com alone. "
+         "ps-2.kev009.com REACHED A FIXED POINT ON 2026-10-04 at 216 142 files and 353.58 GB: "
+         "every name a held page gives is held or recorded as gone.",
          DEFAULTS.with_(dictionary="512m")),
 
-    Unit("ibm-docs", ["ibm-redbooks", "ibm-rs6000-support", "gsi-collection", "filibeto-aix-lib",
-                      "cmu-shadow",
-                      "damage-rt", "AIX5-IA64", "infania-tl1", "infania-tl2", "aixtools",
-                      "circle4", "rs6000-microcode", "aix-orphans", "aix-qemu-git", "techsysadm",
-                      "typewritten", "aixpdslib", "funet-aix", "ibm-openxl-docs", "iffly-wiki",
-                      "misterhayden", "perzl-wiki", "tvsat-cpc710", "csri-toronto"],
-         "About 50 GB in 23 archives: Redbooks, the RS/6000 support tree, two wikis, a blog, "
-         "manuals and the QEMU recipes. One unit because you consult them together and never one "
-         "alone, and because 23 separate uploads is the chaos this plan exists to avoid. The only "
-         "text-rich unit in the collection, so it gets the best compression -- it is small enough "
-         "for that to be free.",
-         DEFAULTS.with_(method=5, dictionary="512m")),
-
-    Unit("ibm-pc-hardware", ["ps-2.kev009.com", "ardent-tool", "mcamafia", "rwth-aachen-ftp"],
-         "374 GB of PS/2 and RS/6000 hardware material -- pccbbs alone is 248 GB. They share "
-         "5.81 GB of identical files and the same subject. `mcamafia` joined on 2026-09-26: "
-         "170 MB of Peter Wendt's own PS/2 technical-reference scans, the same subject as "
-         "ardent-tool and very likely overlapping it. It belongs beside the archive it may "
-         "duplicate rather than in another unit, where the duplication would be paid for twice; "
-         "`b2-cluster.py` reports how much is actually shared. "
-         "`rwth-aachen-ftp` JOINED ON 2026-10-03, moved out of aix-opensource, and four separate "
-         "readings agreed: it shared 0.00 GB with its old unit and 6.30 GB here -- 62 % of its "
-         "own 10.16 GB, 8 490 files of it with ps-2.kev009.com alone; its content profile is "
-         "41 % exe / 25 % zip / 17 % pdf against ps-2's 26 % iso / 26 % exe / 12 % pdf, while the "
-         "unit it sat in is 100 % rpm and stored BECAUSE of that; and somebody after PS/2 "
-         "material had to open two archives to get it. 59 % of that archive is contained in "
-         "ps-2.kev009.com."),
-
-    Unit("ibm-os2-other", ["fsck-ibm-other", "os2bbs", "zx-hobbes-os2", "infania-unixos2",
-                           "dreamlandbbs-os2"],
-         "144 GB of IBM's non-AIX world: OS/2, OS/400, and THREE OS/2 file collections. The "
-         "1.83 GB of identical files is between os2bbs and zx-hobbes-os2; `dreamlandbbs-os2` "
-         "grew from almost nothing to 18.85 GB on 2026-10-03 and shares only 0.07 GB with "
-         "either, which was worth measuring rather than assuming -- two OS/2 shareware "
-         "collections that barely overlap. It is here for the subject, not for the duplicates."),
-
-    # ---------------------------------------------------------------- bitsavers, split by its own
-    # top level. The cut follows the rsync tree, so a re-fetch touches a KNOWN subset of units --
-    # splitting across upstream directory boundaries would make every delivery repack two.
-    Unit("bitsavers-pdf", ["bitsavers/pdf"],
-         "652 GB of scanned paper, 93 681 files. Stored: these are image streams inside an "
-         "already-compressed container, and -m1 would spend hours to find nothing.",
+    # ---------------------------------------------------------------- bitsavers
+    Unit("bitsavers-paper", ["bitsavers/pdf", "bitsavers/magazines"],
+         "844 GB of scanned paper in 96 678 files -- the manuals and the magazines, which are the "
+         "largest single files in the collection. Stored: these are image streams inside an "
+         "already-compressed container, and -m1 would spend hours to find nothing. "
+         "THE TWO WERE SEPARATE UNTIL 2026-10-04 and the reason they were has expired: "
+         "`bitsavers/magazines` stood alone because it `grows a few scans at a time`, and a "
+         "multi-volume RAR cannot be appended to. After B2 nothing is appended to anything, so "
+         "the split had nothing left to buy -- one .rev file, 995 MB.",
          DEFAULTS.with_(method=0)),
 
-    Unit("bitsavers-magazines", ["bitsavers/magazines"],
-         "192 GB in 2 997 files -- the largest files in the collection. Grows a few scans at a "
-         "time, which is exactly why it is not inside the 652 GB unit.",
-         DEFAULTS.with_(method=0)),
+    Unit("bitsavers-software", ["bitsavers"],
+         "352 GB of bitsavers that is software rather than paper: bits, which holds the part of "
+         "bitsavers with real duplicate mass against the rest of the collection, plus components, "
+         "projects, test_equipment, communications and two dozen small branches. "
+         "EXPRESSED AS `bitsavers` MINUS THE PAPER UNIT, so a new top-level directory upstream "
+         "lands here instead of being silently dropped -- the partition test is what makes that "
+         "safe. Two units became one on 2026-10-04 and it saves nothing measurable: 36 .rev apart, "
+         "36 merged. They are one unit because they are one kind of thing, and because the "
+         "subtraction only reads clearly against a single counterpart.",
+         DEFAULTS.with_(dictionary="512m"),
+         exclude=["bitsavers/pdf", "bitsavers/magazines"]),
 
-    Unit("bitsavers-bits", ["bitsavers/bits"],
-         "174 GB of software rather than paper, 58 257 files, and the part of bitsavers with real "
-         "duplicate mass against the rest of the collection."),
-
-    Unit("bitsavers-rest", ["bitsavers"],
-         "179 GB: components, projects, test_equipment, communications and two dozen small "
-         "branches. Expressed as `bitsavers` MINUS the three units above, so a new top-level "
-         "directory upstream lands here instead of being silently dropped -- the partition test "
-         "is what makes that safe.",
-         exclude=["bitsavers/pdf", "bitsavers/magazines", "bitsavers/bits"]),
-
-    # ---------------------------------------------------------------- large third-party bodies
-    Unit("fsck-vendors", ["fsck-vendors"],
-         "404 GB in 37 vendor trees from one host: SGI 105, Sun 82, DEC-Compaq 64, HP 33, "
-         "NeXT 19. One fetch, one unit."),
-
-    Unit("vtda", ["vtda"],
-         "235 GB from five rsync modules. NOT merged with bitsavers although both are museum "
-         "archives: they are the two upstreams that grow on their own, and merging would make "
-         "every delivery repack 1 431 GB. They share 0.77 GB, so merging would save nothing."),
+    # ---------------------------------------------------------------- multi-vendor collections
+    Unit("vendors", ["fsck-vendors", "vtda"],
+         "638 GB from the two large multi-vendor dumps. They share 13.46 GB of byte-identical "
+         "files, which a solid block now collapses INSTEAD OF STORING TWICE -- that pair was the "
+         "single biggest across-unit duplication in the whole plan. It saves no .rev files "
+         "-- 41 + 24 apart, 65 merged -- so those 13.46 GB are the entire byte gain, and they are "
+         "the largest one the regrouping produced. "
+         "A reader after one vendor's material gets 638 GB instead of 404, which is the trade the "
+         "owner named: `wenige GB mehr keine Rolle`.",
+         DEFAULTS.with_(dictionary="512m")),
 
     Unit("oldskool", ["oldskool"],
-         "149 GB, of which drivers/ is 125 GB. One host, one 40-hour fetch, one unit."),
+         "149 GB of PC gaming and demo-scene material. Alone because it shares almost nothing "
+         "with anything -- 1.17 GB with bitsavers and nothing else above a gigabyte -- and "
+         "because no other unit's subject reaches it."),
 
-    # ---------------------------------------------------------------- by platform
-    Unit("sgi", ["irixnet-ftp", "zx-sgi-freeware-old", "sgidepot"],
-         "61 GB of IRIX -- 55 GB until 2026-10-03, when zx-sgi-freeware-old went from 0.94 GB to "
-         "6.68 GB: its hand-written marker had claimed complete while the operator's own sitemap "
-         "named 4 404 more files. The fsck.technology SGI tree stays in `fsck-vendors`; see the note there "
-         "-- 105 GB would have to move to join it, and one host per unit keeps re-fetches "
-         "simple. `sgidepot` joined on 2026-09-26: 497 MB of Ian Mapleson's own writing, "
-         "including his HTML re-typesetting of the Indigo2 Technical Report. Its European "
-         "mirror has already lost its DNS record, which is the clearest statement of risk in "
-         "this whole plan."),
+    # ---------------------------------------------------------------- other platforms
+    Unit("workstations", ["irixnet-ftp", "zx-sgi-freeware-old", "sgidepot",
+                          "dec-ftp-2006", "zx-gatekeeper-dec", "zx-ultrix-freeware",
+                          "zx-kednos-vms", "hp-openvms-2008", "somuchstuff-pdp8",
+                          "decromancer-bits", "next-68k-org", "nice-next"],
+         "169 GB of non-IBM Unix workstations: SGI/IRIX, the whole DEC lineage from PDP through "
+         "VAX, Ultrix and VMS -- including the HP-era OpenVMS tree, which belongs to DEC's "
+         "lineage rather than to HP's -- and NeXT. "
+         "THREE UNITS OF 61, 70 AND 39 GB BECAME ONE, and that is worth exactly nothing in "
+         "recovery volumes: 18 apart, 18 merged. It WAS the largest saving in an earlier draft of "
+         "this plan, which assumed 24.2 GB volumes and three wasted floors; the volume size "
+         "changed to 995 MB and this justification had to change with it. What remains is that "
+         "three uploads became one, and that nobody after a Unix workstation should have to guess "
+         "which of three units holds it. "
+         "-m3 because the DEC third is 26 % uncompressed containers and worth more than the "
+         "default effort; SGI and NeXT lose nothing by it. "
+         "`zx-sgi-freeware-old` closed on 2026-10-03 at 5 702 files against the operator's own "
+         "sitemap, 5 699 of 5 699.",
+         DEFAULTS.with_(method=3, dictionary="512m")),
 
-    Unit("dec", ["dec-ftp-2006", "zx-gatekeeper-dec", "zx-ultrix-freeware", "zx-kednos-vms",
-                 "hp-openvms-2008", "somuchstuff-pdp8", "decromancer-bits"],
-         "70 GB of DEC across PDP, VAX, Ultrix and VMS, including the HP-era OpenVMS tree, which "
-         "belongs to DEC's lineage rather than to HP's. 26 % uncompressed containers, so this one "
-         "is worth more than the default effort.",
-         DEFAULTS.with_(method=3)),
-
-    Unit("next", ["next-68k-org", "nice-next"],
-         "39 GB of NeXT in two archives that share 0.50 GB of identical files. next-68k-org was "
-         "itself unpacked out of a tar inside fsck-vendors, so the two halves of the NeXT world "
-         "would otherwise sit in different units."),
-
-    Unit("unix-history", ["tuhs", "ibiblio-historic-linux", "crashing-org", "crashing-org-kernel",
-                          "crashing-org-www", "penguinppc", "debian-powerpc-boot",
-                          "ibiblio-ppc-ports", "devicetree-openfirmware",
-                          "linuxfoundation-refspecs", "sco-devspecs", "sco-gabi",
-                          "technologists-dellunix", "technologists-sauer", "cryp-to-cwg"],
-         "30 GB: the Unix Heritage Society, historic Linux, Linux-on-PowerPC and the ABI "
-         "specifications. Read together when tracing where something came from."),
-
-    Unit("misc-platforms", ["develooper-hpux", "hp-labs-2007", "hp-alphaserver-2008",
-                            "agilent-ftp-2009", "zx-alphant-nt", "parisc-firmware",
-                            "apollo-clavius", "infania-solaris", "sun3arc",
-                            "novasareforever-aviion", "ndwiki-norsk-data",
-                            "transputer-classiccmp", "wotug-inmos", "zx-microway", "zx-be-os",
-                            "mpoli-bbs", "square7-vintage", "giga-nl-walter", "abc-bladet",
-                            "adoxa-dos", "bretjohnson", "dialectronics", "csiph-gallery",
-                            "infania-os-history", "ultimate-fastpath", "hp-labs-linux-salvage",
-                            "vgamuseum-doc", "obsolyte", "fjkraan", "chipdb", "iommu",
-                            "retro-digitalvintage", "kib-x86docs",
-                            "seds-frommert", "acpc-amstrad", "openpa"],
-         "HP-UX, Alpha, PA-RISC, Apollo, Solaris, Data General, Norsk Data, transputers, BeOS and "
-         "a dozen one-person sites. The deliberate remainder: each too small to upload on its own "
-         "and belonging to no platform in particular. "
-         "`vgamuseum-doc` joined on 2026-09-26 and is the exception that had to be argued: at "
-         "3.44 GB it is not small, and it is coherent rather than leftover -- cross-vendor "
-         "graphics-card documentation, from IBM GXT and the RS/6000 adapter books through DEC "
-         "ZLXp, Sun TechSource and the INMOS databook to PC chipsets. It is here BECAUSE it "
-         "belongs to no single platform, which is what this unit is for; putting it with IBM "
-         "would have buried the DEC, Sun and SGI half of it under the wrong subject. "
-         "`acpc-amstrad` joined on 2026-09-27: 34 files, 1.24 GB of Amstrad CPC peripheral "
-         "documentation -- printer and 3-inch floppy drive manuals in four languages, ROM "
-         "expansion data sheets, the CPC464 technical specification. One home computer, one "
-         "small tree, no platform of its own here: exactly what this unit is for. "
-         "`openpa` joined on 2026-09-28: Paul Weissmann's original PA-RISC and HP 9000 articles, "
-         "under 50 MB. PA-RISC already reaches this unit through `parisc-firmware` and "
-         "`develooper-hpux`, and none of the three is large enough to stand alone. It was added "
-         "on the 27th and removed the same day when the fetch failed outright -- an archive "
-         "holding nothing does not belong in a backup plan."),
+    Unit("misc", ["develooper-hpux", "hp-labs-2007", "hp-alphaserver-2008", "agilent-ftp-2009",
+                  "zx-alphant-nt", "parisc-firmware", "apollo-clavius", "infania-solaris",
+                  "sun3arc", "novasareforever-aviion", "ndwiki-norsk-data",
+                  "transputer-classiccmp", "wotug-inmos", "zx-microway", "zx-be-os", "mpoli-bbs",
+                  "square7-vintage", "giga-nl-walter", "abc-bladet", "adoxa-dos", "bretjohnson",
+                  "dialectronics", "csiph-gallery", "infania-os-history", "ultimate-fastpath",
+                  "hp-labs-linux-salvage", "vgamuseum-doc", "obsolyte", "fjkraan", "chipdb",
+                  "iommu", "retro-digitalvintage", "kib-x86docs", "seds-frommert",
+                  "acpc-amstrad", "openpa",
+                  "tuhs", "ibiblio-historic-linux", "crashing-org", "crashing-org-kernel",
+                  "crashing-org-www", "penguinppc", "debian-powerpc-boot", "ibiblio-ppc-ports",
+                  "devicetree-openfirmware", "linuxfoundation-refspecs", "sco-devspecs",
+                  "sco-gabi", "technologists-dellunix", "technologists-sauer", "cryp-to-cwg"],
+         "144 GB in 51 archives: HP-UX, Alpha, PA-RISC, Apollo, Solaris, Data General, Norsk "
+         "Data, transputers, BeOS, x86 chip documentation, a dozen one-person sites, and the Unix "
+         "and early-Linux history trees. THE DELIBERATE REMAINDER -- each too small to upload on "
+         "its own and belonging to no platform in particular. Merged with unix-history on "
+         "2026-10-04 for one .rev file and for the obvious reason: two remainder units are one "
+         "remainder unit's worth of subject. "
+         "THE FOUR x86 DOCUMENTATION ARCHIVES STAYED HERE against b2-cluster.py's own --propose "
+         "output, which wanted `chipdb`, `iommu`, `kib-x86docs` and `vgamuseum-doc` moved to the "
+         "PC unit. Measured, the move is worth about 2.6 GB: those four duplicate EACH OTHER "
+         "-- iommu and kib-x86docs alone share 9.00 GB -- so that duplication is already inside "
+         "one unit, and most of what is left is shared with bitsavers, which 1.2 TB cannot be "
+         "merged with. An advisory clustering is not a reason to break a subject. "
+         "`vgamuseum-doc` is the exception that had to be argued: at 3.44 GB it is not small, and "
+         "it is coherent rather than leftover -- cross-vendor graphics-card documentation, from "
+         "IBM GXT and the RS/6000 adapter books through DEC ZLXp, Sun TechSource and the INMOS "
+         "databook to PC chipsets. It is here BECAUSE it belongs to no single platform, which is "
+         "what this unit is for; putting it with IBM would have buried the DEC, Sun and SGI half "
+         "of it under the wrong subject. `openpa` holds Paul Weissmann's original PA-RISC and HP "
+         "9000 articles, under 50 MB, and its doc/ prefix is excluded in mirror.py -- every path "
+         "under it answered 404 from three separate addresses.",
+         DEFAULTS.with_(dictionary="512m")),
 )
 
 # The index archive is not one of the units: it is the thing you fetch INSTEAD of a unit.
@@ -661,15 +702,19 @@ def first_volume(archive):
 def check_password(text):
     r"""-> a complaint, or None. Called before anything is packed.
 
-    ONE PASSWORD FOR ALL NINETEEN UNITS, decided deliberately on 2026-09-26. The material is
-    public: it was fetched from public servers, and any sharing would go to a handful of people and
-    would cover the whole collection rather than one unit. Compartmenting buys nothing here, while
-    nineteen secrets would be nineteen chances to lose one over the archive's intended lifetime.
+    NO UNIT ASKS FOR A PASSWORD ANY MORE, so nothing in the current plan reaches this. It is kept
+    because the reasoning that retired it is the reasoning that would have to be reversed first.
 
-    WHICH MAKES A LOST OR WRONG PASSWORD THE ONLY REAL RISK, and it is the one thing this function
-    can act on. A truncated or mistyped password file does not fail -- it packs 3.98 TB that opens
-    with a key nobody has, and the mistake surfaces years later. So the shape is checked here, and
-    `rar t` is run against every unit as soon as it is written.
+    THE ARGUMENT RAN OUT ON 2026-10-04. One password for all nineteen units was decided on
+    2026-09-26 on the grounds that the material is public and compartmenting buys nothing. The
+    owner followed that to its end: if the material is public, the password protects nothing
+    either, and all it adds is the one way 4 TB already on the open web could become unreadable --
+    a lost key, twenty years from now.
+
+    WHAT THIS FUNCTION GUARDS, for a unit that is ever marked encrypt_headers=True: a truncated or
+    mistyped password file does not fail. It packs silently and opens with a key nobody has, and
+    the mistake surfaces years later. So the shape is checked before anything is written, and
+    `rar t` is run against every unit as soon as it is.
     """
     if text != text.strip():
         return "the password's line has leading or trailing whitespace"
@@ -758,9 +803,16 @@ def main(argv=None):
     # EVERY REFUSAL COMES BEFORE THE PLAN. Reading the indexes costs 247 MB and a minute, and the
     # first version spent both before noticing that --execute had no password file.
     rar = "rar"
+    # A PASSWORD IS DEMANDED ONLY IF A UNIT ASKS FOR ONE. Until 2026-10-04 every unit did, and
+    # --execute refused without --password-file. The collection is public material fetched from
+    # public hosts, so encryption protects nothing and adds the one way this could become
+    # unreadable: a lost key. The demand is kept, driven by the units themselves, so a unit that
+    # is one day marked encrypt_headers=True cannot be packed in the clear by accident.
+    wants_password = args.execute and any(u.options.encrypt_headers for u in UNITS)
     if args.execute:
-        if not args.password_file:
-            say("--execute needs --password-file: the password is never a command-line argument")
+        if wants_password and not args.password_file:
+            say("--execute needs --password-file: a unit asks for encrypted headers, and the "
+                "password is never a command-line argument")
             return 2
         rar = find_rar()
         if rar is None:
@@ -780,8 +832,16 @@ def main(argv=None):
     # answers {} rather than raising -- right for a cache, wrong for a packing plan. Checked here,
     # before anything is read, so the refusal names the file instead of the archive being silently
     # small. See `archive_rows`.
-    absent = [os.path.join(a, INDEX_FILE) for u in units for a in u.archives()
-              if not os.path.isfile(os.path.join(args.root, a, INDEX_FILE))]
+    # ONCE PER ARCHIVE AND NOT ONCE PER UNIT THAT NAMES IT. `bitsavers` is named by
+    # bitsavers-paper (as a subtree) and by bitsavers-software (bare), so the plain comprehension
+    # listed it twice and the count disagreed with the number of archives that actually have a
+    # problem. A refusal that cannot count is a refusal a reader stops trusting.
+    seen = []
+    for u in units:
+        for a in u.archives():
+            if a not in seen and not os.path.isfile(os.path.join(args.root, a, INDEX_FILE)):
+                seen.append(a)
+    absent = [os.path.join(a, INDEX_FILE) for a in seen]
     if absent:
         say("REFUSING TO PLAN: %d archive(s) have no index, and would pack as nothing:"
             % len(absent))
@@ -824,20 +884,24 @@ def main(argv=None):
             say("  %-22s %s" % (switch, note))
         return 0
 
-    with io.open(args.password_file, encoding="utf-8") as fh:
-        # Only the line ending is stripped: check_password complains about stray whitespace
-        # rather than removing something that may legitimately belong to the password.
-        password = fh.readline().rstrip(chr(13) + chr(10))
-    complaint = check_password(password)
-    if complaint:
-        say("REFUSING: %s." % complaint)
-        return 2
-    # A password file beside the volumes would be uploaded with them.
-    for where, label in ((args.out, "--out"), (args.work, "--work")):
-        if os.path.abspath(args.password_file).startswith(os.path.abspath(where) + os.sep):
-            say("REFUSING: the password file is inside %s and would be uploaded with the archives."
-                % label)
+    password = None
+    if args.password_file:
+        with io.open(args.password_file, encoding="utf-8") as fh:
+            # Only the line ending is stripped: check_password complains about stray whitespace
+            # rather than removing something that may legitimately belong to the password.
+            password = fh.readline().rstrip(chr(13) + chr(10))
+        complaint = check_password(password)
+        if complaint:
+            say("REFUSING: %s." % complaint)
             return 2
+        # A password file beside the volumes would be uploaded with them. CHECKED EVEN WHEN NO
+        # UNIT IS ENCRYPTED: the file was named, so it exists, and a secret sitting inside --out
+        # travels to B2 whether this run used it or not.
+        for where, label in ((args.out, "--out"), (args.work, "--work")):
+            if os.path.abspath(args.password_file).startswith(os.path.abspath(where) + os.sep):
+                say("REFUSING: the password file is inside %s and would be uploaded with the "
+                    "archives." % label)
+                return 2
     return execute(steps, rar, password)
 
 

@@ -94,7 +94,9 @@ def fixture(also=()):
 FLAT_WORK = os.path.splitdrive(os.path.abspath(__file__))[0] + os.sep + "b2work-test"
 
 # A real unit small enough to stand up in a fixture, used only by the command-line tests.
-REAL_UNIT = "next"
+# A real unit small enough to stand up in a fixture. `next` held this post until the 2026-10-04
+# regrouping folded it into `workstations`; `oldskool` is now the smallest single-archive unit.
+REAL_UNIT = "oldskool"
 REAL_ARCHIVES = [u for u in TOOL.UNITS if u.name == REAL_UNIT][0].archives()
 
 
@@ -162,7 +164,7 @@ class TheRealTableIsAPartition(unittest.TestCase):
 
     def test_the_bitsavers_split_is_exhaustive_by_construction(self):
         """The remainder unit must name `bitsavers` bare and exclude exactly the named subtrees."""
-        rest = [u for u in TOOL.UNITS if u.name == "bitsavers-rest"][0]
+        rest = [u for u in TOOL.UNITS if u.name == "bitsavers-software"][0]
         self.assertEqual(rest.members, ("bitsavers",))
         named = set()
         for unit in TOOL.UNITS:
@@ -176,10 +178,15 @@ class TheRealTableIsAPartition(unittest.TestCase):
             self.assertTrue(unit.members, unit.name)
             self.assertGreater(len(unit.why), 60, "%s: a reason, not a label" % unit.name)
 
-    def test_there_are_nineteen(self):
-        """Not decoration -- the count is the thing that was agreed, and a silent twentieth unit
-        means an upload nobody planned for."""
-        self.assertEqual(len(TOOL.UNITS), 19)
+    def test_there_are_ten(self):
+        """Not decoration -- the count is the thing that was agreed, and a silent eleventh unit
+        means an upload nobody planned for.
+
+        NINETEEN UNTIL 2026-10-04. The owner's rule was that a subject should be one unpack:
+        "wenn man an AIX Sachen arbeitet, entpackt man vermutlich komplett AIX". Measured, the
+        merge is worth 16 GB of 4 581 -- the bytes came from the volume size, not from this -- so
+        the count changed for the reader and not for the bill."""
+        self.assertEqual(len(TOOL.UNITS), 10)
 
     def test_the_names_are_usable_as_directory_names(self):
         for unit in TOOL.UNITS:
@@ -310,7 +317,7 @@ class TheOptionsBuilder(unittest.TestCase):
         """The whole set, in order, for a 30-volume unit. Every one was measured on 2026-09-26."""
         self.assertEqual(TOOL.DEFAULTS.switches(30),
                          ["-ma5", "-m1", "-md256m", "-s", "-sv",
-                          "-v%db" % TOOL.VOLUME_BYTES, "-rr10", "-rv3", "-k", "-scfl"])
+                          "-v%db" % TOOL.VOLUME_BYTES, "-rr3", "-rv3", "-k", "-scfl"])
 
     def test_THE_CHARSET_IS_F_AND_NOT_U(self):
         """U is UTF-16. On a UTF-8 list file `-scul` stored NONE of five non-ASCII names.
@@ -351,6 +358,9 @@ class TheOptionsBuilder(unittest.TestCase):
         """.rev files only mean anything for a split archive; its recovery RECORD still applies."""
         switches = TOOL.INDEX_OPTIONS.switches()
         self.assertFalse([s for s in switches if s.startswith("-rv")])
+        # STILL 10 % HERE while the units went to 3 % on 2026-10-04. The index archive is the thing
+        # you fetch INSTEAD of a unit, it is not split into volumes so it has no .rev to fall back
+        # on, and 10 % of 50 MB is 5 MB. The cheap failure is worth paying for when it is cheap.
         self.assertIn("-rr10", switches)
 
     def test_recovery_volumes_and_recovery_record_are_both_present_and_different(self):
@@ -358,19 +368,24 @@ class TheOptionsBuilder(unittest.TestCase):
         file is the threat cold storage actually presents, and only -rv answers it. Measured:
         both apply from one command, and two deleted volumes were restored from two .rev."""
         switches = TOOL.DEFAULTS.switches(30)
-        self.assertIn("-rr10", switches)
+        self.assertIn("-rr3", switches)
         self.assertIn("-rv3", switches)
 
     def test_THE_RECOVERY_VOLUMES_SCALE_WITH_THE_SET(self):
-        """A fixed two would give `ibm-aix` 6 % and a two-volume unit 100 %.
+        """A fixed count would give `ibm-aix` 706 volumes the same protection as a 30-volume unit.
 
         One .rev answers exactly one lost volume, so the protection has to be a fraction of the
         set with a floor -- the floor because a single lost disc must never be fatal.
+
+        THE FLOOR WENT FROM 2 TO 3 ON 2026-10-04, at the owner's request, and the reason it was
+        affordable is the volume size: a floor costs whole volumes, and a volume went from 24.2 GB
+        to 995 MB in the same change. Three .rev now cost 2.9 GB where two used to cost 48.4.
         """
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(706), 71)
         self.assertEqual(TOOL.DEFAULTS.recovery_volumes(32), 4)
         self.assertEqual(TOOL.DEFAULTS.recovery_volumes(30), 3)
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(2), 2)
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(1), 2)
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(2), 3)
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(1), 3)
 
 
 class TheVolumeSizeFitsTheMedium(unittest.TestCase):
@@ -380,6 +395,32 @@ class TheVolumeSizeFitsTheMedium(unittest.TestCase):
         self.assertLess(TOOL.VOLUME_BYTES, TOOL.BD_RE_BYTES)
         self.assertLess(TOOL.VOLUME_BYTES, TOOL.M_DISC_BD_R_BYTES)
         self.assertGreater(TOOL.BD_RE_BYTES - TOOL.VOLUME_BYTES, 10000000)
+
+    def test_A_WHOLE_NUMBER_OF_VOLUMES_FILLS_EVERY_M_DISC_SIZE(self):
+        """25 on a 25 GB disc, 50 on a 50 GB, 100 on a 100 GB -- inside the owner's 99.5 % margin.
+
+        THIS IS WHY THE SIZE IS 995 000 000 AND NOT 1 000 000 000. A round gigabyte fits only 24
+        volumes on a 25 GB disc and leaves 4 % of every disc empty; five million bytes less per
+        volume buys back one disc in twenty-five. A disc written to its last byte is a disc that
+        may not verify, which is what the 99.5 % figures are for -- they are the owner's, measured
+        against real media, and this case holds the volume size against them rather than against
+        raw capacity.
+        """
+        for gb, limit in sorted(TOOL.M_DISC_995.items()):
+            fit = limit // TOOL.VOLUME_BYTES
+            self.assertEqual(fit, gb, "%d GB disc holds %d volumes" % (gb, fit))
+            self.assertLessEqual(fit * TOOL.VOLUME_BYTES, limit)
+
+    def test_AND_B2_TAKES_A_VOLUME_IN_ONE_PIECE(self):
+        """Under B2's single-part limit, so every volume carries its own whole-file SHA-1.
+
+        A file that goes up through the large-file API is stored as parts and the whole-file digest
+        is only present if the uploader set `large_file_sha1`; PyB2Verify then has to rebuild an
+        S3 ETag from part MD5s to check it. At 995 MB nothing is split, so the check is a plain
+        comparison. One gigabyte is the round number to stay under and leaves the real limit far
+        above -- this asserts the comfortable bound, not the API's edge.
+        """
+        self.assertLess(TOOL.VOLUME_BYTES, 1000000000)
 
     def test_it_is_expressed_in_bytes_and_not_in_an_ambiguous_suffix(self):
         """`-v23000m` means different things depending on case and version. Bytes do not."""
@@ -431,7 +472,7 @@ class TheCommands(unittest.TestCase):
         step = self.steps[0]
         self.assertEqual(step["argv"], [
             "RAR", "a", "-ma5", "-m1", "-md256m", "-s", "-sv",
-            "-v%db" % TOOL.VOLUME_BYTES, "-rr10", "-rv2", "-k", "-scfl",
+            "-v%db" % TOOL.VOLUME_BYTES, "-rr3", "-rv3", "-k", "-scfl",
             os.path.join("OUT", "pair", "pair.rar"),
             "@" + os.path.join("WORK", "pair.list"),
             os.path.join("WORK", "pair" + TOOL.INDEX_SUFFIX),
@@ -600,11 +641,22 @@ class WhatItRefuses(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("no such unit", text)
 
-    def test_EXECUTE_WITHOUT_A_PASSWORD_FILE(self):
-        """The password must never be a command-line argument, so this cannot be waved through."""
+    def test_EXECUTE_WITHOUT_A_PASSWORD_FILE_IS_NOW_ALLOWED(self):
+        """Because no unit asks for one any more, and the demand reads the units.
+
+        This test asserted the OPPOSITE until 2026-10-04 -- `--execute` without `--password-file`
+        was refused, correctly, while every unit encrypted its headers. The owner's decision that
+        public material needs no password turned that refusal into an obstacle, so it now depends
+        on `encrypt_headers` instead of being unconditional.
+
+        WHAT IS CHECKED HERE IS THAT THE RUN GETS PAST THE PASSWORD GATE, not that it succeeds: it
+        still fails on the fixture's missing indexes, which is a different refusal and says so.
+        Asserting the exit code alone would pass for either reason.
+        """
         code, text = self.run_tool("--root", self.root, "--work", FLAT_WORK, "--execute")
+        self.assertNotIn("--password-file", text)
+        self.assertIn("no index", text)
         self.assertEqual(code, 2)
-        self.assertIn("--password-file", text)
 
     def test_the_default_run_says_that_nothing_happened(self):
         code, text = self.run_tool("--root", self.root, "--work", FLAT_WORK, "--only", REAL_UNIT)
@@ -628,7 +680,7 @@ class WhatItRefuses(unittest.TestCase):
             self.assertIn(fact, text)
 
 
-class OnePasswordForAllNineteen(unittest.TestCase):
+class NoPasswordAndNothingToLose(unittest.TestCase):
     r"""Decided on 2026-09-26, with its reason -- and the reason changes what must be guarded.
 
     The material is public, fetched from public servers, and any sharing would go to a handful of
@@ -653,20 +705,35 @@ class OnePasswordForAllNineteen(unittest.TestCase):
         self.assertIsNotNone(TOOL.check_password(" " + "A" * 64))
 
     def test_the_first_volume_is_what_gets_tested(self):
-        self.assertEqual(TOOL.first_volume(os.path.join("OUT", "bull", "bull.rar")),
-                         os.path.join("OUT", "bull", "bull.part01.rar"))
+        self.assertEqual(TOOL.first_volume(os.path.join("OUT", "vendors", "vendors.rar")),
+                         os.path.join("OUT", "vendors", "vendors.part01.rar"))
 
     def test_the_secret_is_masked_wherever_a_command_is_printed(self):
         shown = TOOL.hide_password(["rar", "a", "-hp" + "S" * 64, "x.rar"])
         self.assertEqual(shown, ["rar", "a", "-hp***", "x.rar"])
         self.assertNotIn("S" * 64, " ".join(shown))
 
-    def test_every_unit_encrypts_its_headers(self):
-        """One password, and every unit uses it -- a unit packed in the clear by accident would be
-        the one that leaks the file names the others hide."""
+    def test_NO_UNIT_ENCRYPTS_AND_THAT_IS_THE_DECISION(self):
+        """The owner, 2026-10-04: "da es oeffentliche Daten sind brauche ich kein Passwort /
+        Verschluesselung, lediglich ECC und recovery archive".
+
+        Every archive here was fetched from a public host, so a password protects nothing and adds
+        the one way this collection could become unreadable -- a lost key, twenty years from now,
+        for 4 TB that is already on the open web. The earlier plan encrypted all nineteen units
+        under one password and this test asserted the opposite of what it asserts now.
+        """
         for unit in TOOL.UNITS:
-            self.assertTrue(unit.options.encrypt_headers, unit.name)
-        self.assertTrue(TOOL.INDEX_OPTIONS.encrypt_headers)
+            self.assertFalse(unit.options.encrypt_headers, unit.name)
+        self.assertFalse(TOOL.INDEX_OPTIONS.encrypt_headers)
+
+    def test_but_the_machinery_is_still_there_and_still_driven_by_the_units(self):
+        """Kept rather than deleted, because the next unit might differ. If one is ever marked
+        encrypt_headers=True, --execute must demand a password file again -- so the demand reads
+        the units instead of being hard-coded off."""
+        with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as fh:
+            src = fh.read()
+        self.assertIn("any(u.options.encrypt_headers for u in UNITS)", src)
+        self.assertIn('argv.insert(2, "-hp" + password)', src)
 
 
 class WhenTheCollectionIsHere(unittest.TestCase):
