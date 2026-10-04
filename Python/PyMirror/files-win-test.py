@@ -9,17 +9,21 @@ page and `ohlandl/CPU/docs/Intel/210844-001.pdf` beneath it. Until 2026-10-04 wh
 FIRST won, which is why that archive has `Harris` as a directory -- its files came first -- and had
 `Intel` as a 4 901-byte page that made 20 datasheets unstorable.
 
-THE OWNER'S DECISION: FILES WIN, and the page is stored beside them as `<name>.html`, recorded in
+THE OWNER'S DECISION: FILES WIN, and the page is kept as `<name>/index.html`, recorded in
 RENAMED.txt. The trade is 4 901 bytes of listing against 20 PDFs, and the listing is the one page
 whose content the directory itself already carries.
 
+INSIDE THE DIRECTORY AND NOT BESIDE IT. The first version wrote `<name>.html` in the parent, which
+REINTERPRETS EVERY RELATIVE LINK THE PAGE HOLDS -- see
+test_a_directory_answer_is_stored_INSIDE_the_directory for the measurement that caught it.
+
 TWO HALVES, DELIBERATELY NOT THE SAME RISK:
 
-  a response that IS a directory    stored as <name>.html automatically. Nothing on disk changes;
-                                    a file simply arrives under a name the source did not use.
-  a file ALREADY in the way         moved to <name>.html only with --free-blockers, because a
-                                    fetch that quietly rearranges an archive is not one anybody
-                                    can audit.
+  a response that IS a directory    stored as <name>/index.html automatically. Nothing on disk
+                                    changes; a file arrives under a name the source did not use.
+  a file ALREADY in the way         moved into <name>/index.html only with --free-blockers,
+                                    because a fetch that quietly rearranges an archive is not one
+                                    anybody can audit.
 
 AND THE RENAME IS WRITTEN DOWN, which is the whole difference between a rename and a quiet loss:
 the source called it `Intel`, and only RENAMED.txt says so afterwards.
