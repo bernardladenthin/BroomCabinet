@@ -2310,6 +2310,20 @@ ARCHIVES = [
     ("square7-vintage", "http://vintagecomputers.square7.ch/Vintage/"),
     # biblionik-bull -- see PROVENANCE.md in the archive.
     ("biblionik-bull", "http://www.biblionik.fr/Info/Bull/SOLAR/"),
+    # A SECOND SOURCE ADDRESS DOES NOT HELP, measured 2026-10-04 and worth writing down because
+    # the transport-layer note further down invites exactly that idea. An AIX 7.3 box on IBM Cloud,
+    # a different network entirely, was used to ask the same questions:
+    #
+    #   one HEAD on https://www.openpa.net/        -> 200 in 0.1 s
+    #   13 HEADs on doc/* paths, 4 s apart         -> 13 x [Errno 81] No route to host
+    #   then 3 more HEADs on the ROOT, 5 s apart   -> 3 x No route to host, 30 s each
+    #
+    # So that machine was answered once and then cut off within minutes, exactly as this one is.
+    # The block is per SOURCE ADDRESS and it triggers after a handful of requests, which means a
+    # bridge over another host buys one answer and then the same silence. Not a user-agent
+    # question, not a route-shopping question: there is no address from which this archive can be
+    # finished quickly.
+    #
     # AND IT STOPPED ANSWERING AGAIN ON 2026-10-04, which settles the standing instruction below
     # rather than testing it. 19 HEAD requests at the 4 s this table asks for: the first answered,
     # 5 gave a clean 404, and then THIRTEEN IN A ROW were URLError -- plus the one fetchable file,
