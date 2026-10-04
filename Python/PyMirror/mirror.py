@@ -1778,6 +1778,22 @@ ARCHIVES = [
     ("rwth-aachen-ftp", "http://john.ccac.rwth-aachen.de:8000/ftp/"),
     ("bull-rpms", "https://dl.power-devops.com/bull/RPMS/"),
     ("bull-srpms", "https://dl.power-devops.com/bull/SRPMS/"),
+    # THIS HOST NEVER BLOCKED US, and the record has to say so because for most of 2026-10-04 I
+    # said the opposite. A converge run stopped twice with "0 fetched, 25-30 failures" and I read
+    # it as the server having had enough after 6 800 requests and 6.5 GB. It had not. The failures
+    # were WinError 183 from os.makedirs on OUR filesystem -- see common.blocking_parent -- and
+    # ps-2.kev009.com answered 200 throughout, including while I was explaining that it had
+    # stopped.
+    #
+    # WHAT THAT MISREADING COST: an argument about whether a second address would be
+    # route-shopping, a recommendation to wait a day, and the owner restarting his router for
+    # nothing. The register's rule against route-shopping stands untouched; it simply did not
+    # apply, because there was no block to go around.
+    #
+    # 154 OF THE 2 278 REMAINING PATHS ARE GENUINELY UNSTORABLE, and two files cause all of it:
+    # `ohlandl/CPU/docs/AMD` blocks 149 and `ohlandl/615x/AOS_43/Docs` blocks 5. The source serves
+    # each of those as a PAGE and serves files beneath it; a filesystem holds one or the other.
+    # The register logs 2 416 files across the collection the same way.
     ("ps-2.kev009.com", "https://ps-2.kev009.com/"),
     # ibm-aix -- see PROVENANCE.md in the archive.
     ("ibm-aix", "https://aix.software.ibm.com/aix/"),

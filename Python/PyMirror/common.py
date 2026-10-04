@@ -145,9 +145,9 @@ __all__ = [
     "sums_line", "read_index", "write_index",
     "read_marker", "write_marker", "marker_text", "MARKER_COLUMN",
     "iter_tree", "scan_tree", "hash_tree", "HASH_BATCH",
-    "http_open", "http_get", "http_try", "head_size", "unverified_context",
+    "http_open", "answered_as_a_directory", "http_get", "http_try", "head_size", "unverified_context",
     "site_prefixes", "content_root", "under_site", "reach", "scheme_drift",
-    "quote_url", "Pacer", "Backoff", "Patience", "local_failure", "UNREACHED",
+    "quote_url", "Pacer", "Backoff", "Patience", "blocking_parent", "local_failure", "UNREACHED",
     "GONE_FILE", "GONE_STATUS", "read_gone", "record_gone",
     "REFUSED_FILE", "read_refused", "record_refused",
     "declared_length", "DECLARES_ITS_LENGTH",
@@ -1860,6 +1860,40 @@ class Backoff:
 UNREACHED = frozenset((11001, -2, -3, 10051, 101, 10065, 113, 10050, 100))
 
 
+def blocking_parent(path):
+    """-> the ancestor of `path` that is a FILE where a directory is needed, or None.
+
+    A SOURCE MAY SERVE BOTH `X` AND `X/y`; A FILESYSTEM MAY NOT. ps-2.kev009.com serves
+    `ohlandl/CPU/docs/AMD` as a page AND `ohlandl/CPU/docs/AMD/<datasheet>.pdf` beneath it. One of
+    the two can be stored and the other cannot, and which one wins is simply whichever arrived
+    first.
+
+    WHY THIS IS A FUNCTION AND NOT AN EXCEPTION HANDLER. manifest-fetch.py used to find out by
+    trying: os.makedirs raised WinError 183 ("cannot create a file when that file already
+    exists"), the generic handler counted it as a FAILURE, and Patience counted 30 of those in a
+    row as the host having gone quiet. The run abandoned ps-2.kev009.com with 2 124 fetchable
+    files untouched -- and I spent an afternoon explaining to the owner that the host had blocked
+    us, that a second address would be route-shopping, and that we should wait a day. He restarted
+    his router for nothing. The host had answered 200 the whole time.
+
+    MEASURED 2026-10-04: of 2 278 candidates, 154 were blocked and TWO files did all of it --
+    `ohlandl/CPU/docs/AMD` blocking 149 and `ohlandl/615x/AOS_43/Docs` blocking 5.
+
+    ASKED BEFORE THE REQUEST, so the source is not made to send bytes that cannot be written. The
+    register already knows this shape: 2 416 files across the collection are logged
+    "LOST (a file occupies a parent directory of this one)".
+    """
+    parts = [p for p in str(path).replace("/", os.sep).split(os.sep) if p]
+    if not parts:
+        return None
+    walk = parts[0] + os.sep if parts[0].endswith(":") else parts[0]
+    for seg in parts[1:-1]:
+        walk = os.path.join(walk, seg)
+        if isfile(walk):
+            return walk
+    return None
+
+
 def local_failure(exc):
     """-> a short label when a failure happened on OUR side of the wire, else None.
 
@@ -2233,6 +2267,30 @@ def http_get(url, timeout=120, context=None, extra_headers=None, opener=None):
     """
     with http_open(url, timeout, context, extra_headers, opener) as r:
         return r.read(), r.headers
+
+
+def answered_as_a_directory(asked, final):
+    """-> True if the server redirected a bare path to the same path WITH A TRAILING SLASH.
+
+    THAT SLASH IS THE SERVER SAYING "THIS IS A DIRECTORY", and storing the body under the bare
+    name writes a file where a directory has to go. The register already has the bill for it:
+    four impostor files of 122 077 bytes, each byte-identical to the listing it impersonates, and
+    2 416 files afterwards logged "LOST (a file occupies a parent directory of this path)".
+
+    same_path_plus_slash() answers a stricter question -- same host AND same path -- and that is
+    right for the crawler, which uses it to decide whether to walk further. It is NOT enough here:
+    ps-2.kev009.com answers `/ohlandl/CPU/docs/Intel` with a redirect to
+    `ardent-tool.com/CPU/docs/Intel/`. Different host, different path, and the trailing slash still
+    means exactly what it means. On 2026-10-04 that wrote FOUR more impostors -- Intel, AMD, IBM,
+    Cyrix -- which then made 692 datasheets unstorable.
+    #
+    THE HOST AND THE PATH ARE DELIBERATELY NOT COMPARED. A server is free to answer for another
+    name, and whether the redirect stayed on the same machine says nothing about whether what
+    came back is a directory. Only the slash does.
+    """
+    if not final or not asked:
+        return False
+    return final.endswith("/") and not asked.endswith("/")
 
 
 def http_try(url, timeout=120, limit=None, method=None, **kw):

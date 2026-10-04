@@ -244,5 +244,182 @@ class AStorableNameIsNotAMissingFile(unittest.TestCase):
         self.assertTrue(got.endswith(os.path.join("d", "Aster_x_1.0")), got)
 
 
+class AFileCannotHoldBothXAndXSlashY(unittest.TestCase):
+    """common.blocking_parent, and the afternoon it cost.
+
+    ps-2.kev009.com serves `ohlandl/CPU/docs/AMD` as a PAGE and `ohlandl/CPU/docs/AMD/<sheet>.pdf`
+    beneath it. A filesystem holds one or the other, and which one wins is whichever arrived first.
+    The register logs 2 416 files across the collection the same way: "LOST (a file occupies a
+    parent directory of this one)".
+
+    HOW IT WENT WRONG. manifest-fetch.py found out by TRYING: os.makedirs raised WinError 183, the
+    generic handler counted it as a failure, and Patience counted 30 in a row as the host having
+    gone quiet. The run abandoned the archive with 2 124 FETCHABLE files untouched -- and I read
+    the abandonment as a block, argued for an afternoon about whether a second address would be
+    route-shopping, recommended waiting a day, and let the owner restart his router for nothing.
+    That server answered 200 the whole time.
+
+    MEASURED AFTERWARDS: 154 of 2 278 candidates were blocked, and TWO files did all of it.
+
+    SO THE QUESTION IS ASKED BEFORE THE REQUEST. Not to be tidy -- so that a local impossibility
+    can never again look like a host's silence, and so a source is not made to send bytes that
+    cannot be written.
+    """
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp(prefix="blockparent-")
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def make_file(self, *parts):
+        p = os.path.join(self.root, *parts)
+        d = os.path.dirname(p)
+        if d and not os.path.isdir(d):
+            os.makedirs(d)
+        with io.open(p, "wb") as fh:
+            fh.write(b"x")
+        return p
+
+    def test_a_clear_path_has_no_blocker(self):
+        os.makedirs(os.path.join(self.root, "a", "b"))
+        self.assertIsNone(common.blocking_parent(os.path.join(self.root, "a", "b", "f.pdf")))
+
+    def test_THE_FILE_IN_THE_WAY_IS_NAMED(self):
+        """Counting them is not enough: the useful fact is WHICH file blocks, because two files
+        accounted for all 154 cases and the decision is about two things, not a hundred and fifty."""
+        blocker = self.make_file("a", "docs")
+        got = common.blocking_parent(os.path.join(self.root, "a", "docs", "sheet.pdf"))
+        self.assertEqual(got, blocker)
+
+    def test_it_looks_at_every_level_and_not_only_the_parent(self):
+        blocker = self.make_file("a", "b")
+        got = common.blocking_parent(os.path.join(self.root, "a", "b", "c", "d", "f.pdf"))
+        self.assertEqual(got, blocker)
+
+    def test_THE_TARGET_ITSELF_IS_NOT_ITS_OWN_BLOCKER(self):
+        """`X` existing as a file does not stop `X` being written -- that is an overwrite, not an
+        impossibility. Only ancestors count, and getting this wrong would refuse every re-fetch."""
+        self.make_file("a", "docs")
+        self.assertIsNone(common.blocking_parent(os.path.join(self.root, "a", "docs")))
+
+    def test_the_first_blocker_from_the_top_is_the_one_reported(self):
+        """Two in one path is possible after a messy fetch; the outermost is the one to act on."""
+        outer = self.make_file("a")
+        got = common.blocking_parent(os.path.join(self.root, "a", "b", "c.pdf"))
+        self.assertEqual(got, outer)
+
+    def test_an_empty_or_bare_path_answers_None(self):
+        for p in ("", "f.pdf", os.sep):
+            self.assertIsNone(common.blocking_parent(p), repr(p))
+
+    def test_it_accepts_forward_slashes_too(self):
+        """Callers hand it both shapes -- a url-derived path and an os.path.join one."""
+        blocker = self.make_file("a", "docs")
+        got = common.blocking_parent(self.root.replace(os.sep, "/") + "/a/docs/sheet.pdf")
+        self.assertEqual(got, blocker)
+
+
+class AnUnstorablePathIsNotAFailedFetch(unittest.TestCase):
+    """The consequence in the fetcher, which is the part that actually went wrong."""
+
+    def source(self):
+        with io.open(os.path.join(HERE, "manifest-fetch.py"), encoding="utf-8") as fh:
+            return fh.read()
+
+    def test_it_is_checked_BEFORE_the_request(self):
+        """Order is the whole fix. Asked afterwards it is still an exception on the failure path,
+        and Patience still counts it against the host."""
+        src = self.source()
+        self.assertLess(src.index("blocker = blocking_parent(out)"), src.index("pacer.wait("))
+
+    def test_it_is_counted_apart_from_failed(self):
+        src = self.source()
+        self.assertIn("unstorable.append(", src)
+        self.assertIn("not counted as a failure", src)
+
+    def test_and_it_does_not_touch_patience(self):
+        """A `continue` before the try block, so no branch of the error handling sees it."""
+        src = self.source()
+        between = src[src.index("blocker = blocking_parent(out)"):src.index("pacer.wait(")]
+        self.assertIn("continue", between)
+        self.assertNotIn("patience", between)
+
+    def test_the_report_names_the_blocking_files(self):
+        src = self.source()
+        self.assertIn("UNSTORABLE", src)
+        self.assertIn("blocks %d", src)
+
+
+class ATrailingSlashIsTheServerSayingDirectory(unittest.TestCase):
+    """common.answered_as_a_directory, and the four impostors that paid for it.
+
+    ps-2.kev009.com answers `/ohlandl/CPU/docs/Intel` with a redirect to
+    `ardent-tool.com/CPU/docs/Intel/`. The slash is the server saying "this is a directory", and
+    manifest-fetch.py stored the body -- a 4 901-byte listing titled `Index of /CPU/docs/Intel` --
+    under the bare name. Four of them, Intel AMD IBM Cyrix, and those four files then made 692
+    datasheets unstorable.
+
+    THE REGISTER HAS THE BILL FOR THE SAME SHAPE ALREADY: "FOUR files of 122 077 bytes, each
+    byte-identical to the listing it impersonates", and 2 416 files afterwards logged "LOST (a
+    file occupies a parent directory of this path)". Its own comment on it: "A defect that writes
+    a plausible file is worse than one that writes nothing, because the tree looks fuller
+    afterwards."
+
+    WHY same_path_plus_slash WAS NOT ENOUGH. That function compares host AND path, which is right
+    for the crawler deciding whether to walk further. Here the redirect crosses to a DIFFERENT
+    HOST and drops a path prefix, so it answers False -- while the slash means exactly what it
+    always means. Only the slash is compared now.
+
+    AND THE 692 ARE NOT MISSING. Every one is held in the ardent-tool archive under the same
+    tail -- 692 of 692, checked -- because that is where ps-2 redirects. Nothing was lost; what
+    was created was four files that lie about what they are.
+    """
+
+    def test_a_bare_path_answered_with_a_slash_is_a_directory(self):
+        self.assertTrue(common.answered_as_a_directory(
+            "https://ps-2.kev009.com/ohlandl/CPU/docs/Intel",
+            "https://ardent-tool.com/CPU/docs/Intel/"))
+
+    def test_THE_HOST_AND_PATH_ARE_NOT_COMPARED(self):
+        """A server may answer for another name, and whether the redirect stayed on the same
+        machine says nothing about whether what came back is a directory."""
+        self.assertTrue(common.answered_as_a_directory(
+            "http://a.invalid/x", "https://totally-other.invalid/completely/else/"))
+
+    def test_an_ordinary_answer_is_not_a_directory(self):
+        self.assertFalse(common.answered_as_a_directory(
+            "https://a.invalid/f.pdf", "https://a.invalid/f.pdf"))
+
+    def test_a_redirect_that_keeps_no_slash_is_not_one(self):
+        """A plain http->https or www redirect must not be read as a directory."""
+        self.assertFalse(common.answered_as_a_directory(
+            "http://a.invalid/f.pdf", "https://www.a.invalid/f.pdf"))
+
+    def test_ASKING_FOR_A_SLASH_AND_GETTING_ONE_IS_NOT_A_SURPRISE(self):
+        """A caller that asked for a directory already knows. Returning True there would refuse
+        every legitimate listing fetch."""
+        self.assertFalse(common.answered_as_a_directory(
+            "https://a.invalid/d/", "https://a.invalid/d/"))
+
+    def test_empty_inputs_answer_False(self):
+        for asked, final in (("", "x/"), ("x", ""), (None, "x/"), ("x", None)):
+            self.assertFalse(common.answered_as_a_directory(asked, final), (asked, final))
+
+    def test_the_fetcher_reads_the_final_url_and_refuses_to_store(self):
+        with io.open(os.path.join(HERE, "manifest-fetch.py"), encoding="utf-8") as fh:
+            src = fh.read()
+        self.assertIn("resp.geturl()", src)
+        self.assertIn("answered_as_a_directory(url, final)", src)
+        self.assertIn("directories.append(", src)
+
+    def test_and_it_says_so_with_the_url_it_was_sent_to(self):
+        """Counting them hides WHICH host answered, and in this case the answer came from another
+        archive in this same collection."""
+        with io.open(os.path.join(HERE, "manifest-fetch.py"), encoding="utf-8") as fh:
+            src = fh.read()
+        self.assertIn("answered AS A DIRECTORY", src)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
