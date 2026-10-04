@@ -52,7 +52,8 @@ import os
 import sys
 import urllib.parse
 
-from common import (MIRROR_ROOT, BOOKKEEPING_FILES, IMG_SRC, LINK_ODD_RE, GONE_FILE, exists, load_mirror,
+from common import (MIRROR_ROOT, BOOKKEEPING_FILES, IMG_SRC, LINK_ODD_RE, GONE_FILE,
+                    content_root, exists, load_mirror,
                     looks_like_a_page, read_gone, relative_to, strip_cache_buster, under_site)
 
 # Both are the library's, written out here character for character until 2026-09-23.
@@ -195,6 +196,10 @@ def main():
     # rest of the gap between its headline figure and its real one. .mirror-gone is the record a
     # fetch writes when the source says the file is gone -- treating it as still-missing asks a
     # stranger's server the same question again on every run.
+    # WHERE THE BASE'S PATHS ACTUALLY LIVE. Four archives keep a host directory level -- a wayback
+    # salvage and a multi-host fetch write `<host>/<path>` -- and comparing against the archive
+    # root instead reported 199 held pages of techsysadm as missing. See common.content_root.
+    tree = content_root(root, base)
     gone = read_gone(root)
     files, dirs, outside, refused, dead = [], [], 0, [], []
     for url in sorted(named):
@@ -215,7 +220,7 @@ def main():
         if excluded_by and excluded_by(rel, patterns, args.archive):
             refused.append(rel)
             continue
-        local = os.path.join(root, *[p for p in rel.split("/") if p])
+        local = os.path.join(tree, *[p for p in rel.split("/") if p])
         if exists(local):
             continue
         if rel in gone:

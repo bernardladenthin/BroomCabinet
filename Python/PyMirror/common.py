@@ -146,7 +146,7 @@ __all__ = [
     "read_marker", "write_marker", "marker_text", "MARKER_COLUMN",
     "iter_tree", "scan_tree", "hash_tree", "HASH_BATCH",
     "http_open", "http_get", "http_try", "head_size", "unverified_context",
-    "site_prefixes", "under_site", "reach", "scheme_drift",
+    "site_prefixes", "content_root", "under_site", "reach", "scheme_drift",
     "quote_url", "Pacer", "Backoff", "Patience", "local_failure", "UNREACHED",
     "GONE_FILE", "GONE_STATUS", "read_gone", "record_gone",
     "declared_length", "DECLARES_ITS_LENGTH",
@@ -1264,6 +1264,44 @@ def is_child_link(href, allow_up=False):
     if "?" in href:
         return False
     return True
+
+
+def content_root(archive_dir, base):
+    """-> the directory inside `archive_dir` that `base`'s paths are relative to.
+
+    MOST ARCHIVES ANSWER WITH archive_dir ITSELF. Four do not: a wayback salvage and a multi-host
+    fetch write `<host>/<path>`, so the tree carries a HOST DIRECTORY LEVEL that the registered
+    base says nothing about.
+
+        aixpdslib        aixpdslib.seas.ucla.edu/ + ftp.aixpdslib.seas.ucla.edu/
+        bullfreeware     bullfreeware.com/ + gnome.bullfreeware.com/   (base says www.)
+        ibm-openxl-docs  ibm.com/                                      (base says www.)
+        techsysadm       techsysadm.blogspot.com/ + blogger.googleusercontent.com/
+
+    WHAT IT COST, 2026-10-04. techsysadm's completeness check reported 402 paths outstanding. It
+    mapped `https://techsysadm.blogspot.com/2025/09/x.html` to `<archive>/2025/09/x.html` while the
+    file is at `<archive>/techsysadm.blogspot.com/2025/09/x.html`. 199 of those 203 pages were
+    HELD. Four were genuinely absent, and a check wrong by a factor of fifty is a check that
+    cannot be used to decide whether an archive may be frozen.
+
+    EVIDENCE AND NOT CONFIGURATION, which is looks_like_mirror_root's reasoning in this file
+    already: the directory either exists or it does not, and a register table would have to be
+    maintained for every future salvage. BOTH SPELLINGS ARE TRIED because the salvage writes the
+    host it actually fetched -- bullfreeware is registered on `www.bullfreeware.com` and the tree
+    says `bullfreeware.com`.
+
+    A DIRECTORY THAT MERELY SHARES THE NAME IS NOT A TRAP: the name has to be the base's own host,
+    so an archive holding a `www.example.com/` subtree of somebody else's site is unaffected
+    unless that is also its base.
+    """
+    host = urllib.parse.urlsplit(base).hostname if base else None
+    if not host:
+        return archive_dir
+    bare = host[4:] if host.startswith("www.") else host
+    for candidate in (host, bare, "www." + bare):
+        if candidate and os.path.isdir(os.path.join(archive_dir, candidate)):
+            return os.path.join(archive_dir, candidate)
+    return archive_dir
 
 
 def site_prefixes(base):

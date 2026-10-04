@@ -45,8 +45,11 @@ import re
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.parse
 
-from common import GONE_FILE, MIRROR_ROOT, load_mirror, say
+from common import (GONE_FILE, GONE_STATUS, MIRROR_ROOT, Pacer, host_of, http_open,
+                    load_mirror, record_gone, say)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HARVEST = os.path.join(HERE, "pages-to-urllist.py")
@@ -61,8 +64,63 @@ OUTSTANDING = re.compile(r"^\s*(\d+) FILES NAMED AND NOT ON DISK", re.M)
 FETCHED = re.compile(r"DONE fetched (\d+), gone from the source (\d+), failed (\d+)")
 
 
+def probe(urls, delay, pacer=None, report=say):
+    """Ask HEAD about each candidate. -> {"get": [...], "gone": [(url, code)], "refused": [...]}
+
+    A HEAD BEFORE A GET, BECAUSE MOST OF THESE ARE NOT FILES. Measured over three batches on
+    2026-10-03/04, 1 202 of 1 607 outstanding paths answered 404 -- pages naming files their own
+    server no longer has. Fetching them costs a full request each and an error page to discard;
+    asking costs a header.
+
+        infania-os-history   54 outstanding, 54 x 404
+        somuchstuff-pdp8    480 outstanding, 480 x 404
+        dialectronics       158 outstanding, 158 x 404
+        techsysadm          402 outstanding, 402 x 200   -- and 199 of them were already HELD,
+                                                            which is what content_root fixed
+
+    THE 404s ARE RECORDED FROM THIS MEASUREMENT and not re-asked with a GET, which is the whole
+    saving. A HEAD is the source answering, and .mirror-gone holds what the source answered; going
+    back for a second opinion would spend 1 202 requests on a question already settled.
+
+    A THIRD OUTCOME EXISTS AND IS NOT A FAILURE. 403 and 500 are permanent in practice and
+    record_gone refuses them -- it takes 404 and 410 only, deliberately, because `gone` and
+    `refused` are different facts. They are returned separately so the caller can stop instead of
+    asking again next round: five such paths are known, and before this they cost one wasted round
+    each before the gain brake noticed.
+    """
+    pacer = pacer or Pacer(delay)
+    out = {"get": [], "gone": [], "refused": []}
+    for i, url in enumerate(urls, 1):
+        pacer.wait(host_of(url))
+        try:
+            with http_open(url, timeout=45, method="HEAD") as resp:
+                code = resp.status
+        except urllib.error.HTTPError as e:
+            code = e.code
+        except Exception as e:                                 # noqa: BLE001
+            # NOT COUNTED AS GONE. A timeout or a DNS failure is our side of the wire or a host
+            # having a bad minute, and writing it into .mirror-gone would record our own trouble
+            # as the source's answer.
+            out["refused"].append((url, type(e).__name__))
+            continue
+        if code == 200:
+            out["get"].append(url)
+        elif int(code) in GONE_STATUS:
+            out["gone"].append((url, code))
+        else:
+            out["refused"].append((url, code))
+        if i % 100 == 0:
+            report("      ... %d of %d asked" % (i, len(urls)))
+    return out
+
+
 def outstanding(root, archive, out_path):
-    """-> (count, text) from one harvest. The count is the tool's own figure."""
+    """-> (count, urls, text) from one harvest. The count is the tool's own figure.
+
+    THE URLS COME BACK WITH THE COUNT rather than being re-read from the file by the caller. One
+    read, one source of truth, and the probe step cannot end up asking about a different list than
+    the one the figure describes.
+    """
     res = subprocess.run([sys.executable, HARVEST, "--root", root, "--archive", archive,
                           "--out", out_path],
                          capture_output=True, text=True, cwd=HERE)
@@ -72,8 +130,12 @@ def outstanding(root, archive, out_path):
         # NOT TREATED AS ZERO. A harvest whose figure cannot be read has said nothing, and reading
         # silence as "nothing outstanding" is the exact failure this collection keeps meeting -- a
         # clean zero that looks like a finding.
-        return None, text
-    return int(found.group(1)), text
+        return None, [], text
+    urls = []
+    if os.path.exists(out_path):
+        with io.open(out_path, encoding="utf-8") as fh:
+            urls = [ln.strip() for ln in fh if ln.strip()]
+    return int(found.group(1)), urls, text
 
 
 def fetch(archive, base, url_list, delay, give_up, report=say):
@@ -95,13 +157,14 @@ def fetch(archive, base, url_list, delay, give_up, report=say):
 
 def converge(root, archive, base, delay, max_rounds, min_gain, give_up, go, report=say):
     """Run rounds until a harvest finds nothing. -> the list of (round, outstanding, fetched)."""
+    archive_dir = os.path.join(root, archive)
     history = []
     previous = None
     for n in range(1, max_rounds + 1):
         out_path = os.path.join(root, "logs", "converge-%s-r%d.txt" % (archive, n))
         if not os.path.isdir(os.path.dirname(out_path)):
             os.makedirs(os.path.dirname(out_path))
-        count, text = outstanding(root, archive, out_path)
+        count, urls, text = outstanding(root, archive, out_path)
         if count is None:
             report("  round %d: the harvest figure could not be read -- stopping" % n)
             report(text[-400:])
@@ -127,6 +190,33 @@ def converge(root, archive, base, delay, max_rounds, min_gain, give_up, go, repo
             report("  --go not given: %d urls written to %s, nothing fetched" % (count, out_path))
             history.append((n, count, 0))
             return history
+        # ASKED BEFORE FETCHED. The candidates are split by what the source says about them, and
+        # only the 200s are handed to the fetcher; see probe() for the measurement that makes this
+        # the default rather than an option.
+        asked = probe(urls, delay, report=report)
+        report("    asked %d: %d fetchable, %d gone, %d refused"
+               % (len(urls), len(asked["get"]), len(asked["gone"]), len(asked["refused"])))
+        # RECORDED FROM THE ANSWER WE ALREADY HAVE. Going back with a GET to learn the same 404
+        # again would spend one request per dead link, which is the cost this step exists to avoid.
+        noted = 0
+        for url, code in asked["gone"]:
+            rel = url[len(base):] if url.startswith(base) else None
+            if rel and record_gone(archive_dir, urllib.parse.unquote(rel), code):
+                noted += 1
+        if noted:
+            report("    %d recorded in %s" % (noted, GONE_FILE))
+        for url, code in asked["refused"][:6]:
+            report("    REFUSED %s -- %s" % (code, url[-66:]))
+        if not asked["get"]:
+            # NO WASTED ROUND. Before this, a list of nothing but refusals cost a full fetch
+            # attempt and then one more harvest before the gain brake noticed. There are five such
+            # paths in the collection and record_gone holds none of them.
+            report("  STOPPING: nothing here is fetchable -- %d gone (recorded), %d refused and "
+                   "not recordable" % (len(asked["gone"]), len(asked["refused"])))
+            history.append((n, count, 0))
+            return history
+        with io.open(out_path, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write("\n".join(asked["get"]) + "\n")
         got = fetch(archive, base, out_path, delay, give_up, report=report)
         if got is None:
             return history
