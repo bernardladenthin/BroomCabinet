@@ -155,7 +155,8 @@ def fetch(archive, base, url_list, delay, give_up, report=say):
     return tuple(int(g) for g in found.groups())
 
 
-def converge(root, archive, base, delay, max_rounds, min_gain, give_up, go, report=say):
+def converge(root, archive, base, delay, max_rounds, min_gain, give_up, go, report=say,
+             use_probe=True):
     """Run rounds until a harvest finds nothing. -> the list of (round, outstanding, fetched)."""
     archive_dir = os.path.join(root, archive)
     history = []
@@ -207,7 +208,13 @@ def converge(root, archive, base, delay, max_rounds, min_gain, give_up, go, repo
                    "stopping. Run pages-to-urllist.py by hand and read its output; this is a "
                    "broken harvest, not an empty one." % (n, count))
             return history
-        asked = probe(urls, delay, report=report)
+        if not use_probe:
+            # STRAIGHT TO THE FETCHER, which records a 404 itself. The probe's whole value is not
+            # repeating a request; where most candidates are real it only adds one.
+            report("    --no-probe: handing all %d to the fetcher" % len(urls))
+            asked = {"get": list(urls), "gone": [], "refused": []}
+        else:
+            asked = probe(urls, delay, report=report)
         report("    asked %d: %d fetchable, %d gone, %d refused"
                % (len(urls), len(asked["get"]), len(asked["gone"]), len(asked["refused"])))
         # RECORDED FROM THE ANSWER WE ALREADY HAVE. Going back with a GET to learn the same 404
@@ -282,6 +289,13 @@ def main():
                          "to the same files for ever -- see the Jumper Reference note in the "
                          "module docstring")
     ap.add_argument("--give-up", type=int, default=4, help="passed to manifest-fetch.py")
+    ap.add_argument("--no-probe", action="store_true",
+                    help="skip the HEAD step and hand every candidate to the fetcher. THE PROBE "
+                         "IS A BET: it wins when most candidates are dead (2 099 of 2 504 across "
+                         "five archives) and LOSES when most are real -- ps-2.kev009.com answered "
+                         "200 for 4 906 of 6 098, so asking first turned 6 098 requests into "
+                         "11 004. manifest-fetch.py records a 404 itself, so nothing is lost "
+                         "except the saving")
     ap.add_argument("--go", action="store_true",
                     help="actually fetch. Without it one harvest runs and nothing is requested")
     args = ap.parse_args()
@@ -301,7 +315,7 @@ def main():
     say("  %s  <-  %s" % (args.archive, base))
     say("  %s" % ("FETCHING" if args.go else "LOOKING ONLY -- nothing is requested"))
     history = converge(args.root, args.archive, base, args.delay, args.max_rounds,
-                       args.min_gain, args.give_up, args.go)
+                       args.min_gain, args.give_up, args.go, use_probe=not args.no_probe)
     if args.go and history:
         say("\n  record: %s" % write_record(args.root, args.archive, history, base))
         say("  NEXT: mirror.py --archive %s --index, then a crawl to earn the marker"
