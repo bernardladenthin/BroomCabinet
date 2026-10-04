@@ -317,7 +317,7 @@ class TheOptionsBuilder(unittest.TestCase):
         """The whole set, in order, for a 30-volume unit. Every one was measured on 2026-09-26."""
         self.assertEqual(TOOL.DEFAULTS.switches(30),
                          ["-ma5", "-m1", "-md256m", "-s", "-sv",
-                          "-v%db" % TOOL.VOLUME_BYTES, "-rr3", "-rv3", "-k", "-scfl"])
+                          "-v%db" % TOOL.VOLUME_BYTES, "-rr1", "-rv5", "-k", "-scfl"])
 
     def test_THE_CHARSET_IS_F_AND_NOT_U(self):
         """U is UTF-16. On a UTF-8 list file `-scul` stored NONE of five non-ASCII names.
@@ -368,8 +368,8 @@ class TheOptionsBuilder(unittest.TestCase):
         file is the threat cold storage actually presents, and only -rv answers it. Measured:
         both apply from one command, and two deleted volumes were restored from two .rev."""
         switches = TOOL.DEFAULTS.switches(30)
-        self.assertIn("-rr3", switches)
-        self.assertIn("-rv3", switches)
+        self.assertIn("-rr1", switches)
+        self.assertIn("-rv5", switches)
 
     def test_THE_RECOVERY_VOLUMES_SCALE_WITH_THE_SET(self):
         """A fixed count would give `ibm-aix` 706 volumes the same protection as a 30-volume unit.
@@ -377,15 +377,21 @@ class TheOptionsBuilder(unittest.TestCase):
         One .rev answers exactly one lost volume, so the protection has to be a fraction of the
         set with a floor -- the floor because a single lost disc must never be fatal.
 
-        THE FLOOR WENT FROM 2 TO 3 ON 2026-10-04, at the owner's request, and the reason it was
-        affordable is the volume size: a floor costs whole volumes, and a volume went from 24.2 GB
-        to 995 MB in the same change. Three .rev now cost 2.9 GB where two used to cost 48.4.
+        THE FRACTION WENT FROM 10 % TO 2 % ON 2026-10-04 and that is MORE protection, not less,
+        because the granularity changed underneath it: 2 % of ibm-aix's 3 400 volumes is 68 whole
+        volumes, against 3 of 30 under the old plan, for a fifth of the bytes.
+
+        THE FLOOR IS 5 AND NEVER BINDS -- the smallest unit reaches 14 through the fraction alone.
+        It is DELIBERATELY NOT a disc's worth: a 25 GB M-Disc holds 119 of these volumes, so one
+        lost disc would outrun every unit's 2 %, and a floor of 119 would cost 248 GB instead of
+        83. The owner settled that the discs are a compatibility property rather than a copy --
+        "ich brenne es nicht" -- so the figure answers B2, where one file is the unit of failure.
         """
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(706), 71)
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(32), 4)
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(30), 3)
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(2), 3)
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(1), 3)
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(3400), 68)
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(706), 15)
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(30), 5)
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(2), 5)
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(1), 5)
 
 
 class TheVolumeSizeFitsTheMedium(unittest.TestCase):
@@ -408,8 +414,11 @@ class TheVolumeSizeFitsTheMedium(unittest.TestCase):
         """
         for gb, limit in sorted(TOOL.M_DISC_995.items()):
             fit = limit // TOOL.VOLUME_BYTES
-            self.assertEqual(fit, gb, "%d GB disc holds %d volumes" % (gb, fit))
             self.assertLessEqual(fit * TOOL.VOLUME_BYTES, limit)
+            # At least 99 % of the owner's own margin is used, so the compatibility is real rather
+            # than nominal: 119 volumes on a 25 GB disc fill 99.73 % of it.
+            self.assertGreater(fit * TOOL.VOLUME_BYTES / limit, 0.99,
+                              "%d GB disc holds %d volumes" % (gb, fit))
 
     def test_AND_B2_TAKES_A_VOLUME_IN_ONE_PIECE(self):
         """Under B2's single-part limit, so every volume carries its own whole-file SHA-1.
@@ -472,7 +481,7 @@ class TheCommands(unittest.TestCase):
         step = self.steps[0]
         self.assertEqual(step["argv"], [
             "RAR", "a", "-ma5", "-m1", "-md256m", "-s", "-sv",
-            "-v%db" % TOOL.VOLUME_BYTES, "-rr3", "-rv3", "-k", "-scfl",
+            "-v%db" % TOOL.VOLUME_BYTES, "-rr1", "-rv5", "-k", "-scfl",
             os.path.join("OUT", "pair", "pair.rar"),
             "@" + os.path.join("WORK", "pair.list"),
             os.path.join("WORK", "pair" + TOOL.INDEX_SUFFIX),
@@ -649,13 +658,16 @@ class WhatItRefuses(unittest.TestCase):
         public material needs no password turned that refusal into an obstacle, so it now depends
         on `encrypt_headers` instead of being unconditional.
 
-        WHAT IS CHECKED HERE IS THAT THE RUN GETS PAST THE PASSWORD GATE, not that it succeeds: it
-        still fails on the fixture's missing indexes, which is a different refusal and says so.
-        Asserting the exit code alone would pass for either reason.
+        WHAT IS CHECKED HERE IS THAT THE RUN GETS PAST THE PASSWORD GATE, not that it succeeds.
+        It still refuses, for one of two later reasons, AND WHICH ONE DEPENDS ON THE MACHINE: with
+        rar installed the fixture's missing indexes are reported, without it the missing rar is.
+        The first version of this case asserted "no index" and passed here and failed on CI, where
+        no rar exists -- a test that reads the environment instead of the behaviour. So it asserts
+        the gate it is about, and accepts either refusal after it.
         """
         code, text = self.run_tool("--root", self.root, "--work", FLAT_WORK, "--execute")
         self.assertNotIn("--password-file", text)
-        self.assertIn("no index", text)
+        self.assertTrue("no index" in text or "no rar executable" in text, text)
         self.assertEqual(code, 2)
 
     def test_the_default_run_says_that_nothing_happened(self):
