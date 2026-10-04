@@ -5470,8 +5470,13 @@ class TestHttpTry(unittest.TestCase):
         # hosts at the first awkward one. It also needs the distinction http_try keeps: a 404 means
         # this host publishes no sitemap and is a result, while a timeout means ask again another
         # day and must not be written down as "none".
-        self.assertEqual(uses, ["ask-the-source.py", "find-sitemaps.py", "reachability-probe.py",
-                                "recheck-decisions.py"])
+        # listing-to-urllist.py JOINED ON 2026-10-04 and wants exactly what http_try gives: it
+        # walks a source's own directory listings, and the interesting answers there are the
+        # negative ones. A 404 on one directory is a HOLE IN THE LIST IT PRODUCES and must be said
+        # rather than raised, because a list with a hole in it is what a later fetch calls
+        # complete; a timeout is a different fact and has to stay distinguishable from it.
+        self.assertEqual(uses, ["ask-the-source.py", "find-sitemaps.py", "listing-to-urllist.py",
+                                "reachability-probe.py", "recheck-decisions.py"])
         # converge.py JOINED ON 2026-10-04, and its reason is the one thing http_try cannot do:
         # it asks HEAD. The probe step needs the STATUS and nothing else -- 200 means fetch it,
         # 404 and 410 go straight into .mirror-gone from that answer, anything else is a refusal

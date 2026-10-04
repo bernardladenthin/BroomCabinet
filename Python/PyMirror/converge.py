@@ -62,6 +62,9 @@ RECORD = "CONVERGED.md"
 # until the query rule and the .mirror-gone check landed on 2026-10-03.
 OUTSTANDING = re.compile(r"^\s*(\d+) FILES NAMED AND NOT ON DISK", re.M)
 FETCHED = re.compile(r"DONE fetched (\d+), gone from the source (\d+), failed (\d+)")
+# The fetcher's per-25-file counter, `  125/1521, 51.4 MB`. The one line worth hiding: it is
+# high-frequency by design and the round's own figures say the same thing once.
+PROGRESS = re.compile(r"^\s*\d+/\d+, [\d.]+ MB\s*$")
 
 
 def probe(urls, delay, pacer=None, report=say):
@@ -145,9 +148,34 @@ def fetch(archive, base, url_list, delay, give_up, report=say):
                           "--give-up", str(give_up)],
                          capture_output=True, text=True, cwd=HERE)
     text = res.stdout + res.stderr
+    # EVERYTHING EXCEPT THE NOISE, and it used to be the other way round: three substrings were
+    # relayed -- "DONE fetched", "FAILED", "ABANDONED" -- and whatever the fetcher said that did
+    # not contain one of them was thrown away. The list of what that hid:
+    #
+    #   FAIL   <path> :: <reason>      the reason for every single failure
+    #   GONE HTTP <code>  <path>       which paths the source denied, and with what
+    #   N path(s) UNSTORABLE           a file occupying a parent directory
+    #   N path(s) answered AS A        a redirect to a directory
+    #     DIRECTORY
+    #   OUTSIDE THE BASE, skipped      a url the list named and the fetch would not ask for
+    #   MARKER LEFT ALONE / NO MARKER  why a marker was not written
+    #   WARNING mirror.py could not
+    #     be read -- NO exclusion was  an archive's EXCLUDE silently not applied
+    #     applied to this list
+    #
+    # THE LAST ONE IS THE ARGUMENT. A whitelist keeps what its author happened to think of, and a
+    # warning that a forbidden path may have been requested is exactly what nobody thinks of. It
+    # cost an afternoon on 2026-10-04: thirty "FAIL ... WinError 183" lines were dropped, the loop
+    # reported only "0 fetched, 30 failed", and I read a local filesystem error as ps-2.kev009.com
+    # blocking us -- argued about route-shopping, advised waiting a day, and the owner restarted
+    # his router for nothing. The reason was in a line this filter was discarding.
+    #
+    # WHAT IS STILL HIDDEN is the per-25-file progress counter and nothing else. It is the one
+    # shape that is high-frequency by design, and the round's own figures say the same thing once.
     for line in text.splitlines():
-        if "DONE fetched" in line or "FAILED" in line or "ABANDONED" in line:
-            report("      %s" % line.strip())
+        if not line.strip() or PROGRESS.match(line):
+            continue
+        report("      %s" % line.strip())
     found = FETCHED.search(text)
     if not found:
         report("      the fetch printed no DONE line -- stopping rather than guessing")

@@ -44,7 +44,7 @@ import sys
 import urllib.parse
 
 from common import (MIRROR_ROOT, BOOKKEEPING_FILES, Pacer, exists, host_of, http_try,
-                    content_root, read_gone, relative_to,
+                    content_root, read_gone, relative_to, safe_name,
                     load_mirror, long_path, under_site)
 from robots import robots_verdict, sitemaps
 
@@ -171,7 +171,13 @@ def fetch(url, limit=4 * 1024 * 1024):
 
 
 def look(name, base, archive_dir, mirror, save=False, pacer=None, follow=0):
-    """Two requests at most for one archive. -> a one-line verdict string."""
+    """Two requests at most for one archive, or one per index part with --follow-index.
+
+    -> a one-line verdict string.
+    """
+    # The index's parts that name THIS base, kept so --save can store the inventory itself rather
+    # than a list of urls pointing at it. Stays empty unless an index was followed.
+    kept_parts = []
     # TWO HOSTS, ON PURPOSE. host_of() FOLDS `www.` AWAY so that an apex and a www spelling share
     # one rate -- right for pacing, wrong for connecting, because the folded name need not exist.
     # dreamlandbbs-os2 is registered on `https://www.dreamlandbbs.com/gfd/`; `dreamlandbbs.com`
@@ -258,7 +264,13 @@ def look(name, base, archive_dir, mirror, save=False, pacer=None, follow=0):
             if not (isinstance(st, int) and st == 200 and body):
                 print("     part %s -> %s" % (part[-40:], st), flush=True)
                 continue
-            locs.extend(read_sitemap(body))
+            got = read_sitemap(body)
+            # KEPT ONLY IF IT NAMES THIS BASE, so --save stores the operator's inventory for THIS
+            # subtree rather than the whole host's. Of ftp.zx.net.nz's 27 parts, two name
+            # zx-sgi-freeware-old's paths and 25 describe other archives entirely.
+            if any(under_site(loc, base) is not None for loc in got):
+                kept_parts.append((part, body))
+            locs.extend(got)
         how += ", %d of %d parts followed" % (min(follow, len(parts)), len(parts))
     else:
         locs = LOC.findall(text)
@@ -282,13 +294,37 @@ def look(name, base, archive_dir, mirror, save=False, pacer=None, follow=0):
         missing = sorted(inside - held_paths(tree) - set(refused))
     saved = ""
     if save and os.path.isdir(archive_dir):
-        dest = os.path.join(archive_dir, "sitemap.xml")
-        if not exists(dest):
-            with io.open(long_path(dest), "w", encoding="utf-8", newline="\n") as fh:
-                fh.write(text)
-            saved = "  [saved]"
+        if kept_parts:
+            # AN INDEX IS NOT ONE FILE. Saving `sitemap.xml` for a host whose inventory is split
+            # over 27 parts stores a list of urls and none of the inventory. ftp.zx.net.nz is that
+            # shape, and the evidence that closed zx-sgi-freeware-old -- 5 699 of 5 699 -- lives
+            # in two of those 27 parts.
+            #
+            # THE INDEX AND THE RELEVANT PARTS ONLY, under sitemap/. The other 25 describe the
+            # rest of the host and do not belong inside a subtree archive; they would also be the
+            # larger half. Done by hand on 2026-10-03, with the script in a temporary directory,
+            # which is the reason this is here at all.
+            d = os.path.join(archive_dir, "sitemap")
+            if not os.path.isdir(d):
+                os.makedirs(d)
+            wrote = 0
+            for part_url, part_body in [(url, text.encode("utf-8"))] + kept_parts:
+                leaf = safe_name(urllib.parse.unquote(part_url.rsplit("/", 1)[-1]))
+                dest = os.path.join(d, leaf or "sitemap.xml")
+                if exists(dest):
+                    continue
+                with io.open(long_path(dest), "wb") as fh:
+                    fh.write(part_body)
+                wrote += 1
+            saved = "  [saved %d of %d into sitemap/]" % (wrote, 1 + len(kept_parts))
         else:
-            saved = "  [already held]"
+            dest = os.path.join(archive_dir, "sitemap.xml")
+            if not exists(dest):
+                with io.open(long_path(dest), "w", encoding="utf-8", newline="\n") as fh:
+                    fh.write(text)
+                saved = "  [saved]"
+            else:
+                saved = "  [already held]"
     return ("%-24s %4d entries, %4d files under the base, %4d page urls, %4d dirs, %4d outside, "
             "MISSING %d%s  (%s)%s%s"
             % (name, len(locs), len(inside), pageish, len(dirish), outside, len(missing), saved,
