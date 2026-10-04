@@ -82,7 +82,7 @@ from common import (INDEX_FILE, MIRROR_ROOT, find_tool, human, read_index, relat
 # STILL M-DISC COMPATIBLE, WHICH IS ALL IT NEEDS TO BE: 119 volumes fill a 25 GB disc to 99.73 %
 # of the owner's own 99.5 % burn margin, 238 a 50 GB and 477 a 100 GB. The owner does not burn
 # them -- "ich brenne es nicht, es sollte nur kompatibel sein" -- so the disc is a property of the
-# size and not a plan the redundancy has to pay for. See recovery_volumes_min.
+# size and not a plan the redundancy has to pay for. See the 5 / 10 / 15 rule on Options.
 VOLUME_BYTES = 199 * 1024 * 1024
 BD_RE_BYTES = 24220008448
 M_DISC_BD_R_BYTES = 25025314816
@@ -90,6 +90,9 @@ M_DISC_BD_R_BYTES = 25025314816
 # last byte is a disc that may not verify, so the volume size is checked against these and not
 # against the figures above.
 M_DISC_995 = {25: 24899485696, 50: 49800019968, 100: 99600039936}
+# How many volumes fill a 25 GB M-Disc inside that margin. 119 at 199 MiB, where it was 1 when a
+# volume was 24.2 GB -- which is why the plan counts files and derives discs, not the other way.
+PER_M_DISC = M_DISC_995[25] // VOLUME_BYTES
 
 INDEX_DIR = "index"
 INDEX_SUFFIX = ".index.csv"
@@ -150,10 +153,18 @@ PERSONAL_IN_PATH = ("users", "documents", "desktop", "appdata", "home")
 # Switches whose exact behaviour differs between WinRAR versions. Named here rather than assumed,
 # because a wrong guess is only visible after hours of packing.
 VERIFY_AGAINST_YOUR_RAR = {
-    "nothing": "every switch this tool emits was put to a real WinRAR on 2026-09-26. What is "
-               "listed above is measured, not assumed. The one thing no measurement can settle is "
-               "whether a restore works twenty years from now, which is why the volumes are "
-               "RAR5 rather than a newer format and the dictionary stays at 1 GB or less.",
+    "nothing": "every switch this tool emits was put to a real WinRAR on 2026-09-26, and the four "
+               "added since were checked against RAR 7.23's own switch list and accepted by it on "
+               "2026-10-05. What is listed above is measured, not assumed. "
+               "TWO OF THEM ARE NO LONGER DOCUMENTED: `rar -?` in 7.23 lists neither -ma nor -sv, "
+               "yet -ma5 is accepted while -ma4 and -ma7 both answer `Unbekannte Option` -- so "
+               "RAR 5.0 is not an old format to be escaped, it is the ONLY format this version "
+               "writes. -sv is accepted too and is no longer passed, because it bounded the solid "
+               "block to one 199 MiB volume and made the 6 GB dictionary pointless. "
+               "The one thing no measurement can settle is whether a restore works twenty years "
+               "from now. A dictionary above 4 GB needs WinRAR 7.0 or newer to unpack; on the "
+               "command line that is a refusal unless -mdx is passed, and in the GUI it is a "
+               "dialog asking whether to continue.",
 }
 
 
@@ -166,8 +177,9 @@ class Options(object):
     """
 
     FIELDS = ("archive_format", "method", "dictionary", "solid", "solid_per_volume",
-              "volume_bytes", "recovery_record", "recovery_volumes_min",
-              "recovery_volumes_fraction", "lock", "encrypt_headers", "extra")
+              "volume_bytes", "recovery_record", "recovery_volumes_small",
+              "recovery_volumes_medium", "recovery_volumes_large", "lock", "encrypt_headers",
+              "extra")
 
     def __init__(self, **kw):
         unknown = set(kw) - set(self.FIELDS)
@@ -181,19 +193,35 @@ class Options(object):
         merged.update(kw)
         return Options(**merged)
 
-    def recovery_volumes(self, volumes):
-        """-> how many .rev files this unit gets, for a set of `volumes` volumes.
+    # THE OWNER'S 5 / 10 / 15 RULE, 2026-10-05, replacing a 2 % fraction with a floor. `-rv` takes
+    # a count, so a count is what this expresses -- "für kleine reichen 5, mittel 10 und das ganz
+    # große hat 15 recovery archive".
+    #
+    # THE THRESHOLDS ARE IN VOLUMES because that is what a .rev replaces, and they fall between the
+    # real units rather than being round numbers for their own sake:
+    #
+    #     small   < 1 200   misc 698, oldskool 722, workstations 820, aix-opensource 1 007
+    #     medium  < 3 000   aix-support 1 561, bitsavers-software 1 705, ibm-pc 2 568
+    #     large   >=3 000   vendors 3 090, ibm-aix 3 400, bitsavers-paper 4 087
+    #
+    # WHAT IT COSTS AND WHAT IT GIVES UP, stated plainly: 95 .rev files in all, 19.8 GB, against
+    # 398 and 83 GB under the 2 % rule. For bitsavers-paper that is 15 replaceable volumes out of
+    # 4 087, which is 0.37 % rather than 2 %. The owner's reason is that this is the THIRD line of
+    # defence, not the first: every volume carries its own 1 % record, every volume exists both
+    # locally and on B2, and a .rev is for the case where both of those have failed on the same
+    # part.
+    SMALL_VOLUMES = 1200
+    MEDIUM_VOLUMES = 3000
 
-        A FIXED COUNT IS THE WRONG SHAPE and that is measured, not felt. Two .rev files protect
-        `unix-history` (2 volumes) completely and `ibm-aix` (32 volumes) by 6 %. The units here
-        span 2 to 32 volumes, so the redundancy has to scale with the set -- a fraction with a
-        floor. The floor matters: one .rev can only ever answer one lost volume, and a single disc
-        failure in a two-volume unit would otherwise be fatal.
-        """
+    def recovery_volumes(self, volumes):
+        """-> how many .rev files this unit gets, for a set of `volumes` volumes."""
         if volumes is None or not self.volume_bytes:
             return 0
-        return max(self.recovery_volumes_min,
-                   int(math.ceil(volumes * self.recovery_volumes_fraction)))
+        if volumes < self.SMALL_VOLUMES:
+            return self.recovery_volumes_small
+        if volumes < self.MEDIUM_VOLUMES:
+            return self.recovery_volumes_medium
+        return self.recovery_volumes_large
 
     def switches(self, volumes=None):
         """-> the switch list, in a fixed order so two runs produce the same command.
@@ -242,10 +270,77 @@ class Options(object):
 # duplicates are worth more than the compression.
 DEFAULTS = Options(
     archive_format="5",
-    method=1,
-    dictionary="256m",
+    # -m5, REVERSED FROM -m1 ON 2026-10-04. The old default was fast because two thirds of the
+    # collection cannot be compressed anyway; the owner's answer was that this is written once and
+    # read for decades -- "da wir langzeit archivieren ist vlt. eine gute kompression besser als
+    # schnell, das spart später viel". The cost is CPU hours, once, and no extra memory.
+    #
+    # A 6 GB DICTIONARY, THE OWNER'S FIGURE, and three documented things make it the right size:
+    #
+    #   IT COVERS EVERY DUPLICATE IN THE COLLECTION. A solid block collapses two byte-identical
+    #   files only if the window still reaches the first one, and `sort_key` puts them adjacent.
+    #   Measured per unit on 2026-10-04, the largest duplicate anywhere is 2 000.5 MB (vendors),
+    #   then 1 997.5 (ibm-aix) and 1 346.4 (aix-support). 6 GB clears all of them with room, and
+    #   rar.txt says that where the duplicates fit the dictionary, plain -s is the better tool
+    #   than -oi: no references, no first-file dependency between volumes.
+    #
+    #   AND IT IS AIMED AT THE 667 GB OF DISK IMAGES. rar.txt names exactly this case: a larger
+    #   dictionary "kann die Komprimierungsrate von großen Dateien mit weit auseinanderliegenden,
+    #   sich wiederholenden Datenblöcken verbessern, wie z. B. bei Festplattenabbildern virtueller
+    #   Maschinen" and for "eine Sammlung von ISO-Images". This collection is 521 GB of iso, 60 GB
+    #   of mdf and 50 GB of img.
+    #
+    #   THE READER PAYS ONLY IN MEMORY, NOT IN A SWITCH. Above 4 GB an archive needs WinRAR 7.0 or
+    #   newer, and unpacking needs a little more than the dictionary. I told the owner a reader
+    #   would also have to know -mdx; that is wrong and he corrected it. WhatsNew.txt: the command
+    #   line refuses by default, but the GUI "zeigt WinRAR ein Dialog an, der den Benutzer
+    #   auffordert zu entscheiden, ob die Datei entpackt oder die Verarbeitung abgebrochen werden
+    #   soll". No switch, one dialog.
+    #
+    # WHAT THE MEMORY COST IS, HONESTLY: rar.txt gives two points -- about 7 GB for a 1 GB
+    # dictionary and about 96 GB for 64 GB -- and no figure between them, and calls both "grob
+    # geschätzt". So 6 GB lies somewhere in 9 to 42 GB and the documentation will not narrow it.
+    # The machine has 63 GB.
+    method=5,
+    dictionary="6g",
+    # AND EVERY UNIT USES THESE, which is the owner's instruction -- "Ich will es einheitlich für
+    # alle archive" -- and a measurement turned it from a simplification into a correction.
+    #
+    # TWO UNITS WERE -m0, STORED RATHER THAN COMPRESSED, on the reasoning that their content is
+    # already compressed: oss4aix.org is 100 % rpm and bitsavers-paper is scanned paper. -m0 also
+    # switches off the solid block, so identical files are then stored twice in full. Measured per
+    # unit on 2026-10-04:
+    #
+    #   aix-opensource   208.0 GB holding 116.9 GB of byte-identical files -- 56.2 %
+    #   bitsavers-paper  844.4 GB holding   2.0 GB                         --  0.2 %
+    #
+    # SO -m0 WAS COSTING 117 GB on one of them. I had argued the opposite as recently as the same
+    # afternoon, on the grounds that oss4aix.org "appears in none of b2-cluster.py's sharing
+    # pairs" -- which is true and was the wrong measurement: those pairs count duplication BETWEEN
+    # archives, and this is a package repository duplicating itself, the same rpm under many
+    # paths. The question was asked about one unit and answered for all ten.
+    #
+    # THE WHOLE COLLECTION HOLDS 521.3 GB OF SUCH DUPLICATES INSIDE UNITS, 12.8 % of 4 061 GB, and
+    # all of it is now reachable: the largest single duplicate is 2 000.5 MB and the dictionary is
+    # 6 GB. Compressing bitsavers-paper's 844 GB of scans buys only its 2.0 GB and costs CPU, and
+    # that is the price of one rule instead of ten.
     solid=True,
-    solid_per_volume=True,
+    # -sv IS GONE, 2026-10-05, AND IT HAD TO GO FOR THE DICTIONARY TO MEAN ANYTHING. The project's
+    # own measurement of 2026-09-26 found that what `-sv` buys is "each volume is an independent
+    # solid block". A volume is 199 MiB, so with `-sv` the solid stream RESTARTS every 199 MiB and
+    # a 6 GB dictionary can never see past it -- the two switches were working against each other,
+    # and 521.3 GB of byte-identical files inside units would have been stored twice over.
+    #
+    # WHAT IT COSTS is selective retrieval: without `-sv`, extracting one file needs every volume
+    # from the start of the set, up to 844 GB for bitsavers-paper, where `-sv` kept it to one or
+    # two. That was the reason it was there, and the owner retired the reason rather than the
+    # measurement: "alle Volumes ab dem ersten ist kein Problem, die liegen eh bei mir da".
+    #
+    # AND THE DAMAGE CASE IS COVERED TWICE OVER: a solid stream means one broken volume spoils what
+    # follows it, which is why every volume still carries its own 1 % recovery record and why the
+    # .rev files exist. rar.txt names this cost of -s outright -- "geringe
+    # Reparaturwahrscheinlichkeit bei Archivbeschädigungen".
+    solid_per_volume=False,
     volume_bytes=VOLUME_BYTES,
     # 1 %, AND THE DIVISION OF LABOUR IS THE WHOLE ARGUMENT. -rr repairs damage INSIDE a volume;
     # .rev replaces one that is gone. At 199 MiB, 1 % is about 2 MiB per volume, and rar.txt says
@@ -257,19 +352,9 @@ DEFAULTS = Options(
     # down: at 24.2 GB a volume was precious and worth defending in place; at 199 MiB it is
     # cheaper to replace than to patch. 1 % of 4 061 GB is 41 GB against 406 GB at 10 %.
     recovery_record="1",
-    # 2 %, DOWN FROM 10 %, because the granularity changed what a percentage buys. 2 % of ibm-aix
-    # is 68 whole volumes -- against 3 under the old plan -- so this is far MORE absolute
-    # protection for a fifth of the bytes.
-    recovery_volumes_fraction=0.02,
-    # 5, AND IT NEVER BINDS: the smallest unit reaches 14 through the fraction alone. It is a
-    # guard for a unit small enough that 2 % rounds to almost nothing, and it costs nothing today.
-    #
-    # IT IS DELIBERATELY NOT A DISC'S WORTH. A 25 GB M-Disc now holds 119 volumes, so one lost
-    # disc would take 119 volumes with it and NO unit's 2 % covers that -- a floor of 119 would,
-    # at 248 GB instead of 83. The owner settled it: the discs are a compatibility property, not
-    # a copy. "ich brenne es nicht ... es reicht daher die betrachtung fuer b2", where the unit of
-    # failure is one file and 2 % answers 68 of them.
-    recovery_volumes_min=5,
+    recovery_volumes_small=5,
+    recovery_volumes_medium=10,
+    recovery_volumes_large=15,
     lock=True,
     # NO ENCRYPTION. The owner's decision on 2026-10-04: "da es öffentliche Daten sind brauche ich
     # kein Passwort / Verschlüsselung, lediglich ECC und recovery archive". Every archive here was
@@ -323,8 +408,7 @@ UNITS = (
          "old sentence said `most likely to be re-fetched, and nothing else should be repacked "
          "when it is` -- that argument RETIRED with B2, where nothing is repacked ever again. "
          "What keeps it separate now is the method: folded into aix-support it would save ONE "
-         ".rev file, 995 MB, and cost 702 GB its -m5 -md1g.",
-         DEFAULTS.with_(method=5, dictionary="1g")),
+         ".rev file, 995 MB, and cost 702 GB its -m5 -md1g."),
 
     Unit("aix-support", ["fsck-aix-media", "fsck-aix-apps",
                          "bull-rpms", "bull-srpms", "bullfreeware", "ia-bullfreeware",
@@ -364,8 +448,7 @@ UNITS = (
          "-m3 IS A COMPROMISE AND NAMED AS ONE: the documentation third wants -m5 and is the only "
          "text-rich body in the collection, the Bull third only needs the solid block that any "
          "method above 0 provides, and the media third is already compressed. Three settings "
-         "cannot apply to one unit, so the middle one does.",
-         DEFAULTS.with_(method=3, dictionary="512m")),
+         "cannot apply to one unit, so the middle one does."),
 
     Unit("aix-opensource", ["oss4aix.org"],
          "208 GB that is 100 % rpm. Stored rather than compressed: there is nothing to win and "
@@ -376,8 +459,7 @@ UNITS = (
          "`rwth-aachen-ftp` LEFT ON 2026-10-03 and the unit's own sentence is why: this one is "
          "all rpm, and that archive held none -- 41 % exe, 25 % zip, 17 % pdf -- so it was being "
          "stored under a rule written for somebody else's content. It shared 0.00 GB with this "
-         "unit and 6.30 GB with ibm-pc, where it now is.",
-         DEFAULTS.with_(method=0)),
+         "unit and 6.30 GB with ibm-pc, where it now is."),
 
     # ---------------------------------------------------------------- IBM PC, PS/2 and OS/2
     Unit("ibm-pc", ["ps-2.kev009.com", "ardent-tool", "mcamafia", "rwth-aachen-ftp",
@@ -396,8 +478,7 @@ UNITS = (
          "0.00 GB shared with its old unit against 6.30 GB here -- 62 % of its own 10.16 GB, "
          "8 490 files of it with ps-2.kev009.com alone. "
          "ps-2.kev009.com REACHED A FIXED POINT ON 2026-10-04 at 216 142 files and 353.58 GB: "
-         "every name a held page gives is held or recorded as gone.",
-         DEFAULTS.with_(dictionary="512m")),
+         "every name a held page gives is held or recorded as gone."),
 
     # ---------------------------------------------------------------- bitsavers
     Unit("bitsavers-paper", ["bitsavers/pdf", "bitsavers/magazines"],
@@ -407,8 +488,7 @@ UNITS = (
          "THE TWO WERE SEPARATE UNTIL 2026-10-04 and the reason they were has expired: "
          "`bitsavers/magazines` stood alone because it `grows a few scans at a time`, and a "
          "multi-volume RAR cannot be appended to. After B2 nothing is appended to anything, so "
-         "the split had nothing left to buy -- one .rev file, 995 MB.",
-         DEFAULTS.with_(method=0)),
+         "the split had nothing left to buy -- one .rev file, 995 MB."),
 
     Unit("bitsavers-software", ["bitsavers"],
          "352 GB of bitsavers that is software rather than paper: bits, which holds the part of "
@@ -419,7 +499,6 @@ UNITS = (
          "safe. Two units became one on 2026-10-04 and it saves nothing measurable: 36 .rev apart, "
          "36 merged. They are one unit because they are one kind of thing, and because the "
          "subtraction only reads clearly against a single counterpart.",
-         DEFAULTS.with_(dictionary="512m"),
          exclude=["bitsavers/pdf", "bitsavers/magazines"]),
 
     # ---------------------------------------------------------------- multi-vendor collections
@@ -430,8 +509,7 @@ UNITS = (
          "-- 41 + 24 apart, 65 merged -- so those 13.46 GB are the entire byte gain, and they are "
          "the largest one the regrouping produced. "
          "A reader after one vendor's material gets 638 GB instead of 404, which is the trade the "
-         "owner named: `wenige GB mehr keine Rolle`.",
-         DEFAULTS.with_(dictionary="512m")),
+         "owner named: `wenige GB mehr keine Rolle`."),
 
     Unit("oldskool", ["oldskool"],
          "149 GB of PC gaming and demo-scene material. Alone because it shares almost nothing "
@@ -455,8 +533,7 @@ UNITS = (
          "-m3 because the DEC third is 26 % uncompressed containers and worth more than the "
          "default effort; SGI and NeXT lose nothing by it. "
          "`zx-sgi-freeware-old` closed on 2026-10-03 at 5 702 files against the operator's own "
-         "sitemap, 5 699 of 5 699.",
-         DEFAULTS.with_(method=3, dictionary="512m")),
+         "sitemap, 5 699 of 5 699."),
 
     Unit("misc", ["develooper-hpux", "hp-labs-2007", "hp-alphaserver-2008", "agilent-ftp-2009",
                   "zx-alphant-nt", "parisc-firmware", "apollo-clavius", "infania-solaris",
@@ -490,8 +567,7 @@ UNITS = (
          "what this unit is for; putting it with IBM would have buried the DEC, Sun and SGI half "
          "of it under the wrong subject. `openpa` holds Paul Weissmann's original PA-RISC and HP "
          "9000 articles, under 50 MB, and its doc/ prefix is excluded in mirror.py -- every path "
-         "under it answered 404 from three separate addresses.",
-         DEFAULTS.with_(dictionary="512m")),
+         "under it answered 404 from three separate addresses."),
 )
 
 # The index archive is not one of the units: it is the thing you fetch INSTEAD of a unit.
@@ -673,13 +749,17 @@ def report(steps, verbose=False, stream=None):
         size = sum(r["size"] for r in step["rows"])
         total_bytes += size
         total_files += len(step["rows"])
-        discs = step["volumes"] + step["recovery_volumes"]
-        total_discs += discs
+        # FILES, NOT DISCS, and the two stopped being the same thing on 2026-10-04. A volume was
+        # 24.2 GB and filled one BD-RE, so counting volumes counted discs; at 199 MiB a 25 GB
+        # M-Disc holds 119 of them. The figure a reader needs now is how many FILES go to B2, and
+        # the disc count is that divided by PER_M_DISC.
+        files_out = step["volumes"] + step["recovery_volumes"]
+        total_discs += files_out
         say("", stream=stream)
         extra = ("  + %d empty dir(s)" % len(step["empty_dirs"])) if step["empty_dirs"] else ""
-        say("=== %-22s %10s  %7d files%s  %3d vol + %d rev = %3d disc(s) ==="
+        say("=== %-22s %10s  %7d files%s  %4d vol + %d rev = %4d file(s) ==="
             % (unit.name, human(size), len(step["rows"]), extra, step["volumes"],
-               step["recovery_volumes"], discs), stream=stream)
+               step["recovery_volumes"], files_out), stream=stream)
         say("  %s" % " ".join(step["argv"]), stream=stream)
         say("  cwd  %s" % step["cwd"], stream=stream)
         if verbose:
@@ -690,8 +770,9 @@ def report(steps, verbose=False, stream=None):
             if len(step["rows"]) > 8:
                 say("       ... %d more" % (len(step["rows"]) - 8), stream=stream)
     say("", stream=stream)
-    say("%d unit(s), %s, %d files, %d disc(s) at %s per volume"
-        % (len(steps) - 1, human(total_bytes), total_files, total_discs, human(VOLUME_BYTES)),
+    say("%d unit(s), %s, %d files in, %d file(s) out at %s per volume -- %d M-Disc(s) at %d per 25 GB"
+        % (len(steps) - 1, human(total_bytes), total_files, total_discs, human(VOLUME_BYTES),
+           int(math.ceil(float(total_discs) / PER_M_DISC)), PER_M_DISC),
         stream=stream)
     return total_bytes, total_files, total_discs
 
@@ -897,7 +978,9 @@ def main(argv=None):
 
     if not args.execute:
         say("")
-        say("NOTHING WAS RUN. Pass --execute with --password-file to pack.")
+        # NO PASSWORD IS MENTIONED ANY MORE: no unit encrypts, so naming --password-file here
+        # would send a reader looking for a file nothing asks for.
+        say("NOTHING WAS RUN. Pass --execute to pack.")
         say("")
         say("Measured against a real WinRAR on 2026-09-26:")
         for fact, note in sorted(MEASURED_ON_THIS_MACHINE.items()):

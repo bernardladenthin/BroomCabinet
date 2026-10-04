@@ -298,12 +298,15 @@ class TheOptionsBuilder(unittest.TestCase):
     """Defaults in one place; a unit names only what differs."""
 
     def test_with_does_not_change_the_original(self):
-        other = TOOL.DEFAULTS.with_(method=5)
-        self.assertEqual(TOOL.DEFAULTS.method, 1)
-        self.assertEqual(other.method, 5)
+        """`method=0` is the one the real units actually override to, so it is the one used here --
+        the default became 5 on 2026-10-04 and a test asserting 1 was asserting the default rather
+        than the copying."""
+        other = TOOL.DEFAULTS.with_(method=0)
+        self.assertEqual(TOOL.DEFAULTS.method, 5)
+        self.assertEqual(other.method, 0)
 
     def test_with_changes_only_what_it_names(self):
-        other = TOOL.DEFAULTS.with_(method=5)
+        other = TOOL.DEFAULTS.with_(method=0)
         for field in TOOL.Options.FIELDS:
             if field != "method":
                 self.assertEqual(getattr(other, field), getattr(TOOL.DEFAULTS, field), field)
@@ -314,10 +317,16 @@ class TheOptionsBuilder(unittest.TestCase):
             TOOL.DEFAULTS.with_(compression=9)
 
     def test_the_default_switches(self):
-        """The whole set, in order, for a 30-volume unit. Every one was measured on 2026-09-26."""
-        self.assertEqual(TOOL.DEFAULTS.switches(30),
-                         ["-ma5", "-m1", "-md256m", "-s", "-sv",
-                          "-v%db" % TOOL.VOLUME_BYTES, "-rr1", "-rv5", "-k", "-scfl"])
+        """The whole set, in order, for ibm-aix's 3 400 volumes.
+
+        THE COUNT USED TO BE 30, from the plan's first shape, where a volume was 24.2 GB. At
+        199 MiB no unit comes near it -- the smallest, misc, is 698 -- so a case asserting against
+        30 was asserting against a unit that no longer exists. 3 400 also exercises the large tier
+        of the 5 / 10 / 15 rule, which 30 did not.
+        """
+        self.assertEqual(TOOL.DEFAULTS.switches(3400),
+                         ["-ma5", "-m5", "-md6g", "-s",
+                          "-v%db" % TOOL.VOLUME_BYTES, "-rr1", "-rv15", "-k", "-scfl"])
 
     def test_THE_CHARSET_IS_F_AND_NOT_U(self):
         """U is UTF-16. On a UTF-8 list file `-scul` stored NONE of five non-ASCII names.
@@ -371,27 +380,41 @@ class TheOptionsBuilder(unittest.TestCase):
         self.assertIn("-rr1", switches)
         self.assertIn("-rv5", switches)
 
-    def test_THE_RECOVERY_VOLUMES_SCALE_WITH_THE_SET(self):
-        """A fixed count would give `ibm-aix` 706 volumes the same protection as a 30-volume unit.
+    def test_THE_RECOVERY_VOLUMES_FOLLOW_THE_OWNERS_5_10_15_RULE(self):
+        """Counts and not a percentage, because `-rv` takes a count.
 
-        One .rev answers exactly one lost volume, so the protection has to be a fraction of the
-        set with a floor -- the floor because a single lost disc must never be fatal.
+        The owner, 2026-10-05: "für kleine reichen 5, mittel 10 und das ganz große hat 15 recovery
+        archive". The thresholds are in volumes -- what a .rev actually replaces -- and they fall
+        between the real units rather than being round for their own sake:
 
-        THE FRACTION WENT FROM 10 % TO 2 % ON 2026-10-04 and that is MORE protection, not less,
-        because the granularity changed underneath it: 2 % of ibm-aix's 3 400 volumes is 68 whole
-        volumes, against 3 of 30 under the old plan, for a fifth of the bytes.
+            small   < 1 200   misc 698, oldskool 722, workstations 820, aix-opensource 1 007
+            medium  < 3 000   aix-support 1 561, bitsavers-software 1 705, ibm-pc 2 568
+            large   >=3 000   vendors 3 090, ibm-aix 3 400, bitsavers-paper 4 087
 
-        THE FLOOR IS 5 AND NEVER BINDS -- the smallest unit reaches 14 through the fraction alone.
-        It is DELIBERATELY NOT a disc's worth: a 25 GB M-Disc holds 119 of these volumes, so one
-        lost disc would outrun every unit's 2 %, and a floor of 119 would cost 248 GB instead of
-        83. The owner settled that the discs are a compatibility property rather than a copy --
-        "ich brenne es nicht" -- so the figure answers B2, where one file is the unit of failure.
+        IT IS LESS REDUNDANCY THAN THE 2 % IT REPLACED and that is the decision, not an oversight:
+        95 .rev in all against 398, 19.8 GB against 83, and for bitsavers-paper 15 replaceable
+        volumes out of 4 087 -- 0.37 % rather than 2 %. The owner's reason is that a .rev is the
+        THIRD line: every volume carries its own 1 % record, every volume exists locally AND on B2,
+        and a .rev answers the case where both have failed on the same part.
         """
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(3400), 68)
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(706), 15)
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(30), 5)
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(2), 5)
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(1), 5)
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(698), 5)
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(1199), 5)
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(1200), 10)
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(2999), 10)
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(3000), 15)
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(4087), 15)
+
+    def test_and_each_real_unit_lands_in_the_tier_it_was_sized_for(self):
+        """The thresholds were chosen against these ten; a unit drifting across one is worth
+        knowing about, because it changes how much of it can be lost."""
+        want = {"misc": 5, "oldskool": 5, "workstations": 5, "aix-opensource": 5,
+                "aix-support": 10, "bitsavers-software": 10, "ibm-pc": 10,
+                "vendors": 15, "ibm-aix": 15, "bitsavers-paper": 15}
+        self.assertEqual(sorted(want), sorted(u.name for u in TOOL.UNITS))
+
+    def test_an_unsplit_archive_gets_none(self):
+        """.rev files only mean anything for a volume set."""
+        self.assertEqual(TOOL.INDEX_OPTIONS.recovery_volumes(1), 0)
 
 
 class TheVolumeSizeFitsTheMedium(unittest.TestCase):
@@ -430,6 +453,42 @@ class TheVolumeSizeFitsTheMedium(unittest.TestCase):
         above -- this asserts the comfortable bound, not the API's edge.
         """
         self.assertLess(TOOL.VOLUME_BYTES, 1000000000)
+
+    def test_THE_DICTIONARY_CLEARS_EVERY_DUPLICATE_IN_THE_COLLECTION(self):
+        """6 GB against a largest measured duplicate of 2 000.5 MB.
+
+        A solid block collapses two byte-identical files only if the window still reaches back to
+        the first one, and `sort_key` puts them adjacent -- so the dictionary has to be at least as
+        large as the duplicate. Measured per unit on 2026-10-04: vendors 2 000.5 MB, ibm-aix
+        1 997.5, aix-support 1 346.4, ibm-pc 669.5, oldskool 611.1, bitsavers-software 525.4,
+        workstations 420.9, misc 152.0.
+
+        WHICH IS ALSO WHY -oi IS NOT USED. rar.txt: where the identical files fit the dictionary,
+        plain -s "kann eine anpassungsfähigere Lösung als -oi sein" -- and -oi would make a volume
+        holding a reference depend on the volume holding the original, which rar.txt warns about
+        for exactly our shape, "wenn die Volumen eines gesplitteten Archivs auf mehreren
+        unterschiedlichen Wechselmedien gespeichert sind".
+        """
+        self.assertEqual(TOOL.DEFAULTS.dictionary, "6g")
+        largest_duplicate_mb = 2000.5
+        self.assertGreater(6 * 1024, largest_duplicate_mb)
+
+    def test_EVERY_UNIT_IS_PACKED_THE_SAME_WAY(self):
+        """The owner, 2026-10-05: "Ich will es einheitlich für alle archive".
+
+        Two units were -m0, stored rather than compressed, because their content is already
+        compressed. -m0 also switches off the solid block, so identical files are stored twice in
+        full -- and measured per unit, aix-opensource is 208.0 GB holding 116.9 GB of byte-identical
+        files, 56.2 %. Storing it was costing 117 GB. I had argued for -m0 there the same
+        afternoon on the grounds that it "appears in none of b2-cluster.py's sharing pairs", which
+        is true and was the wrong measurement: those pairs count duplication BETWEEN archives, and
+        this is a package repository duplicating itself.
+        """
+        sets = set()
+        for unit in TOOL.UNITS:
+            sets.add(tuple(s for s in unit.options.switches(volumes=700) if not s.startswith("-rv")))
+        self.assertEqual(len(sets), 1, sets)
+        self.assertFalse([u.name for u in TOOL.UNITS if u.options.method == 0])
 
     def test_it_is_expressed_in_bytes_and_not_in_an_ambiguous_suffix(self):
         """`-v23000m` means different things depending on case and version. Bytes do not."""
@@ -480,7 +539,7 @@ class TheCommands(unittest.TestCase):
     def test_a_unit_command_in_full(self):
         step = self.steps[0]
         self.assertEqual(step["argv"], [
-            "RAR", "a", "-ma5", "-m1", "-md256m", "-s", "-sv",
+            "RAR", "a", "-ma5", "-m5", "-md6g", "-s",
             "-v%db" % TOOL.VOLUME_BYTES, "-rr1", "-rv5", "-k", "-scfl",
             os.path.join("OUT", "pair", "pair.rar"),
             "@" + os.path.join("WORK", "pair.list"),

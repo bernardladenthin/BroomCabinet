@@ -32,7 +32,9 @@ import datetime
 import importlib.util
 import ast
 import io
+import ntpath
 import os
+import posixpath
 import shutil
 import subprocess
 import sys
@@ -232,7 +234,19 @@ class NoToolBuildsARelativePathWithTheNormalisingHelper(unittest.TestCase):
         base = os.path.join("mirror", "an-archive")
         full = os.path.join(base, "sub", "readme.")
         self.assertEqual(common.relative_to(base, full), "sub/readme.")
-        self.assertTrue(os.path.relpath(full, base).endswith("readme"))
+        # AND THE HAZARD IT REPLACES, ASSERTED THROUGH ntpath RATHER THAN os.path. The stripping
+        # lives in ntpath.relpath specifically -- ntpath.normpath keeps the dot, posixpath keeps
+        # it everywhere -- so `os.path.relpath` strips it on Windows and not on Linux. This case
+        # asserted the stripping unconditionally: it passed on the machine the collection lives on
+        # and failed on CI, which is a test reading the platform instead of the behaviour.
+        #
+        # ntpath IS PURE STRING WORK AND BEHAVES THE SAME ON BOTH, so naming it tests the real
+        # hazard everywhere instead of only where it bites. 33 files in the collection end in a
+        # dot, and relative_to exists for them.
+        self.assertEqual(ntpath.relpath(ntpath.join("mirror", "an-archive", "sub", "readme."),
+                                        ntpath.join("mirror", "an-archive")), "sub" + chr(92) + "readme")
+        self.assertEqual(posixpath.relpath("mirror/an-archive/sub/readme.",
+                                           "mirror/an-archive"), "sub/readme.")
 
     def test_and_it_still_agrees_with_relpath_on_an_ordinary_name(self):
         """A replacement that differs everywhere would be a different bug."""
