@@ -2310,6 +2310,20 @@ ARCHIVES = [
     ("square7-vintage", "http://vintagecomputers.square7.ch/Vintage/"),
     # biblionik-bull -- see PROVENANCE.md in the archive.
     ("biblionik-bull", "http://www.biblionik.fr/Info/Bull/SOLAR/"),
+    # A SECOND SOURCE ADDRESS DOES NOT HELP, measured 2026-10-04 and worth writing down because
+    # the transport-layer note further down invites exactly that idea. An AIX 7.3 box on IBM Cloud,
+    # a different network entirely, was used to ask the same questions:
+    #
+    #   one HEAD on https://www.openpa.net/        -> 200 in 0.1 s
+    #   13 HEADs on doc/* paths, 4 s apart         -> 13 x [Errno 81] No route to host
+    #   then 3 more HEADs on the ROOT, 5 s apart   -> 3 x No route to host, 30 s each
+    #
+    # So that machine was answered once and then cut off within minutes, exactly as this one is.
+    # The block is per SOURCE ADDRESS and it triggers after a handful of requests, which means a
+    # bridge over another host buys one answer and then the same silence. Not a user-agent
+    # question, not a route-shopping question: there is no address from which this archive can be
+    # finished quickly.
+    #
     # AND IT STOPPED ANSWERING AGAIN ON 2026-10-04, which settles the standing instruction below
     # rather than testing it. 19 HEAD requests at the 4 s this table asks for: the first answered,
     # 5 gave a clean 404, and then THIRTEEN IN A ROW were URLError -- plus the one fetchable file,
@@ -4169,6 +4183,33 @@ DRIVERS_OUT_SUB = (
 
 EXCLUDE = {
     "ardent-tool": ("incoming/",),
+
+    # A DEAD PREFIX THE SITE'S OWN PAGES STILL LINK. openpa.net serves its documents at
+    # `/<name>.html` and 26 links scattered over 19 of its pages still say `/doc/<name>.html`.
+    # Almost certainly a link rewrite with stragglers left behind: every page carrying a doc/ link
+    # also carries the short form, and heavily -- hp-ux_11i.html has ONE doc link against 136
+    # short ones, hp-ux_10_20.html one against 96. Across the archive it is 26 against 8 989.
+    #
+    # THREE INDEPENDENT READINGS, 2026-10-01 to 2026-10-04:
+    #
+    #   the server    12 of the doc/ paths were asked over two days -- ALL TWELVE answered 404,
+    #                 spread across the tree, including doc/images/ and a doc/doc/ path
+    #   the tree      all 14 documents the remaining doc/ links name are HELD here under the
+    #                 short name, 14 of 14
+    #   their pages   26 doc/ links against 8 989 short ones, mixed on the same pages
+    #
+    # WHY THIS IS AN EXCLUSION AND NOT 13 MORE LINES IN .mirror-gone. The other 13 paths cannot
+    # be asked: this host answers about six requests per source address and then drops SYNs, and
+    # that was re-measured on 2026-10-04 from a second machine on a different network, which was
+    # answered once and then cut off within minutes. Recording 13 unasked paths as 404 would put
+    # an inference in a file that holds answers. An exclusion records a DECISION, which is what
+    # this is.
+    #
+    # A NEW ADDRESS WOULD WORK AND IS NOT USED. A router restart or a VPN would buy another six
+    # answers, and this register's own rule is that route-shopping around a block is the thing
+    # this collection does not do. It would also buy nothing: 13 more 404s cannot say more than
+    # 26-against-8 989 already says.
+    "openpa": ("doc/",),
 
     # ONE OF THE TWO SUB-MIRRORS, HELD BACK UNTIL IT IS MEASURED -- and the pattern below was
     # tested against a real child URL before this line was written, because the previous attempt
