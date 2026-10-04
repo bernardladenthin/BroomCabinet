@@ -4184,7 +4184,21 @@ DRIVERS_OUT_SUB = (
 EXCLUDE = {
     "ardent-tool": ("incoming/",),
 
-    # A DEAD PREFIX THE SITE'S OWN PAGES STILL LINK. openpa.net serves its documents at
+    # AN ALIAS PREFIX, NOT A DEAD ONE -- corrected 2026-10-04 after this entry had already said
+    # "dead". The owner obtained a new address and asked for two or three samples of the paths
+    # this exclusion covers, and the third of them overturned the reason while confirming the
+    # decision:
+    #
+    #   doc/led.html                        200, 30 964 bytes
+    #   led.html held here                       30 964 bytes
+    #   sha256 of both       06b234b57aa08f3a56b52bffdcbf6b9c25af98fe7b5c4e3c98616b87c67f66ec
+    #
+    # BYTE-IDENTICAL. So `doc/` is served for at least one path and serves the same document as
+    # the short name. Of 14 of these paths measured over three days, 13 answer 404 and that one
+    # answers with a duplicate. NOTHING UNIQUE IS BEHIND THE PREFIX -- which is why the exclusion
+    # stands -- but "dead" was the wrong word and would have misled the next reader.
+    #
+    # openpa.net serves its documents at
     # `/<name>.html` and 26 links scattered over 19 of its pages still say `/doc/<name>.html`.
     # Almost certainly a link rewrite with stragglers left behind: every page carrying a doc/ link
     # also carries the short form, and heavily -- hp-ux_11i.html has ONE doc link against 136
@@ -4192,8 +4206,9 @@ EXCLUDE = {
     #
     # THREE INDEPENDENT READINGS, 2026-10-01 to 2026-10-04:
     #
-    #   the server    12 of the doc/ paths were asked over two days -- ALL TWELVE answered 404,
-    #                 spread across the tree, including doc/images/ and a doc/doc/ path
+    #   the server    14 of the doc/ paths were asked over three days -- 13 answered 404, spread
+    #                 across the tree including doc/images/ and a doc/doc/ path, and ONE answered
+    #                 200 with the same bytes as the file held under its short name
     #   the tree      all 14 documents the remaining doc/ links name are HELD here under the
     #                 short name, 14 of 14
     #   their pages   26 doc/ links against 8 989 short ones, mixed on the same pages
