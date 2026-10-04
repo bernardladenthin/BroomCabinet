@@ -48,8 +48,8 @@ import time
 import urllib.error
 import urllib.parse
 
-from common import (GONE_FILE, GONE_STATUS, MIRROR_ROOT, Pacer, host_of, http_open,
-                    load_mirror, record_gone, say)
+from common import (GONE_FILE, GONE_STATUS, MIRROR_ROOT, Pacer, REFUSED_FILE, host_of,
+                    http_open, load_mirror, record_gone, record_refused, say)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HARVEST = os.path.join(HERE, "pages-to-urllist.py")
@@ -226,6 +226,17 @@ def converge(root, archive, base, delay, max_rounds, min_gain, give_up, go, repo
                 noted += 1
         if noted:
             report("    %d recorded in %s" % (noted, GONE_FILE))
+        # A REFUSAL IS AN ANSWER TOO, and it now has a file. Only a real status goes in --
+        # record_refused declines a timeout or a DNS failure, because those are our side of the
+        # wire and develooper-hpux answered 503 on one probe and 404 on the next.
+        noted_refused = 0
+        for url, code in asked["refused"]:
+            rel = url[len(base):] if url.startswith(base) else None
+            if rel and isinstance(code, int):
+                if record_refused(archive_dir, urllib.parse.unquote(rel), code):
+                    noted_refused += 1
+        if noted_refused:
+            report("    %d recorded in %s" % (noted_refused, REFUSED_FILE))
         for url, code in asked["refused"][:6]:
             report("    REFUSED %s -- %s" % (code, url[-66:]))
         if not asked["get"]:

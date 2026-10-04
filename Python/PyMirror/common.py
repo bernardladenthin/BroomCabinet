@@ -149,6 +149,7 @@ __all__ = [
     "site_prefixes", "content_root", "under_site", "reach", "scheme_drift",
     "quote_url", "Pacer", "Backoff", "Patience", "local_failure", "UNREACHED",
     "GONE_FILE", "GONE_STATUS", "read_gone", "record_gone",
+    "REFUSED_FILE", "read_refused", "record_refused",
     "declared_length", "DECLARES_ITS_LENGTH",
     "ZIP_TAIL", "ZIP_EOCD", "ZIP_CD_ENTRY", "ZIP64_MARK", "ISO_PVD_AT",
     "load_peer", "load_mirror", "source_url", "HTTP_FACE", "find_tool", "split_archive",
@@ -176,7 +177,7 @@ __all__ = [
     "MIRROR_ROOT",
     "ROOT_MARKER", "ARCHIVE_MARKERS", "archive_root",
     "COLLECTION_INDEX", "COLLECTION_SUMS",
-    "looks_like_a_page", "looks_like_a_document", "looks_like_a_copy_of_a_page",
+    "is_extension_only", "looks_like_a_page", "looks_like_a_document", "looks_like_a_copy_of_a_page",
     "BACKUP_TAIL",
     "PAGE_EXTENSIONS", "DOCUMENT_EXTENSIONS", "PROGRAM_PAGE_EXTENSIONS",
     "MARKUP_EXTENSIONS",
@@ -628,6 +629,24 @@ GONE_FILE = ".mirror-gone"
 # fact and one a configuration change can reverse; writing them into a gone-record would turn a
 # permissions decision into a claim about existence.
 GONE_STATUS = frozenset((404, 410))
+# A SOURCE SAYING NO IS NOT A SOURCE SAYING GONE, and until 2026-10-04 the second kind of
+# answer had nowhere to live. Six paths in this collection are permanently refused:
+#
+#   technologists-sauer  asgchs91.rm, songs/zekeswaltz.mp3, songs/zekeswaltz.html   403
+#   typewritten          Manual/IBM/AIX/2.2.1/man2/sh .html                         403
+#   fjkraan              comp/m10/guide                                             403
+#   bretjohnson          forum                                                      500
+#
+# record_gone refuses all of them, correctly -- 403 and 500 say "we will not serve you
+# this", which may stop being true tomorrow, and collapsing that into "gone" is the
+# mistake read_gone's docstring exists to prevent. But a completeness check that reports
+# them for ever is a check nobody can read, and converge.py spent one wasted round on each
+# before its gain brake noticed.
+#
+# SO THEY GET THEIR OWN FILE rather than a widened GONE_STATUS. Widening would change the
+# meaning of a record data has already been written against, and this register's rule for
+# that is explicit.
+REFUSED_FILE = ".mirror-refused"
 PROVENANCE_FILE = "PROVENANCE.md"           # where the archive came from, written by hand
 CATALOGUE_FILE = "CATALOGUE.md"             # generated for the whole tree from the markers
 # Placed at a tree's root by hand. It marks a directory as "this is the tree" for a bare run
@@ -698,6 +717,10 @@ OWN_FILES = frozenset({
     # the three: the name is new as of 2026-10-02, so ZERO of the markers on disk was written
     # against a tree holding it, and excluding it cannot put a marker at odds with its own tree.
     GONE_FILE,
+    # THE SIBLING OF GONE_FILE, new on 2026-10-04, so no marker on disk was written against a
+    # tree holding it and excluding it cannot put one at odds with its own tree -- the same
+    # measurement the three names above rest on.
+    REFUSED_FILE,
     # THE SAME MEASUREMENT AS GONE_FILE ABOVE, and the same easy case: all three names are
     # new on 2026-10-02, so ZERO markers on disk were written against a tree holding them
     # and excluding them cannot put a marker at odds with its own tree. They must be in
@@ -766,6 +789,62 @@ BOOKKEEPING_FILES = frozenset(OWN_FILES | {
     "CONVERGED.md",
     "SHA256SUMS",               # written by the one-off fetchers, in sha256sum(1) form
 })                              # STILL-MISSING.txt is inherited from OWN_FILES, see there
+
+
+def read_refused(archive_dir):
+    """-> {relative path: (date, status)} from the archive's REFUSED_FILE.
+
+    THE SIBLING OF read_gone, and the difference is the whole point: that one holds answers that
+    mean "this is not here", this one holds answers that mean "we will not give it to you". Both
+    stop a path being asked for by default and neither hides it -- the date is in the file so a
+    later run can decide the answer is stale.
+    """
+    out = {}
+    path = os.path.join(archive_dir, REFUSED_FILE)
+    if not exists(path):
+        return out
+    with io.open(long_path(path), encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split(None, 2)
+            if len(parts) != 3:
+                continue
+            when, status, rel = parts
+            try:
+                out[rel] = (when, int(status))
+            except ValueError:
+                continue
+    return out
+
+
+def record_refused(archive_dir, rel, status, when=None):
+    """Append one path the source refuses, with the status it refused with. -> True if written.
+
+    ANY STATUS THE SOURCE ACTUALLY GAVE, deliberately wider than GONE_STATUS: 403, 401, 500, 451 --
+    whatever a server said about this path rather than about the connection. What does NOT belong
+    is a timeout or a DNS failure: those are our side of the wire or a host having a bad minute,
+    and develooper-hpux answered 503 on one probe and 404 on the next, which is why that line is
+    drawn here rather than left to the caller.
+    """
+    status = int(status)
+    if status in GONE_STATUS or not 400 <= status < 600:
+        # 404 AND 410 BELONG IN THE OTHER FILE, and anything outside the 4xx/5xx range is not a
+        # refusal at all. Refusing to write is better than keeping two records of one fact.
+        return False
+    if rel in read_refused(archive_dir):
+        return False
+    path = os.path.join(archive_dir, REFUSED_FILE)
+    fresh = not exists(path)
+    with io.open(long_path(path), "a", encoding="utf-8", newline="\n") as fh:
+        if fresh:
+            fh.write("# Paths this archive's source REFUSED, the status it used, and the date.\n"
+                     "# Not 404 -- that is .mirror-gone. These are answers of the shape 403, 401\n"
+                     "# or 500: the file may well exist and this source will not serve it here.\n"
+                     "# Re-askable on purpose; the date is what makes the answer stale.\n")
+        fh.write("%s %s %s\n" % (when or time.strftime("%Y-%m-%d"), status, rel))
+    return True
 
 
 def read_gone(archive_dir):
@@ -1117,6 +1196,31 @@ def looks_like_a_document(name):
     today would stop being walked.
     """
     return name.lower().endswith(DOCUMENT_EXTENSIONS)
+
+
+def is_extension_only(href):
+    """-> True if the last segment is a bare extension with NO STEM: `.html`, `dir/.htm`.
+
+    NOT A FILENAME, and six links in this collection are exactly this shape -- typewritten's
+    `Manual/IBM/AIX/2.2.1/man1/.html` and `man5/.html`, seds-frommert's `spider/OS2/HPFS/.html`
+    and two siblings. Every one answers 403, which is a server declining to discuss a path rather
+    than saying it is absent, so record_gone cannot hold them and a completeness check reported
+    them for ever.
+
+    THE SAME REASONING AS remove-fragment-copies.py'S FIRST TEST, written out there as "the part
+    before the first '#' is NOT empty -- `#System_FW` has no stem; it IS the name". Here the part
+    before the extension is empty, so what is left is not a name with an extension but an
+    extension with nothing in front of it. A page generator emitting `<a href=".html">` is the
+    likely origin; the register's own pages show it next to thousands of ordinary links.
+
+    DELIBERATELY NARROW. A dotfile IS a name -- `.htaccess`, `.bashrc`, `.mirror-gone` -- and the
+    test is not "starts with a dot". It is "the whole last segment is a dot followed by a known
+    page extension and nothing else", which no real file in 1.8 million was found to match.
+    """
+    last = (href or "").rstrip("/").rsplit("/", 1)[-1]
+    if not last.startswith(".") or last.count(".") != 1:
+        return False
+    return ("x" + last).lower().endswith(PAGE_EXTENSIONS)
 
 
 def looks_like_a_page(name):

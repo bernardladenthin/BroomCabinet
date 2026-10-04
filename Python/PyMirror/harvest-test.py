@@ -506,8 +506,12 @@ class WhatTheSourceAlreadyAnswered404For(unittest.TestCase):
         try:
             self.gone_for(h, ["dead.zip"])
             h.run()
-            self.assertIn("already answered 404 by the source", h.text)
+            # THE WORDING WIDENED ON 2026-10-04 and this case caught it, which is what it is
+            # for. The line now names both records -- .mirror-gone and .mirror-refused -- because
+            # a path may be absent OR refused and the filter covers either.
+            self.assertIn("already answered by the source", h.text)
             self.assertIn(common.GONE_FILE, h.text)
+            self.assertIn(common.REFUSED_FILE, h.text)
         finally:
             h.close()
 

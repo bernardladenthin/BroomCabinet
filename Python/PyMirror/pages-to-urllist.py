@@ -53,8 +53,9 @@ import sys
 import urllib.parse
 
 from common import (MIRROR_ROOT, BOOKKEEPING_FILES, IMG_SRC, LINK_ODD_RE, GONE_FILE,
-                    content_root, exists, load_mirror,
-                    looks_like_a_page, read_gone, relative_to, strip_cache_buster, under_site)
+                    REFUSED_FILE, content_root, exists, is_extension_only, load_mirror,
+                    looks_like_a_page, read_gone, read_refused, relative_to,
+                    strip_cache_buster, under_site)
 
 # Both are the library's, written out here character for character until 2026-09-23.
 HREF = LINK_ODD_RE
@@ -186,6 +187,14 @@ def main():
                     h = strip_cache_buster(h)
                     if "?" in h:
                         continue
+                    # AN EXTENSION WITH NOTHING IN FRONT OF IT IS NOT A FILENAME. Six links in
+                    # this collection are `<dir>/.html` -- typewritten's man1/ and man5/,
+                    # seds-frommert's OS2/HPFS/ and two siblings -- and every one answers 403,
+                    # which record_gone cannot hold, so they were reported outstanding for ever.
+                    # Measured before the rule was written: of 1 814 446 indexed files, ZERO have
+                    # a name of this shape. See common.is_extension_only.
+                    if is_extension_only(h):
+                        continue
                     if not h or h.lower().startswith(SKIP):
                         continue
                     named.setdefault(urllib.parse.urljoin(here_url, h), here_url)
@@ -201,6 +210,9 @@ def main():
     # root instead reported 199 held pages of techsysadm as missing. See common.content_root.
     tree = content_root(root, base)
     gone = read_gone(root)
+    # AND WHAT THE SOURCE REFUSES. Its sibling record: 403, 401 or 500 rather than 404.
+    # Six paths in this collection answer that way and were offered on every run.
+    refused_before = read_refused(root)
     files, dirs, outside, refused, dead = [], [], 0, [], []
     for url in sorted(named):
         # THE SAME SITE UNDER ANOTHER SPELLING IS STILL THE SAME SITE. A plain startswith on the
@@ -223,7 +235,7 @@ def main():
         local = os.path.join(tree, *[p for p in rel.split("/") if p])
         if exists(local):
             continue
-        if rel in gone:
+        if rel in gone or rel in refused_before:
             dead.append(rel)
             continue
         # A directory linked without its slash is not a file. If the directory is here, the
@@ -243,8 +255,8 @@ def main():
     print("     %d outside the archive" % outside)
     print("     %d directory links without a trailing slash (already walked)" % len(dirs))
     if dead:
-        print("     %d already answered 404 by the source (in %s) -- not counted below"
-              % (len(dead), GONE_FILE))
+        print("     %d already answered by the source (in %s / %s) -- not counted below"
+              % (len(dead), GONE_FILE, REFUSED_FILE))
     if refused:
         # SAID BEFORE THE HEADLINE FIGURE, not after it. The count below is what the next command
         # would fetch, and a reader who sees only that number cannot tell it was ever narrowed.
