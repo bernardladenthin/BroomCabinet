@@ -473,56 +473,48 @@ class TheProbeIsABetAndCanBeDeclined(unittest.TestCase):
 
 
 class WhatTheFetcherSaysIsRELAYED(unittest.TestCase):
-    """The filter was a whitelist of three substrings and it hid the reason for everything.
+    """Nothing is hidden, and the one exception this had lasted a day.
 
-    fetch() relayed only lines containing "DONE fetched", "FAILED" or "ABANDONED". What that threw
-    away:
+    THE FIRST DEFECT was a whitelist: only lines containing "DONE fetched", "FAILED" or
+    "ABANDONED" were relayed, which threw away the reason for every failure, every GONE line, the
+    unstorable and directory reports, and -- worst -- "WARNING mirror.py could not be read -- NO
+    exclusion was applied to this list". It cost an afternoon: thirty "FAIL ... [WinError 183]"
+    lines were dropped, the loop said "0 fetched, 30 failed", and I read a local filesystem error
+    as ps-2.kev009.com blocking us. The owner restarted his router for nothing.
 
-        FAIL   <path> :: <reason>       the reason for every single failure
-        GONE HTTP <code>  <path>        which paths the source denied, and with what
-        N path(s) UNSTORABLE            a file occupying a parent directory
-        N path(s) answered AS A         a redirect to a directory
-          DIRECTORY
-        OUTSIDE THE BASE, skipped       a url the list named and the fetch would not ask for
-        MARKER LEFT ALONE / NO MARKER   why a marker was not written
-        WARNING mirror.py could not     an archive's EXCLUDE silently not applied
-          be read
+    THE SECOND WAS MY OWN OVER-CORRECTION. Inverting the filter, I kept one exception: the
+    per-25-file progress counter, described in the code as "high-frequency by design". That was a
+    claim made without looking. manifest-fetch.py prints it once per TWENTY-FIVE fetched files, so
+    at a 2 s interval it is one line per fifty seconds -- 58 lines for a list of 1 455.
 
-    THE LAST ONE IS THE ARGUMENT FOR INVERTING IT. A whitelist keeps what its author thought of,
-    and a warning that a forbidden path may have been requested is precisely what nobody thinks of.
+    AND IT WAS THE LINE SOMEBODY ASKED FOR. Twenty minutes into that run the owner asked how long
+    it had left, and the answer had to be reconstructed by counting files on disk by modification
+    time, because the figure the fetcher had already printed was being discarded.
 
-    IT COST AN AFTERNOON ON 2026-10-04. Thirty "FAIL ... [WinError 183]" lines were dropped, the
-    loop reported only "0 fetched, 30 failed", and I read a local filesystem error as
-    ps-2.kev009.com blocking us -- argued about route-shopping, advised waiting a day, and the
-    owner restarted his router for nothing. The reason was in a line this filter discarded.
+    SO THE SPECIAL CASE IS GONE RATHER THAN TUNED. No threshold, no "every Nth line", no judgement
+    about which list is big enough: the fetcher decides how often to speak and this function does
+    not second-guess it.
     """
 
-    def test_the_progress_counter_is_the_only_thing_hidden(self):
-        for line in ("  125/1521, 51.4 MB", "  1/1, 0.0 MB", "   9999/9999, 1234.5 MB"):
-            self.assertTrue(CONVERGE.PROGRESS.match(line), line)
-
-    def test_EVERYTHING_ELSE_IS_RELAYED(self):
-        for line in ("  FAIL   x/y :: [WinError 183] blah",
-                     "  GONE HTTP 403  a/b.zip",
-                     "  692 path(s) UNSTORABLE: a file occupies a parent directory.",
-                     "  3 path(s) the server answered AS A DIRECTORY",
-                     "  OUTSIDE THE BASE, skipped: http://other.invalid/x",
-                     "  WARNING mirror.py could not be read -- NO exclusion was applied",
-                     "  MARKER LEFT ALONE: it belongs to whatever wrote it",
-                     "  DONE fetched 3, gone from the source 0, failed 0, 0.0 MB"):
-            self.assertFalse(CONVERGE.PROGRESS.match(line), line)
-
-    def test_a_count_in_prose_is_not_mistaken_for_progress(self):
-        """The pattern is anchored at both ends, so a sentence that happens to contain `3/4` or a
-        size is still relayed."""
-        for line in ("  took 3/4 of the list, 12.0 MB in", "  12.0 MB of 99/100 done, see above"):
-            self.assertFalse(CONVERGE.PROGRESS.match(line), line)
-
-    def test_the_source_relays_by_default_rather_than_by_whitelist(self):
+    def source(self):
         with io.open(os.path.join(HERE, "converge.py"), encoding="utf-8") as fh:
+            return fh.read()
+
+    def test_the_progress_counter_is_relayed_too(self):
+        self.assertNotIn("PROGRESS", self.source())
+
+    def test_only_a_blank_line_is_dropped(self):
+        self.assertIn("if not line.strip():", self.source())
+
+    def test_nothing_is_relayed_by_whitelist_any_more(self):
+        self.assertNotIn('if "DONE fetched" in line or "FAILED" in line', self.source())
+
+    def test_the_fetcher_throttles_its_own_progress(self):
+        """The reason no filter is needed. If that ever becomes every file, the decision above is
+        worth revisiting -- and this case is where it would show."""
+        with io.open(os.path.join(HERE, "manifest-fetch.py"), encoding="utf-8") as fh:
             src = fh.read()
-        self.assertIn("if not line.strip() or PROGRESS.match(line):", src)
-        self.assertNotIn('if "DONE fetched" in line or "FAILED" in line', src)
+        self.assertIn("if ok % 25 == 0:", src)
 
 
 if __name__ == "__main__":
