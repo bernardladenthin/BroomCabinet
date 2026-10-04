@@ -263,13 +263,31 @@ def main():
         print("     WARNING mirror.py could not be read -- NO exclusion was applied. Check the "
               "list by hand before fetching it.")
     print("     %d FILES NAMED AND NOT ON DISK" % len(files))
+
+    # THE WORK BEFORE THE COSMETICS, and the order was the other way round until 2026-10-04.
+    # Printing a sample of the paths came first, and on a Windows console that print can RAISE:
+    # gsi-collection names pages whose titles hold characters cp1252 cannot encode, and the tool
+    # died with UnicodeEncodeError after announcing "3789 FILES NAMED AND NOT ON DISK" and
+    # before writing a single url.
+    #
+    # WHAT THAT COST. converge.py read the figure, found no file to read, and reported "nothing
+    # here is fetchable" -- a false closure for an archive with 3 789 paths outstanding. The
+    # list is this tool's product and the samples are a courtesy; a courtesy must not be able
+    # to destroy the product.
+    if args.out:
+        io.open(args.out, "w", encoding="utf-8", newline="\n").write("\n".join(files) + "\n")
+
     for u in files[:12]:
-        print("        %s" % urllib.parse.unquote(u[len(base):])[:86])
+        # ENCODABLE OR NOT, THE LINE GETS PRINTED. Going through the console's own encoding
+        # with errors="replace" turns an undisplayable character into a question mark instead
+        # of an exception. Nothing downstream reads this line; the file above is what is read.
+        line = "        %s" % urllib.parse.unquote(u[len(base):])[:86]
+        enc = getattr(sys.stdout, "encoding", None) or "utf-8"
+        print(line.encode(enc, "replace").decode(enc, "replace"))
     if len(files) > 12:
         print("        ... and %d more" % (len(files) - 12))
 
     if args.out:
-        io.open(args.out, "w", encoding="utf-8", newline="\n").write("\n".join(files) + "\n")
         print("\n  written: %s" % args.out)
         print("  NEXT: manifest-fetch.py --archive %s --url-list %s --base %s --delay <seconds>"
               % (args.archive, args.out, base))

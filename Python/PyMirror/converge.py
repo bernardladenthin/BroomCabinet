@@ -193,6 +193,20 @@ def converge(root, archive, base, delay, max_rounds, min_gain, give_up, go, repo
         # ASKED BEFORE FETCHED. The candidates are split by what the source says about them, and
         # only the 200s are handed to the fetcher; see probe() for the measurement that makes this
         # the default rather than an option.
+        # A FIGURE WITHOUT A LIST IS A BROKEN HARVEST, NOT AN EMPTY ONE, and treating the two
+        # alike cost gsi-collection a false closure on 2026-10-04. pages-to-urllist.py announced
+        # "3789 FILES NAMED AND NOT ON DISK" and then died printing a sample path its console
+        # could not encode -- before writing the file. This loop read the figure, found no urls,
+        # fell through to "nothing here is fetchable" and stopped. Had the figure been 0 it would
+        # have claimed a FIXED POINT.
+        #
+        # THE SAME SHAPE AS EVERY OTHER CLEAN ZERO IN THIS COLLECTION: an answer that looks like a
+        # finding because the thing that should have spoken said nothing at all.
+        if count > 0 and not urls:
+            report("  round %d: the harvest reported %d outstanding and wrote NO url list -- "
+                   "stopping. Run pages-to-urllist.py by hand and read its output; this is a "
+                   "broken harvest, not an empty one." % (n, count))
+            return history
         asked = probe(urls, delay, report=report)
         report("    asked %d: %d fetchable, %d gone, %d refused"
                % (len(urls), len(asked["get"]), len(asked["gone"]), len(asked["refused"])))

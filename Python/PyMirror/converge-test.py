@@ -369,5 +369,65 @@ class NothingFetchableStopsTheRoundEarly(unittest.TestCase):
         self.assertLess(src.index("asked = probe("), src.index("got = fetch("))
 
 
+class AFigureWithoutAListIsABrokenHarvest(unittest.TestCase):
+    """The false closure of 2026-10-04, pinned.
+
+    pages-to-urllist.py announced "3789 FILES NAMED AND NOT ON DISK" for gsi-collection and then
+    DIED printing a sample path its Windows console could not encode -- before writing the url
+    file. This loop read the figure, found no urls, and reported "nothing here is fetchable".
+
+    HAD THE FIGURE BEEN 0 IT WOULD HAVE CLAIMED A FIXED POINT. The same shape as every other clean
+    zero here: an answer that looks like a finding because the thing that should have spoken said
+    nothing at all. Two defects were fixed -- the tool now writes its product before printing its
+    courtesies -- and this case is the one that stops the loop believing a figure it cannot act on.
+    """
+
+    def test_a_count_with_no_urls_stops_the_run(self):
+        class Mute(Fake):
+            def outstanding(self, _root, _archive, _out):
+                self.harvests += 1
+                return 3789, [], "  3789 FILES NAMED AND NOT ON DISK"
+
+        f = Mute([3789])
+        history = patched(f, f.run)
+        self.assertEqual(history, [])
+        self.assertEqual(f.probes, 0)
+        self.assertEqual(f.fetches, 0)
+
+    def test_and_it_says_the_harvest_is_broken_rather_than_empty(self):
+        class Mute(Fake):
+            def outstanding(self, _root, _archive, _out):
+                self.harvests += 1
+                return 3789, [], "  3789 FILES NAMED AND NOT ON DISK"
+
+        f = Mute([3789])
+        patched(f, f.run)
+        self.assertIn("wrote NO url list", f.text())
+        self.assertIn("broken harvest, not an empty one", f.text())
+        self.assertNotIn("nothing here is fetchable", f.text())
+
+    def test_a_count_of_zero_with_no_urls_is_STILL_a_fixed_point(self):
+        """The honest empty case must survive the guard: a closed archive names nothing and
+        therefore writes nothing, and that is the answer the whole tool exists to reach."""
+        f = Fake([0])
+        history = patched(f, f.run)
+        self.assertEqual(history, [(1, 0, 0)])
+        self.assertIn("FIXED POINT", f.text())
+
+    def test_the_tool_writes_its_list_before_printing_samples(self):
+        """The other half of the fix, in the other file: the product cannot be destroyed by the
+        courtesy. Order matters and a comment is not an order."""
+        with io.open(os.path.join(HERE, "pages-to-urllist.py"), encoding="utf-8") as fh:
+            src = fh.read()
+        write_at = src.index('io.open(args.out, "w"')
+        print_at = src.index("for u in files[:12]:")
+        self.assertLess(write_at, print_at)
+
+    def test_and_that_printing_cannot_raise_on_an_undisplayable_path(self):
+        with io.open(os.path.join(HERE, "pages-to-urllist.py"), encoding="utf-8") as fh:
+            src = fh.read()
+        self.assertIn('encode(enc, "replace")', src)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
