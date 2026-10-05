@@ -50,12 +50,22 @@ Windows, `Start-Process` hands the process to the operating system instead:
       'b2-pack.py','--root','Q:/mirror','--out','X:/mirrorPacked',
       '--work','X:/mirrorPackedWork','--only','misc','--execute'
       -WorkingDirectory '<the directory holding b2-pack.py>'
-      -RedirectStandardOutput 'X:\mirrorPackedWork\misc-run.log'
-      -RedirectStandardError  'X:\mirrorPackedWork\misc-run.err'
+      -RedirectStandardOutput '<--out>\misc-run.log'
+      -RedirectStandardError  '<--out>\misc-run.err'
       -WindowStyle Hidden"
 
     (one line in the shell; `-u` so the log is not buffered, and the two redirects MUST be
      different files -- Start-Process refuses one file for both)
+
+THE LOGS GO TO --out, AND THAT IS THE WHOLE POINT OF THE SPLIT. One drive holds the collection and
+is READ; the other receives everything this run produces and is WRITTEN. The owner, 2026-10-05:
+"damit auf dem einen datenträger nur gelesen wird auf dem anderen geschrieben". Keeping the log
+anywhere else blurs that line, and the line is what makes "the mirror is read-only" a statement
+somebody can check with a disk counter rather than a promise.
+
+IT ALSO MEANS THE LOGS TRAVEL TO B2 beside the volumes, because --out is the upload directory.
+That is wanted: how a unit was packed, by which switches and with what rar said, is provenance,
+and provenance that stays on the packing machine is provenance that is eventually lost.
 
 THREE THINGS THAT BIT ON THE FIRST REAL RUN, 2026-10-05:
 

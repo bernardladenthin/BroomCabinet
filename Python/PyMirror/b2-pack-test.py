@@ -518,6 +518,24 @@ class EveryDecisionOfTheOwnerIsInTheCommand(unittest.TestCase):
         self.assertIn("12.9 GB", doc)
         self.assertIn("nicht erstellen", doc)
 
+    def test_THE_LOGS_GO_WHERE_THE_WRITING_IS_ALLOWED(self):
+        """One drive is read, the other is written, and the log must not blur that.
+
+        The owner, 2026-10-05: "damit auf dem einen datenträger nur gelesen wird auf dem anderen
+        geschrieben". It is what makes "the collection is read-only" checkable with a disk counter
+        instead of being a promise -- and it was worth checking: the owner saw writes in Task
+        Manager during the first run, and they turned out to be Windows' write-behind cache
+        flushing earlier writes to the OUTPUT drive, with no file under the collection changed.
+
+        The recipe therefore redirects both streams into --out and not into --work, even though
+        --work is the scratch directory, because --work may sit anywhere while --out is by
+        definition the side that receives.
+        """
+        doc = TOOL.__doc__
+        self.assertIn("<--out>" + chr(92) + "misc-run.log", doc)
+        self.assertIn("<--out>" + chr(92) + "misc-run.err", doc)
+        self.assertNotIn("mirrorPackedWork" + chr(92) + "misc-run", doc)
+
 
 class TheVolumeSizeFitsTheMedium(unittest.TestCase):
 
