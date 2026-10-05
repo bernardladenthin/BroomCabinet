@@ -38,9 +38,37 @@ THREE THINGS THIS TOOL DOES NOT DO. It never writes into the collection -- it re
 guesses a RAR switch: everything uncertain is in `VERIFY_AGAINST_YOUR_RAR` with what to check.
 
     python b2-pack.py                               the whole plan, nothing executed
-    python b2-pack.py --only bull --verbose          one unit, with its file list
+    python b2-pack.py --only misc --verbose          one unit, with its file list
     python b2-pack.py --sizes                       what each unit weighs, from the indexes
-    python b2-pack.py --execute --password-file P    actually pack (refuses without rar)
+    python b2-pack.py --execute                     actually pack (refuses without rar)
+
+HOW TO START A UNIT SO IT SURVIVES THE SESSION. A unit takes hours -- misc is the smallest at
+144 GB -- and a packer started from an agent session, a terminal or an SSH login dies with it. On
+Windows, `Start-Process` hands the process to the operating system instead:
+
+    powershell -NoProfile -Command "Start-Process -FilePath 'python' -ArgumentList '-u',
+      'b2-pack.py','--root','Q:/mirror','--out','X:/mirrorPacked',
+      '--work','X:/mirrorPackedWork','--only','misc','--execute'
+      -WorkingDirectory '<the directory holding b2-pack.py>'
+      -RedirectStandardOutput 'X:\mirrorPackedWork\misc-run.log'
+      -RedirectStandardError  'X:\mirrorPackedWork\misc-run.err'
+      -WindowStyle Hidden"
+
+    (one line in the shell; `-u` so the log is not buffered, and the two redirects MUST be
+     different files -- Start-Process refuses one file for both)
+
+THREE THINGS THAT BIT ON THE FIRST REAL RUN, 2026-10-05:
+
+  THE DESTINATION DIRECTORY MUST EXIST OR BE CREATABLE. RAR does not create it and answers
+  `Kann ... nicht erstellen. Das System kann den angegebenen Pfad nicht finden.` with exit code 9.
+  `execute()` creates it; the failure was a directory removed by hand between two attempts.
+
+  A KILLED RUN LEAVES A PARTIAL FIRST VOLUME. Remove it before restarting, or `rar a` treats the
+  set as one to be updated rather than created.
+
+  MEASURED MEMORY: 12.9 GB with -md6g -m5. rar.txt gives only two anchors -- about 7 GB for a
+  1 GB dictionary and about 96 GB for 64 GB -- and nothing between, so this is the figure to
+  reuse rather than an interpolation.
 """
 import argparse
 import collections
@@ -50,8 +78,8 @@ import os
 import subprocess
 import sys
 
-from common import (INDEX_FILE, MIRROR_ROOT, find_tool, human, read_index, relative_to, say,
-                    split_archive)
+from common import (BOOKKEEPING_FILES, INDEX_FILE, MIRROR_ROOT, find_tool, human, read_index,
+                    relative_to, say, split_archive)
 
 # THE VOLUME SIZE IS THE OWNER'S AND IT IS 199 MiB, MEASURED RATHER THAN RECALLED. It was
 # 24 200 000 000 bytes until 2026-10-04, then 995 000 000 for a few hours, and that middle figure
@@ -608,6 +636,45 @@ def archive_rows(root, archive):
             for path, (size, _mtime, digest) in rows.items()]
 
 
+def bookkeeping_for(unit, root, rows):
+    r"""-> the unit's OWN files, which the index deliberately leaves out.
+
+    THE ARCHIVE MUST CARRY ITS OWN FIXITY RECORDS OR IT CANNOT BE CHECKED. `.sha256sum`,
+    `.sha1sum`, `.md5sum` and `.sfv` are dotfiles in `common.BOOKKEEPING_FILES`, and `mirror.py`
+    keeps them OUT of `.mirror-index.csv` on purpose: the index describes the CONTENT, and
+    counting our own notes as content would make every marker wrong. That rule is right for the
+    collection and wrong at the moment of packing, where the notes are the most valuable small
+    thing in the tree.
+
+    WITHOUT THIS, A RESTORED UNIT COULD ONLY BE CHECKED AGAINST SHA-256 -- the unit index carries
+    that one digest per file and nothing else. The four manifests were built and cross-checked
+    over four days across 1.8 million files; SHA-1, MD5 and CRC32 would simply not survive.
+    Measured on 2026-10-05: 838 such files exist across the collection and only 18 of them are in
+    any index, so 820 would have been left behind.
+
+    THEY GO INTO THE @list AND NOT INTO THE UNIT INDEX, the same way empty directories do. The
+    index's columns are archive, path, size and sha256, and these files have no sha256 recorded
+    anywhere -- writing them in with an empty digest would put a row in the index that no auditor
+    could act on.
+
+    WHAT IS ALREADY INDEXED IS NOT ADDED TWICE. Some notes do appear in an index -- RENAMED.txt in
+    all seven archives that have one, FRAGMENT-COPIES-REMOVED.txt in four, five of the thirteen
+    CONVERGED.md -- because the WIDE bookkeeping set is skipped by auditors but still counted by
+    markers. So the test is per file and against this unit's own rows, not against a list of names.
+    """
+    held = set((r["archive"], r["path"]) for r in rows)
+    out = []
+    for archive in unit.archives():
+        for name in sorted(BOOKKEEPING_FILES):
+            if name.endswith(".tmp"):
+                continue
+            if (archive, name) in held:
+                continue
+            if os.path.isfile(os.path.join(root, archive, name)):
+                out.append("%s/%s" % (archive, name))
+    return out
+
+
 def rows_for(unit, root, cache=None):
     """-> the unit's files, in packing order."""
     rows = []
@@ -700,7 +767,7 @@ def plan(units, root, out, work, rar="rar", with_dirs=True):
         steps.append({"unit": unit, "argv": argv, "cwd": root, "list_path": list_path,
                       "index_path": index_path, "archive": archive, "rows": rows,
                       "volumes": volumes, "recovery_volumes": unit.options.recovery_volumes(volumes),
-                      "empty_dirs": dirs})
+                      "empty_dirs": dirs, "bookkeeping": bookkeeping_for(unit, root, rows)})
     index_archive = os.path.join(out, INDEX_DIR, "index.rar")
     steps.append({"unit": None, "argv": [rar, "a", "-ep"] + INDEX_OPTIONS.switches()
                   + [index_archive, "*" + INDEX_SUFFIX],
@@ -708,7 +775,7 @@ def plan(units, root, out, work, rar="rar", with_dirs=True):
                   "archive": index_archive, "rows": [],
                   # Every step carries the same keys, so a caller never has to ask which kind it
                   # is before reading one. The index archive has no volumes and no directories.
-                  "volumes": None, "recovery_volumes": 0, "empty_dirs": []})
+                  "volumes": None, "recovery_volumes": 0, "empty_dirs": [], "bookkeeping": []})
     return steps
 
 
@@ -726,6 +793,11 @@ def write_list(step, dry_run=True):
         # LAST, AND AS DIRECTORIES. They carry no bytes, so their position cannot disturb the
         # solid ordering the files were sorted into, and putting them at the end keeps that
         # ordering readable as exactly what sort_key produced.
+        # THE UNIT'S OWN RECORDS, before the empty directories. Their position cannot disturb the
+        # solid ordering the content was sorted into -- they are a few hundred small files at the
+        # end of a stream of hundreds of thousands.
+        for path in step["bookkeeping"]:
+            fh.write(path + chr(10))
         for path in step["empty_dirs"]:
             fh.write(path + chr(10))
     with io.open(step["index_path"], "w", encoding="utf-8", newline="\n") as fh:
@@ -757,6 +829,8 @@ def report(steps, verbose=False, stream=None):
         total_discs += files_out
         say("", stream=stream)
         extra = ("  + %d empty dir(s)" % len(step["empty_dirs"])) if step["empty_dirs"] else ""
+        if step["bookkeeping"]:
+            extra += "  + %d own record(s)" % len(step["bookkeeping"])
         say("=== %-22s %10s  %7d files%s  %4d vol + %d rev = %4d file(s) ==="
             % (unit.name, human(size), len(step["rows"]), extra, step["volumes"],
                step["recovery_volumes"], files_out), stream=stream)

@@ -35,6 +35,8 @@ import sys
 import tempfile
 import unittest
 
+import common  # noqa: E402
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -417,6 +419,106 @@ class TheOptionsBuilder(unittest.TestCase):
         self.assertEqual(TOOL.INDEX_OPTIONS.recovery_volumes(1), 0)
 
 
+class TheArchiveCarriesItsOwnFixityRecords(unittest.TestCase):
+    r"""Without this a restored unit could be checked against SHA-256 and nothing else.
+
+    `.sha256sum`, `.sha1sum`, `.md5sum` and `.sfv` are dotfiles in common.BOOKKEEPING_FILES, and
+    mirror.py keeps them OUT of `.mirror-index.csv` deliberately: the index describes the CONTENT,
+    and counting our own notes as content would make every marker wrong. The rule is right for the
+    collection and wrong at the moment of packing.
+
+    MEASURED ON 2026-10-05, after the owner asked whether the checksum files end up in the RAR:
+    838 such files exist across the collection and 18 of them are in any index, so 820 were being
+    left behind -- every .sha256sum, .sha1sum, .md5sum, .sfv and .mirror-index.csv in all 113
+    archives, and 100 PROVENANCE.md. The unit index that IS packed carries one digest per file,
+    so SHA-1, MD5 and CRC32 would not have survived the move to cold storage at all. For misc it
+    is 366 files against 144.19 GB: 0.13 %.
+    """
+
+    def test_a_units_own_records_are_collected(self):
+        unit = [u for u in TOOL.UNITS if u.name == "misc"][0]
+        if not os.path.isdir(TOOL.MIRROR_ROOT):
+            self.skipTest("the collection is not mounted here")
+        rows = TOOL.rows_for(unit, TOOL.MIRROR_ROOT, {})
+        got = TOOL.bookkeeping_for(unit, TOOL.MIRROR_ROOT, rows)
+        # THE NAMES COME FROM THE LIBRARY, not from this file. common_test.py refuses a tool that
+        # spells a bookkeeping name by hand, and it caught this case doing exactly that -- the
+        # guard exists because a hand-spelled name drifts away from the set the tools act on.
+        wanted = sorted(common.MANIFEST_FILES.values()) + [common.INDEX_FILE]
+        self.assertEqual(len(wanted), len(common.DIGESTS) + 1)
+        for name in wanted:
+            self.assertTrue([q for q in got if q.endswith("/" + name)], name)
+
+    def test_what_the_index_ALREADY_holds_is_not_added_twice(self):
+        """Some notes do appear in an index -- RENAMED.txt in all seven archives that have one,
+        FRAGMENT-COPIES-REMOVED.txt in four -- because the WIDE set is skipped by auditors but
+        still counted by markers. So the test is per file, not per name."""
+        rows = [{"archive": "a", "path": "RENAMED.txt"}]
+
+        class OneArchive(object):
+            def archives(self):
+                return ["a"]
+
+        got = TOOL.bookkeeping_for(OneArchive(), "no-such-root", rows)
+        self.assertEqual(got, [])
+
+    def test_they_go_into_the_LIST_and_not_into_the_unit_index(self):
+        """The index's columns are archive, path, size and sha256, and these files have no sha256
+        recorded anywhere. A row with an empty digest is one no auditor could act on."""
+        src = io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8").read()
+        write_list = src[src.index("def write_list("):src.index("def report(")]
+        self.assertIn('for path in step["bookkeeping"]:', write_list)
+        after = write_list[write_list.index('fh.write("archive,path,size,sha256'):]
+        self.assertNotIn("bookkeeping", after)
+
+    def test_the_count_is_reported_so_a_reader_sees_it_happened(self):
+        src = io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8").read()
+        self.assertIn("own record(s)", src)
+
+
+class EveryDecisionOfTheOwnerIsInTheCommand(unittest.TestCase):
+    r"""The settlement of 2026-10-04 and 2026-10-05, as one assertion over the emitted switches.
+
+    EACH OF THESE WAS DECIDED SEPARATELY, several of them against something I had argued for, and
+    a table of them is easier to re-read in a year than ten comments scattered through the module.
+    If one is ever changed, this is where it says so.
+    """
+
+    def test_the_whole_command_for_a_large_unit(self):
+        self.assertEqual(
+            TOOL.DEFAULTS.switches(3400),
+            ["-ma5",            # the ONLY format RAR 7.23 writes; -ma4 and -ma7 are unknown to it
+             "-m5",             # maximum, because this is written once and read for decades
+             "-md6g",           # the owner's figure: clears every duplicate (largest 2 000.5 MB)
+             "-s",              # solid, and WITHOUT -sv, or the stream restarts every 199 MiB
+             "-v208666624b",    # 199 MiB: under B2's measured 200 MiB one-piece SHA-1 cutoff
+             "-rr1",            # ~2 MiB per volume, for bit rot and bad sectors in place
+             "-rv15",           # the 5 / 10 / 15 rule; 3 400 volumes is the large tier
+             "-k",              # lock, which is what keeps the .rev files valid
+             "-scfl"])          # UTF-8 for the @list file; -scul stored NOTHING when measured
+
+    def test_and_nothing_encrypts(self):
+        """Public material: a password would protect nothing and could only be lost."""
+        self.assertNotIn("-hp", " ".join(TOOL.DEFAULTS.switches(3400)))
+        self.assertFalse(TOOL.DEFAULTS.encrypt_headers)
+
+    def test_THE_DETACHED_LAUNCH_IS_WRITTEN_DOWN(self):
+        """A unit takes hours and a packer started from a session dies with it.
+
+        The recipe belongs with the tool rather than in a chat log, because the next person to run
+        one will read the module docstring and nothing else. Three things that bit on the first
+        real run are recorded beside it: RAR does not create the destination directory, a killed
+        run leaves a partial first volume that must go before restarting, and the measured memory
+        at -md6g -m5 is 12.9 GB -- a figure rar.txt does not give, since it anchors only 1 GB and
+        64 GB.
+        """
+        doc = TOOL.__doc__
+        self.assertIn("Start-Process", doc)
+        self.assertIn("-RedirectStandardOutput", doc)
+        self.assertIn("12.9 GB", doc)
+        self.assertIn("nicht erstellen", doc)
+
+
 class TheVolumeSizeFitsTheMedium(unittest.TestCase):
 
     def test_a_volume_fits_both_media(self):
@@ -641,8 +743,14 @@ class DirectoriesThatHoldNothing(unittest.TestCase):
         TOOL.write_list(step, dry_run=False)
         with io.open(step["list_path"], encoding="utf-8") as fh:
             lines = fh.read().splitlines()
+        # CONTENT, THEN OUR OWN RECORDS, THEN THE EMPTY DIRECTORIES. The fixture writes a real
+        # .mirror-index.csv for each archive, so the middle group is not empty here -- which makes
+        # this case an end-to-end check that bookkeeping_for() reaches write_list at all.
         self.assertEqual(lines[-1], "split/pdf/hollow")
-        self.assertEqual(lines[:-1], ["%s/%s" % (r["archive"], r["path"]) for r in step["rows"]])
+        content = ["%s/%s" % (r["archive"], r["path"]) for r in step["rows"]]
+        self.assertEqual(lines[:len(content)], content)
+        self.assertEqual(lines[len(content):-1], step["bookkeeping"])
+        self.assertIn("split/.mirror-index.csv", step["bookkeeping"])
 
     def test_skipping_the_walk_is_possible_and_says_so(self):
         """`--no-empty-dirs` exists for a quick look at the commands, and it DROPS them."""
@@ -666,7 +774,8 @@ class TheFilesItWritesWhenAsked(unittest.TestCase):
         TOOL.write_list(self.step, dry_run=False)
         with io.open(self.step["list_path"], encoding="utf-8") as fh:
             lines = fh.read().splitlines()
-        self.assertEqual(lines, ["%s/%s" % (r["archive"], r["path"]) for r in self.step["rows"]])
+        content = ["%s/%s" % (r["archive"], r["path"]) for r in self.step["rows"]]
+        self.assertEqual(lines, content + self.step["bookkeeping"])
 
     def test_the_index_carries_the_digest_and_is_sorted_for_a_human(self):
         """Packing order is for the compressor; the index is for somebody looking something up."""
