@@ -797,6 +797,12 @@ BOOKKEEPING_FILES = frozenset(OWN_FILES | {
     # FIRST name in sorted order keeping its name every time -- which is why ardent-tool's 157-file
     # `PS55/docs` moved into its 1-file `PS55/Docs`. Wide set only, like the records above it.
     "CASE-DIRS-MERGED.txt",
+    # CASE-DIRS-RENAMED.txt -- the other answer to the same problem, for the case where merging
+    # cannot be used. In ibiblio-historic-linux every colliding group is blocked by TRANS.TBL, the
+    # ISO-9660 table describing the directory it sits in, so a merge would have to rewrite 16 of
+    # them; renaming one member to `X_` leaves both directories and both tables untouched. 16
+    # renames, 65 file paths, 0 bytes of content changed. Wide set only, like the records above.
+    "CASE-DIRS-RENAMED.txt",
     # HOW-THIS-ARRIVED.md -- the provenance note beside a marker whose own figures are true but
     # whose `duration` hides the work. dreamlandbbs-os2 has the first: its crawl took three
     # minutes because twelve hours of fetching across six rounds came first, and that history

@@ -113,7 +113,27 @@ def groups_in(root, archive, index=None):
             for rel, got in paths.items():
                 if rel.startswith(member + "/"):
                     tails[rel[len(member) + 1:].lower()].append((member, rel, got[2]))
-        clash = sorted(tail for tail, rows in tails.items() if len(set(r[2] for r in rows)) > 1)
+        # A CLASH IS BETWEEN MEMBERS, NEVER INSIDE ONE. The first version flagged any tail whose
+        # rows disagreed, including two files sitting in the SAME member whose names differ only in
+        # case -- and those already coexist, so moving them keeps each one's name and changes
+        # nothing about them. It made the tool report 1 887 clashes for ibm-aix's fixes/V4 against
+        # fixes/v4, where V4 held four files all under ml/ and the 1 887 names like
+        # cics/cics.msg.ja_jp... were inside v4 itself. The group was refused for a reason that
+        # had nothing to do with merging it, and the owner moved it by hand instead.
+        #
+        # WHAT IS A CLASH: two members contributing the same tail with different bytes. After the
+        # move those two land in one directory under case-equal paths, which is exactly what rar
+        # halves. Same tail and same bytes is the duplicate case -- one copy survives.
+        clash = []
+        for tail, rows in tails.items():
+            by_member = {}
+            for member, _rel, digest in rows:
+                by_member.setdefault(member, set()).add(digest)
+            if len(by_member) < 2:
+                continue
+            if len(set(d for digests in by_member.values() for d in digests)) > 1:
+                clash.append(tail)
+        clash = sorted(clash)
         moves = []
         for member in others:
             for rel in sorted(paths):

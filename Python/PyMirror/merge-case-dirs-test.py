@@ -86,6 +86,36 @@ class WhichGroupsAreSafeToMerge(unittest.TestCase):
         self.assertEqual(len(got), 1)
         self.assertEqual(got[0][3], [])
 
+    def test_A_CASE_PAIR_INSIDE_ONE_MEMBER_DOES_NOT_BLOCK_THE_MERGE(self):
+        """And the first version thought it did, which cost a day and a manual move.
+
+        ibm-aix's fixes/V4 held FOUR files, all under ml/. The tool reported 1 887 clashes for the
+        group and refused it -- but those 1 887 names, `cics/cics.msg.ja_jp...` and the rest, were
+        inside fixes/v4 ITSELF. Two files in one directory whose names differ only in case already
+        coexist there; moving a sibling directory's contents in keeps each name and changes nothing
+        about them. The group was refused for a reason that had nothing to do with merging it, I
+        reported the figure to the owner as fact, and he moved the directory by hand instead.
+
+        A CLASH IS BETWEEN MEMBERS: two of them contributing the same tail with different bytes,
+        which after the move share one directory under case-equal paths.
+        """
+        idx = index_of({"V/ml/a": "x", "v/ml/b": "y", "v/cics/Q": "p", "v/cics/q": "r"})
+        got = TOOL.mergeable("r", "a", idx)
+        self.assertEqual(len(got), 1)
+        self.assertEqual(got[0][3], [])
+        self.assertEqual(len(got[0][2]), 3)
+
+    def test_but_two_MEMBERS_with_the_same_tail_and_different_bytes_do(self):
+        idx = index_of({"V/same": "x", "v/SAME": "y"})
+        every = TOOL.groups_in("r", "a", idx)
+        self.assertEqual(every[0][3], ["same"])
+        self.assertEqual(TOOL.mergeable("r", "a", idx), [])
+
+    def test_and_two_members_with_the_same_tail_and_the_SAME_bytes_do_not(self):
+        """funet-aix's RS6000 and rs6000: 20 files, identical digests. One copy survives."""
+        idx = index_of({"RS6000/a": "same", "rs6000/A": "same"})
+        self.assertEqual(TOOL.groups_in("r", "a", idx)[0][3], [])
+
     def test_a_NESTED_group_is_left_to_its_parent(self):
         """aixpdslib/pub/URT and pub/URT/RISC both collide; merging the parent carries the child.
         Acting on both would move the same files twice."""
