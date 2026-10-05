@@ -781,6 +781,22 @@ BOOKKEEPING_FILES = frozenset(OWN_FILES | {
     # hours ago and agree with it. Here it changes what an auditor reads and nothing a marker
     # claims.
     "FRAGMENT-COPIES-REMOVED.txt",
+    # EMPTY-CASE-TWINS-REMOVED.txt -- the same shape of record for the same shape of mistake, and
+    # it was missing from this set for about an hour on 2026-10-05, which `mirror.py --verify`
+    # caught immediately: the file sat on disk, outside the index, and read as unindexed content.
+    #
+    # WHAT IT RECORDS. A case-insensitive server answers two spellings of one URL as one resource;
+    # this crawler followed both and one arrived EMPTY. 56 such files across ibiblio-historic-linux,
+    # ibm-aix and somuchstuff-pdp8. They had to go because Rar.exe stores only ONE of two paths
+    # differing in case, without saying which -- so an empty twin could have displaced 348 631
+    # bytes on the way to cold storage. Wide set only, exactly like the three names below it.
+    "EMPTY-CASE-TWINS-REMOVED.txt",
+    # CASE-DIRS-MERGED.txt -- two directories whose names differed only in case, put into one.
+    # Windows cannot hold both and WinRAR silently halves them, so the collection has to become
+    # something Windows can hold. 14 merges across 6 archives on 2026-10-05, 460 files moved, the
+    # FIRST name in sorted order keeping its name every time -- which is why ardent-tool's 157-file
+    # `PS55/docs` moved into its 1-file `PS55/Docs`. Wide set only, like the records above it.
+    "CASE-DIRS-MERGED.txt",
     # HOW-THIS-ARRIVED.md -- the provenance note beside a marker whose own figures are true but
     # whose `duration` hides the work. dreamlandbbs-os2 has the first: its crawl took three
     # minutes because twelve hours of fetching across six rounds came first, and that history
