@@ -791,6 +791,15 @@ BOOKKEEPING_FILES = frozenset(OWN_FILES | {
     # differing in case, without saying which -- so an empty twin could have displaced 348 631
     # bytes on the way to cold storage. Wide set only, exactly like the three names below it.
     "EMPTY-CASE-TWINS-REMOVED.txt",
+    # IDENTICAL-CASE-TWINS-REMOVED.txt -- the same record for the SAFER half of the same problem,
+    # and the one the measurement of 2026-10-05 showed to be the larger half: of 420 case
+    # collisions left outside the three ibm-aix tars, 168 are two spellings holding BYTE-FOR-BYTE
+    # the same content. Dropping either loses nothing whatsoever -- the bytes remain under the
+    # other name and the sha256 written beside each pair is the proof, re-read from disk at the
+    # moment of deletion rather than taken from a plan that may be hours old. The empty-twin
+    # record above can only claim an empty file is gone; this one can claim nothing was lost.
+    # Wide set only, like every record around it.
+    "IDENTICAL-CASE-TWINS-REMOVED.txt",
     # CASE-DIRS-MERGED.txt -- two directories whose names differed only in case, put into one.
     # Windows cannot hold both and WinRAR silently halves them, so the collection has to become
     # something Windows can hold. 14 merges across 6 archives on 2026-10-05, 460 files moved, the
@@ -803,6 +812,14 @@ BOOKKEEPING_FILES = frozenset(OWN_FILES | {
     # them; renaming one member to `X_` leaves both directories and both tables untouched. 16
     # renames, 65 file paths, 0 bytes of content changed. Wide set only, like the records above.
     "CASE-DIRS-RENAMED.txt",
+    # CASE-FILES-RENAMED.txt -- the same answer one level down, for the shape neither dropping nor
+    # a tar fits: two FILES in one directory whose names differ only in case and whose content
+    # genuinely differs, scattered one to three at a time over about 123 directories. A tar per
+    # directory would be absurd there and dropping would destroy a file. 163 of the 178 collisions
+    # left on 2026-10-06 are this. The second spelling in sorted order gains a trailing `_`; both
+    # files stay, no byte changes, and the record names the pair with its sizes so the rename can
+    # be read back. Wide set only, like every record above it.
+    "CASE-FILES-RENAMED.txt",
     # HOW-THIS-ARRIVED.md -- the provenance note beside a marker whose own figures are true but
     # whose `duration` hides the work. dreamlandbbs-os2 has the first: its crawl took three
     # minutes because twelve hours of fetching across six rounds came first, and that history

@@ -79,6 +79,33 @@ from common import (BOOKKEEPING_FILES, INDEX_FILE, MIRROR_ROOT, SUMS_FILE, exist
 
 RECORD_FILE = "EMPTY-CASE-TWINS-REMOVED.txt"
 
+# THE SECOND MODE'S RECORD, kept apart from the first because the REASON differs and a reader a
+# year from now has to be able to tell which claim was made. "It was empty" and "its bytes are
+# still here under the other name" are not the same statement, and only the second is provable
+# from a digest. The tool's name predates this mode; it covers both shapes of one problem.
+SAME_RECORD_FILE = "IDENTICAL-CASE-TWINS-REMOVED.txt"
+
+SAME_RECORD_HEADER = """# Files removed %s because the file beside them, under another casing of
+# the same name, holds BYTE-FOR-BYTE THE SAME CONTENT. Both digests were read
+# from disk at the moment of deletion, not taken from the index, and they were
+# equal -- that equality is the whole justification.
+#
+# A case-insensitive server answers two spellings of one URL as one resource,
+# and this crawler followed both, so the same bytes arrived twice. Rar.exe
+# cannot store two paths differing only in case: it keeps one and does not say
+# which, and the CRC32 of the one it dropped then no longer matches what our
+# manifests record for that path. Measured on misc.rar: 275 such paths, 165
+# with a CRC32 that disagreed, and `rar t` reported "Alles OK" over all of it.
+#
+# NOTHING BELOW WAS LOST. The left-hand name is gone; every byte it held is in
+# the file named on the right, and the sha256 printed with it is the proof. The
+# kept spelling is the one that sorts first, which is merge-case-dirs.py's rule
+# -- with identical content there is nothing to choose between them, so the
+# choice is made to be predictable rather than clever.
+#
+# removed  ->  the file that holds the same bytes
+"""
+
 RECORD_HEADER = """# Files removed %s because they were 0 bytes and the file beside them, under
 # the other casing of the same name, holds the content. Emptiness was read from
 # disk at the moment of deletion, not taken from the index.
@@ -99,6 +126,64 @@ def disk_size(path):
     if not exists(path):
         return None
     return os.path.getsize(long_path(path))
+
+
+def disk_digest(path):
+    """-> sha256 of the file on disk, or None if it is not there. Production `digest_of`."""
+    if not exists(path):
+        return None
+    return sha256_file(path)
+
+
+def identical_twins_in(root, archive, digest_of=disk_digest):
+    r"""-> [(drop_rel, keeper_rel, size)] where two spellings hold THE SAME BYTES.
+
+    THE SECOND SHAPE OF ONE PROBLEM, and the safer of the two. The empty-twin case drops a 0-byte
+    file whose partner has content, which loses an empty file. This one drops a file whose partner
+    is byte-for-byte identical, which loses NOTHING AT ALL -- the bytes remain, under the other
+    spelling, and their digest is the proof. Measured across the collection on 2026-10-05: 420
+    extra members outside the three tars, and 168 of them are this case.
+
+    THE DIGESTS COME FROM DISK, NOT FROM THE INDEX, for the reason the empty-twin function gives:
+    an index can be stale, and on 2026-10-05 the CRC32 cross-check found two manifests describing
+    a file that had been rewritten since they were built. The index only narrows the search.
+
+    THE KEEPER IS THE SORTED-FIRST SPELLING, which is `merge-case-dirs.py`'s rule for exactly the
+    same reason: with identical content there is nothing to choose between them, so the choice has
+    to be one a later reader can predict and a second run would repeat. `Filink.zip` is kept and
+    `filink.zip` dropped, because uppercase sorts first -- not because either is more correct.
+
+    `digest_of` IS INJECTABLE for the same reason `size_of` is: `A.TBL` and `a.TBL` cannot both
+    exist in an ordinary Windows directory, so a fixture that wrote both would end up with one
+    file and this function would never see the condition it looks for.
+    """
+    folded = collections.defaultdict(list)
+    for rel in read_index(os.path.join(root, archive, INDEX_FILE)):
+        folded[rel.replace("\\", "/").lower()].append(rel.replace("\\", "/"))
+    out = []
+    for key in sorted(folded):
+        group = sorted(folded[key])
+        if len(group) < 2:
+            continue
+        seen = {}
+        for rel in group:
+            full = os.path.join(root, archive, *rel.split("/"))
+            digest = digest_of(full)
+            if digest is None:
+                seen = {}
+                break
+            seen.setdefault(digest, []).append(rel)
+        if not seen:
+            continue
+        for digest in sorted(seen):
+            same = sorted(seen[digest])
+            if len(same) < 2:
+                continue                      # a lone spelling of these bytes: nothing to drop
+            keeper = same[0]
+            size = disk_size(os.path.join(root, archive, *keeper.split("/")))
+            for rel in same[1:]:
+                out.append((rel, keeper, size if size is not None else 0))
+    return out
 
 
 def twins_in(root, archive, size_of=disk_size):
@@ -161,16 +246,23 @@ def save_bookkeeping(root, archive, backup, report=say):
     return True
 
 
-def write_record(root, archive, pairs):
+def write_record(root, archive, pairs, same_content=False, digests=None):
     """Append the removal record BEFORE anything is deleted."""
-    path = os.path.join(root, archive, RECORD_FILE)
+    name = SAME_RECORD_FILE if same_content else RECORD_FILE
+    header = SAME_RECORD_HEADER if same_content else RECORD_HEADER
+    path = os.path.join(root, archive, name)
     new = not exists(path)
     with io.open(long_path(path), "a", encoding="utf-8", newline="\n") as fh:
         if new:
-            fh.write(RECORD_HEADER % time.strftime("%Y-%m-%d"))
+            fh.write(header % time.strftime("%Y-%m-%d"))
         fh.write("\n")
-        for empty, keeper, size in pairs:
-            fh.write("%s\n  -> %s   (%d bytes)\n" % (empty, keeper, size))
+        for dropped, keeper, size in pairs:
+            fh.write("%s\n  -> %s   (%d bytes)\n" % (dropped, keeper, size))
+            # THE DIGEST IS THE CLAIM, so it is written down beside the pair it justifies. A
+            # record saying "these were identical" without the number is an assertion; with it,
+            # a later reader can check the surviving file and see for himself.
+            if same_content and digests and dropped in digests:
+                fh.write("     sha256 %s\n" % digests[dropped])
     return path
 
 
@@ -229,6 +321,10 @@ def main(argv=None):
                     help="where the index and manifests are copied before any change. Required "
                          "with --apply: these five files per archive are the only record of what "
                          "the tree looked like, and they are rewritten by this tool")
+    ap.add_argument("--same-content", action="store_true",
+                    help="the OTHER shape: drop a twin whose partner holds byte-for-byte the "
+                         "same content, proved by reading both digests from disk. Loses nothing "
+                         "at all, which the empty-twin default cannot claim")
     ap.add_argument("--apply", action="store_true",
                     help="actually remove. Without it NOTHING is written")
     args = ap.parse_args(argv)
@@ -240,27 +336,34 @@ def main(argv=None):
         n for n in os.listdir(args.root)
         if os.path.isfile(os.path.join(args.root, n, INDEX_FILE)))
 
+    kind = "identical twin" if args.same_content else "empty twin"
     found = []
     lines = []
     for archive in names:
-        pairs = twins_in(args.root, archive)
+        pairs = (identical_twins_in(args.root, archive) if args.same_content
+                 else twins_in(args.root, archive))
         if not pairs:
             continue
         found.append((archive, pairs))
-        say("  %-26s %3d empty twin(s)" % (archive, len(pairs)))
-        for empty, keeper, size in pairs:
-            lines.append("%s\t%s\t%s\t%d" % (archive, empty, keeper, size))
+        say("  %-26s %3d %s(s)" % (archive, len(pairs), kind))
+        for dropped, keeper, size in pairs:
+            lines.append("%s\t%s\t%s\t%d" % (archive, dropped, keeper, size))
 
     total = sum(len(pairs) for _name, pairs in found)
+    twice = sum(size for _name, pairs in found for _d, _k, size in pairs)
     say("")
-    say("%d empty twin(s) across %d archive(s), %d bytes in total"
-        % (total, len(found), 0))
+    say("%d %s(s) across %d archive(s), %s"
+        % (total, kind, len(found),
+           "%d bytes that exist twice" % twice if args.same_content else "0 bytes"))
     if args.out:
         folder = os.path.dirname(os.path.abspath(args.out))
         if folder and not os.path.isdir(folder):
             os.makedirs(folder)
         with io.open(args.out, "w", encoding="utf-8", newline="\n") as fh:
-            fh.write("archive\tempty\tkeeper\tkeeper_size\n")
+            # THE COLUMN IS NAMED FOR WHAT IT HOLDS. "empty" over a file that holds 20829 bytes
+            # is a plan that reads as a different claim than the one being made.
+            fh.write("archive\t%s\tkeeper\tkeeper_size\n"
+                     % ("dropped" if args.same_content else "empty"))
             fh.write("\n".join(lines) + ("\n" if lines else ""))
         say("plan written: %s" % args.out)
 
@@ -278,26 +381,49 @@ def main(argv=None):
         if not save_bookkeeping(args.root, archive, args.backup):
             return 2
         say("     bookkeeping copied to %s" % os.path.join(args.backup, archive))
-        say("     record: %s" % write_record(args.root, archive, pairs))
+        # THE DIGESTS ARE RE-READ HERE, not reused from the planning pass, and they go into the
+        # record before anything is removed. The plan may be minutes or hours old; the only
+        # digest that justifies a deletion is the one the file has at the moment it happens.
+        fresh = {}
+        if args.same_content:
+            for dropped, keeper, _size in pairs:
+                for rel in (dropped, keeper):
+                    full = os.path.join(args.root, archive, *rel.split("/"))
+                    fresh[rel] = disk_digest(full)
+        say("     record: %s" % write_record(args.root, archive, pairs,
+                                             same_content=args.same_content, digests=fresh))
         removed = []
-        for empty, keeper, _size in pairs:
-            full = os.path.join(args.root, archive, *empty.split("/"))
-            if not exists(full):
-                say("     already gone: %s" % empty)
-                continue
-            if os.path.getsize(long_path(full)) != 0:
-                say("     NOT EMPTY ANY MORE, left alone: %s" % empty)
-                continue
+        for dropped, keeper, _size in pairs:
+            full = os.path.join(args.root, archive, *dropped.split("/"))
             keeper_full = os.path.join(args.root, archive, *keeper.split("/"))
-            if not exists(keeper_full) or os.path.getsize(long_path(keeper_full)) == 0:
-                say("     the keeper %s is gone or empty -- STOPPING" % keeper)
-                return 2
+            if not exists(full):
+                say("     already gone: %s" % dropped)
+                continue
+            if args.same_content:
+                # THE WHOLE JUSTIFICATION, CHECKED AGAIN AT THE LAST MOMENT. If the two are not
+                # still byte-identical, this deletion would lose something, and the right answer
+                # is to stop rather than to leave one file of a pair deleted and wonder later.
+                if fresh.get(dropped) is None or fresh.get(keeper) is None:
+                    say("     one of the pair is gone -- STOPPING at %s" % dropped)
+                    return 2
+                if fresh[dropped] != fresh[keeper]:
+                    say("     NOT IDENTICAL ANY MORE -- STOPPING at %s" % dropped)
+                    say("       %s  %s" % (fresh[dropped][:16], dropped))
+                    say("       %s  %s" % (fresh[keeper][:16], keeper))
+                    return 2
+            else:
+                if os.path.getsize(long_path(full)) != 0:
+                    say("     NOT EMPTY ANY MORE, left alone: %s" % dropped)
+                    continue
+                if not exists(keeper_full) or os.path.getsize(long_path(keeper_full)) == 0:
+                    say("     the keeper %s is gone or empty -- STOPPING" % keeper)
+                    return 2
             os.remove(long_path(full))
-            removed.append(empty)
+            removed.append(dropped)
             done += 1
-            pruned = prune_empty_dirs(args.root, archive, empty)
+            pruned = prune_empty_dirs(args.root, archive, dropped)
             if pruned:
-                say("     %s -- and %d empty director(ies) above it" % (empty, pruned))
+                say("     %s -- and %d empty director(ies) above it" % (dropped, pruned))
         if removed and not forget(args.root, archive, removed):
             return 2
         say("     %d removed, index and four manifests rewritten" % len(removed))

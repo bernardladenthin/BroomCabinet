@@ -88,7 +88,7 @@ python wedge_test.py
 Every path is a parameter, and `mirror.py` in particular has **no default root** -- the subject of
 the next section.
 
-The tools added later relax this. **Thirty-six of them** default `--root` to `Q:\mirror` --
+The tools added later relax this. **Thirty-seven of them** default `--root` to `Q:\mirror` --
 `autoindex-tls-broken.py`, `b2-cluster.py`, `b2-pack.py`, `blogger-sitemap.py`, `case-collision-recover.py`,
 `containment.py`,
 `converge.py`, `corpus-coverage.py`, `crawl-gap-audit.py`, `extract-container-tar.py`, `fill-from-local.py`, `find-html-imposters.py`, `find-sitemaps.py`,
@@ -98,7 +98,7 @@ The tools added later relax this. **Thirty-six of them** default `--root` to `Q:
 `pages-to-urllist.py`, `recheck-decisions.py`, `redbooks-fetch.py`, `refresh-table.py`,
 `remove-fragment-copies.py`, `sfv-verify.py`, `subset-refetch.py`, `suspect-reconsider.py`,
 `truncated-vs-source.py`, `verify-content.py`, `verify-extraction.py`,
-`drop-empty-case-twins.py`, `merge-case-dirs.py`, `rename-case-dirs.py`.
+`drop-empty-case-twins.py`, `merge-case-dirs.py`, `rename-case-dirs.py`, `rename-case-files.py`.
 **Eight** demand `--root` outright (`catalogue.py`, `checksums.py`, `dedupe-docs.py`,
 `dokuwiki-source.py`, `mediawiki-source.py`, `pmwiki-source.py`, `restate-marker.py`,
 `wayback-salvage.py`); **two** take it without a default (`audit.py`, `mirror.py`).
@@ -109,7 +109,7 @@ The tools added later relax this. **Thirty-six of them** default `--root` to `Q:
 walks the collection.
 `ask-the-source.py` is the clearest case: it reads recorded lengths from a table and bytes from a
 URL, and a `--root` it never used would be an invitation to believe it had checked something on
-disk. 36 + 8 + 2 + 10 = **56 scripts with an argument parser**, which is the whole set.
+disk. 37 + 8 + 2 + 10 = **57 scripts with an argument parser**, which is the whole set.
 
 They are maintenance tools for one collection rather than general-purpose fetchers, and the trade
 is deliberate -- but it is a trade. This paragraph named three tools for a while, then kept naming

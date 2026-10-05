@@ -69,6 +69,7 @@ class Tree(object):
         self.archive = archive
         self.dir = os.path.join(self.root, archive)
         self.sizes = {}
+        self.digests = {}
         rows = {}
         for rel, data in files.items():
             full = os.path.join(self.dir, *rel.split("/"))
@@ -76,7 +77,8 @@ class Tree(object):
             # NOT os.path.normcase: it lower-cases on Windows, which would map A.TBL and
             # a.TBL onto one key and defeat the very distinction this table exists to carry.
             self.sizes[os.path.abspath(full)] = len(data)
-            rows[rel] = (len(data), 0, common.sha256_file(full))
+            self.digests[os.path.abspath(full)] = common.sha256_bytes(data)
+            rows[rel] = (len(data), 0, common.sha256_bytes(data))
         common.write_index(os.path.join(self.dir, common.INDEX_FILE),
                            os.path.join(self.dir, common.SUMS_FILE), rows)
         common.write_manifests(self.dir, dict(
@@ -86,8 +88,21 @@ class Tree(object):
         """The filesystem's answer, replaced by what the fixture declared."""
         return self.sizes.get(os.path.abspath(path))
 
+    def digest_of(self, path):
+        r"""The same substitution for digests, and needed for the same reason.
+
+        Two spellings holding IDENTICAL bytes collapse to one file on an ordinary Windows
+        directory just as two spellings with different bytes do -- so `A` and `a` would be one
+        file whose digest is trivially equal to itself, and a test built on that would prove
+        nothing about a pair. The table says what each NAME holds.
+        """
+        return self.digests.get(os.path.abspath(path))
+
     def twins(self):
         return TOOL.twins_in(self.root, self.archive, size_of=self.size_of)
+
+    def identical(self):
+        return TOOL.identical_twins_in(self.root, self.archive, digest_of=self.digest_of)
 
     def close(self):
         shutil.rmtree(self.root, ignore_errors=True)
@@ -390,6 +405,120 @@ class TheOrderOfWhatComesAfterwards(unittest.TestCase):
         """An instruction without its reason is one somebody reorders later."""
         self.assertIn("not in the index it rewrote", self.source())
 
+
+
+class WhatCountsAsAnIdenticalTwin(unittest.TestCase):
+    r"""The safer half: two spellings, the same bytes, so dropping one loses nothing at all.
+
+    Measured 2026-10-05: of 420 case collisions outside the three ibm-aix tars, 168 are this.
+    `fjkraan` was the first done -- Filink.zip beside filink.zip at 20829 B with one digest, and
+    trs-DOS.htm beside trs-dos.htm at 719 B with one digest.
+    """
+
+    def tearDown(self):
+        if getattr(self, "tree", None):
+            self.tree.close()
+
+    def test_the_same_bytes_under_two_spellings_is_a_pair(self):
+        self.tree = Tree({"d/Filink.zip": b"payload", "d/filink.zip": b"payload"})
+        self.assertEqual([(d, k) for d, k, _s in self.tree.identical()],
+                         [("d/filink.zip", "d/Filink.zip")])
+
+    def test_the_keeper_is_the_spelling_THAT_SORTS_FIRST(self):
+        r"""merge-case-dirs.py's rule, for the same reason: predictable beats clever."""
+        self.tree = Tree({"d/B": b"same", "d/b": b"same"})
+        dropped, keeper, _size = self.tree.identical()[0]
+        self.assertEqual(keeper, "d/B")       # uppercase sorts first in ASCII
+        self.assertEqual(dropped, "d/b")
+
+    def test_DIFFERENT_bytes_are_never_a_pair(self):
+        r"""THE WHOLE SAFETY OF THIS MODE. VG8020.JPG at 10052 B beside vg8020.jpg at 12414 B are
+        two different photographs, and a tool that dropped one would destroy one of them."""
+        self.tree = Tree({"d/VG8020.JPG": b"first image", "d/vg8020.jpg": b"second image!"})
+        self.assertEqual(self.tree.identical(), [])
+
+    def test_a_lone_spelling_is_not_a_pair(self):
+        self.tree = Tree({"d/only.zip": b"payload", "d/other.zip": b"payload"})
+        self.assertEqual(self.tree.identical(), [])
+
+    def test_three_spellings_of_the_same_bytes_drop_two(self):
+        r"""vacpp.html.JA_JP / Ja_JP / ja_JP is a real three-member group in ibm-aix.
+
+        Three CASINGS OF ONE NAME, which needs two letters to express -- `A` and `a` are the only
+        two spellings a single letter has, and an earlier version of this test used three
+        different names and proved nothing.
+        """
+        self.tree = Tree({"d/AB": b"x", "d/Ab": b"x", "d/ab": b"x"})
+        rows = self.tree.identical()
+        self.assertEqual([(d, k) for d, k, _s in rows],
+                         [("d/Ab", "d/AB"), ("d/ab", "d/AB")])
+
+    def test_a_group_split_by_content_keeps_both_distinct_files(self):
+        r"""Three spellings, two of them identical: the pair collapses, the odd one stays.
+
+        This is the shape that would cost data if the function grouped by name alone, because the
+        keeper for the identical pair must be one of THOSE TWO and never the third file.
+        """
+        self.tree = Tree({"d/X": b"same", "d/x": b"same", "d/X~": b"different"})
+        rows = self.tree.identical()
+        self.assertEqual([(d, k) for d, k, _s in rows], [("d/x", "d/X")])
+
+    def test_a_file_missing_from_disk_stops_the_group(self):
+        """A digest that cannot be read is not a digest that matches."""
+        self.tree = Tree({"d/A": b"same", "d/a": b"same"})
+        self.tree.digests.pop(os.path.abspath(os.path.join(self.tree.dir, "d", "A")), None)
+        self.assertEqual(self.tree.identical(), [])
+
+    def test_the_size_reported_is_the_keeper_s(self):
+        self.tree = Tree({"d/A": b"1234567", "d/a": b"1234567"})
+        _dropped, _keeper, size = self.tree.identical()[0]
+        self.assertEqual(size, 7)
+
+
+class TheTwoRecordsSayDifferentThings(unittest.TestCase):
+    r"""A record is a claim, and these two claims are not the same one.
+
+    "It was empty" and "its bytes are still here" differ in what they promise, and only the
+    second is provable from a digest -- so the digest is written beside each pair.
+    """
+
+    def setUp(self):
+        self.folder = tempfile.mkdtemp(prefix="twins-rec-")
+        os.makedirs(os.path.join(self.folder, "arch"))
+
+    def tearDown(self):
+        shutil.rmtree(self.folder, ignore_errors=True)
+
+    def read(self, name):
+        with io.open(os.path.join(self.folder, "arch", name), encoding="utf-8") as fh:
+            return fh.read()
+
+    def test_the_two_modes_write_to_two_different_files(self):
+        self.assertNotEqual(TOOL.RECORD_FILE, TOOL.SAME_RECORD_FILE)
+
+    def test_the_identical_record_names_its_own_justification(self):
+        TOOL.write_record(self.folder, "arch", [("d/a", "d/A", 7)], same_content=True,
+                          digests={"d/a": "f" * 64})
+        text = self.read(TOOL.SAME_RECORD_FILE)
+        self.assertIn("BYTE-FOR-BYTE THE SAME CONTENT", text)
+        self.assertIn("NOTHING BELOW WAS LOST", text)
+
+    def test_the_digest_is_written_beside_the_pair(self):
+        """Without it the record asserts; with it a reader can check the surviving file."""
+        TOOL.write_record(self.folder, "arch", [("d/a", "d/A", 7)], same_content=True,
+                          digests={"d/a": "ab" * 32})
+        self.assertIn("sha256 " + "ab" * 32, self.read(TOOL.SAME_RECORD_FILE))
+
+    def test_the_empty_record_is_untouched_by_the_other_mode(self):
+        TOOL.write_record(self.folder, "arch", [("d/a", "d/A", 7)], same_content=True,
+                          digests={})
+        self.assertFalse(os.path.exists(os.path.join(self.folder, "arch", TOOL.RECORD_FILE)))
+
+    def test_both_record_names_are_registered_as_bookkeeping(self):
+        r"""EMPTY-CASE-TWINS-REMOVED.txt was missing from the set for an hour on 2026-10-05 and
+        `mirror.py --verify` read it as unindexed content within that hour."""
+        self.assertIn(TOOL.RECORD_FILE, common.BOOKKEEPING_FILES)
+        self.assertIn(TOOL.SAME_RECORD_FILE, common.BOOKKEEPING_FILES)
 
 
 if __name__ == "__main__":
