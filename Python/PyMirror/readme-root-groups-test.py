@@ -50,10 +50,11 @@ README = os.path.join(HERE, "README.md")
 DEFAULT_PHRASE = "default `--root` to `" + common.MIRROR_ROOT + "`"
 DEFAULT_ANCHOR = DEFAULT_PHRASE + " --"
 
-WORDS = {2: "Two", 8: "Eight", 9: "Nine", 24: "Twenty-four", 25: "Twenty-five",
+WORDS = {2: "Two", 8: "Eight", 9: "Nine", 10: "Ten", 24: "Twenty-four", 25: "Twenty-five",
          26: "Twenty-six", 27: "Twenty-seven", 28: "Twenty-eight",
          29: "Twenty-nine", 30: "Thirty", 31: "Thirty-one", 32: "Thirty-two",
-         33: "Thirty-three"}
+         33: "Thirty-three", 34: "Thirty-four", 35: "Thirty-five", 36: "Thirty-six",
+         37: "Thirty-seven"}
 
 
 def groups():

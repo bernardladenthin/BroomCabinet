@@ -121,6 +121,21 @@ ALLOWED = {
     "pdf_test.py": {
         "C:": "a PDF string-escape fixture: b\"C:\" + two backslashes + b\"tmp\"",
     },
+    "tar-subtree.py": {
+        "C:": "'C:/Program Files/Git/usr/bin/tar.exe' -- GNU tar's location from the Git for "
+              "Windows installer, in the same candidate shape as b2-pack.py's Rar.exe. It is "
+              "named outright because a bare `tar.exe` resolves through System32 to bsdtar, "
+              "which has no -d and made the comparison check unable to fail",
+        "X:": "the tar target drive in TARGET_ROOT -- the packing scratch space, named beside "
+              "the collection root it reads from, which comes from common.MIRROR_ROOT",
+    },
+    "tar-subtree-test.py": {
+        "C:": "SystemRoot's default, used to find bsdtar and prove the binary check rejects it",
+        "X:": "posix() turns a drive letter into /x/..., which cannot be tested without one; "
+              "also the docstring saying which two drives a test must never be pointed at",
+        "Q:": "the same two: posix() on the collection's letter, and the warning in the "
+              "docstring that no fixture here may name the collection",
+    },
     "ask-the-source.py": {
         "Q:": "a --help example naming the collection",
     },
