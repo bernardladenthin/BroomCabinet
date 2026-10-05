@@ -419,6 +419,208 @@ class TheOptionsBuilder(unittest.TestCase):
         self.assertEqual(TOOL.INDEX_OPTIONS.recovery_volumes(1), 0)
 
 
+class _OneArchive(object):
+    """A unit of one archive that claims everything, for the pure-function cases below."""
+
+    def archives(self):
+        return ["alpha"]
+
+    def claims(self, archive, path):
+        return True
+
+
+class ItRefusesToLoseAFileToRarsCaseBlindness(unittest.TestCase):
+    r"""`rar a` stores ONE of two paths differing only in case, says nothing, and exits 0.
+
+    MEASURED ON 2026-10-05 with a 14-byte a.txt and a 22-byte A.txt in a directory carrying the
+    Windows per-directory case-sensitivity flag. Passing the directory, passing -r, passing an
+    @list, passing -oni, and naming both files explicitly ALL produced an archive with ONE entry
+    and no warning; a second `rar a` of the other REPLACED the entry. 7-Zip 24.09 at least refuses
+    -- "ERROR: Duplicate filename on disk" -- and writes nothing at all.
+
+    THE ARCHIVE NAMESPACE IS CASE-SENSITIVE, which is what makes this a tooling limit rather than
+    a format one: on a SINGLE-volume archive, packing the second file under a staged name and then
+    `rar rn`-ing it to its real name produced both `data\a.txt` (14 bytes) and `data\A.txt` (22
+    bytes). The same `rar rn` on a 5-volume set printed "Fertig" and changed nothing -- so the
+    workaround exists and does not reach the shape this plan needs, which is 199 MiB volumes.
+
+    COLLECTION-WIDE: 4 542 files in 15 archives, 3.55 GB, 3 404 groups of two and 569 of three,
+    4 028 of them in ibm-aix. `rar t` reports "Alles OK" over the hole because it only checks what
+    the archive holds.
+
+    AND THE MIRROR IS NOT WHERE THIS GETS FIXED. Renaming there would break the one property the
+    collection has -- being a faithful copy -- and could not survive a re-fetch, because which
+    member of a pair arrives first is not deterministic. The owner settled that on 2026-10-05; the
+    form the archive takes instead is still open, and until it is settled this refusal stands.
+    """
+
+    def rows(self, *paths):
+        return [{"archive": "a", "path": p, "size": 1, "digest": "x"} for p in paths]
+
+    def test_a_pair_is_found(self):
+        got = TOOL.case_collisions(self.rows("dir/One.txt", "dir/one.txt", "dir/other.txt"))
+        self.assertEqual(got, [["a/dir/One.txt", "a/dir/one.txt"]])
+
+    def test_a_group_of_three_is_one_group_and_loses_two(self):
+        """569 such groups exist, and a fix that renames only one member would still lose one."""
+        got = TOOL.case_collisions(self.rows("x/A.bff", "x/a.bff", "x/A.BFF"))
+        self.assertEqual(len(got), 1)
+        self.assertEqual(len(got[0]), 3)
+
+    def test_A_COLLISION_IN_A_DIRECTORY_COMPONENT_COUNTS_TOO(self):
+        """ardent-tool holds PS55/Docs/scans/x.pdf and PS55/docs/scans/x.pdf. The differing
+        component is not the filename, and RAR drops one just the same. 82 directories appear
+        under two casings across 6 archives, with 68 587 files below them."""
+        got = TOOL.case_collisions(self.rows("PS55/Docs/scans/x.pdf", "PS55/docs/scans/x.pdf"))
+        self.assertEqual(len(got), 1)
+
+    def test_an_ordinary_tree_has_none(self):
+        self.assertEqual(TOOL.case_collisions(self.rows("a.txt", "b.txt", "dir/c.txt")), [])
+
+    def test_the_comparison_is_lower_and_not_casefold(self):
+        """casefold() folds the German sharp s to "ss", which is right for comparing words and
+        wrong here: the question is whether ONE FILESYSTEM can hold both names, and NTFS compares
+        with an upper-case table rather than with Unicode case folding. A fold more aggressive than
+        the filesystem's reports collisions that do not exist."""
+        src = io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8").read()
+        block = src[src.index("def case_collisions("):src.index("def listing_text(")]
+        self.assertIn(".lower()", block)
+        self.assertNotIn("casefold", block)
+
+    def test_IT_IS_A_REFUSAL_BEFORE_ANYTHING_IS_WRITTEN(self):
+        """And on a dry run too: the figure a reader needs is the one from BEFORE they spend two
+        hours packing. Checked against the real misc unit, which holds 275 such files."""
+        src = io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8").read()
+        block = src[src.index("losing = []"):src.index('    rar = "rar"')]
+        self.assertIn("REFUSING:", block)
+        self.assertIn("return 2", block)
+        self.assertIn("case_collisions(", block)
+
+    def test_and_the_real_collection_still_holds_them(self):
+        """If this ever fails, the collection has changed and the refusal above can be lifted --
+        which is exactly the signal worth having. Skipped where the collection is not mounted."""
+        if not os.path.isdir(TOOL.MIRROR_ROOT):
+            self.skipTest("the collection is not mounted here")
+        unit = [u for u in TOOL.UNITS if u.name == "misc"][0]
+        groups = TOOL.case_collisions(TOOL.rows_for(unit, TOOL.MIRROR_ROOT, {}))
+        self.assertTrue(groups, "misc held 275 case collisions on 2026-10-05")
+
+
+class TheCRC32CrossCheck(unittest.TestCase):
+    r"""A SECOND OPINION ON WHAT WAS PACKED, and a file count, for about 50 seconds a unit.
+
+    `rar t` proves the archive decompresses to what RAR recorded WHILE PACKING. Both sides of that
+    comparison come from the same read, so it cannot notice RAR having packed the wrong bytes, and
+    it cannot notice a file that never reached the archive at all. The .sfv was built days earlier,
+    by us, from the files themselves -- so holding RAR's stored CRC32 against it compares two
+    independent readings, and comparing the counts answers the second question.
+
+    IT IS CHEAP BECAUSE THE CRCs ARE IN THE HEADERS. `rar lt` needs no dictionary and decompresses
+    nothing: measured on misc, 98.62 GB in 468 volumes, all the listings took 49 seconds against
+    seven minutes for `rar t`.
+
+    IT FOUND TWO THINGS ON ITS FIRST REAL RUN, which is the whole argument for having it:
+
+      TWO STALE MANIFEST ENTRIES. bretjohnson/CONVERGED.md and fjkraan/CONVERGED.md were rewritten
+      by the converge runs of 2026-10-04 at 13:53, after their manifests had been built. The .sfv
+      said DA5535AA and the file was E173965F. mirror.py --index updates the weaker digests only
+      for files it re-hashes, so a file written after an index run keeps its old CRC32, SHA-1 and
+      MD5 while its SHA-256 stays correct. Corrected by re-indexing exactly those two archives: one
+      line changed in each manifest, the content untouched.
+
+      275 FILES MISSING FROM THE ARCHIVE, which is how a far larger defect surfaced. Rar.exe cannot
+      store two files whose paths differ only in case: it keeps one, says nothing, and exits 0.
+      Collection-wide that is 4 542 files across 15 archives, 3.55 GB.
+    """
+
+    LISTING = "\n".join([
+        "        Name: alpha/one.txt",
+        "         Art: Datei",
+        "       CRC32: AABBCCDD",
+        "        Name: alpha/sub",
+        "         Art: Verzeichnis",
+        "        Name: alpha/TWO.txt",
+        "         Art: Datei",
+        "       CRC32: 11223344",
+    ])
+
+    def test_it_reads_name_and_crc_pairs_and_skips_a_directory(self):
+        """A directory has a Name and no CRC32, so a pair is only taken when the CRC arrives before
+        the next name -- otherwise a directory would inherit the next file's checksum."""
+        got = TOOL.crc32_from_listing(self.LISTING)
+        self.assertEqual(got, {"alpha/one.txt": "AABBCCDD", "alpha/TWO.txt": "11223344"})
+
+    def test_a_backslash_becomes_a_forward_slash(self):
+        r"""RAR lists `archive\path`; the .sfv and the index use forward slashes."""
+        line = "        Name: a" + chr(92) + "b.txt\n       CRC32: DEADBEEF"
+        self.assertEqual(TOOL.crc32_from_listing(line), {"a/b.txt": "DEADBEEF"})
+
+    def test_A_CASE_DIFFERENCE_IS_A_MISSING_FILE_AND_MUST_FAIL(self):
+        """And an earlier version of this check folded case, which would have HIDDEN the defect.
+
+        Folding looked reasonable: NTFS is case-insensitive, RAR stores the name the filesystem
+        reports, so a .sfv entry `SPAM.wiki` matching an archive entry `Spam.wiki` read like a
+        bookkeeping difference. It is not. Measured: the directory carries the per-directory
+        case-sensitivity flag, SPAM.wiki is 26 bytes, Spam.wiki is 30, both exist, and the archive
+        holds only one. Folding would have reported OK over 4 542 missing files.
+        """
+        want = {"alpha/two.txt": "11223344"}
+        complaint = TOOL.crc32_complaint(_OneArchive(), "no-such-root", self.LISTING, 1, want=want)
+        self.assertIsNotNone(complaint)
+        self.assertIn("does not hold", complaint)
+
+    def test_a_clean_unit_says_nothing(self):
+        want = {"alpha/one.txt": "AABBCCDD", "alpha/TWO.txt": "11223344"}
+        self.assertIsNone(
+            TOOL.crc32_complaint(_OneArchive(), "no-such-root", self.LISTING, 2, want=want))
+
+    def test_a_differing_crc_is_named_with_the_file(self):
+        want = {"alpha/one.txt": "FFFFFFFF"}
+        complaint = TOOL.crc32_complaint(_OneArchive(), "no-such-root", self.LISTING, 1, want=want)
+        self.assertIn("alpha/one.txt", complaint)
+        self.assertIn("differs", complaint)
+
+    def test_our_own_records_are_counted_and_not_faulted(self):
+        """The 366 manifests and markers packed with a unit appear in no .sfv. They are counted in
+        the note and are not a reason to stop."""
+        want = {"alpha/one.txt": "AABBCCDD", "alpha/TWO.txt": "11223344"}
+        listing = self.LISTING + "\n        Name: alpha/.sha256sum\n       CRC32: 99887766"
+        self.assertIsNone(
+            TOOL.crc32_complaint(_OneArchive(), "no-such-root", listing, 2, want=want))
+
+    def test_EVERY_VOLUME_IS_LISTED_BECAUSE_ONE_IS_NOT_THE_SET(self):
+        """`rar lt <first volume>` lists only the files whose headers sit in THAT volume.
+
+        Measured on misc: part001 answered 67 315 files, part234 answered 127, part468 answered 10,
+        against the 342 489 the set holds. A check built on the first volume alone would have
+        compared 20 % of the archive and reported success.
+        """
+        src = io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8").read()
+        block = src[src.index("def listing_text("):src.index("def crc32_from_listing(")]
+        self.assertIn("glob.glob(", block)
+        self.assertIn(".part*.rar", block)
+
+    def test_AND_THE_LISTING_IS_READ_AS_UTF8(self):
+        """-scfr, or 350 files of misc do not match.
+
+        RAR writes a pipe in the system codepage by default, so a name carrying a character cp1252
+        cannot hold came back mangled and the comparison called the file missing. Same trap as
+        -scfl on the @list side, measured 2026-09-26 -- `f` is UTF-8 and `u` is UTF-16 -- but on
+        the reading side, where a wrong charset reads as an archive with holes in it.
+        """
+        src = io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8").read()
+        block = src[src.index("def listing_text("):src.index("def crc32_from_listing(")]
+        self.assertIn("-scfr", block)
+        self.assertIn("utf-8", block)
+
+    def test_it_runs_after_rar_t_and_stops_the_run_on_a_mismatch(self):
+        src = io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8").read()
+        block = src[src.index("checked = subprocess.run(test"):src.index("def main(")]
+        self.assertIn("crc32_complaint(", block)
+        self.assertIn("THE CRC32 CROSS-CHECK FAILED", block)
+        self.assertLess(block.index("crc32_complaint("), block.index("return 2"))
+
+
 class TheArchiveCarriesItsOwnFixityRecords(unittest.TestCase):
     r"""Without this a restored unit could be checked against SHA-256 and nothing else.
 
@@ -535,6 +737,26 @@ class EveryDecisionOfTheOwnerIsInTheCommand(unittest.TestCase):
         self.assertIn("<--out>" + chr(92) + "misc-run.log", doc)
         self.assertIn("<--out>" + chr(92) + "misc-run.err", doc)
         self.assertNotIn("mirrorPackedWork" + chr(92) + "misc-run", doc)
+
+    def test_THE_TWO_LEVELS_OF_CHECKING_ARE_WRITTEN_DOWN(self):
+        """Because in twenty years the module docstring is the whole manual.
+
+        Measured against misc on 2026-10-05: `rar l` and `rar lt` need no dictionary and no
+        decompression, and `lt` yields the CRC32 of every file out of the archive headers plus the
+        parameters it was packed with. `rar t` decompresses every byte, took 7 minutes and 3.8 GB,
+        and REFUSES without -mdx6g.
+
+        THE CHEAP LEVEL IS WHY THE MANIFESTS HAD TO GO IN. `lt`'s CRC32 can be held against the
+        .sfv packed inside the unit -- a list we built independently from the files themselves --
+        and that comparison reads no compressed data at all. Without the manifests there would be
+        nothing for those CRCs to be checked against.
+        """
+        doc = TOOL.__doc__
+        self.assertIn("rar lt", doc)
+        self.assertIn("CRC32", doc)
+        self.assertIn("rar t -mdx6g", doc)
+        self.assertIn("rar rc", doc)
+        self.assertIn("A SINGLE VOLUME CANNOT BE TESTED ON ITS OWN", doc)
 
 
 class TheVolumeSizeFitsTheMedium(unittest.TestCase):
@@ -902,9 +1124,46 @@ class NoPasswordAndNothingToLose(unittest.TestCase):
         self.assertIsNotNone(TOOL.check_password("A" * 64 + " "))
         self.assertIsNotNone(TOOL.check_password(" " + "A" * 64))
 
+    def test_THE_TEST_COMMAND_CARRIES_mdx_OR_IT_READS_NOTHING(self):
+        """At 6 GB, `rar t` refuses from the command line unless told the dictionary is allowed.
+
+            Ein 6 GB grosses Woerterbuch ueberschreitet die Obergrenze von 4 GB und benoetigt mehr
+            als 6 GB Speicher zum Entpacken. Verwenden Sie die Schalter -md6g oder -mdx6g, um das
+            Entpacken dennoch durchzufuehren.
+
+        AND IT LOOKED LIKE SUCCESS ON THE FIRST REAL RUN. `rar t` tested the five .rev files, which
+        carry no compressed stream, printed OK five times, then said "Keine Dateien zum Entpacken"
+        and exited 2 -- so 98 GB of content was never read. A check that passes over the thing it
+        was meant to check is worse than no check, which is why this case asserts the switch is
+        built rather than asserting that some test passed.
+
+        -mdx AND NOT -md, because rar.txt says -mdx applies only when unpacking: it cannot change
+        what a later `rar a` writes, even by accident.
+        """
+        src = io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8").read()
+        block = src[src.index('test = ([rar, "t"]'):src.index('say("  testing')]
+        self.assertIn('"-mdx" + unit_options.dictionary', block)
+        self.assertNotIn('"-md" + unit_options.dictionary', block)
+
+    def test_AND_THE_FIRST_VOLUME_IS_FOUND_NOT_SPELLED(self):
+        """RAR uses as many digits as the volume count needs, and this guessed two.
+
+        The first real run packed misc into 468 volumes, so RAR wrote `misc.part001.rar`; `rar t`
+        was pointed at `misc.part01.rar`, could not open it, and the tool announced THE ARCHIVE
+        DOES NOT TEST CLEAN for a set that was intact. An alarm about the wrong thing is worse
+        than no alarm, because the next one is believed less.
+        """
+        src = io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8").read()
+        block = src[src.index("def first_volume("):src.index("def check_password(")]
+        self.assertIn("glob.glob(", block)
+        self.assertNotIn('".part01.rar"', block)
+
     def test_the_first_volume_is_what_gets_tested(self):
+        """THREE DIGITS, not two: every unit in the plan needs them. The smallest, misc, came out
+        at 468 volumes, and nothing here is small enough for RAR to choose fewer. This is the
+        fallback for a set that is not on disk yet -- `plan()` prints the name before packing."""
         self.assertEqual(TOOL.first_volume(os.path.join("OUT", "vendors", "vendors.rar")),
-                         os.path.join("OUT", "vendors", "vendors.part01.rar"))
+                         os.path.join("OUT", "vendors", "vendors.part001.rar"))
 
     def test_the_secret_is_masked_wherever_a_command_is_printed(self):
         shown = TOOL.hide_password(["rar", "a", "-hp" + "S" * 64, "x.rar"])
