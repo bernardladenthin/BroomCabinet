@@ -904,11 +904,20 @@ def free_memory():
 
 
 def memory_estimate(dictionary):
-    """-> rar.txt's rough figure for packing with `dictionary`, in bytes, or None.
+    r"""-> rar.txt's rough figure for packing with `dictionary`, in bytes, or None.
 
     TWO POINTS AND A STRAIGHT LINE BETWEEN THEM, which is all the documentation offers: about
     7 GB for a 1 GB dictionary and about 96 GB for 64 GB, both called "grob geschaetzt" there.
-    That is roughly 1.4 GB of memory per GB of dictionary, so 4g lands near 11 GB.
+    That is roughly 1.4 GB of memory per GB of dictionary, so 4g lands near 12 GB.
+
+    AND MEASURED AT 10.00 GB FOR 4g, on 2026-10-06, during the workstations run -- so the line is
+    slightly high rather than wrong, which is as much as two rough points can be asked for.
+
+    WHAT THE SAME MEASUREMENT SETTLED ABOUT *WHEN*: Rar.exe held 0.19 GB while `-oi1` pre-hashed
+    420 307 files and 10.00 GB once compression started. The dictionary is allocated when the
+    first block is compressed, not at launch -- so a run that looks harmless in its first minutes
+    is not yet the run whose memory matters, and the figure to watch is the one after the first
+    volume appears.
     """
     want = parse_size(dictionary) if dictionary else 0
     if not want:

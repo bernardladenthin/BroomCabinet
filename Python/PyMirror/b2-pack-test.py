@@ -1473,6 +1473,29 @@ class TheOtherResourceAPackCanRunOutOf(unittest.TestCase):
         self.assertGreater(near, 10.0)
         self.assertLess(near, 14.0)
 
+    def test_THE_ESTIMATE_IS_WITHIN_REACH_OF_THE_ONE_MEASUREMENT(self):
+        r"""4g was measured at 10.00 GB during the workstations run of 2026-10-06, against an
+        interpolation of 12.07. Slightly high rather than wrong, which is as much as a line
+        between two figures the vendor calls rough can be asked for.
+
+        The point of pinning it is the other direction: if a later change made the estimate read
+        3 GB or 40 GB for 4g, the plan would be printing a number with no relation to what RAR
+        actually takes, and a reader would size a machine by it.
+        """
+        got = TOOL.memory_estimate("4g") / float(1 << 30)
+        self.assertGreater(got, 8.0)
+        self.assertLess(got, 16.0)
+
+    def test_AND_IT_RECORDS_WHEN_THE_MEMORY_IS_TAKEN(self):
+        r"""0.19 GB while -oi1 pre-hashed 420 307 files, 10.00 GB once compression began. A run
+        that looks harmless in its first minutes is not yet the run whose memory matters, and
+        anyone watching the wrong minute concludes the dictionary costs nothing."""
+        doc = TOOL.memory_estimate.__doc__
+        self.assertIn("0.19 GB", doc)
+        self.assertIn("10.00 GB", doc)
+        flat = " ".join(doc.split())
+        self.assertIn("allocated when the first block is compressed", flat)
+
     def test_the_estimate_follows_rar_txts_two_points(self):
         """1 GB -> about 7, 64 GB -> about 96, which is the line's definition."""
         self.assertAlmostEqual(TOOL.memory_estimate("1g") / float(1 << 30), 7.0, places=1)
