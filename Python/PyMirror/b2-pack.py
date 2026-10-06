@@ -273,12 +273,16 @@ VERIFY_AGAINST_YOUR_RAR = {
                "TWO OF THEM ARE NO LONGER DOCUMENTED: `rar -?` in 7.23 lists neither -ma nor -sv, "
                "yet -ma5 is accepted while -ma4 and -ma7 both answer `Unbekannte Option` -- so "
                "RAR 5.0 is not an old format to be escaped, it is the ONLY format this version "
-               "writes. -sv is accepted too and is no longer passed, because it bounded the solid "
-               "block to one 199 MiB volume and made the 6 GB dictionary pointless. "
+               "writes. -sv is accepted too and is NOT passed, because measurement on 2026-10-06 "
+               "showed it would be a no-op: plain -s is byte-for-byte identical to -s=v, so the "
+               "solid stream already resets at every volume boundary. The window is therefore the "
+               "volume, which is why the dictionary came down to 4g and why -oi1 does the "
+               "deduplication the dictionary was believed to be doing. "
                "The one thing no measurement can settle is whether a restore works twenty years "
                "from now. A dictionary above 4 GB needs WinRAR 7.0 or newer to unpack; on the "
-               "command line that is a refusal unless -mdx is passed, and in the GUI it is a "
-               "dialog asking whether to continue.",
+               "command line that is a refusal and in the GUI a dialog -- measured at 5 GiB of "
+               "input, `rar t` answers OK on -md4g and exits 3 on -md6g, which is why 4g is the "
+               "ceiling.",
 }
 
 
