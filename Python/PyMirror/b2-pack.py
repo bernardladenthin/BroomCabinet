@@ -104,16 +104,19 @@ doing its work during a repair.
 """
 import argparse
 import collections
+import filecmp
 import glob
 import io
 import math
 import os
 import re
+import shutil
 import subprocess
 import sys
 
-from common import (BOOKKEEPING_FILES, INDEX_FILE, MIRROR_ROOT, SFV_FILE, find_tool, human,
-                    parse_size, read_index, read_sfv, relative_to, say, split_archive)
+from common import (BOOKKEEPING_FILES, INDEX_FILE, MIRROR_ROOT, SFV_FILE, exists, find_tool,
+                    human, long_path, parse_size, read_index, read_sfv, relative_to, say,
+                    split_archive)
 
 # THE VOLUME SIZE IS THE OWNER'S AND IT IS 199 MiB, MEASURED RATHER THAN RECALLED. It was
 # 24 200 000 000 bytes until 2026-10-04, then 995 000 000 for a few hours, and that middle figure
@@ -854,6 +857,48 @@ def rows_for(unit, root, cache=None):
 RAR_CANDIDATES = (r"C:\Program Files\WinRAR\Rar.exe", "rar", "Rar.exe")
 
 
+def place_index_beside(step, report=say):
+    r"""Copy the unit's own index CSV next to its volumes. -> the destination, or None.
+
+    WHY IT IS COPIED AND NOT MOVED. The work directory's copy is what the NEXT unit's index
+    archive is built from -- `rar a ... *.index.csv` over all ten -- so taking it away would
+    quietly empty that archive. Both copies exist on purpose.
+
+    AND WHY IT IS NOT LEFT PACKED. The CSV is already inside the archive, as the last argument of
+    the pack command, so a unit describes itself. But reading it there costs unpacking a 101 GB
+    set, and the whole point of the file is to answer "what is in misc" without fetching misc. The
+    owner's instruction on 2026-10-06: upload it beside the volumes, unpacked, every time. 52 MB
+    against 101 GB, readable in a browser, and it carries archive, path, size and sha256 for every
+    file -- enough to verify any single extracted file afterwards.
+
+    IT NEVER OVERWRITES. A destination that is already there and identical is reported and left;
+    one that differs is a REFUSAL, because two different indexes for one archive means one of
+    them describes something else and the tool cannot tell which.
+    """
+    source = step.get("index_path")
+    if not source or not exists(source):
+        return None
+    folder = os.path.dirname(os.path.dirname(step["archive"]))
+    target = os.path.join(folder, os.path.basename(source))
+    if exists(target):
+        if filecmp.cmp(long_path(source), long_path(target), shallow=False):
+            report("  the index is already beside the volumes: %s" % target)
+            return target
+        report("  REFUSING to replace a DIFFERENT index already at %s" % target)
+        return None
+    try:
+        shutil.copy2(long_path(source), long_path(target))
+    except OSError as problem:
+        report("  cannot place the index beside the volumes: %s" % problem)
+        return None
+    if not filecmp.cmp(long_path(source), long_path(target), shallow=False):
+        report("  the copied index does not match its source -- %s" % target)
+        return None
+    report("  index placed beside the volumes: %s (%s)"
+           % (target, human(os.path.getsize(long_path(target)))))
+    return target
+
+
 def free_memory():
     r"""-> free physical bytes, or None where it cannot be asked.
 
@@ -1454,6 +1499,10 @@ def execute(steps, rar, password):
             refs = getattr(crc32_complaint, "references", 0)
             say("  CRC32 and file count agree with the .sfv%s"
                 % (" (%d -oi1 reference(s) judged through their targets)" % refs if refs else ""))
+            # AFTER THE CHECKS AND NOT BEFORE. An index placed beside volumes that then failed
+            # their cross-check would describe an archive nobody should use, and the file is the
+            # one thing a reader trusts without opening the archive.
+            place_index_beside(step)
         if checked.returncode != 0:
             say("  THE ARCHIVE DOES NOT TEST CLEAN (rar t exited %d) -- stopping before the next "
                 "unit." % checked.returncode)

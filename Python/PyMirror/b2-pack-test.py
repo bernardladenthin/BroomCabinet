@@ -31,6 +31,7 @@ almost matches a subtree, and a file with no extension.
 import importlib.util
 import io
 import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -1541,6 +1542,103 @@ class TheOtherResourceAPackCanRunOutOf(unittest.TestCase):
         """So a short-memory run costs nothing, not even the search for Rar.exe."""
         text = self.source()
         self.assertLess(text.index("short = memory_complaint("), text.index("rar = find_rar()"))
+
+
+class TheIndexGoesBesideTheVolumes(unittest.TestCase):
+    r"""The owner's instruction on 2026-10-06: after every unit, put its index CSV next to it.
+
+    WHY IT IS WORTH A COPY. The CSV is already INSIDE the archive -- it is the last argument of
+    the pack command, so a unit describes itself -- but reading it there costs unpacking a 101 GB
+    set. Beside the volumes it answers "what is in misc" for 52 MB, in a browser, without RAR,
+    and it carries archive, path, size and sha256 for every file: 341 970 lines for misc.
+
+    AND A COPY RATHER THAN A MOVE, because the work directory's copy is what the index archive is
+    built from -- `rar a ... *.index.csv` over all ten units -- and taking it away would quietly
+    produce an empty one.
+    """
+
+    def setUp(self):
+        self.base = tempfile.mkdtemp(prefix="b2p-idx-")
+        self.work = os.path.join(self.base, "work")
+        self.out = os.path.join(self.base, "out", "unit")
+        os.makedirs(self.work)
+        os.makedirs(self.out)
+        self.source = os.path.join(self.work, "unit.index.csv")
+        self.write(self.source, "archive,path,size,sha256\narch,a.bff,12,ab\n")
+        self.step = {"index_path": self.source,
+                     "archive": os.path.join(self.out, "unit.rar")}
+
+    def tearDown(self):
+        shutil.rmtree(self.base, ignore_errors=True)
+
+    def write(self, path, text):
+        with io.open(path, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
+
+    def read(self, path):
+        with io.open(path, encoding="utf-8") as handle:
+            return handle.read()
+
+    def target(self):
+        return os.path.join(os.path.dirname(self.out), "unit.index.csv")
+
+    def source_text(self):
+        with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
+            return handle.read()
+
+    def test_it_lands_beside_the_volume_directory_and_not_inside_it(self):
+        r"""One level up from the volumes: the unit folder holds the archive's own directory, and
+        the index belongs with the logs, where a reader looks first."""
+        got = TOOL.place_index_beside(self.step, report=lambda *_a: None)
+        self.assertEqual(got, self.target())
+        self.assertTrue(os.path.exists(self.target()))
+
+    def test_the_copy_is_byte_identical(self):
+        TOOL.place_index_beside(self.step, report=lambda *_a: None)
+        self.assertEqual(self.read(self.target()), self.read(self.source))
+
+    def test_THE_SOURCE_STAYS_WHERE_IT_IS(self):
+        r"""A move would empty the index archive, which is built from the work directory."""
+        TOOL.place_index_beside(self.step, report=lambda *_a: None)
+        self.assertTrue(os.path.exists(self.source))
+
+    def test_an_identical_copy_already_there_is_reported_and_left(self):
+        TOOL.place_index_beside(self.step, report=lambda *_a: None)
+        said = []
+        got = TOOL.place_index_beside(self.step, report=said.append)
+        self.assertEqual(got, self.target())
+        self.assertIn("already beside", " ".join(said))
+
+    def test_A_DIFFERENT_INDEX_ALREADY_THERE_IS_A_REFUSAL(self):
+        r"""Two different indexes for one archive means one of them describes something else, and
+        the tool cannot tell which -- so it must not pick."""
+        self.write(self.target(), "archive,path,size,sha256\nsomething,else.bff,1,ff\n")
+        said = []
+        got = TOOL.place_index_beside(self.step, report=said.append)
+        self.assertIsNone(got)
+        self.assertIn("REFUSING", " ".join(said))
+
+    def test_and_that_refusal_leaves_the_existing_file_untouched(self):
+        self.write(self.target(), "keep me\n")
+        TOOL.place_index_beside(self.step, report=lambda *_a: None)
+        self.assertEqual(self.read(self.target()), "keep me\n")
+
+    def test_a_missing_source_is_answered_and_not_raised(self):
+        os.remove(self.source)
+        self.assertIsNone(TOOL.place_index_beside(self.step, report=lambda *_a: None))
+
+    def test_a_step_without_an_index_is_answered_and_not_raised(self):
+        """The index archive's own step has no index of its own."""
+        self.assertIsNone(TOOL.place_index_beside({"archive": "x.rar"},
+                                                  report=lambda *_a: None))
+
+    def test_IT_HAPPENS_AFTER_THE_CHECKS_AND_NOT_BEFORE(self):
+        r"""An index placed beside volumes that then failed their cross-check would describe an
+        archive nobody should use -- and it is the one file a reader trusts without opening the
+        archive."""
+        text = self.source_text()
+        self.assertLess(text.index("CRC32 and file count agree"),
+                        text.index("place_index_beside(step)"))
 
 
 if __name__ == "__main__":
