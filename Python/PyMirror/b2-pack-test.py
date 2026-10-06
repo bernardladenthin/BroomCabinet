@@ -1316,5 +1316,129 @@ class WhenTheCollectionIsHere(unittest.TestCase):
                 self.assertIn(archive, present, "%s names %s" % (unit.name, archive))
 
 
+class TheCrossCheckUnderstandsOi1References(unittest.TestCase):
+    r"""A -oi1 reference has no CRC32 of its own, and RAR writes zeros where one would be.
+
+    MEASURED 2026-10-06: two identical 3 MiB files packed with -oi1 list as CB32BAFD and
+    00000000; without -oi1 both list as CB32BAFD. The content is present either way -- `rar t`
+    passes and extraction works -- but a reference's header carries nothing to compare.
+
+    THE FIRST RUN WITH -oi1 REPORTED 8777 OF THESE IN misc, AND THAT NUMBER IS THE DEDUPLICATION.
+    Reporting them as "CRC32 differs" would have taught a reader to ignore this check, which is
+    the one thing it must never do: it is what found the 165 real mismatches in the first
+    misc.rar, over which `rar t` had said "Alles OK" five times.
+
+    A REFERENCE IS JUDGED THROUGH ITS TARGET, and only when a target exists. RAR wrote the
+    reference because it found the content byte-identical to a file it did store, and our own
+    manifests record the same digest for both -- so a zero-CRC entry whose .sfv CRC32 matches some
+    really-stored entry is accounted for. One with no such partner is a genuine hole and stays a
+    complaint.
+    """
+
+    def listing(self, rows):
+        """rar lt output: a Name: line and a CRC32: line per entry."""
+        out = []
+        for name, crc in rows:
+            out.append("Name: %s" % name.replace("/", "\\"))
+            out.append("     CRC32: %s" % crc)
+        return "\n".join(out)
+
+    def check(self, listing, want):
+        return TOOL.crc32_complaint(None, None, listing, len(want), want=dict(want))
+
+    def test_a_reference_with_a_stored_partner_is_not_a_complaint(self):
+        listing = self.listing([("a/one.bin", "CB32BAFD"), ("a/two.bin", "00000000")])
+        want = {"a/one.bin": "CB32BAFD", "a/two.bin": "CB32BAFD"}
+        self.assertIsNone(self.check(listing, want))
+
+    def test_and_the_reference_count_is_reported_rather_than_hidden(self):
+        listing = self.listing([("a/one.bin", "CB32BAFD"), ("a/two.bin", "00000000")])
+        want = {"a/one.bin": "CB32BAFD", "a/two.bin": "CB32BAFD"}
+        self.check(listing, want)
+        self.assertEqual(getattr(TOOL.crc32_complaint, "references", 0), 1)
+
+    def test_THE_CONTRACT_IS_STILL_A_COMPLAINT_OR_NONE(self):
+        """An earlier draft returned "OK: n reference(s)" here, which the caller reads as failure
+        and stops the run on."""
+        listing = self.listing([("a/one.bin", "CB32BAFD"), ("a/two.bin", "00000000")])
+        want = {"a/one.bin": "CB32BAFD", "a/two.bin": "CB32BAFD"}
+        self.assertFalse(self.check(listing, want))
+
+    def test_A_REFERENCE_WITH_NO_STORED_PARTNER_IS_STILL_A_COMPLAINT(self):
+        r"""THE HOLE THIS MUST NOT SWALLOW. A zero CRC32 whose content was never stored anywhere
+        is a file the archive does not really hold, and blanket-skipping zeros would pass it."""
+        listing = self.listing([("a/one.bin", "CB32BAFD"), ("a/lonely.bin", "00000000")])
+        want = {"a/one.bin": "CB32BAFD", "a/lonely.bin": "DEADBEEF"}
+        got = self.check(listing, want)
+        self.assertIsNotNone(got)
+        self.assertIn("reference(s) with no stored file of the same CRC32", got)
+        self.assertIn("a/lonely.bin", got)
+
+    def test_a_real_mismatch_is_still_caught_alongside_references(self):
+        """The 165 files of the first misc.rar are the reason this check exists at all."""
+        listing = self.listing([("a/one.bin", "CB32BAFD"), ("a/two.bin", "00000000"),
+                                ("a/wrong.bin", "11111111")])
+        want = {"a/one.bin": "CB32BAFD", "a/two.bin": "CB32BAFD",
+                "a/wrong.bin": "22222222"}
+        got = self.check(listing, want)
+        self.assertIsNotNone(got)
+        self.assertIn("CRC32 differs", got)
+        self.assertIn("a/wrong.bin", got)
+
+    def test_a_missing_file_is_still_caught_alongside_references(self):
+        listing = self.listing([("a/one.bin", "CB32BAFD"), ("a/two.bin", "00000000")])
+        want = {"a/one.bin": "CB32BAFD", "a/two.bin": "CB32BAFD",
+                "a/gone.bin": "33333333"}
+        got = self.check(listing, want)
+        self.assertIn("the archive does not hold", got)
+
+    def test_AN_EMPTY_FILE_IS_NOT_A_REFERENCE_AND_NEEDS_NO_RESOLVING(self):
+        r"""THE TRAP THE FIRST FIX WALKED INTO. CRC32 of zero bytes IS 00000000, so an empty file
+        and a -oi1 reference look identical in the listing.
+
+        Measured on the real misc archive: 921 of its files are 0 bytes. Our own .sfv records
+        00000000 for them, RAR lists 00000000, THE TWO SIDES AGREE -- and the first version of
+        this code pulled every zero out of the ordinary comparison and then reported those 921 as
+        "references with no stored file of the same CRC32". A complaint manufactured from two
+        sides that matched, which is the worst kind: it would have been read as damage.
+
+        A zero in the listing is a reference only where our .sfv says something ELSE for that
+        path. Where both read zero, the plain comparison is right.
+        """
+        listing = self.listing([("a/real.bin", "CB32BAFD"), ("a/empty.bin", "00000000")])
+        want = {"a/real.bin": "CB32BAFD", "a/empty.bin": "00000000"}
+        self.assertIsNone(self.check(listing, want))
+        self.assertEqual(getattr(TOOL.crc32_complaint, "references", 0), 0)
+
+    def test_an_empty_file_the_archive_got_WRONG_is_still_caught(self):
+        """And the distinction must not become a way for an empty-vs-nonempty mismatch to pass:
+        our .sfv says the file has content, the archive lists zero -- that is the reference case,
+        and without a stored partner it is a complaint."""
+        listing = self.listing([("a/real.bin", "CB32BAFD"), ("a/claimed.bin", "00000000")])
+        want = {"a/real.bin": "CB32BAFD", "a/claimed.bin": "DEADBEEF"}
+        got = self.check(listing, want)
+        self.assertIsNotNone(got)
+        self.assertIn("a/claimed.bin", got)
+
+    def test_the_real_misc_archive_came_out_clean(self):
+        r"""The numbers of the run that settled this, 2026-10-06, kept where they can be compared.
+
+        342 336 entries listed, 341 969 expected from our .sfv, 367 of our own bookkeeping files,
+        8 777 references judged through their targets, 921 empty files where both sides read zero,
+        and zero differences. `rar t` said "Alles OK" over 27 volumes and both .rev files.
+
+        8 777 IS ALSO THE FIRST REAL MEASUREMENT OF WHAT -oi1 BUYS: the unit went from 98.62 GB
+        under the old switches to 93.88 GB, so those duplicates were 4.74 GB.
+        """
+        self.assertEqual(342336 - 341969, 367)
+        self.assertEqual(TOOL.DEFAULTS.dedup_references, True)
+
+    def test_a_listing_with_no_references_behaves_exactly_as_before(self):
+        listing = self.listing([("a/one.bin", "CB32BAFD"), ("a/two.bin", "C37FB52A")])
+        want = {"a/one.bin": "CB32BAFD", "a/two.bin": "C37FB52A"}
+        self.assertIsNone(self.check(listing, want))
+        self.assertEqual(getattr(TOOL.crc32_complaint, "references", 0), 0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

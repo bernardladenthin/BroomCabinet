@@ -1173,6 +1173,40 @@ def crc32_complaint(unit, root, listing_text, packed_rows, want=None):
     have = crc32_from_listing(listing_text)
     if want is None:
         want = crc32_expected(unit, root)
+
+    # A -oi1 REFERENCE CARRIES NO CRC32 AND RAR WRITES ZEROS IN ITS PLACE. Measured 2026-10-06:
+    # two identical 3 MiB files packed with -oi1 list as CB32BAFD and 00000000, and without -oi1
+    # both list as CB32BAFD. The content is present either way -- `rar t` passes and extraction
+    # works -- but the header of a reference has nothing to compare against.
+    #
+    # THE FIRST RUN WITH -oi1 REPORTED 8777 SUCH FILES IN misc AND THAT NUMBER IS THE DEDUPLICATION,
+    # not damage: 8777 byte-identical duplicates collapsed into references. Reporting them as
+    # "CRC32 differs" would teach a reader to ignore this check, which is the one thing it must
+    # never do -- it is what found the 165 real mismatches in the first misc.rar.
+    #
+    # A REFERENCE IS CORRECT IF ITS TARGET IS, and that is provable here rather than assumed: the
+    # reference exists only because RAR found the content byte-identical to a file it did store,
+    # and our own manifests independently record the same sha256 for both. So each zero-CRC entry
+    # is checked for having a partner -- a path whose .sfv CRC32 equals some entry the archive DID
+    # store with a real CRC. One without a partner is a genuine complaint and stays one.
+    # AN EMPTY FILE ALSO HAS CRC32 00000000, which is the trap this walked into on its first
+    # attempt. 921 files in misc are 0 bytes; RAR lists them as 00000000 and our own .sfv records
+    # 00000000, so the two AGREE and there is nothing to resolve. Treating every zero as a
+    # reference pulled them out of the ordinary comparison and then reported them as references
+    # with no target -- a complaint manufactured out of two sides that matched.
+    #
+    # So a zero in the LISTING is a reference only when our .sfv says something else for that
+    # path: that is the case where RAR had a CRC and chose not to write it. Where both sides read
+    # zero, the plain comparison is correct and handles it.
+    references = sorted(k for k in have
+                        if have[k] == "00000000" and want.get(k, "00000000") != "00000000")
+    stored_crcs = set(v for v in have.values() if v != "00000000")
+    orphan_refs = sorted(k for k in references if want.get(k) not in stored_crcs)
+    for name in references:
+        if name not in orphan_refs:
+            have.pop(name, None)           # judged through its target, not its own header
+            want.pop(name, None)
+
     differs = sorted(k for k in want if k in have and want[k] != have[k])
     missing = sorted(k for k in want if k not in have)
     ours = sorted(k for k in have if k not in want)
@@ -1183,11 +1217,22 @@ def crc32_complaint(unit, root, listing_text, packed_rows, want=None):
     if missing:
         problems.append("%d file(s) in the .sfv that the archive does not hold, e.g. %s"
                         % (len(missing), missing[0]))
+    if orphan_refs:
+        problems.append("%d reference(s) with no stored file of the same CRC32, e.g. %s"
+                        % (len(orphan_refs), orphan_refs[0]))
     if not problems:
+        # THE CONTRACT IS "a complaint, or None", AND A REFERENCE COUNT IS NOT A COMPLAINT. An
+        # earlier draft of this returned "OK: 8777 reference(s)" here, which the caller would have
+        # read as a failure and stopped the run on -- the function's one job is to be falsy when
+        # the unit is sound. The count is worth saying out loud, so it is attached for a caller
+        # that wants it rather than smuggled into the complaint.
+        crc32_complaint.references = len(references)
         return None
+    crc32_complaint.references = len(references)
     return ("; ".join(problems)
-            + " [%d listed, %d in the .sfv, %d packed rows, %d of our own records]"
-            % (len(have), len(want), packed_rows, len(ours)))
+            + " [%d listed, %d in the .sfv, %d packed rows, %d of our own records, "
+              "%d -oi1 reference(s)]"
+            % (len(have), len(want), packed_rows, len(ours), len(references)))
 
 
 def first_volume(archive):
@@ -1299,7 +1344,9 @@ def execute(steps, rar, password):
             if complaint:
                 say("  THE CRC32 CROSS-CHECK FAILED: %s" % complaint)
                 return 2
-            say("  CRC32 and file count agree with the .sfv")
+            refs = getattr(crc32_complaint, "references", 0)
+            say("  CRC32 and file count agree with the .sfv%s"
+                % (" (%d -oi1 reference(s) judged through their targets)" % refs if refs else ""))
         if checked.returncode != 0:
             say("  THE ARCHIVE DOES NOT TEST CLEAN (rar t exited %d) -- stopping before the next "
                 "unit." % checked.returncode)
