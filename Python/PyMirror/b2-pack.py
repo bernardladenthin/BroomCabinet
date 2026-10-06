@@ -136,25 +136,77 @@ from common import (BOOKKEEPING_FILES, INDEX_FILE, MIRROR_ROOT, SFV_FILE, find_t
 #   older snapshot, the other was downloaded and hashed locally (`source=download`). Neither came
 #   from B2. The feature exists; this uploader does not use it.
 #
-# 199 MiB RATHER THAN 200, because a .rev file is slightly LARGER than the volumes it protects --
-# rar.txt says so and the 2026-09-26 measurement showed it (1 048 627 against 1 048 576). It also
-# carries a checksum per protected volume, and ibm-aix has 3 400 of them. One MiB of headroom
-# covers both and keeps every .rev under the cutoff as well.
+# AND ON 2026-10-06 THE 200 MiB CUTOFF WAS IDENTIFIED AND THEN DELIBERATELY ABANDONED. The
+# boundary measured above is Cyberduck's: its own documentation says "Files larger than 200MB are
+# split into 100MB chunks and uploaded with multiple connections", which is exactly the
+# `100000000*250,4758990` in the owner's snapshots. It is not documented as configurable. So
+# staying under it was never a property of B2 -- whose single-request limit really is 5 GB -- but
+# of one uploader's fixed threshold.
 #
-# STILL M-DISC COMPATIBLE, WHICH IS ALL IT NEEDS TO BE: 119 volumes fill a 25 GB disc to 99.73 %
-# of the owner's own 99.5 % burn margin, 238 a 50 GB and 477 a 100 GB. The owner does not burn
-# them -- "ich brenne es nicht, es sollte nur kompatibel sein" -- so the disc is a property of the
-# size and not a plan the redundancy has to pay for. See the 5 / 10 / 15 rule on Options.
-VOLUME_BYTES = 199 * 1024 * 1024
+# WHAT MADE 199 MiB UNAFFORDABLE WAS THE SOLID BLOCK, not the cutoff. Measured 2026-10-06 at the
+# production volume size: plain `-s` is byte-for-byte identical to `-s=v`, so the solid stream
+# RESETS AT EVERY VOLUME BOUNDARY (rar.txt says so under -s=v, "vorausgesetzt, es wurden nach dem
+# vorangegangenen Zurücksetzen genügend Daten gepackt" -- 199 MiB counts as enough). The effective
+# compression window was therefore 199 MiB and never the 6 GB dictionary:
+#
+#   -s      630 364 279 B   4 volumes      the production setting
+#   -s=v    630 364 279 B   4 volumes      identical, which is the proof
+#   -s=d    525 383 636 B   3 volumes      100.1 MiB smaller, one duplicate collapsed
+#
+# So 521.3 GB of byte-identical in-unit duplicates were being stored in full. Removing `-sv` on
+# 2026-10-05 "so the dictionary would mean something" achieved nothing: the default already did
+# what -sv does.
+#
+# 3 557 000 000 BYTES, AND EVERY DIGIT OF IT IS A CONSTRAINT:
+#
+#   FAT32           4 294 967 295 B is the hard maximum file size (2^32 - 1, from the 4-byte
+#                   length field in the directory entry). 738 MB of headroom, which also absorbs
+#                   a .rev being slightly larger than the volume it protects.
+#   a 4 GB stick    3.557e9 fits a nominal 4 GB device with room; 4e9 and 4 149 914 282 do not.
+#   EVERY M-DISC    SEVEN volumes on a 25 GB, FOURTEEN on a 50 GB, TWENTY-EIGHT on a 100 GB, and
+#                   all three land on 99.50 % of the RAW capacity -- under the owner's ceiling of
+#                   99.7 % and on his 99.5 % burn margin, with 120.5 MiB left on a 25 GB disc for
+#                   UDF's own structures (one to two MB for seven large files).
+#
+# 3 900 000 000 WAS THE FIRST ANSWER AND IT WASTED A DISC EVERY TWENTY-NINE. Six of those fill a
+# 25 GB disc to 93.5 %, leaving 1.5 GB unused per disc -- 261 GB across the 174 discs the
+# collection needs. Seven smaller volumes tile it almost exactly instead. The price is 1142
+# volumes rather than 1042 and a 3.56 GB solid block rather than 3.9 GB, which is nothing against
+# 261 GB of disc.
+#
+# THE CAPACITY FIGURE IS THE BD-R ONE AND THAT DISTINCTION MATTERS. A BD-RE reserves a spare area
+# for defect management and takes only 24 220 008 448 B -- the figure an ImgBurn user hit when he
+# expected 25 025 314 816 and came up 768 MiB short. M-Disc is write-once BD-R, which has no such
+# reservation. Both numbers are kept below so neither gets used for the other medium.
+#
+# WHAT IT COSTS ON B2: Cyberduck will upload each volume as ~39 parts of 100 MB, so B2 stores a
+# per-part SHA-1 and no whole-file digest. The owner accepted that -- "lediglich b2 ist dann nicht
+# optimal wegen sha, aber das ist nicht ganz so schlimm" -- and it is survivable because THIS
+# COLLECTION CARRIES ITS OWN FOUR MANIFESTS. B2's digest was a convenience; .sha256sum is the
+# authority, and PyB2Verify already rebuilds the ETag from parts for exactly this case.
+#
+# WHAT IT BUYS: 1142 volumes instead of ~19 500, a 3.56 GB solid window instead of 199 MiB, and
+# -rr1 becoming 35 MB per volume instead of 2 MiB -- the same percentage, eighteen times the
+# repair.
+VOLUME_BYTES = 3557000000
+# The owner's ceiling on how full a disc may be written. A disc filled to its last byte is one
+# that may not verify, and UDF needs room for its own descriptors on top of the payload.
+M_DISC_MAX_FILL = 0.997
 BD_RE_BYTES = 24220008448
 M_DISC_BD_R_BYTES = 25025314816
 # The owner's burn margins for M-Disc, as raw bytes at 99.5 % of capacity. A disc written to its
 # last byte is a disc that may not verify, so the volume size is checked against these and not
 # against the figures above.
 M_DISC_995 = {25: 24899485696, 50: 49800019968, 100: 99600039936}
-# How many volumes fill a 25 GB M-Disc inside that margin. 119 at 199 MiB, where it was 1 when a
-# volume was 24.2 GB -- which is why the plan counts files and derives discs, not the other way.
+# How many volumes fill a 25 GB M-Disc inside that margin. SIX at 3.9e9, where it was 119 at
+# 199 MiB and 1 when a volume was 24.2 GB -- which is why the plan counts files and derives discs,
+# not the other way. Six also changes what the .rev budget can promise: at 119 per disc, no
+# plausible number of .rev files could replace one lost disc; at six, a 3 % budget covers five.
 PER_M_DISC = M_DISC_995[25] // VOLUME_BYTES
+# FAT32's maximum file size, 2^32 - 1, from the 4-byte length field in a directory entry. Asserted
+# rather than trusted: a volume above it cannot be put on the kind of cheap stick that is the
+# cheapest off-site copy there is, and the failure would only show up at the moment of copying.
+FAT32_MAX_BYTES = 4 * 1024 ** 3 - 1
 
 INDEX_DIR = "index"
 INDEX_SUFFIX = ".index.csv"
@@ -239,8 +291,9 @@ class Options(object):
     """
 
     FIELDS = ("archive_format", "method", "dictionary", "solid", "solid_per_volume",
-              "volume_bytes", "recovery_record", "recovery_volumes_small",
-              "recovery_volumes_medium", "recovery_volumes_large", "lock", "encrypt_headers",
+              "volume_bytes", "dedup_references", "recovery_record", "recovery_percent",
+              "recovery_volumes_floor",
+              "lock", "encrypt_headers",
               "extra")
 
     def __init__(self, **kw):
@@ -272,18 +325,42 @@ class Options(object):
     # defence, not the first: every volume carries its own 1 % record, every volume exists both
     # locally and on B2, and a .rev is for the case where both of those have failed on the same
     # part.
-    SMALL_VOLUMES = 1200
-    MEDIUM_VOLUMES = 3000
 
     def recovery_volumes(self, volumes):
-        """-> how many .rev files this unit gets, for a set of `volumes` volumes."""
+        r"""-> how many .rev files this unit gets, for a set of `volumes` volumes.
+
+        A PERCENTAGE, BECAUSE THE FIXED LADDER WAS INVERTED. 5 of 703 volumes is 0.71 % and 15 of
+        4087 is 0.37 %: the unit with six times the volumes, and therefore six times the exposure
+        to independent loss, got half the relative protection. RARLAB's own default for `-rv` is
+        10 % (rar.txt: "Wird der Parameter <N> nicht angegeben, wird er auf 10% gesetzt"), so the
+        ladder was running the largest unit at a small fraction of the vendor default.
+
+        AND THERE IS NO PARTIAL CREDIT. N recovery volumes restore any N missing volumes and N+1
+        losses restore nothing at all, so the number is not a dial that degrades gracefully -- it
+        is a threshold, and it should scale with the set it guards.
+
+        2 %, AND THE "COVERS A WHOLE M-DISC" ARGUMENT FOR 3 % WAS WRONG. It counted the
+        collection's 1042 volumes as one set; .rev files protect ONE UNIT. At 3.9 GB a unit is 37
+        to 217 volumes, so it spans several discs and a disc carries volumes from more than one
+        unit -- no per-unit .rev budget can promise to replace a disc. What is left is the plain
+        question of how many volumes of one unit may go missing, and 2 % answers it at 78 GB
+        across the collection against 121 GB for 3 %.
+        
+        TWO PER CENT IS DEFENSIBLE BECAUSE .rev IS THE FOURTH LINE, not the first. Every volume
+        exists locally, on B2 (whose 17+3 Reed-Solomon vaults are rated at eleven nines) and on
+        M-Disc, and each volume carries its own 1 % record for damage inside it. A .rev is for the
+        case where all of that has failed on the same volume.
+        
+        THE FLOOR IS 2 AND WAS 5, which only became wrong when the volumes grew. At 199 MiB a
+        floor of 5 was 1 GB on any unit; at 3.9 GB it is 19.5 GB, and on the 144 GB misc unit that
+        would have been 13.5 % -- a floor quietly overriding the percentage it was meant to
+        backstop. Two keeps the promise that every unit, however small, can lose a volume and a
+        spare.
+        """
         if volumes is None or not self.volume_bytes:
             return 0
-        if volumes < self.SMALL_VOLUMES:
-            return self.recovery_volumes_small
-        if volumes < self.MEDIUM_VOLUMES:
-            return self.recovery_volumes_medium
-        return self.recovery_volumes_large
+        from_percent = int(volumes * self.recovery_percent / 100.0)
+        return max(from_percent, self.recovery_volumes_floor)
 
     def switches(self, volumes=None):
         """-> the switch list, in a fixed order so two runs produce the same command.
@@ -305,8 +382,30 @@ class Options(object):
             out.append("-md%s" % self.dictionary)
             if self.solid:
                 out.append("-s")
+                # -sv IS NEVER PASSED AND THE FIELD IS KEPT ONLY SO A UNIT COULD ASK. Measured
+                # 2026-10-06: plain `-s` is byte-for-byte identical to `-s=v`, so the stream
+                # already resets at every volume. -sv would be a no-op with a misleading name.
                 if self.solid_per_volume:
                     out.append("-sv")
+            if self.dedup_references:
+                # -oi1 STORES A BYTE-IDENTICAL FILE ONCE AND THE REST AS REFERENCES, and it is the
+                # switch that actually does what the 6 GB dictionary was believed to be doing.
+                # Measured 2026-10-06 on 600 MiB with a duplicate 500 MiB behind its twin:
+                #
+                #   -s -md6g           630 364 797 B   4 volumes
+                #   -s -oi1 -md256m    525 300 860 B   3 volumes
+                #   -s -oi1 -md4g      525 300 860 B   3 volumes   identical to 256m
+                #
+                # The dictionary makes NO difference to it, because references never go through
+                # the match finder -- so it reaches across volume boundaries that the solid reset
+                # closes. Aimed at the 521.3 GB of byte-identical duplicates inside units.
+                #
+                # WHAT IT COSTS, AND rar.txt NAMES IT: the duplicates were accidental redundancy.
+                # After -oi1 the volume holding the single stored copy carries every reference to
+                # it, and losing that volume loses them all. That is the reason the .rev budget
+                # moved to a percentage in the same change -- Reed-Solomon over the whole set is
+                # better placed than redundant copies of whichever files happened to repeat.
+                out.append("-oi1")
         # No volume split for the index archive: it is small and is meant to be fetched whole.
         if self.volume_bytes:
             out.append("-v%db" % self.volume_bytes)
@@ -370,7 +469,21 @@ DEFAULTS = Options(
     # geschätzt". So 6 GB lies somewhere in 9 to 42 GB and the documentation will not narrow it.
     # The machine has 63 GB.
     method=5,
-    dictionary="6g",
+    # 4g AND NOT 6g, SETTLED BY MEASUREMENT ON 2026-10-06 at 5 GiB of input (small inputs prove
+    # nothing here: RAR clamps the dictionary down to the total input size, so a 40 MB test records
+    # a tiny dictionary for every request and all of them pass):
+    #
+    #   -md4g   rar t without -mdx:  OK
+    #   -md6g   rar t without -mdx:  exit 3
+    #
+    # The archive stays RAR 5.0 either way -- there is no RAR 7 format, `-ma7` answers "Unbekannte
+    # Option" -- but above 4 GB it carries a minimum-version requirement, and on the COMMAND LINE
+    # that is a refusal rather than the GUI's dialog. This collection is meant to be read in
+    # decades, by whatever tool is at hand, so the ceiling is where the refusal stops.
+    #
+    # AND IT NOW MATCHES THE SOLID BLOCK EXACTLY. The block is the volume, 3.9 GB, so a dictionary
+    # above 4 GB could never be filled; the old 6g was unreachable twice over.
+    dictionary="4g",
     # AND EVERY UNIT USES THESE, which is the owner's instruction -- "Ich will es einheitlich für
     # alle archive" -- and a measurement turned it from a simplification into a correction.
     #
@@ -410,6 +523,7 @@ DEFAULTS = Options(
     # Reparaturwahrscheinlichkeit bei Archivbeschädigungen".
     solid_per_volume=False,
     volume_bytes=VOLUME_BYTES,
+    dedup_references=True,
     # 1 %, AND THE DIVISION OF LABOUR IS THE WHOLE ARGUMENT. -rr repairs damage INSIDE a volume;
     # .rev replaces one that is gone. At 199 MiB, 1 % is about 2 MiB per volume, and rar.txt says
     # a recovery record repairs slightly less than its own size in contiguous damage -- so 2 MiB
@@ -420,9 +534,10 @@ DEFAULTS = Options(
     # down: at 24.2 GB a volume was precious and worth defending in place; at 199 MiB it is
     # cheaper to replace than to patch. 1 % of 4 061 GB is 41 GB against 406 GB at 10 %.
     recovery_record="1",
-    recovery_volumes_small=5,
-    recovery_volumes_medium=10,
-    recovery_volumes_large=15,
+    # 2 %, replacing the 5 / 10 / 15 ladder, with a floor of 2. See recovery_volumes() for why a
+    # percentage, why two per cent, and why the floor had to come down when the volumes grew.
+    recovery_percent=2,
+    recovery_volumes_floor=2,
     lock=True,
     # NO ENCRYPTION. The owner's decision on 2026-10-04: "da es öffentliche Daten sind brauche ich
     # kein Passwort / Verschlüsselung, lediglich ECC und recovery archive". Every archive here was
@@ -1207,7 +1322,14 @@ def main(argv=None):
     ap.add_argument("--no-empty-dirs", action="store_true",
                     help="skip the walk that finds directories holding nothing. Faster, and it "
                          "DROPS 281 of them -- only for a quick look at the commands")
-    ap.add_argument("--execute", action="store_true", help="actually pack (needs --password-file)")
+    # THE HELP SAID "needs --password-file" UNCONDITIONALLY AND THAT WAS NOT TRUE. No unit sets
+    # encrypt_headers, because the collection is public material fetched from public hosts, so the
+    # demand never fires -- and a reader who believed the old text would conclude a password had
+    # to be invented for a 144 GB run that asks for none. The condition lives at the refusal,
+    # where it is driven by the units; the help now says the same thing the code does.
+    ap.add_argument("--execute", action="store_true",
+                    help="actually pack. A unit that asks for encrypted headers also needs "
+                         "--password-file; none does today")
     ap.add_argument("--password-file", help="first line is the password; never printed")
     args = ap.parse_args(argv)
 

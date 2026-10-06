@@ -327,8 +327,8 @@ class TheOptionsBuilder(unittest.TestCase):
         of the 5 / 10 / 15 rule, which 30 did not.
         """
         self.assertEqual(TOOL.DEFAULTS.switches(3400),
-                         ["-ma5", "-m5", "-md6g", "-s",
-                          "-v%db" % TOOL.VOLUME_BYTES, "-rr1", "-rv15", "-k", "-scfl"])
+                         ["-ma5", "-m5", "-md4g", "-s", "-oi1",
+                          "-v%db" % TOOL.VOLUME_BYTES, "-rr1", "-rv68", "-k", "-scfl"])
 
     def test_THE_CHARSET_IS_F_AND_NOT_U(self):
         """U is UTF-16. On a UTF-8 list file `-scul` stored NONE of five non-ASCII names.
@@ -380,39 +380,69 @@ class TheOptionsBuilder(unittest.TestCase):
         both apply from one command, and two deleted volumes were restored from two .rev."""
         switches = TOOL.DEFAULTS.switches(30)
         self.assertIn("-rr1", switches)
-        self.assertIn("-rv5", switches)
+        self.assertIn("-rv2", switches)      # the floor; see recovery_volumes()
 
-    def test_THE_RECOVERY_VOLUMES_FOLLOW_THE_OWNERS_5_10_15_RULE(self):
-        """Counts and not a percentage, because `-rv` takes a count.
+    def test_THE_RECOVERY_VOLUMES_ARE_A_PERCENTAGE_WITH_A_FLOOR(self):
+        r"""2 % of the volume count, never fewer than 2. A count is emitted, because -rv takes one.
 
-        The owner, 2026-10-05: "für kleine reichen 5, mittel 10 und das ganz große hat 15 recovery
-        archive". The thresholds are in volumes -- what a .rev actually replaces -- and they fall
-        between the real units rather than being round for their own sake:
+        THIS IS THE THIRD ANSWER AND THE SECOND TIME IT HAS BEEN A PERCENTAGE. A 2 % rule was
+        replaced on 2026-10-05 by a 5 / 10 / 15 ladder on the owner's words -- "fuer kleine reichen
+        5, mittel 10 und das ganz grosse hat 15 recovery archive" -- and the ladder was reverted on
+        2026-10-06 for a reason that was true the whole time: IT WAS INVERTED. 5 of 703 volumes is
+        0.71 %, 15 of 4087 is 0.37 %, so the unit with six times the volumes and six times the
+        exposure got half the relative cover. The intuition was about absolute counts; the risk
+        scales with the set.
 
-            small   < 1 200   misc 698, oldskool 722, workstations 820, aix-opensource 1 007
-            medium  < 3 000   aix-support 1 561, bitsavers-software 1 705, ibm-pc 2 568
-            large   >=3 000   vendors 3 090, ibm-aix 3 400, bitsavers-paper 4 087
+        RARLAB's own default for -rv is 10 % (rar.txt: "Wird der Parameter <N> nicht angegeben,
+        wird er auf 10% gesetzt"), so the ladder ran the largest unit at a twenty-seventh of the
+        vendor default while reading like a considered choice.
 
-        IT IS LESS REDUNDANCY THAN THE 2 % IT REPLACED and that is the decision, not an oversight:
-        95 .rev in all against 398, 19.8 GB against 83, and for bitsavers-paper 15 replaceable
-        volumes out of 4 087 -- 0.37 % rather than 2 %. The owner's reason is that a .rev is the
-        THIRD line: every volume carries its own 1 % record, every volume exists locally AND on B2,
-        and a .rev answers the case where both have failed on the same part.
+        2 % AND NOT 3 %, the owner on 2026-10-06: "waeren hier nicht 2% besser? auf lange sicht?
+        das ist massiv". At 3.557 GB a .rev file is 3.56 GB, so the percentage is expensive in
+        absolute terms -- 78 GB across the collection at 2 % against 121 GB at 3 %. And a .rev is
+        the FOURTH line: every volume carries its own 1 % record for damage inside it, and exists
+        locally, on B2 and on M-Disc.
+
+        THE "IT COVERS A WHOLE M-DISC" ARGUMENT FOR 3 % WAS WRONG AND IS RECORDED AS WRONG. It
+        counted the collection's volumes as one set, but .rev files protect ONE UNIT: at 3.557 GB a
+        unit is 41 to 238 volumes, spans several discs, and a disc carries volumes of more than one
+        unit. No per-unit budget can promise to replace a disc.
+
+        THE FLOOR CAME DOWN FROM 5 TO 2 IN THE SAME CHANGE, because it only became wrong when the
+        volumes grew: at 199 MiB a floor of 5 was 1 GB on any unit, at 3.557 GB it is 17.8 GB, and
+        on the 144 GB misc unit that would have been 12 % -- a floor quietly overriding the
+        percentage it exists to backstop. The owner confirmed two: "genau, min 2 rev sollten es
+        sein".
         """
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(698), 5)
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(1199), 5)
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(1200), 10)
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(2999), 10)
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(3000), 15)
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(4087), 15)
+        # 2 % where the set is big enough for it to bite. Volume counts at 3.557 GB per volume:
+        # misc 41, ibm-aix 198, bitsavers-paper 238.
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(238), 4)
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(198), 3)
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(100), 2)
+        # the floor, for a unit too small for the percentage to produce anything
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(41), 2)
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(6), 2)
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(1), 2)
+        # and it scales, which the ladder did not
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(4087), 81)
+        # no volumes at all means no .rev: the index archive is not split
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(None), 0)
 
-    def test_and_each_real_unit_lands_in_the_tier_it_was_sized_for(self):
-        """The thresholds were chosen against these ten; a unit drifting across one is worth
-        knowing about, because it changes how much of it can be lost."""
-        want = {"misc": 5, "oldskool": 5, "workstations": 5, "aix-opensource": 5,
-                "aix-support": 10, "bitsavers-software": 10, "ibm-pc": 10,
-                "vendors": 15, "ibm-aix": 15, "bitsavers-paper": 15}
-        self.assertEqual(sorted(want), sorted(u.name for u in TOOL.UNITS))
+    def test_and_every_real_unit_gets_at_least_the_floor(self):
+        r"""THE TIER TEST IS GONE WITH THE TIERS. It mapped each of the ten units to 5, 10 or 15,
+        which was the ladder's whole shape; a percentage has no tiers to drift across.
+
+        What is still worth asserting is that no unit comes out with nothing. At 3.557 GB the
+        smallest units are a few dozen volumes, where 2 % rounds to zero and only the floor keeps
+        them covered -- which is the case the floor was lowered to 2 for rather than removed.
+        """
+        for unit in TOOL.UNITS:
+            if not unit.options.volume_bytes:
+                continue                      # the index archive is not split
+            for volumes in (1, 6, 41, 238):
+                got = unit.options.recovery_volumes(volumes)
+                self.assertGreaterEqual(got, 2, "%s at %d volumes got %d"
+                                        % (unit.name, volumes, got))
 
     def test_an_unsplit_archive_gets_none(self):
         """.rev files only mean anything for a volume set."""
@@ -448,10 +478,13 @@ class ItRefusesToLoseAFileToRarsCaseBlindness(unittest.TestCase):
     4 028 of them in ibm-aix. `rar t` reports "Alles OK" over the hole because it only checks what
     the archive holds.
 
-    AND THE MIRROR IS NOT WHERE THIS GETS FIXED. Renaming there would break the one property the
-    collection has -- being a faithful copy -- and could not survive a re-fetch, because which
-    member of a pair arrives first is not deterministic. The owner settled that on 2026-10-05; the
-    form the archive takes instead is still open, and until it is settled this refusal stands.
+    HOW IT WAS SETTLED, over 2026-10-05 and 2026-10-06. The first position was that the mirror is
+    not where this gets fixed -- renaming would break the one property the collection has, being a
+    faithful copy. The owner then reversed it, on the ground that a re-fetch five years from now
+    will not reproduce today's tree anyway: "wir müssen das so gesehen nur gut genug machen". So
+    all 4417 colliding extra members were resolved IN the mirror, in three shapes chosen per
+    branch, and the collection now holds none. The refusal below is kept for the re-fetch case,
+    which is the one thing none of this can prevent.
     """
 
     def rows(self, *paths):
@@ -496,14 +529,28 @@ class ItRefusesToLoseAFileToRarsCaseBlindness(unittest.TestCase):
         self.assertIn("return 2", block)
         self.assertIn("case_collisions(", block)
 
-    def test_and_the_real_collection_still_holds_them(self):
-        """If this ever fails, the collection has changed and the refusal above can be lifted --
-        which is exactly the signal worth having. Skipped where the collection is not mounted."""
+    def test_and_the_real_collection_NO_LONGER_HOLDS_ANY(self):
+        r"""THE CANARY FIRED, AND THIS IS WHAT IT MEANT. It asserted the opposite until
+        2026-10-06 -- "misc held 275 case collisions on 2026-10-05" -- so that the day the
+        collection changed, a test would say so instead of a refusal quietly becoming dead code.
+
+        It changed. 4417 colliding extra members became 0, in three shapes: six tars over the
+        branches where the spelling encodes something (AIX locales, netstation.msg.AR_AA against
+        Ar_AA against ar_AA, libC against libc), 164 byte-identical twins dropped with the sha256
+        that justified each one, and 163 renames with a trailing underscore where both files were
+        genuinely different and scattered too thinly for a tar.
+
+        THE REFUSAL IN b2-pack.py STAYS. It is not dead code: it is what makes a RE-FETCH safe.
+        Which member of a case pair arrives first is not deterministic, so a crawl years from now
+        can put them back -- and then this guard is the only thing between that and an archive
+        that packs clean while holding one file of every pair. A guard worth keeping is one whose
+        condition is false today.
+        """
         if not os.path.isdir(TOOL.MIRROR_ROOT):
             self.skipTest("the collection is not mounted here")
         unit = [u for u in TOOL.UNITS if u.name == "misc"][0]
         groups = TOOL.case_collisions(TOOL.rows_for(unit, TOOL.MIRROR_ROOT, {}))
-        self.assertTrue(groups, "misc held 275 case collisions on 2026-10-05")
+        self.assertEqual(groups, [], "a case collision is back in misc -- do not pack it")
 
 
 class TheCRC32CrossCheck(unittest.TestCase):
@@ -691,11 +738,12 @@ class EveryDecisionOfTheOwnerIsInTheCommand(unittest.TestCase):
             TOOL.DEFAULTS.switches(3400),
             ["-ma5",            # the ONLY format RAR 7.23 writes; -ma4 and -ma7 are unknown to it
              "-m5",             # maximum, because this is written once and read for decades
-             "-md6g",           # the owner's figure: clears every duplicate (largest 2 000.5 MB)
-             "-s",              # solid, and WITHOUT -sv, or the stream restarts every 199 MiB
-             "-v208666624b",    # 199 MiB: under B2's measured 200 MiB one-piece SHA-1 cutoff
-             "-rr1",            # ~2 MiB per volume, for bit rot and bad sectors in place
-             "-rv15",           # the 5 / 10 / 15 rule; 3 400 volumes is the large tier
+             "-md4g",           # as far as a dictionary goes without demanding WinRAR 7 to read
+             "-s",              # solid, which already resets per volume -- -sv would be a no-op
+             "-oi1",            # byte-identical files stored once, then as references
+             "-v3557000000b",   # 7 per 25 GB M-Disc at 99.50 % of raw; fits FAT32 and a 4 GB stick
+             "-rr1",            # ~35 MB per volume, for bit rot and bad sectors in place
+             "-rv68",           # 2 % of 3 400 volumes, floor 2
              "-k",              # lock, which is what keeps the .rev files valid
              "-scfl"])          # UTF-8 for the @list file; -scul stored NOTHING when measured
 
@@ -780,24 +828,79 @@ class TheVolumeSizeFitsTheMedium(unittest.TestCase):
         for gb, limit in sorted(TOOL.M_DISC_995.items()):
             fit = limit // TOOL.VOLUME_BYTES
             self.assertLessEqual(fit * TOOL.VOLUME_BYTES, limit)
-            # At least 99 % of the owner's own margin is used, so the compatibility is real rather
-            # than nominal: 119 volumes on a 25 GB disc fill 99.73 % of it.
+            # At least 99 % of the owner's own margin is used, so the compatibility is real
+            # rather than nominal: 7 volumes fill a 25 GB disc to 99.99 % of that margin.
             self.assertGreater(fit * TOOL.VOLUME_BYTES / limit, 0.99,
                               "%d GB disc holds %d volumes" % (gb, fit))
 
-    def test_AND_B2_TAKES_A_VOLUME_IN_ONE_PIECE(self):
-        """Under B2's single-part limit, so every volume carries its own whole-file SHA-1.
+    def test_AND_NEVER_PAST_THE_OWNERS_CEILING_ON_THE_RAW_CAPACITY(self):
+        r"""NO DISC IS FILLED PAST 99.7 % OF ITS RAW SIZE, which is a different question from the
+        one above and the one the owner asked on 2026-10-06: "Wir duerfen die m disc aber nie zu
+        100% fuellen ... 99,7 sollten wir hoechstens haben".
 
-        A file that goes up through the large-file API is stored as parts and the whole-file digest
-        is only present if the uploader set `large_file_sha1`; PyB2Verify then has to rebuild an
-        S3 ETag from part MD5s to check it. At 995 MB nothing is split, so the check is a plain
-        comparison. One gigabyte is the round number to stay under and leaves the real limit far
-        above -- this asserts the comfortable bound, not the API's edge.
+        The margin table is a percentage OF THE RAW CAPACITY, so filling it to 100 % puts the disc
+        at 99.5 % -- fine. The failure this guards is a later volume size that tiles the margin
+        neatly while pushing the disc itself to the edge. UDF also needs room for its own
+        descriptors on top of the payload, and a disc written to its last byte is one that may not
+        verify.
+
+        Measured at 3 557 000 000: 7 / 14 / 28 volumes, every one of the three at 99.50 % of raw,
+        leaving 120.5 / 240.9 / 482.9 MiB for UDF -- one to two MB is what seven large files need.
         """
-        self.assertLess(TOOL.VOLUME_BYTES, 1000000000)
+        raw = {25: TOOL.M_DISC_BD_R_BYTES, 50: 50050629632, 100: 100102307840}
+        for gb, capacity in sorted(raw.items()):
+            fit = int(capacity * TOOL.M_DISC_MAX_FILL) // TOOL.VOLUME_BYTES
+            used = fit * TOOL.VOLUME_BYTES
+            self.assertLessEqual(used / float(capacity), TOOL.M_DISC_MAX_FILL,
+                                 "%d GB disc: %d volumes fill %.2f %% of raw"
+                                 % (gb, fit, 100.0 * used / capacity))
+            # and the compatibility has to be worth having: at least six volumes per disc, or the
+            # volume has grown so large that the disc is no longer a sensible unit.
+            self.assertGreaterEqual(fit, 6, "%d GB disc holds only %d volume(s)" % (gb, fit))
+
+    def test_A_BD_RE_IS_NOT_A_BD_R_AND_THE_TWO_FIGURES_STAY_APART(self):
+        r"""A rewritable disc reserves a spare area for defect management and holds 768 MiB less.
+
+        An ImgBurn user expected 25 025 314 816 B on a 25 GB disc and could write only
+        24 220 008 448 -- which is the BD-RE figure, and is why both constants exist here. M-Disc
+        is write-once BD-R and has no such reservation, so the burn margins are taken against the
+        larger number. Using the BD-RE figure for M-Disc would waste 768 MiB on every disc; using
+        the BD-R figure for a BD-RE would overfill it.
+        """
+        self.assertLess(TOOL.BD_RE_BYTES, TOOL.M_DISC_BD_R_BYTES)
+        self.assertEqual(TOOL.M_DISC_BD_R_BYTES - TOOL.BD_RE_BYTES, 805306368)   # 768 MiB
+        for _gb, margin in TOOL.M_DISC_995.items():
+            self.assertLessEqual(margin, TOOL.M_DISC_BD_R_BYTES * 100)
+
+    def test_A_VOLUME_FITS_FAT32_AND_A_FOUR_GB_STICK(self):
+        r"""THE CEILING THAT BINDS THE SIZE DOWNWARDS, and the reason it is not 4 149 914 282.
+
+        FAT32 cannot hold a file of 4 GiB or more: the directory entry stores the length in four
+        bytes, so the maximum is 2^32 - 1 = 4 294 967 295. A nominal "4 GB" stick holds about
+        4e9 bytes before any filesystem, so a volume has to stay under that too -- which rules out
+        both 4 000 000 000 and the 4 149 914 282 that would have tiled a 25 GB disc exactly.
+
+        A .rev FILE IS SLIGHTLY LARGER THAN THE VOLUME IT PROTECTS and grows with the number of
+        volumes it covers, so the headroom is checked against the volume size with room to spare
+        rather than against the limit exactly.
+        """
+        self.assertLess(TOOL.VOLUME_BYTES, TOOL.FAT32_MAX_BYTES)
+        self.assertLess(TOOL.VOLUME_BYTES, 4 * 1000 ** 3,
+                        "a volume must fit a nominal 4 GB device")
+        headroom = TOOL.FAT32_MAX_BYTES - TOOL.VOLUME_BYTES
+        self.assertGreater(headroom, 100 * 1024 * 1024,
+                           "only %d B of FAT32 headroom for .rev overhead" % headroom)
 
     def test_THE_DICTIONARY_CLEARS_EVERY_DUPLICATE_IN_THE_COLLECTION(self):
-        """6 GB against a largest measured duplicate of 2 000.5 MB.
+        """4 GB against a largest measured duplicate of 2 000.5 MB -- and 4 and not 6.
+
+        Measured 2026-10-06 at 5 GiB of input, which is the only size that proves anything because
+        RAR clamps the dictionary down to the total input: `rar t` on a -md6g archive REFUSES
+        without -mdx (exit 3), on -md4g it answers OK. The archive is RAR 5.0 either way; above
+        4 GB it carries a minimum-version requirement that the command line turns into a refusal.
+
+        4 GB ALSO MATCHES THE SOLID BLOCK NOW. The block is one volume, 3.56 GB, so anything above
+        4 GB could never be filled -- the old 6g was unreachable twice over.
 
         A solid block collapses two byte-identical files only if the window still reaches back to
         the first one, and `sort_key` puts them adjacent -- so the dictionary has to be at least as
@@ -811,7 +914,7 @@ class TheVolumeSizeFitsTheMedium(unittest.TestCase):
         for exactly our shape, "wenn die Volumen eines gesplitteten Archivs auf mehreren
         unterschiedlichen Wechselmedien gespeichert sind".
         """
-        self.assertEqual(TOOL.DEFAULTS.dictionary, "6g")
+        self.assertEqual(TOOL.DEFAULTS.dictionary, "4g")
         largest_duplicate_mb = 2000.5
         self.assertGreater(6 * 1024, largest_duplicate_mb)
 
@@ -881,8 +984,8 @@ class TheCommands(unittest.TestCase):
     def test_a_unit_command_in_full(self):
         step = self.steps[0]
         self.assertEqual(step["argv"], [
-            "RAR", "a", "-ma5", "-m5", "-md6g", "-s",
-            "-v%db" % TOOL.VOLUME_BYTES, "-rr1", "-rv5", "-k", "-scfl",
+            "RAR", "a", "-ma5", "-m5", "-md4g", "-s", "-oi1",
+            "-v%db" % TOOL.VOLUME_BYTES, "-rr1", "-rv2", "-k", "-scfl",
             os.path.join("OUT", "pair", "pair.rar"),
             "@" + os.path.join("WORK", "pair.list"),
             os.path.join("WORK", "pair" + TOOL.INDEX_SUFFIX),
