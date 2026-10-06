@@ -113,8 +113,10 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 
-from common import (BOOKKEEPING_FILES, INDEX_FILE, MIRROR_ROOT, SFV_FILE, exists, find_tool,
+from common import (BOOKKEEPING_FILES, DIGESTS, INDEX_FILE, MANIFEST_FILES, MIRROR_ROOT,
+                    SFV_FILE, exists, find_tool,
                     human, long_path, parse_size, read_index, read_sfv, relative_to, say,
                     split_archive)
 
@@ -857,6 +859,57 @@ def rows_for(unit, root, cache=None):
 RAR_CANDIDATES = (r"C:\Program Files\WinRAR\Rar.exe", "rar", "Rar.exe")
 
 
+def fixity_over(folder, work, report=say):
+    r"""Write the four manifests for the PACKED ARTEFACTS in `folder`. -> True when they are there.
+
+    THE GAP THIS CLOSES. Every check before this one is about what is INSIDE the archive: `rar t`
+    decompresses the members, the CRC32 cross-check holds their stored checksums against our own
+    `.sfv`, and `<unit>.index.csv` lists them with their digests. NOTHING described the .rar
+    volumes THEMSELVES. After an upload, a corrupted volume could only be found by unpacking it.
+
+    THROUGH PyFixity AND NOT A FOURTH IMPLEMENTATION. `../PyFixity/pyfixity.py index` reads every
+    file once, computes SHA-256, SHA-1, MD5 and CRC32 in a single pass, and writes
+    `.sha256sum .sha1sum .md5sum .sfv` at the root of the tree it is given -- the same four this
+    collection carries everywhere, in the same formats `sha256sum -c`, `md5sum -c` and QuickSFV
+    read. It is the tool the three ibm-aix tars were given on 2026-10-06, and writing a fifth
+    digest pass here would be the drift this project keeps a shared library to avoid.
+
+    THE INDEX GOES TO THE WORK DIRECTORY, not into the tree. PyFixity's own documentation says so
+    -- "It changes on every check, so keep it OUTSIDE a tree that gets uploaded or synced" -- and
+    this tree is the one that gets uploaded.
+
+    IT COVERS THE WHOLE UNIT FOLDER: the volumes, the .rev files, `<unit>.index.csv` and the logs.
+    Everything that goes to B2 is then described by one `.sha256sum` beside it, and that file is
+    what makes an upload verifiable without fetching 101 GB back.
+    """
+    tool = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "PyFixity", "pyfixity.py")
+    if not exists(tool):
+        report("  no PyFixity at %s -- the archive's own checksums were NOT written" % tool)
+        return False
+    index = os.path.join(work, os.path.basename(folder.rstrip("\\/")) + ".fixity.csv")
+    started = time.time()
+    done = subprocess.run([sys.executable, tool, "index", folder, "--index", index],
+                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    text = done.stdout.decode("utf-8", "replace")
+    if done.returncode != 0:
+        report("  PyFixity exited %d -- the archive's own checksums were NOT written"
+               % done.returncode)
+        for line in [one for one in text.splitlines() if one.strip()][-6:]:
+            report("       %s" % line.strip()[:110])
+        return False
+    # THE FOUR NAMES FROM THE LIBRARY. A list written out here would keep passing after a rename
+    # while PyFixity wrote the new spelling, and this check would then report success over four
+    # files that are not there.
+    missing = [MANIFEST_FILES[algorithm] for algorithm in DIGESTS
+               if not exists(os.path.join(folder, MANIFEST_FILES[algorithm]))]
+    if missing:
+        report("  PyFixity reported success but %s are not there" % ", ".join(missing))
+        return False
+    report("  the archive's own four manifests are beside it (%.0fs)" % (time.time() - started))
+    return True
+
+
 def place_index_beside(step, report=say):
     r"""Copy the unit's own index CSV next to its volumes. -> the destination, or None.
 
@@ -1503,6 +1556,11 @@ def execute(steps, rar, password):
             # their cross-check would describe an archive nobody should use, and the file is the
             # one thing a reader trusts without opening the archive.
             place_index_beside(step)
+            # AND THEN THE ARCHIVE'S OWN CHECKSUMS, last of all, because they have to cover the
+            # index that was just placed. Everything before this describes what is inside the
+            # archive; this describes the files that go to B2.
+            fixity_over(os.path.dirname(os.path.dirname(step["archive"])),
+                        os.path.dirname(step["index_path"]))
         if checked.returncode != 0:
             say("  THE ARCHIVE DOES NOT TEST CLEAN (rar t exited %d) -- stopping before the next "
                 "unit." % checked.returncode)

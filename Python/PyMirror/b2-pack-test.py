@@ -28,6 +28,7 @@ case itself. A test that needed 3.98 TB mounted could only ever run here. The fi
 small CSV indexes with the shapes that matter: a duplicate pair, a subtree split, a name that
 almost matches a subtree, and a file with no extension.
 """
+import hashlib
 import importlib.util
 import io
 import os
@@ -1639,6 +1640,102 @@ class TheIndexGoesBesideTheVolumes(unittest.TestCase):
         text = self.source_text()
         self.assertLess(text.index("CRC32 and file count agree"),
                         text.index("place_index_beside(step)"))
+
+
+class TheArchiveGetsItsOwnChecksums(unittest.TestCase):
+    r"""The gap: nothing described the .rar volumes THEMSELVES.
+
+    Every other check is about what is INSIDE the archive. `rar t` decompresses the members and
+    compares them with the CRC32 RAR recorded; the cross-check holds those against our own `.sfv`;
+    `<unit>.index.csv` lists every member with its sha256. After an upload, a volume corrupted in
+    transit could only have been found by unpacking it.
+
+    THROUGH PyFixity, which is the tool the three ibm-aix tars were given on 2026-10-06: one read
+    per file, SHA-256, SHA-1, MD5 and CRC32 in a single pass, written as the same four manifests
+    this collection carries everywhere. A fifth digest pass written here would be exactly the
+    drift this project keeps a shared library to avoid.
+    """
+
+    def setUp(self):
+        self.base = tempfile.mkdtemp(prefix="b2p-fix-")
+        self.folder = os.path.join(self.base, "unit")
+        self.work = os.path.join(self.base, "work")
+        os.makedirs(os.path.join(self.folder, "unit"))
+        os.makedirs(self.work)
+        # the shape a packed unit has: volumes in their own directory, the index beside them
+        for name in ("unit.part01.rar", "unit.part02.rar", "unit.part01.rev"):
+            with io.open(os.path.join(self.folder, "unit", name), "wb") as handle:
+                handle.write(os.urandom(4096))
+        with io.open(os.path.join(self.folder, "unit.index.csv"), "w",
+                     encoding="utf-8", newline="\n") as handle:
+            handle.write("archive,path,size,sha256\narch,a.bff,12,ab\n")
+
+    def tearDown(self):
+        shutil.rmtree(self.base, ignore_errors=True)
+
+    def manifests(self):
+        # THE FOUR NAMES FROM THE LIBRARY, not spelled here: common_test.py refuses a hand-
+        # written one, because a rename would leave this test asserting the old spelling and
+        # passing while the tool wrote the new one.
+        want = [common.MANIFEST_FILES[algorithm] for algorithm in common.DIGESTS]
+        return [name for name in want if os.path.exists(os.path.join(self.folder, name))]
+
+    def test_ALL_FOUR_MANIFESTS_LAND_BESIDE_THE_UNIT(self):
+        got = TOOL.fixity_over(self.folder, self.work, report=lambda *_a: None)
+        self.assertTrue(got)
+        self.assertEqual(self.manifests(),
+                         [common.MANIFEST_FILES[a] for a in common.DIGESTS])
+
+    def test_they_cover_the_volumes_AND_the_index_beside_them(self):
+        r"""One .sha256sum describing everything that goes to B2 is the point: the volumes, the
+        .rev files and the index CSV a reader fetches instead of the archive."""
+        TOOL.fixity_over(self.folder, self.work, report=lambda *_a: None)
+        with io.open(os.path.join(self.folder, common.SUMS_FILE), encoding="utf-8") as handle:
+            text = handle.read()
+        self.assertIn("unit.part01.rar", text)
+        self.assertIn("unit.part01.rev", text)
+        self.assertIn("unit.index.csv", text)
+
+    def test_THE_INDEX_FILE_GOES_TO_THE_WORK_DIRECTORY_AND_NOT_THE_TREE(self):
+        r"""PyFixity's own documentation: "It changes on every check, so keep it OUTSIDE a tree
+        that gets uploaded or synced" -- and this tree is the one that gets uploaded."""
+        TOOL.fixity_over(self.folder, self.work, report=lambda *_a: None)
+        self.assertTrue(any(name.endswith(".fixity.csv") for name in os.listdir(self.work)))
+        self.assertFalse(os.path.exists(os.path.join(self.folder, ".fixity-index.csv")))
+
+    def test_the_digests_are_the_real_ones(self):
+        """Not a stub: the file's sha256 has to be the sha256 of its bytes."""
+        TOOL.fixity_over(self.folder, self.work, report=lambda *_a: None)
+        with io.open(os.path.join(self.folder, "unit", "unit.part01.rar"), "rb") as handle:
+            want = hashlib.sha256(handle.read()).hexdigest()
+        with io.open(os.path.join(self.folder, common.SUMS_FILE), encoding="utf-8") as handle:
+            self.assertIn(want, handle.read())
+
+    def test_a_missing_PyFixity_is_reported_and_not_silently_skipped(self):
+        r"""A unit uploaded without its own checksums is one nobody can check after the fact, so
+        the absence has to be loud."""
+        said = []
+        was = TOOL.exists
+        try:
+            TOOL.exists = lambda path: False if path.endswith("pyfixity.py") else was(path)
+            got = TOOL.fixity_over(self.folder, self.work, report=said.append)
+        finally:
+            TOOL.exists = was
+        self.assertFalse(got)
+        self.assertIn("no PyFixity", " ".join(said))
+
+    def test_IT_RUNS_LAST_SO_IT_COVERS_THE_INDEX(self):
+        """The index CSV is placed first and must be inside the manifests, so the order matters."""
+        with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
+            text = handle.read()
+        call = text.index("fixity_over(os.path.dirname(")
+        self.assertLess(text.index("place_index_beside(step)"), call)
+
+    def test_and_it_runs_only_after_the_checks_pass(self):
+        with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
+            text = handle.read()
+        call = text.index("fixity_over(os.path.dirname(")
+        self.assertLess(text.index("CRC32 and file count agree"), call)
 
 
 if __name__ == "__main__":
