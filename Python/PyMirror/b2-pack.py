@@ -104,16 +104,21 @@ doing its work during a repair.
 """
 import argparse
 import collections
+import filecmp
 import glob
 import io
 import math
 import os
 import re
+import shutil
 import subprocess
 import sys
+import time
 
-from common import (BOOKKEEPING_FILES, INDEX_FILE, MIRROR_ROOT, SFV_FILE, find_tool, human,
-                    read_index, read_sfv, relative_to, say, split_archive)
+from common import (BOOKKEEPING_FILES, DIGESTS, INDEX_FILE, MANIFEST_FILES, MIRROR_ROOT,
+                    SFV_FILE, exists, find_tool,
+                    human, long_path, parse_size, read_index, read_sfv, relative_to, say,
+                    split_archive)
 
 # THE VOLUME SIZE IS THE OWNER'S AND IT IS 199 MiB, MEASURED RATHER THAN RECALLED. It was
 # 24 200 000 000 bytes until 2026-10-04, then 995 000 000 for a few hours, and that middle figure
@@ -136,25 +141,77 @@ from common import (BOOKKEEPING_FILES, INDEX_FILE, MIRROR_ROOT, SFV_FILE, find_t
 #   older snapshot, the other was downloaded and hashed locally (`source=download`). Neither came
 #   from B2. The feature exists; this uploader does not use it.
 #
-# 199 MiB RATHER THAN 200, because a .rev file is slightly LARGER than the volumes it protects --
-# rar.txt says so and the 2026-09-26 measurement showed it (1 048 627 against 1 048 576). It also
-# carries a checksum per protected volume, and ibm-aix has 3 400 of them. One MiB of headroom
-# covers both and keeps every .rev under the cutoff as well.
+# AND ON 2026-10-06 THE 200 MiB CUTOFF WAS IDENTIFIED AND THEN DELIBERATELY ABANDONED. The
+# boundary measured above is Cyberduck's: its own documentation says "Files larger than 200MB are
+# split into 100MB chunks and uploaded with multiple connections", which is exactly the
+# `100000000*250,4758990` in the owner's snapshots. It is not documented as configurable. So
+# staying under it was never a property of B2 -- whose single-request limit really is 5 GB -- but
+# of one uploader's fixed threshold.
 #
-# STILL M-DISC COMPATIBLE, WHICH IS ALL IT NEEDS TO BE: 119 volumes fill a 25 GB disc to 99.73 %
-# of the owner's own 99.5 % burn margin, 238 a 50 GB and 477 a 100 GB. The owner does not burn
-# them -- "ich brenne es nicht, es sollte nur kompatibel sein" -- so the disc is a property of the
-# size and not a plan the redundancy has to pay for. See the 5 / 10 / 15 rule on Options.
-VOLUME_BYTES = 199 * 1024 * 1024
+# WHAT MADE 199 MiB UNAFFORDABLE WAS THE SOLID BLOCK, not the cutoff. Measured 2026-10-06 at the
+# production volume size: plain `-s` is byte-for-byte identical to `-s=v`, so the solid stream
+# RESETS AT EVERY VOLUME BOUNDARY (rar.txt says so under -s=v, "vorausgesetzt, es wurden nach dem
+# vorangegangenen Zurücksetzen genügend Daten gepackt" -- 199 MiB counts as enough). The effective
+# compression window was therefore 199 MiB and never the 6 GB dictionary:
+#
+#   -s      630 364 279 B   4 volumes      the production setting
+#   -s=v    630 364 279 B   4 volumes      identical, which is the proof
+#   -s=d    525 383 636 B   3 volumes      100.1 MiB smaller, one duplicate collapsed
+#
+# So 521.3 GB of byte-identical in-unit duplicates were being stored in full. Removing `-sv` on
+# 2026-10-05 "so the dictionary would mean something" achieved nothing: the default already did
+# what -sv does.
+#
+# 3 557 000 000 BYTES, AND EVERY DIGIT OF IT IS A CONSTRAINT:
+#
+#   FAT32           4 294 967 295 B is the hard maximum file size (2^32 - 1, from the 4-byte
+#                   length field in the directory entry). 738 MB of headroom, which also absorbs
+#                   a .rev being slightly larger than the volume it protects.
+#   a 4 GB stick    3.557e9 fits a nominal 4 GB device with room; 4e9 and 4 149 914 282 do not.
+#   EVERY M-DISC    SEVEN volumes on a 25 GB, FOURTEEN on a 50 GB, TWENTY-EIGHT on a 100 GB, and
+#                   all three land on 99.50 % of the RAW capacity -- under the owner's ceiling of
+#                   99.7 % and on his 99.5 % burn margin, with 120.5 MiB left on a 25 GB disc for
+#                   UDF's own structures (one to two MB for seven large files).
+#
+# 3 900 000 000 WAS THE FIRST ANSWER AND IT WASTED A DISC EVERY TWENTY-NINE. Six of those fill a
+# 25 GB disc to 93.5 %, leaving 1.5 GB unused per disc -- 261 GB across the 174 discs the
+# collection needs. Seven smaller volumes tile it almost exactly instead. The price is 1142
+# volumes rather than 1042 and a 3.56 GB solid block rather than 3.9 GB, which is nothing against
+# 261 GB of disc.
+#
+# THE CAPACITY FIGURE IS THE BD-R ONE AND THAT DISTINCTION MATTERS. A BD-RE reserves a spare area
+# for defect management and takes only 24 220 008 448 B -- the figure an ImgBurn user hit when he
+# expected 25 025 314 816 and came up 768 MiB short. M-Disc is write-once BD-R, which has no such
+# reservation. Both numbers are kept below so neither gets used for the other medium.
+#
+# WHAT IT COSTS ON B2: Cyberduck will upload each volume as ~39 parts of 100 MB, so B2 stores a
+# per-part SHA-1 and no whole-file digest. The owner accepted that -- "lediglich b2 ist dann nicht
+# optimal wegen sha, aber das ist nicht ganz so schlimm" -- and it is survivable because THIS
+# COLLECTION CARRIES ITS OWN FOUR MANIFESTS. B2's digest was a convenience; .sha256sum is the
+# authority, and PyB2Verify already rebuilds the ETag from parts for exactly this case.
+#
+# WHAT IT BUYS: 1142 volumes instead of ~19 500, a 3.56 GB solid window instead of 199 MiB, and
+# -rr1 becoming 35 MB per volume instead of 2 MiB -- the same percentage, eighteen times the
+# repair.
+VOLUME_BYTES = 3557000000
+# The owner's ceiling on how full a disc may be written. A disc filled to its last byte is one
+# that may not verify, and UDF needs room for its own descriptors on top of the payload.
+M_DISC_MAX_FILL = 0.997
 BD_RE_BYTES = 24220008448
 M_DISC_BD_R_BYTES = 25025314816
 # The owner's burn margins for M-Disc, as raw bytes at 99.5 % of capacity. A disc written to its
 # last byte is a disc that may not verify, so the volume size is checked against these and not
 # against the figures above.
 M_DISC_995 = {25: 24899485696, 50: 49800019968, 100: 99600039936}
-# How many volumes fill a 25 GB M-Disc inside that margin. 119 at 199 MiB, where it was 1 when a
-# volume was 24.2 GB -- which is why the plan counts files and derives discs, not the other way.
+# How many volumes fill a 25 GB M-Disc inside that margin. SIX at 3.9e9, where it was 119 at
+# 199 MiB and 1 when a volume was 24.2 GB -- which is why the plan counts files and derives discs,
+# not the other way. Six also changes what the .rev budget can promise: at 119 per disc, no
+# plausible number of .rev files could replace one lost disc; at six, a 3 % budget covers five.
 PER_M_DISC = M_DISC_995[25] // VOLUME_BYTES
+# FAT32's maximum file size, 2^32 - 1, from the 4-byte length field in a directory entry. Asserted
+# rather than trusted: a volume above it cannot be put on the kind of cheap stick that is the
+# cheapest off-site copy there is, and the failure would only show up at the moment of copying.
+FAT32_MAX_BYTES = 4 * 1024 ** 3 - 1
 
 INDEX_DIR = "index"
 INDEX_SUFFIX = ".index.csv"
@@ -221,12 +278,16 @@ VERIFY_AGAINST_YOUR_RAR = {
                "TWO OF THEM ARE NO LONGER DOCUMENTED: `rar -?` in 7.23 lists neither -ma nor -sv, "
                "yet -ma5 is accepted while -ma4 and -ma7 both answer `Unbekannte Option` -- so "
                "RAR 5.0 is not an old format to be escaped, it is the ONLY format this version "
-               "writes. -sv is accepted too and is no longer passed, because it bounded the solid "
-               "block to one 199 MiB volume and made the 6 GB dictionary pointless. "
+               "writes. -sv is accepted too and is NOT passed, because measurement on 2026-10-06 "
+               "showed it would be a no-op: plain -s is byte-for-byte identical to -s=v, so the "
+               "solid stream already resets at every volume boundary. The window is therefore the "
+               "volume, which is why the dictionary came down to 4g and why -oi1 does the "
+               "deduplication the dictionary was believed to be doing. "
                "The one thing no measurement can settle is whether a restore works twenty years "
                "from now. A dictionary above 4 GB needs WinRAR 7.0 or newer to unpack; on the "
-               "command line that is a refusal unless -mdx is passed, and in the GUI it is a "
-               "dialog asking whether to continue.",
+               "command line that is a refusal and in the GUI a dialog -- measured at 5 GiB of "
+               "input, `rar t` answers OK on -md4g and exits 3 on -md6g, which is why 4g is the "
+               "ceiling.",
 }
 
 
@@ -239,8 +300,9 @@ class Options(object):
     """
 
     FIELDS = ("archive_format", "method", "dictionary", "solid", "solid_per_volume",
-              "volume_bytes", "recovery_record", "recovery_volumes_small",
-              "recovery_volumes_medium", "recovery_volumes_large", "lock", "encrypt_headers",
+              "volume_bytes", "dedup_references", "recovery_record", "recovery_percent",
+              "recovery_volumes_floor",
+              "lock", "encrypt_headers",
               "extra")
 
     def __init__(self, **kw):
@@ -272,18 +334,42 @@ class Options(object):
     # defence, not the first: every volume carries its own 1 % record, every volume exists both
     # locally and on B2, and a .rev is for the case where both of those have failed on the same
     # part.
-    SMALL_VOLUMES = 1200
-    MEDIUM_VOLUMES = 3000
 
     def recovery_volumes(self, volumes):
-        """-> how many .rev files this unit gets, for a set of `volumes` volumes."""
+        r"""-> how many .rev files this unit gets, for a set of `volumes` volumes.
+
+        A PERCENTAGE, BECAUSE THE FIXED LADDER WAS INVERTED. 5 of 703 volumes is 0.71 % and 15 of
+        4087 is 0.37 %: the unit with six times the volumes, and therefore six times the exposure
+        to independent loss, got half the relative protection. RARLAB's own default for `-rv` is
+        10 % (rar.txt: "Wird der Parameter <N> nicht angegeben, wird er auf 10% gesetzt"), so the
+        ladder was running the largest unit at a small fraction of the vendor default.
+
+        AND THERE IS NO PARTIAL CREDIT. N recovery volumes restore any N missing volumes and N+1
+        losses restore nothing at all, so the number is not a dial that degrades gracefully -- it
+        is a threshold, and it should scale with the set it guards.
+
+        2 %, AND THE "COVERS A WHOLE M-DISC" ARGUMENT FOR 3 % WAS WRONG. It counted the
+        collection's 1042 volumes as one set; .rev files protect ONE UNIT. At 3.9 GB a unit is 37
+        to 217 volumes, so it spans several discs and a disc carries volumes from more than one
+        unit -- no per-unit .rev budget can promise to replace a disc. What is left is the plain
+        question of how many volumes of one unit may go missing, and 2 % answers it at 78 GB
+        across the collection against 121 GB for 3 %.
+        
+        TWO PER CENT IS DEFENSIBLE BECAUSE .rev IS THE FOURTH LINE, not the first. Every volume
+        exists locally, on B2 (whose 17+3 Reed-Solomon vaults are rated at eleven nines) and on
+        M-Disc, and each volume carries its own 1 % record for damage inside it. A .rev is for the
+        case where all of that has failed on the same volume.
+        
+        THE FLOOR IS 2 AND WAS 5, which only became wrong when the volumes grew. At 199 MiB a
+        floor of 5 was 1 GB on any unit; at 3.9 GB it is 19.5 GB, and on the 144 GB misc unit that
+        would have been 13.5 % -- a floor quietly overriding the percentage it was meant to
+        backstop. Two keeps the promise that every unit, however small, can lose a volume and a
+        spare.
+        """
         if volumes is None or not self.volume_bytes:
             return 0
-        if volumes < self.SMALL_VOLUMES:
-            return self.recovery_volumes_small
-        if volumes < self.MEDIUM_VOLUMES:
-            return self.recovery_volumes_medium
-        return self.recovery_volumes_large
+        from_percent = int(volumes * self.recovery_percent / 100.0)
+        return max(from_percent, self.recovery_volumes_floor)
 
     def switches(self, volumes=None):
         """-> the switch list, in a fixed order so two runs produce the same command.
@@ -305,8 +391,30 @@ class Options(object):
             out.append("-md%s" % self.dictionary)
             if self.solid:
                 out.append("-s")
+                # -sv IS NEVER PASSED AND THE FIELD IS KEPT ONLY SO A UNIT COULD ASK. Measured
+                # 2026-10-06: plain `-s` is byte-for-byte identical to `-s=v`, so the stream
+                # already resets at every volume. -sv would be a no-op with a misleading name.
                 if self.solid_per_volume:
                     out.append("-sv")
+            if self.dedup_references:
+                # -oi1 STORES A BYTE-IDENTICAL FILE ONCE AND THE REST AS REFERENCES, and it is the
+                # switch that actually does what the 6 GB dictionary was believed to be doing.
+                # Measured 2026-10-06 on 600 MiB with a duplicate 500 MiB behind its twin:
+                #
+                #   -s -md6g           630 364 797 B   4 volumes
+                #   -s -oi1 -md256m    525 300 860 B   3 volumes
+                #   -s -oi1 -md4g      525 300 860 B   3 volumes   identical to 256m
+                #
+                # The dictionary makes NO difference to it, because references never go through
+                # the match finder -- so it reaches across volume boundaries that the solid reset
+                # closes. Aimed at the 521.3 GB of byte-identical duplicates inside units.
+                #
+                # WHAT IT COSTS, AND rar.txt NAMES IT: the duplicates were accidental redundancy.
+                # After -oi1 the volume holding the single stored copy carries every reference to
+                # it, and losing that volume loses them all. That is the reason the .rev budget
+                # moved to a percentage in the same change -- Reed-Solomon over the whole set is
+                # better placed than redundant copies of whichever files happened to repeat.
+                out.append("-oi1")
         # No volume split for the index archive: it is small and is meant to be fetched whole.
         if self.volume_bytes:
             out.append("-v%db" % self.volume_bytes)
@@ -370,7 +478,21 @@ DEFAULTS = Options(
     # geschätzt". So 6 GB lies somewhere in 9 to 42 GB and the documentation will not narrow it.
     # The machine has 63 GB.
     method=5,
-    dictionary="6g",
+    # 4g AND NOT 6g, SETTLED BY MEASUREMENT ON 2026-10-06 at 5 GiB of input (small inputs prove
+    # nothing here: RAR clamps the dictionary down to the total input size, so a 40 MB test records
+    # a tiny dictionary for every request and all of them pass):
+    #
+    #   -md4g   rar t without -mdx:  OK
+    #   -md6g   rar t without -mdx:  exit 3
+    #
+    # The archive stays RAR 5.0 either way -- there is no RAR 7 format, `-ma7` answers "Unbekannte
+    # Option" -- but above 4 GB it carries a minimum-version requirement, and on the COMMAND LINE
+    # that is a refusal rather than the GUI's dialog. This collection is meant to be read in
+    # decades, by whatever tool is at hand, so the ceiling is where the refusal stops.
+    #
+    # AND IT NOW MATCHES THE SOLID BLOCK EXACTLY. The block is the volume, 3.9 GB, so a dictionary
+    # above 4 GB could never be filled; the old 6g was unreachable twice over.
+    dictionary="4g",
     # AND EVERY UNIT USES THESE, which is the owner's instruction -- "Ich will es einheitlich für
     # alle archive" -- and a measurement turned it from a simplification into a correction.
     #
@@ -410,6 +532,7 @@ DEFAULTS = Options(
     # Reparaturwahrscheinlichkeit bei Archivbeschädigungen".
     solid_per_volume=False,
     volume_bytes=VOLUME_BYTES,
+    dedup_references=True,
     # 1 %, AND THE DIVISION OF LABOUR IS THE WHOLE ARGUMENT. -rr repairs damage INSIDE a volume;
     # .rev replaces one that is gone. At 199 MiB, 1 % is about 2 MiB per volume, and rar.txt says
     # a recovery record repairs slightly less than its own size in contiguous damage -- so 2 MiB
@@ -420,9 +543,10 @@ DEFAULTS = Options(
     # down: at 24.2 GB a volume was precious and worth defending in place; at 199 MiB it is
     # cheaper to replace than to patch. 1 % of 4 061 GB is 41 GB against 406 GB at 10 %.
     recovery_record="1",
-    recovery_volumes_small=5,
-    recovery_volumes_medium=10,
-    recovery_volumes_large=15,
+    # 2 %, replacing the 5 / 10 / 15 ladder, with a floor of 2. See recovery_volumes() for why a
+    # percentage, why two per cent, and why the floor had to come down when the volumes grew.
+    recovery_percent=2,
+    recovery_volumes_floor=2,
     lock=True,
     # NO ENCRYPTION. The owner's decision on 2026-10-04: "da es öffentliche Daten sind brauche ich
     # kein Passwort / Verschlüsselung, lediglich ECC und recovery archive". Every archive here was
@@ -733,6 +857,218 @@ def rows_for(unit, root, cache=None):
 # that is common.find_tool(), which iso-second-opinion.py's 7-Zip probe shares since 2026-09-27.
 # `Rar.exe` and not `WinRAR.exe`: the GUI binary opens a window and ignores a command line.
 RAR_CANDIDATES = (r"C:\Program Files\WinRAR\Rar.exe", "rar", "Rar.exe")
+
+
+def fixity_over(folder, work, report=say):
+    r"""Write the four manifests for the PACKED ARTEFACTS in `folder`. -> True when they are there.
+
+    THE GAP THIS CLOSES. Every check before this one is about what is INSIDE the archive: `rar t`
+    decompresses the members, the CRC32 cross-check holds their stored checksums against our own
+    `.sfv`, and `<unit>.index.csv` lists them with their digests. NOTHING described the .rar
+    volumes THEMSELVES. After an upload, a corrupted volume could only be found by unpacking it.
+
+    THROUGH PyFixity AND NOT A FOURTH IMPLEMENTATION. `../PyFixity/pyfixity.py index` reads every
+    file once, computes SHA-256, SHA-1, MD5 and CRC32 in a single pass, and writes
+    `.sha256sum .sha1sum .md5sum .sfv` at the root of the tree it is given -- the same four this
+    collection carries everywhere, in the same formats `sha256sum -c`, `md5sum -c` and QuickSFV
+    read. It is the tool the three ibm-aix tars were given on 2026-10-06, and writing a fifth
+    digest pass here would be the drift this project keeps a shared library to avoid.
+
+    THE INDEX GOES TO THE WORK DIRECTORY, not into the tree. PyFixity's own documentation says so
+    -- "It changes on every check, so keep it OUTSIDE a tree that gets uploaded or synced" -- and
+    this tree is the one that gets uploaded.
+
+    IT COVERS WHAT GOES TO B2 AND NOTHING ELSE: the volumes, the .rev files and
+    `<unit>.index.csv`, all in one flat directory, with `*.log` excluded. One `.sha256sum` beside
+    them is what makes an upload verifiable without fetching 101 GB back -- and the owner uploads
+    that directory as it stands, so a manifest naming a file he does not upload would be a
+    manifest that fails on the far side.
+    """
+    tool = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "PyFixity", "pyfixity.py")
+    if not exists(tool):
+        report("  no PyFixity at %s -- the archive's own checksums were NOT written" % tool)
+        return False
+    index = os.path.join(work, os.path.basename(folder.rstrip("\\/")) + ".fixity.csv")
+    started = time.time()
+    # THE LOGS ARE EXCLUDED, which is the owner's decision of 2026-10-06: he stripped their lines
+    # out of the manifests by hand. A manifest describes the UPLOADABLE set -- the volumes, the
+    # .rev files and the index CSV -- and `pack.log` is a local record of how they came to be, 82
+    # to 95 MB of one line per file. Covering it would also make the manifest go stale the moment
+    # a run appended to the log.
+    done = subprocess.run([sys.executable, tool, "index", folder, "--index", index,
+                           "--exclude-glob", "*.log"],
+                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    text = done.stdout.decode("utf-8", "replace")
+    if done.returncode != 0:
+        report("  PyFixity exited %d -- the archive's own checksums were NOT written"
+               % done.returncode)
+        for line in [one for one in text.splitlines() if one.strip()][-6:]:
+            report("       %s" % line.strip()[:110])
+        return False
+    # THE FOUR NAMES FROM THE LIBRARY. A list written out here would keep passing after a rename
+    # while PyFixity wrote the new spelling, and this check would then report success over four
+    # files that are not there.
+    missing = [MANIFEST_FILES[algorithm] for algorithm in DIGESTS
+               if not exists(os.path.join(folder, MANIFEST_FILES[algorithm]))]
+    if missing:
+        report("  PyFixity reported success but %s are not there" % ", ".join(missing))
+        return False
+    report("  the archive's own four manifests are beside it (%.0fs)" % (time.time() - started))
+    return True
+
+
+def place_index_beside(step, report=say):
+    r"""Copy the unit's own index CSV next to its volumes. -> the destination, or None.
+
+    WHY IT IS COPIED AND NOT MOVED. The work directory's copy is what the NEXT unit's index
+    archive is built from -- `rar a ... *.index.csv` over all ten -- so taking it away would
+    quietly empty that archive. Both copies exist on purpose.
+
+    AND WHY IT IS NOT LEFT PACKED. The CSV is already inside the archive, as the last argument of
+    the pack command, so a unit describes itself. But reading it there costs unpacking a 101 GB
+    set, and the whole point of the file is to answer "what is in misc" without fetching misc. The
+    owner's instruction on 2026-10-06: upload it beside the volumes, unpacked, every time. 52 MB
+    against 101 GB, readable in a browser, and it carries archive, path, size and sha256 for every
+    file -- enough to verify any single extracted file afterwards.
+
+    IT NEVER OVERWRITES. A destination that is already there and identical is reported and left;
+    one that differs is a REFUSAL, because two different indexes for one archive means one of
+    them describes something else and the tool cannot tell which.
+    """
+    source = step.get("index_path")
+    if not source or not exists(source):
+        return None
+    # BESIDE THE VOLUMES AND IN THE SAME DIRECTORY, which is the shape the owner built by hand on
+    # 2026-10-06 and the one he uploads: `<out>/<unit>/` holding the .rar, the .rev, the index CSV
+    # and the four manifests, all flat. An earlier version put the index one level up, on the
+    # assumption that the volumes had a directory of their own -- they do, and it IS the unit's.
+    folder = os.path.dirname(step["archive"])
+    target = os.path.join(folder, os.path.basename(source))
+    if exists(target):
+        if filecmp.cmp(long_path(source), long_path(target), shallow=False):
+            report("  the index is already beside the volumes: %s" % target)
+            return target
+        report("  REFUSING to replace a DIFFERENT index already at %s" % target)
+        return None
+    try:
+        shutil.copy2(long_path(source), long_path(target))
+    except OSError as problem:
+        report("  cannot place the index beside the volumes: %s" % problem)
+        return None
+    if not filecmp.cmp(long_path(source), long_path(target), shallow=False):
+        report("  the copied index does not match its source -- %s" % target)
+        return None
+    report("  index placed beside the volumes: %s (%s)"
+           % (target, human(os.path.getsize(long_path(target)))))
+    return target
+
+
+def free_memory():
+    r"""-> free physical bytes, or None where it cannot be asked.
+
+    THROUGH ctypes AND THE STANDARD LIBRARY ONLY, because this project has no dependencies and a
+    packing run must not acquire one in order to tell the truth about why it died.
+
+    WHY IT IS ASKED AT ALL. On 2026-10-06 a workstations run was killed before it wrote a single
+    volume: 0.52 GB free of 63.34 GB, with an editor holding 39.59 GB. The run had not reached
+    Rar.exe, so nothing in its own output said anything about the cause -- and the same shape six
+    hours into a 638 GB unit would have wasted the six hours. The free DISK space has been in the
+    plan from the beginning; this is the other resource a pack can run out of.
+    """
+    if os.name != "nt":
+        try:
+            with io.open("/proc/meminfo") as handle:
+                for line in handle:
+                    if line.startswith("MemAvailable:"):
+                        return int(line.split()[1]) * 1024
+        except (OSError, ValueError, IndexError):
+            return None
+        return None
+    try:
+        import ctypes
+
+        class Status(ctypes.Structure):
+            _fields_ = [("dwLength", ctypes.c_ulong),
+                        ("dwMemoryLoad", ctypes.c_ulong),
+                        ("ullTotalPhys", ctypes.c_ulonglong),
+                        ("ullAvailPhys", ctypes.c_ulonglong),
+                        ("ullTotalPageFile", ctypes.c_ulonglong),
+                        ("ullAvailPageFile", ctypes.c_ulonglong),
+                        ("ullTotalVirtual", ctypes.c_ulonglong),
+                        ("ullAvailVirtual", ctypes.c_ulonglong),
+                        ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+
+        status = Status()
+        status.dwLength = ctypes.sizeof(Status)
+        if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+            return None
+        return int(status.ullAvailPhys)
+    # NAMED EXCEPTIONS AND NOT `Exception`, which common_test.py refuses for a reason this very
+    # function proves: a bare catch here would have swallowed a misspelled field name in Status
+    # and reported "cannot tell how much memory is free" for a bug in this file. AttributeError is
+    # the honest one to expect -- `ctypes.windll` does not exist off Windows -- and OSError covers
+    # the call itself failing.
+    except (AttributeError, OSError, ValueError):
+        return None
+
+
+def memory_estimate(dictionary):
+    r"""-> rar.txt's rough figure for packing with `dictionary`, in bytes, or None.
+
+    TWO POINTS AND A STRAIGHT LINE BETWEEN THEM, which is all the documentation offers: about
+    7 GB for a 1 GB dictionary and about 96 GB for 64 GB, both called "grob geschaetzt" there.
+    That is roughly 1.4 GB of memory per GB of dictionary, so 4g lands near 12 GB.
+
+    AND MEASURED AT 10.00 GB FOR 4g, on 2026-10-06, during the workstations run -- so the line is
+    slightly high rather than wrong, which is as much as two rough points can be asked for.
+
+    WHAT THE SAME MEASUREMENT SETTLED ABOUT *WHEN*: Rar.exe held 0.19 GB while `-oi1` pre-hashed
+    420 307 files and 10.00 GB once compression started. The dictionary is allocated when the
+    first block is compressed, not at launch -- so a run that looks harmless in its first minutes
+    is not yet the run whose memory matters, and the figure to watch is the one after the first
+    volume appears.
+    """
+    want = parse_size(dictionary) if dictionary else 0
+    if not want:
+        return None
+    gb = want / float(1 << 30)
+    return int((7.0 + (gb - 1.0) * (96.0 - 7.0) / (64.0 - 1.0)) * (1 << 30))
+
+
+def memory_complaint(dictionary, free=None):
+    r"""-> a complaint about there being too little memory, or None.
+
+    THE REFUSAL IS AT A FLOOR NOTHING CAN ARGUE WITH: less free memory than the dictionary itself.
+    A 4 GB window cannot live in 3 GB, whatever an estimate says.
+
+    AND NOT AT THE ESTIMATE, deliberately. memory_estimate() interpolates between two figures
+    rar.txt itself calls rough, and refusing a run on an interpolation between two estimates would
+    stop a pack that would have worked. Above the floor the numbers are printed and the decision
+    is the owner's -- he is the one who knows whether the editor holding 39 GB is about to close.
+    """
+    if free is None:
+        free = free_memory()
+    if free is None:
+        return None
+    want = parse_size(dictionary) if dictionary else 0
+    if want and free < want:
+        return ("only %s of memory free, which is less than the %s dictionary itself -- packing "
+                "would fail or page" % (human(free), dictionary))
+    return None
+
+
+def memory_note(dictionary, free=None):
+    """-> one line for the plan: what is free, and the documented estimate for this dictionary."""
+    if free is None:
+        free = free_memory()
+    if free is None:
+        return "cannot tell how much memory is free"
+    guess = memory_estimate(dictionary)
+    if guess is None:
+        return "%s of memory free" % human(free)
+    return ("%s of memory free; rar.txt's two rough estimates put a %s dictionary near %s"
+            % (human(free), dictionary, human(guess)))
 
 
 def find_rar(candidates=RAR_CANDIDATES):
@@ -1054,6 +1390,40 @@ def crc32_complaint(unit, root, listing_text, packed_rows, want=None):
     have = crc32_from_listing(listing_text)
     if want is None:
         want = crc32_expected(unit, root)
+
+    # A -oi1 REFERENCE CARRIES NO CRC32 AND RAR WRITES ZEROS IN ITS PLACE. Measured 2026-10-06:
+    # two identical 3 MiB files packed with -oi1 list as CB32BAFD and 00000000, and without -oi1
+    # both list as CB32BAFD. The content is present either way -- `rar t` passes and extraction
+    # works -- but the header of a reference has nothing to compare against.
+    #
+    # THE FIRST RUN WITH -oi1 REPORTED 8777 SUCH FILES IN misc AND THAT NUMBER IS THE DEDUPLICATION,
+    # not damage: 8777 byte-identical duplicates collapsed into references. Reporting them as
+    # "CRC32 differs" would teach a reader to ignore this check, which is the one thing it must
+    # never do -- it is what found the 165 real mismatches in the first misc.rar.
+    #
+    # A REFERENCE IS CORRECT IF ITS TARGET IS, and that is provable here rather than assumed: the
+    # reference exists only because RAR found the content byte-identical to a file it did store,
+    # and our own manifests independently record the same sha256 for both. So each zero-CRC entry
+    # is checked for having a partner -- a path whose .sfv CRC32 equals some entry the archive DID
+    # store with a real CRC. One without a partner is a genuine complaint and stays one.
+    # AN EMPTY FILE ALSO HAS CRC32 00000000, which is the trap this walked into on its first
+    # attempt. 921 files in misc are 0 bytes; RAR lists them as 00000000 and our own .sfv records
+    # 00000000, so the two AGREE and there is nothing to resolve. Treating every zero as a
+    # reference pulled them out of the ordinary comparison and then reported them as references
+    # with no target -- a complaint manufactured out of two sides that matched.
+    #
+    # So a zero in the LISTING is a reference only when our .sfv says something else for that
+    # path: that is the case where RAR had a CRC and chose not to write it. Where both sides read
+    # zero, the plain comparison is correct and handles it.
+    references = sorted(k for k in have
+                        if have[k] == "00000000" and want.get(k, "00000000") != "00000000")
+    stored_crcs = set(v for v in have.values() if v != "00000000")
+    orphan_refs = sorted(k for k in references if want.get(k) not in stored_crcs)
+    for name in references:
+        if name not in orphan_refs:
+            have.pop(name, None)           # judged through its target, not its own header
+            want.pop(name, None)
+
     differs = sorted(k for k in want if k in have and want[k] != have[k])
     missing = sorted(k for k in want if k not in have)
     ours = sorted(k for k in have if k not in want)
@@ -1064,11 +1434,22 @@ def crc32_complaint(unit, root, listing_text, packed_rows, want=None):
     if missing:
         problems.append("%d file(s) in the .sfv that the archive does not hold, e.g. %s"
                         % (len(missing), missing[0]))
+    if orphan_refs:
+        problems.append("%d reference(s) with no stored file of the same CRC32, e.g. %s"
+                        % (len(orphan_refs), orphan_refs[0]))
     if not problems:
+        # THE CONTRACT IS "a complaint, or None", AND A REFERENCE COUNT IS NOT A COMPLAINT. An
+        # earlier draft of this returned "OK: 8777 reference(s)" here, which the caller would have
+        # read as a failure and stopped the run on -- the function's one job is to be falsy when
+        # the unit is sound. The count is worth saying out loud, so it is attached for a caller
+        # that wants it rather than smuggled into the complaint.
+        crc32_complaint.references = len(references)
         return None
+    crc32_complaint.references = len(references)
     return ("; ".join(problems)
-            + " [%d listed, %d in the .sfv, %d packed rows, %d of our own records]"
-            % (len(have), len(want), packed_rows, len(ours)))
+            + " [%d listed, %d in the .sfv, %d packed rows, %d of our own records, "
+              "%d -oi1 reference(s)]"
+            % (len(have), len(want), packed_rows, len(ours), len(references)))
 
 
 def first_volume(archive):
@@ -1180,7 +1561,24 @@ def execute(steps, rar, password):
             if complaint:
                 say("  THE CRC32 CROSS-CHECK FAILED: %s" % complaint)
                 return 2
-            say("  CRC32 and file count agree with the .sfv")
+            refs = getattr(crc32_complaint, "references", 0)
+            say("  CRC32 and file count agree with the .sfv%s"
+                % (" (%d -oi1 reference(s) judged through their targets)" % refs if refs else ""))
+            # AFTER THE CHECKS AND NOT BEFORE. An index placed beside volumes that then failed
+            # their cross-check would describe an archive nobody should use, and the file is the
+            # one thing a reader trusts without opening the archive.
+            place_index_beside(step)
+            # AND THEN THE ARCHIVE'S OWN CHECKSUMS, last of all, because they have to cover the
+            # index that was just placed. Everything before this describes what is inside the
+            # archive; this describes the files that go to B2.
+            # THE INDEX ARCHIVE'S STEP HAS NO index_path AND THIS CRASHED A SEVEN-HOUR RUN ON IT.
+            # `os.path.dirname(None)` raises TypeError, so vendors packed 399 GB, passed `rar t`
+            # and passed the cross-check, and then died before its index was placed or its
+            # checksums written. The guard belongs at the call site, because the step for the
+            # index archive legitimately has nothing to place and nothing to describe.
+            if step.get("index_path"):
+                fixity_over(os.path.dirname(step["archive"]),
+                            os.path.dirname(step["index_path"]))
         if checked.returncode != 0:
             say("  THE ARCHIVE DOES NOT TEST CLEAN (rar t exited %d) -- stopping before the next "
                 "unit." % checked.returncode)
@@ -1207,7 +1605,14 @@ def main(argv=None):
     ap.add_argument("--no-empty-dirs", action="store_true",
                     help="skip the walk that finds directories holding nothing. Faster, and it "
                          "DROPS 281 of them -- only for a quick look at the commands")
-    ap.add_argument("--execute", action="store_true", help="actually pack (needs --password-file)")
+    # THE HELP SAID "needs --password-file" UNCONDITIONALLY AND THAT WAS NOT TRUE. No unit sets
+    # encrypt_headers, because the collection is public material fetched from public hosts, so the
+    # demand never fires -- and a reader who believed the old text would conclude a password had
+    # to be invented for a 144 GB run that asks for none. The condition lives at the refusal,
+    # where it is driven by the units; the help now says the same thing the code does.
+    ap.add_argument("--execute", action="store_true",
+                    help="actually pack. A unit that asks for encrypted headers also needs "
+                         "--password-file; none does today")
     ap.add_argument("--password-file", help="first line is the password; never printed")
     args = ap.parse_args(argv)
 
@@ -1272,6 +1677,15 @@ def main(argv=None):
             say("--execute needs --password-file: a unit asks for encrypted headers, and the "
                 "password is never a command-line argument")
             return 2
+        # AND BELOW THE FLOOR IT REFUSES, before a six-hour run starts. The floor is the
+        # dictionary size itself, which no estimate can argue with; everything above it is the
+        # owner's call and printed rather than enforced.
+        short = memory_complaint(DEFAULTS.dictionary)
+        if short:
+            say("REFUSING: %s" % short)
+            say("  Close what is holding it, or pass a unit whose options use a smaller "
+                "dictionary.")
+            return 2
         rar = find_rar()
         if rar is None:
             say("REFUSING TO RUN: no rar executable found.")
@@ -1328,6 +1742,12 @@ def main(argv=None):
         return 0
 
     report(steps, verbose=args.verbose)
+
+    # MEMORY IS REPORTED IN THE PLAN, beside the volume and disc counts, because it is the other
+    # resource a pack can run out of and the only one whose exhaustion leaves no trace in the
+    # run's own output. On 2026-10-06 a workstations run was killed with 0.52 GB free of 63.34,
+    # before Rar.exe had started, and nothing it printed said why.
+    say("  %s" % memory_note(DEFAULTS.dictionary))
 
     if not args.execute:
         say("")

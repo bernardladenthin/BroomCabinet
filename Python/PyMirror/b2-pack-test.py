@@ -28,9 +28,11 @@ case itself. A test that needed 3.98 TB mounted could only ever run here. The fi
 small CSV indexes with the shapes that matter: a duplicate pair, a subtree split, a name that
 almost matches a subtree, and a file with no extension.
 """
+import hashlib
 import importlib.util
 import io
 import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -327,8 +329,8 @@ class TheOptionsBuilder(unittest.TestCase):
         of the 5 / 10 / 15 rule, which 30 did not.
         """
         self.assertEqual(TOOL.DEFAULTS.switches(3400),
-                         ["-ma5", "-m5", "-md6g", "-s",
-                          "-v%db" % TOOL.VOLUME_BYTES, "-rr1", "-rv15", "-k", "-scfl"])
+                         ["-ma5", "-m5", "-md4g", "-s", "-oi1",
+                          "-v%db" % TOOL.VOLUME_BYTES, "-rr1", "-rv68", "-k", "-scfl"])
 
     def test_THE_CHARSET_IS_F_AND_NOT_U(self):
         """U is UTF-16. On a UTF-8 list file `-scul` stored NONE of five non-ASCII names.
@@ -380,39 +382,69 @@ class TheOptionsBuilder(unittest.TestCase):
         both apply from one command, and two deleted volumes were restored from two .rev."""
         switches = TOOL.DEFAULTS.switches(30)
         self.assertIn("-rr1", switches)
-        self.assertIn("-rv5", switches)
+        self.assertIn("-rv2", switches)      # the floor; see recovery_volumes()
 
-    def test_THE_RECOVERY_VOLUMES_FOLLOW_THE_OWNERS_5_10_15_RULE(self):
-        """Counts and not a percentage, because `-rv` takes a count.
+    def test_THE_RECOVERY_VOLUMES_ARE_A_PERCENTAGE_WITH_A_FLOOR(self):
+        r"""2 % of the volume count, never fewer than 2. A count is emitted, because -rv takes one.
 
-        The owner, 2026-10-05: "für kleine reichen 5, mittel 10 und das ganz große hat 15 recovery
-        archive". The thresholds are in volumes -- what a .rev actually replaces -- and they fall
-        between the real units rather than being round for their own sake:
+        THIS IS THE THIRD ANSWER AND THE SECOND TIME IT HAS BEEN A PERCENTAGE. A 2 % rule was
+        replaced on 2026-10-05 by a 5 / 10 / 15 ladder on the owner's words -- "fuer kleine reichen
+        5, mittel 10 und das ganz grosse hat 15 recovery archive" -- and the ladder was reverted on
+        2026-10-06 for a reason that was true the whole time: IT WAS INVERTED. 5 of 703 volumes is
+        0.71 %, 15 of 4087 is 0.37 %, so the unit with six times the volumes and six times the
+        exposure got half the relative cover. The intuition was about absolute counts; the risk
+        scales with the set.
 
-            small   < 1 200   misc 698, oldskool 722, workstations 820, aix-opensource 1 007
-            medium  < 3 000   aix-support 1 561, bitsavers-software 1 705, ibm-pc 2 568
-            large   >=3 000   vendors 3 090, ibm-aix 3 400, bitsavers-paper 4 087
+        RARLAB's own default for -rv is 10 % (rar.txt: "Wird der Parameter <N> nicht angegeben,
+        wird er auf 10% gesetzt"), so the ladder ran the largest unit at a twenty-seventh of the
+        vendor default while reading like a considered choice.
 
-        IT IS LESS REDUNDANCY THAN THE 2 % IT REPLACED and that is the decision, not an oversight:
-        95 .rev in all against 398, 19.8 GB against 83, and for bitsavers-paper 15 replaceable
-        volumes out of 4 087 -- 0.37 % rather than 2 %. The owner's reason is that a .rev is the
-        THIRD line: every volume carries its own 1 % record, every volume exists locally AND on B2,
-        and a .rev answers the case where both have failed on the same part.
+        2 % AND NOT 3 %, the owner on 2026-10-06: "waeren hier nicht 2% besser? auf lange sicht?
+        das ist massiv". At 3.557 GB a .rev file is 3.56 GB, so the percentage is expensive in
+        absolute terms -- 78 GB across the collection at 2 % against 121 GB at 3 %. And a .rev is
+        the FOURTH line: every volume carries its own 1 % record for damage inside it, and exists
+        locally, on B2 and on M-Disc.
+
+        THE "IT COVERS A WHOLE M-DISC" ARGUMENT FOR 3 % WAS WRONG AND IS RECORDED AS WRONG. It
+        counted the collection's volumes as one set, but .rev files protect ONE UNIT: at 3.557 GB a
+        unit is 41 to 238 volumes, spans several discs, and a disc carries volumes of more than one
+        unit. No per-unit budget can promise to replace a disc.
+
+        THE FLOOR CAME DOWN FROM 5 TO 2 IN THE SAME CHANGE, because it only became wrong when the
+        volumes grew: at 199 MiB a floor of 5 was 1 GB on any unit, at 3.557 GB it is 17.8 GB, and
+        on the 144 GB misc unit that would have been 12 % -- a floor quietly overriding the
+        percentage it exists to backstop. The owner confirmed two: "genau, min 2 rev sollten es
+        sein".
         """
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(698), 5)
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(1199), 5)
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(1200), 10)
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(2999), 10)
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(3000), 15)
-        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(4087), 15)
+        # 2 % where the set is big enough for it to bite. Volume counts at 3.557 GB per volume:
+        # misc 41, ibm-aix 198, bitsavers-paper 238.
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(238), 4)
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(198), 3)
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(100), 2)
+        # the floor, for a unit too small for the percentage to produce anything
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(41), 2)
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(6), 2)
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(1), 2)
+        # and it scales, which the ladder did not
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(4087), 81)
+        # no volumes at all means no .rev: the index archive is not split
+        self.assertEqual(TOOL.DEFAULTS.recovery_volumes(None), 0)
 
-    def test_and_each_real_unit_lands_in_the_tier_it_was_sized_for(self):
-        """The thresholds were chosen against these ten; a unit drifting across one is worth
-        knowing about, because it changes how much of it can be lost."""
-        want = {"misc": 5, "oldskool": 5, "workstations": 5, "aix-opensource": 5,
-                "aix-support": 10, "bitsavers-software": 10, "ibm-pc": 10,
-                "vendors": 15, "ibm-aix": 15, "bitsavers-paper": 15}
-        self.assertEqual(sorted(want), sorted(u.name for u in TOOL.UNITS))
+    def test_and_every_real_unit_gets_at_least_the_floor(self):
+        r"""THE TIER TEST IS GONE WITH THE TIERS. It mapped each of the ten units to 5, 10 or 15,
+        which was the ladder's whole shape; a percentage has no tiers to drift across.
+
+        What is still worth asserting is that no unit comes out with nothing. At 3.557 GB the
+        smallest units are a few dozen volumes, where 2 % rounds to zero and only the floor keeps
+        them covered -- which is the case the floor was lowered to 2 for rather than removed.
+        """
+        for unit in TOOL.UNITS:
+            if not unit.options.volume_bytes:
+                continue                      # the index archive is not split
+            for volumes in (1, 6, 41, 238):
+                got = unit.options.recovery_volumes(volumes)
+                self.assertGreaterEqual(got, 2, "%s at %d volumes got %d"
+                                        % (unit.name, volumes, got))
 
     def test_an_unsplit_archive_gets_none(self):
         """.rev files only mean anything for a volume set."""
@@ -448,10 +480,13 @@ class ItRefusesToLoseAFileToRarsCaseBlindness(unittest.TestCase):
     4 028 of them in ibm-aix. `rar t` reports "Alles OK" over the hole because it only checks what
     the archive holds.
 
-    AND THE MIRROR IS NOT WHERE THIS GETS FIXED. Renaming there would break the one property the
-    collection has -- being a faithful copy -- and could not survive a re-fetch, because which
-    member of a pair arrives first is not deterministic. The owner settled that on 2026-10-05; the
-    form the archive takes instead is still open, and until it is settled this refusal stands.
+    HOW IT WAS SETTLED, over 2026-10-05 and 2026-10-06. The first position was that the mirror is
+    not where this gets fixed -- renaming would break the one property the collection has, being a
+    faithful copy. The owner then reversed it, on the ground that a re-fetch five years from now
+    will not reproduce today's tree anyway: "wir müssen das so gesehen nur gut genug machen". So
+    all 4417 colliding extra members were resolved IN the mirror, in three shapes chosen per
+    branch, and the collection now holds none. The refusal below is kept for the re-fetch case,
+    which is the one thing none of this can prevent.
     """
 
     def rows(self, *paths):
@@ -496,14 +531,28 @@ class ItRefusesToLoseAFileToRarsCaseBlindness(unittest.TestCase):
         self.assertIn("return 2", block)
         self.assertIn("case_collisions(", block)
 
-    def test_and_the_real_collection_still_holds_them(self):
-        """If this ever fails, the collection has changed and the refusal above can be lifted --
-        which is exactly the signal worth having. Skipped where the collection is not mounted."""
+    def test_and_the_real_collection_NO_LONGER_HOLDS_ANY(self):
+        r"""THE CANARY FIRED, AND THIS IS WHAT IT MEANT. It asserted the opposite until
+        2026-10-06 -- "misc held 275 case collisions on 2026-10-05" -- so that the day the
+        collection changed, a test would say so instead of a refusal quietly becoming dead code.
+
+        It changed. 4417 colliding extra members became 0, in three shapes: six tars over the
+        branches where the spelling encodes something (AIX locales, netstation.msg.AR_AA against
+        Ar_AA against ar_AA, libC against libc), 164 byte-identical twins dropped with the sha256
+        that justified each one, and 163 renames with a trailing underscore where both files were
+        genuinely different and scattered too thinly for a tar.
+
+        THE REFUSAL IN b2-pack.py STAYS. It is not dead code: it is what makes a RE-FETCH safe.
+        Which member of a case pair arrives first is not deterministic, so a crawl years from now
+        can put them back -- and then this guard is the only thing between that and an archive
+        that packs clean while holding one file of every pair. A guard worth keeping is one whose
+        condition is false today.
+        """
         if not os.path.isdir(TOOL.MIRROR_ROOT):
             self.skipTest("the collection is not mounted here")
         unit = [u for u in TOOL.UNITS if u.name == "misc"][0]
         groups = TOOL.case_collisions(TOOL.rows_for(unit, TOOL.MIRROR_ROOT, {}))
-        self.assertTrue(groups, "misc held 275 case collisions on 2026-10-05")
+        self.assertEqual(groups, [], "a case collision is back in misc -- do not pack it")
 
 
 class TheCRC32CrossCheck(unittest.TestCase):
@@ -691,11 +740,12 @@ class EveryDecisionOfTheOwnerIsInTheCommand(unittest.TestCase):
             TOOL.DEFAULTS.switches(3400),
             ["-ma5",            # the ONLY format RAR 7.23 writes; -ma4 and -ma7 are unknown to it
              "-m5",             # maximum, because this is written once and read for decades
-             "-md6g",           # the owner's figure: clears every duplicate (largest 2 000.5 MB)
-             "-s",              # solid, and WITHOUT -sv, or the stream restarts every 199 MiB
-             "-v208666624b",    # 199 MiB: under B2's measured 200 MiB one-piece SHA-1 cutoff
-             "-rr1",            # ~2 MiB per volume, for bit rot and bad sectors in place
-             "-rv15",           # the 5 / 10 / 15 rule; 3 400 volumes is the large tier
+             "-md4g",           # as far as a dictionary goes without demanding WinRAR 7 to read
+             "-s",              # solid, which already resets per volume -- -sv would be a no-op
+             "-oi1",            # byte-identical files stored once, then as references
+             "-v3557000000b",   # 7 per 25 GB M-Disc at 99.50 % of raw; fits FAT32 and a 4 GB stick
+             "-rr1",            # ~35 MB per volume, for bit rot and bad sectors in place
+             "-rv68",           # 2 % of 3 400 volumes, floor 2
              "-k",              # lock, which is what keeps the .rev files valid
              "-scfl"])          # UTF-8 for the @list file; -scul stored NOTHING when measured
 
@@ -780,24 +830,79 @@ class TheVolumeSizeFitsTheMedium(unittest.TestCase):
         for gb, limit in sorted(TOOL.M_DISC_995.items()):
             fit = limit // TOOL.VOLUME_BYTES
             self.assertLessEqual(fit * TOOL.VOLUME_BYTES, limit)
-            # At least 99 % of the owner's own margin is used, so the compatibility is real rather
-            # than nominal: 119 volumes on a 25 GB disc fill 99.73 % of it.
+            # At least 99 % of the owner's own margin is used, so the compatibility is real
+            # rather than nominal: 7 volumes fill a 25 GB disc to 99.99 % of that margin.
             self.assertGreater(fit * TOOL.VOLUME_BYTES / limit, 0.99,
                               "%d GB disc holds %d volumes" % (gb, fit))
 
-    def test_AND_B2_TAKES_A_VOLUME_IN_ONE_PIECE(self):
-        """Under B2's single-part limit, so every volume carries its own whole-file SHA-1.
+    def test_AND_NEVER_PAST_THE_OWNERS_CEILING_ON_THE_RAW_CAPACITY(self):
+        r"""NO DISC IS FILLED PAST 99.7 % OF ITS RAW SIZE, which is a different question from the
+        one above and the one the owner asked on 2026-10-06: "Wir duerfen die m disc aber nie zu
+        100% fuellen ... 99,7 sollten wir hoechstens haben".
 
-        A file that goes up through the large-file API is stored as parts and the whole-file digest
-        is only present if the uploader set `large_file_sha1`; PyB2Verify then has to rebuild an
-        S3 ETag from part MD5s to check it. At 995 MB nothing is split, so the check is a plain
-        comparison. One gigabyte is the round number to stay under and leaves the real limit far
-        above -- this asserts the comfortable bound, not the API's edge.
+        The margin table is a percentage OF THE RAW CAPACITY, so filling it to 100 % puts the disc
+        at 99.5 % -- fine. The failure this guards is a later volume size that tiles the margin
+        neatly while pushing the disc itself to the edge. UDF also needs room for its own
+        descriptors on top of the payload, and a disc written to its last byte is one that may not
+        verify.
+
+        Measured at 3 557 000 000: 7 / 14 / 28 volumes, every one of the three at 99.50 % of raw,
+        leaving 120.5 / 240.9 / 482.9 MiB for UDF -- one to two MB is what seven large files need.
         """
-        self.assertLess(TOOL.VOLUME_BYTES, 1000000000)
+        raw = {25: TOOL.M_DISC_BD_R_BYTES, 50: 50050629632, 100: 100102307840}
+        for gb, capacity in sorted(raw.items()):
+            fit = int(capacity * TOOL.M_DISC_MAX_FILL) // TOOL.VOLUME_BYTES
+            used = fit * TOOL.VOLUME_BYTES
+            self.assertLessEqual(used / float(capacity), TOOL.M_DISC_MAX_FILL,
+                                 "%d GB disc: %d volumes fill %.2f %% of raw"
+                                 % (gb, fit, 100.0 * used / capacity))
+            # and the compatibility has to be worth having: at least six volumes per disc, or the
+            # volume has grown so large that the disc is no longer a sensible unit.
+            self.assertGreaterEqual(fit, 6, "%d GB disc holds only %d volume(s)" % (gb, fit))
+
+    def test_A_BD_RE_IS_NOT_A_BD_R_AND_THE_TWO_FIGURES_STAY_APART(self):
+        r"""A rewritable disc reserves a spare area for defect management and holds 768 MiB less.
+
+        An ImgBurn user expected 25 025 314 816 B on a 25 GB disc and could write only
+        24 220 008 448 -- which is the BD-RE figure, and is why both constants exist here. M-Disc
+        is write-once BD-R and has no such reservation, so the burn margins are taken against the
+        larger number. Using the BD-RE figure for M-Disc would waste 768 MiB on every disc; using
+        the BD-R figure for a BD-RE would overfill it.
+        """
+        self.assertLess(TOOL.BD_RE_BYTES, TOOL.M_DISC_BD_R_BYTES)
+        self.assertEqual(TOOL.M_DISC_BD_R_BYTES - TOOL.BD_RE_BYTES, 805306368)   # 768 MiB
+        for _gb, margin in TOOL.M_DISC_995.items():
+            self.assertLessEqual(margin, TOOL.M_DISC_BD_R_BYTES * 100)
+
+    def test_A_VOLUME_FITS_FAT32_AND_A_FOUR_GB_STICK(self):
+        r"""THE CEILING THAT BINDS THE SIZE DOWNWARDS, and the reason it is not 4 149 914 282.
+
+        FAT32 cannot hold a file of 4 GiB or more: the directory entry stores the length in four
+        bytes, so the maximum is 2^32 - 1 = 4 294 967 295. A nominal "4 GB" stick holds about
+        4e9 bytes before any filesystem, so a volume has to stay under that too -- which rules out
+        both 4 000 000 000 and the 4 149 914 282 that would have tiled a 25 GB disc exactly.
+
+        A .rev FILE IS SLIGHTLY LARGER THAN THE VOLUME IT PROTECTS and grows with the number of
+        volumes it covers, so the headroom is checked against the volume size with room to spare
+        rather than against the limit exactly.
+        """
+        self.assertLess(TOOL.VOLUME_BYTES, TOOL.FAT32_MAX_BYTES)
+        self.assertLess(TOOL.VOLUME_BYTES, 4 * 1000 ** 3,
+                        "a volume must fit a nominal 4 GB device")
+        headroom = TOOL.FAT32_MAX_BYTES - TOOL.VOLUME_BYTES
+        self.assertGreater(headroom, 100 * 1024 * 1024,
+                           "only %d B of FAT32 headroom for .rev overhead" % headroom)
 
     def test_THE_DICTIONARY_CLEARS_EVERY_DUPLICATE_IN_THE_COLLECTION(self):
-        """6 GB against a largest measured duplicate of 2 000.5 MB.
+        """4 GB against a largest measured duplicate of 2 000.5 MB -- and 4 and not 6.
+
+        Measured 2026-10-06 at 5 GiB of input, which is the only size that proves anything because
+        RAR clamps the dictionary down to the total input: `rar t` on a -md6g archive REFUSES
+        without -mdx (exit 3), on -md4g it answers OK. The archive is RAR 5.0 either way; above
+        4 GB it carries a minimum-version requirement that the command line turns into a refusal.
+
+        4 GB ALSO MATCHES THE SOLID BLOCK NOW. The block is one volume, 3.56 GB, so anything above
+        4 GB could never be filled -- the old 6g was unreachable twice over.
 
         A solid block collapses two byte-identical files only if the window still reaches back to
         the first one, and `sort_key` puts them adjacent -- so the dictionary has to be at least as
@@ -811,7 +916,7 @@ class TheVolumeSizeFitsTheMedium(unittest.TestCase):
         for exactly our shape, "wenn die Volumen eines gesplitteten Archivs auf mehreren
         unterschiedlichen Wechselmedien gespeichert sind".
         """
-        self.assertEqual(TOOL.DEFAULTS.dictionary, "6g")
+        self.assertEqual(TOOL.DEFAULTS.dictionary, "4g")
         largest_duplicate_mb = 2000.5
         self.assertGreater(6 * 1024, largest_duplicate_mb)
 
@@ -881,8 +986,8 @@ class TheCommands(unittest.TestCase):
     def test_a_unit_command_in_full(self):
         step = self.steps[0]
         self.assertEqual(step["argv"], [
-            "RAR", "a", "-ma5", "-m5", "-md6g", "-s",
-            "-v%db" % TOOL.VOLUME_BYTES, "-rr1", "-rv5", "-k", "-scfl",
+            "RAR", "a", "-ma5", "-m5", "-md4g", "-s", "-oi1",
+            "-v%db" % TOOL.VOLUME_BYTES, "-rr1", "-rv2", "-k", "-scfl",
             os.path.join("OUT", "pair", "pair.rar"),
             "@" + os.path.join("WORK", "pair.list"),
             os.path.join("WORK", "pair" + TOOL.INDEX_SUFFIX),
@@ -1211,6 +1316,464 @@ class WhenTheCollectionIsHere(unittest.TestCase):
         for unit in TOOL.UNITS:
             for archive in unit.archives():
                 self.assertIn(archive, present, "%s names %s" % (unit.name, archive))
+
+
+class TheCrossCheckUnderstandsOi1References(unittest.TestCase):
+    r"""A -oi1 reference has no CRC32 of its own, and RAR writes zeros where one would be.
+
+    MEASURED 2026-10-06: two identical 3 MiB files packed with -oi1 list as CB32BAFD and
+    00000000; without -oi1 both list as CB32BAFD. The content is present either way -- `rar t`
+    passes and extraction works -- but a reference's header carries nothing to compare.
+
+    THE FIRST RUN WITH -oi1 REPORTED 8777 OF THESE IN misc, AND THAT NUMBER IS THE DEDUPLICATION.
+    Reporting them as "CRC32 differs" would have taught a reader to ignore this check, which is
+    the one thing it must never do: it is what found the 165 real mismatches in the first
+    misc.rar, over which `rar t` had said "Alles OK" five times.
+
+    A REFERENCE IS JUDGED THROUGH ITS TARGET, and only when a target exists. RAR wrote the
+    reference because it found the content byte-identical to a file it did store, and our own
+    manifests record the same digest for both -- so a zero-CRC entry whose .sfv CRC32 matches some
+    really-stored entry is accounted for. One with no such partner is a genuine hole and stays a
+    complaint.
+    """
+
+    def listing(self, rows):
+        """rar lt output: a Name: line and a CRC32: line per entry."""
+        out = []
+        for name, crc in rows:
+            out.append("Name: %s" % name.replace("/", "\\"))
+            out.append("     CRC32: %s" % crc)
+        return "\n".join(out)
+
+    def check(self, listing, want):
+        return TOOL.crc32_complaint(None, None, listing, len(want), want=dict(want))
+
+    def test_a_reference_with_a_stored_partner_is_not_a_complaint(self):
+        listing = self.listing([("a/one.bin", "CB32BAFD"), ("a/two.bin", "00000000")])
+        want = {"a/one.bin": "CB32BAFD", "a/two.bin": "CB32BAFD"}
+        self.assertIsNone(self.check(listing, want))
+
+    def test_and_the_reference_count_is_reported_rather_than_hidden(self):
+        listing = self.listing([("a/one.bin", "CB32BAFD"), ("a/two.bin", "00000000")])
+        want = {"a/one.bin": "CB32BAFD", "a/two.bin": "CB32BAFD"}
+        self.check(listing, want)
+        self.assertEqual(getattr(TOOL.crc32_complaint, "references", 0), 1)
+
+    def test_THE_CONTRACT_IS_STILL_A_COMPLAINT_OR_NONE(self):
+        """An earlier draft returned "OK: n reference(s)" here, which the caller reads as failure
+        and stops the run on."""
+        listing = self.listing([("a/one.bin", "CB32BAFD"), ("a/two.bin", "00000000")])
+        want = {"a/one.bin": "CB32BAFD", "a/two.bin": "CB32BAFD"}
+        self.assertFalse(self.check(listing, want))
+
+    def test_A_REFERENCE_WITH_NO_STORED_PARTNER_IS_STILL_A_COMPLAINT(self):
+        r"""THE HOLE THIS MUST NOT SWALLOW. A zero CRC32 whose content was never stored anywhere
+        is a file the archive does not really hold, and blanket-skipping zeros would pass it."""
+        listing = self.listing([("a/one.bin", "CB32BAFD"), ("a/lonely.bin", "00000000")])
+        want = {"a/one.bin": "CB32BAFD", "a/lonely.bin": "DEADBEEF"}
+        got = self.check(listing, want)
+        self.assertIsNotNone(got)
+        self.assertIn("reference(s) with no stored file of the same CRC32", got)
+        self.assertIn("a/lonely.bin", got)
+
+    def test_a_real_mismatch_is_still_caught_alongside_references(self):
+        """The 165 files of the first misc.rar are the reason this check exists at all."""
+        listing = self.listing([("a/one.bin", "CB32BAFD"), ("a/two.bin", "00000000"),
+                                ("a/wrong.bin", "11111111")])
+        want = {"a/one.bin": "CB32BAFD", "a/two.bin": "CB32BAFD",
+                "a/wrong.bin": "22222222"}
+        got = self.check(listing, want)
+        self.assertIsNotNone(got)
+        self.assertIn("CRC32 differs", got)
+        self.assertIn("a/wrong.bin", got)
+
+    def test_a_missing_file_is_still_caught_alongside_references(self):
+        listing = self.listing([("a/one.bin", "CB32BAFD"), ("a/two.bin", "00000000")])
+        want = {"a/one.bin": "CB32BAFD", "a/two.bin": "CB32BAFD",
+                "a/gone.bin": "33333333"}
+        got = self.check(listing, want)
+        self.assertIn("the archive does not hold", got)
+
+    def test_AN_EMPTY_FILE_IS_NOT_A_REFERENCE_AND_NEEDS_NO_RESOLVING(self):
+        r"""THE TRAP THE FIRST FIX WALKED INTO. CRC32 of zero bytes IS 00000000, so an empty file
+        and a -oi1 reference look identical in the listing.
+
+        Measured on the real misc archive: 921 of its files are 0 bytes. Our own .sfv records
+        00000000 for them, RAR lists 00000000, THE TWO SIDES AGREE -- and the first version of
+        this code pulled every zero out of the ordinary comparison and then reported those 921 as
+        "references with no stored file of the same CRC32". A complaint manufactured from two
+        sides that matched, which is the worst kind: it would have been read as damage.
+
+        A zero in the listing is a reference only where our .sfv says something ELSE for that
+        path. Where both read zero, the plain comparison is right.
+        """
+        listing = self.listing([("a/real.bin", "CB32BAFD"), ("a/empty.bin", "00000000")])
+        want = {"a/real.bin": "CB32BAFD", "a/empty.bin": "00000000"}
+        self.assertIsNone(self.check(listing, want))
+        self.assertEqual(getattr(TOOL.crc32_complaint, "references", 0), 0)
+
+    def test_an_empty_file_the_archive_got_WRONG_is_still_caught(self):
+        """And the distinction must not become a way for an empty-vs-nonempty mismatch to pass:
+        our .sfv says the file has content, the archive lists zero -- that is the reference case,
+        and without a stored partner it is a complaint."""
+        listing = self.listing([("a/real.bin", "CB32BAFD"), ("a/claimed.bin", "00000000")])
+        want = {"a/real.bin": "CB32BAFD", "a/claimed.bin": "DEADBEEF"}
+        got = self.check(listing, want)
+        self.assertIsNotNone(got)
+        self.assertIn("a/claimed.bin", got)
+
+    def test_the_real_misc_archive_came_out_clean(self):
+        r"""The numbers of the run that settled this, 2026-10-06, kept where they can be compared.
+
+        342 336 entries listed, 341 969 expected from our .sfv, 367 of our own bookkeeping files,
+        8 777 references judged through their targets, 921 empty files where both sides read zero,
+        and zero differences. `rar t` said "Alles OK" over 27 volumes and both .rev files.
+
+        8 777 IS ALSO THE FIRST REAL MEASUREMENT OF WHAT -oi1 BUYS: the unit went from 98.62 GB
+        under the old switches to 93.88 GB, so those duplicates were 4.74 GB.
+        """
+        self.assertEqual(342336 - 341969, 367)
+        self.assertEqual(TOOL.DEFAULTS.dedup_references, True)
+
+    def test_a_listing_with_no_references_behaves_exactly_as_before(self):
+        listing = self.listing([("a/one.bin", "CB32BAFD"), ("a/two.bin", "C37FB52A")])
+        want = {"a/one.bin": "CB32BAFD", "a/two.bin": "C37FB52A"}
+        self.assertIsNone(self.check(listing, want))
+        self.assertEqual(getattr(TOOL.crc32_complaint, "references", 0), 0)
+
+
+class TheOtherResourceAPackCanRunOutOf(unittest.TestCase):
+    r"""Memory, which until 2026-10-06 nothing here looked at.
+
+    WHAT HAPPENED. A workstations run was killed before it wrote a single volume: 0.52 GB free of
+    63.34 GB, with an editor holding 39.59 GB. The run had not reached Rar.exe, so its own output
+    said nothing at all -- the log was zero bytes -- and the cause had to be found by listing
+    processes afterwards. The same shape six hours into the 638 GB vendors unit would have cost
+    the six hours and left the same silence.
+
+    The free DISK space has been in the plan since the beginning. This is the other one.
+    """
+
+    def test_free_memory_answers_a_plausible_number_here(self):
+        got = TOOL.free_memory()
+        if got is None:
+            self.skipTest("this host does not answer")
+        self.assertGreater(got, 1 << 20)                  # more than a megabyte
+        self.assertLess(got, 1 << 50)                     # less than a petabyte
+
+    def test_it_returns_None_rather_than_raising_where_it_cannot_ask(self):
+        """A plan must still print when the figure is unavailable, so the failure is a None."""
+        self.assertIn("or None where it cannot be asked", TOOL.free_memory.__doc__)
+
+    def test_THE_ESTIMATE_IS_LABELLED_AS_ONE(self):
+        r"""rar.txt gives two points -- about 7 GB for 1 GB and about 96 GB for 64 GB -- and calls
+        both "grob geschaetzt". A straight line between two rough figures is not a measurement and
+        the note says so, because the next reader will otherwise treat 12.07 GB as a requirement.
+        """
+        self.assertIn("rough", TOOL.memory_note("4g", free=50 * (1 << 30)))
+        near = TOOL.memory_estimate("4g") / float(1 << 30)
+        self.assertGreater(near, 10.0)
+        self.assertLess(near, 14.0)
+
+    def test_THE_ESTIMATE_IS_WITHIN_REACH_OF_THE_ONE_MEASUREMENT(self):
+        r"""4g was measured at 10.00 GB during the workstations run of 2026-10-06, against an
+        interpolation of 12.07. Slightly high rather than wrong, which is as much as a line
+        between two figures the vendor calls rough can be asked for.
+
+        The point of pinning it is the other direction: if a later change made the estimate read
+        3 GB or 40 GB for 4g, the plan would be printing a number with no relation to what RAR
+        actually takes, and a reader would size a machine by it.
+        """
+        got = TOOL.memory_estimate("4g") / float(1 << 30)
+        self.assertGreater(got, 8.0)
+        self.assertLess(got, 16.0)
+
+    def test_AND_IT_RECORDS_WHEN_THE_MEMORY_IS_TAKEN(self):
+        r"""0.19 GB while -oi1 pre-hashed 420 307 files, 10.00 GB once compression began. A run
+        that looks harmless in its first minutes is not yet the run whose memory matters, and
+        anyone watching the wrong minute concludes the dictionary costs nothing."""
+        doc = TOOL.memory_estimate.__doc__
+        self.assertIn("0.19 GB", doc)
+        self.assertIn("10.00 GB", doc)
+        flat = " ".join(doc.split())
+        self.assertIn("allocated when the first block is compressed", flat)
+
+    def test_the_estimate_follows_rar_txts_two_points(self):
+        """1 GB -> about 7, 64 GB -> about 96, which is the line's definition."""
+        self.assertAlmostEqual(TOOL.memory_estimate("1g") / float(1 << 30), 7.0, places=1)
+        self.assertAlmostEqual(TOOL.memory_estimate("64g") / float(1 << 30), 96.0, places=1)
+
+    def test_IT_REFUSES_ONLY_BELOW_A_FLOOR_NOTHING_CAN_ARGUE_WITH(self):
+        r"""Less free memory than the dictionary itself. A 4 GB window cannot live in 3 GB.
+
+        Not at the estimate: refusing a run on an interpolation between two figures the vendor
+        calls rough would stop packs that would have worked.
+        """
+        self.assertIsNotNone(TOOL.memory_complaint("4g", free=3 * (1 << 30)))
+        self.assertIsNone(TOOL.memory_complaint("4g", free=5 * (1 << 30)))
+
+    def test_the_complaint_names_both_numbers(self):
+        got = TOOL.memory_complaint("4g", free=2 * (1 << 30))
+        self.assertIn("2.15 GB", got)
+        self.assertIn("4g", got)
+
+    def test_no_dictionary_means_no_opinion(self):
+        """The index archive is packed with -m5 and no -md; there is nothing to refuse it for."""
+        self.assertIsNone(TOOL.memory_complaint("", free=1 << 20))
+        self.assertIsNone(TOOL.memory_complaint(None, free=1 << 20))
+
+    def test_an_unanswerable_host_is_not_a_refusal(self):
+        r"""THE FAILURE MODE TO AVOID: a tool that cannot read the figure must not therefore
+        decline to pack. Refusing on a missing measurement is worse than packing without one."""
+        self.assertIsNone(TOOL.memory_complaint("4g", free=None)
+                          if TOOL.free_memory() is None else None)
+
+    def source(self):
+        with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
+            return handle.read()
+
+    def test_the_plan_prints_the_line_unconditionally(self):
+        """Including on a dry run, which is where a reader looks before committing six hours."""
+        text = self.source()
+        self.assertIn("say(\"  %s\" % memory_note(", text)
+        self.assertLess(text.index("memory_note(DEFAULTS.dictionary)"),
+                        text.index("NOTHING WAS RUN"))
+
+    def test_and_the_refusal_comes_before_rar_is_even_located(self):
+        """So a short-memory run costs nothing, not even the search for Rar.exe."""
+        text = self.source()
+        self.assertLess(text.index("short = memory_complaint("), text.index("rar = find_rar()"))
+
+
+class TheIndexGoesBesideTheVolumes(unittest.TestCase):
+    r"""The owner's instruction on 2026-10-06: after every unit, put its index CSV next to it.
+
+    WHY IT IS WORTH A COPY. The CSV is already INSIDE the archive -- it is the last argument of
+    the pack command, so a unit describes itself -- but reading it there costs unpacking a 101 GB
+    set. Beside the volumes it answers "what is in misc" for 52 MB, in a browser, without RAR,
+    and it carries archive, path, size and sha256 for every file: 341 970 lines for misc.
+
+    AND A COPY RATHER THAN A MOVE, because the work directory's copy is what the index archive is
+    built from -- `rar a ... *.index.csv` over all ten units -- and taking it away would quietly
+    produce an empty one.
+    """
+
+    def setUp(self):
+        self.base = tempfile.mkdtemp(prefix="b2p-idx-")
+        self.work = os.path.join(self.base, "work")
+        # ONE FLAT DIRECTORY PER UNIT, which is the shape the owner built by hand on 2026-10-06
+        # and uploads as it stands: <out>/<unit>/ holding the volumes, the .rev files, the index
+        # CSV and the four manifests, all side by side.
+        self.out = os.path.join(self.base, "out", "unit")
+        os.makedirs(self.work)
+        os.makedirs(self.out)
+        self.source = os.path.join(self.work, "unit.index.csv")
+        self.write(self.source, "archive,path,size,sha256\narch,a.bff,12,ab\n")
+        self.step = {"index_path": self.source,
+                     "archive": os.path.join(self.out, "unit.rar")}
+
+    def tearDown(self):
+        shutil.rmtree(self.base, ignore_errors=True)
+
+    def write(self, path, text):
+        with io.open(path, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
+
+    def read(self, path):
+        with io.open(path, encoding="utf-8") as handle:
+            return handle.read()
+
+    def target(self):
+        return os.path.join(self.out, "unit.index.csv")
+
+    def source_text(self):
+        with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
+            return handle.read()
+
+    def test_IT_LANDS_IN_THE_SAME_DIRECTORY_AS_THE_VOLUMES(self):
+        r"""Flat, beside the .rar and .rev files. An earlier version put it one level up, on the
+        assumption that the volumes had a directory of their own below the unit's -- they do not,
+        and the owner flattened the three finished units by hand to prove the point. He uploads
+        that directory as it stands, so anything not in it is not uploaded."""
+        got = TOOL.place_index_beside(self.step, report=lambda *_a: None)
+        self.assertEqual(got, self.target())
+        self.assertTrue(os.path.exists(self.target()))
+
+    def test_the_copy_is_byte_identical(self):
+        TOOL.place_index_beside(self.step, report=lambda *_a: None)
+        self.assertEqual(self.read(self.target()), self.read(self.source))
+
+    def test_THE_SOURCE_STAYS_WHERE_IT_IS(self):
+        r"""A move would empty the index archive, which is built from the work directory."""
+        TOOL.place_index_beside(self.step, report=lambda *_a: None)
+        self.assertTrue(os.path.exists(self.source))
+
+    def test_an_identical_copy_already_there_is_reported_and_left(self):
+        TOOL.place_index_beside(self.step, report=lambda *_a: None)
+        said = []
+        got = TOOL.place_index_beside(self.step, report=said.append)
+        self.assertEqual(got, self.target())
+        self.assertIn("already beside", " ".join(said))
+
+    def test_A_DIFFERENT_INDEX_ALREADY_THERE_IS_A_REFUSAL(self):
+        r"""Two different indexes for one archive means one of them describes something else, and
+        the tool cannot tell which -- so it must not pick."""
+        self.write(self.target(), "archive,path,size,sha256\nsomething,else.bff,1,ff\n")
+        said = []
+        got = TOOL.place_index_beside(self.step, report=said.append)
+        self.assertIsNone(got)
+        self.assertIn("REFUSING", " ".join(said))
+
+    def test_and_that_refusal_leaves_the_existing_file_untouched(self):
+        self.write(self.target(), "keep me\n")
+        TOOL.place_index_beside(self.step, report=lambda *_a: None)
+        self.assertEqual(self.read(self.target()), "keep me\n")
+
+    def test_a_missing_source_is_answered_and_not_raised(self):
+        os.remove(self.source)
+        self.assertIsNone(TOOL.place_index_beside(self.step, report=lambda *_a: None))
+
+    def test_a_step_without_an_index_is_answered_and_not_raised(self):
+        """The index archive's own step has no index of its own."""
+        self.assertIsNone(TOOL.place_index_beside({"archive": "x.rar"},
+                                                  report=lambda *_a: None))
+
+    def test_IT_HAPPENS_AFTER_THE_CHECKS_AND_NOT_BEFORE(self):
+        r"""An index placed beside volumes that then failed their cross-check would describe an
+        archive nobody should use -- and it is the one file a reader trusts without opening the
+        archive."""
+        text = self.source_text()
+        self.assertLess(text.index("CRC32 and file count agree"),
+                        text.index("place_index_beside(step)"))
+
+
+class TheArchiveGetsItsOwnChecksums(unittest.TestCase):
+    r"""The gap: nothing described the .rar volumes THEMSELVES.
+
+    Every other check is about what is INSIDE the archive. `rar t` decompresses the members and
+    compares them with the CRC32 RAR recorded; the cross-check holds those against our own `.sfv`;
+    `<unit>.index.csv` lists every member with its sha256. After an upload, a volume corrupted in
+    transit could only have been found by unpacking it.
+
+    THROUGH PyFixity, which is the tool the three ibm-aix tars were given on 2026-10-06: one read
+    per file, SHA-256, SHA-1, MD5 and CRC32 in a single pass, written as the same four manifests
+    this collection carries everywhere. A fifth digest pass written here would be exactly the
+    drift this project keeps a shared library to avoid.
+    """
+
+    def setUp(self):
+        self.base = tempfile.mkdtemp(prefix="b2p-fix-")
+        self.folder = os.path.join(self.base, "unit")
+        self.work = os.path.join(self.base, "work")
+        os.makedirs(self.folder)
+        os.makedirs(self.work)
+        # the shape a packed unit has: everything flat in one directory, plus a log that must NOT
+        # be covered -- the owner stripped those lines out of all three manifests by hand.
+        for name in ("unit.part01.rar", "unit.part02.rar", "unit.part01.rev"):
+            with io.open(os.path.join(self.folder, name), "wb") as handle:
+                handle.write(os.urandom(4096))
+        with io.open(os.path.join(self.folder, "pack.log"), "w", encoding="utf-8") as handle:
+            handle.write("one line per file, 82 MB of it on misc\n")
+        with io.open(os.path.join(self.folder, "unit.index.csv"), "w",
+                     encoding="utf-8", newline="\n") as handle:
+            handle.write("archive,path,size,sha256\narch,a.bff,12,ab\n")
+
+    def tearDown(self):
+        shutil.rmtree(self.base, ignore_errors=True)
+
+    def manifests(self):
+        # THE FOUR NAMES FROM THE LIBRARY, not spelled here: common_test.py refuses a hand-
+        # written one, because a rename would leave this test asserting the old spelling and
+        # passing while the tool wrote the new one.
+        want = [common.MANIFEST_FILES[algorithm] for algorithm in common.DIGESTS]
+        return [name for name in want if os.path.exists(os.path.join(self.folder, name))]
+
+    def test_ALL_FOUR_MANIFESTS_LAND_BESIDE_THE_UNIT(self):
+        got = TOOL.fixity_over(self.folder, self.work, report=lambda *_a: None)
+        self.assertTrue(got)
+        self.assertEqual(self.manifests(),
+                         [common.MANIFEST_FILES[a] for a in common.DIGESTS])
+
+    def test_they_cover_the_volumes_AND_the_index_beside_them(self):
+        r"""One .sha256sum describing everything that goes to B2 is the point: the volumes, the
+        .rev files and the index CSV a reader fetches instead of the archive."""
+        TOOL.fixity_over(self.folder, self.work, report=lambda *_a: None)
+        with io.open(os.path.join(self.folder, common.SUMS_FILE), encoding="utf-8") as handle:
+            text = handle.read()
+        self.assertIn("unit.part01.rar", text)
+        self.assertIn("unit.part01.rev", text)
+        self.assertIn("unit.index.csv", text)
+
+    def test_THE_INDEX_FILE_GOES_TO_THE_WORK_DIRECTORY_AND_NOT_THE_TREE(self):
+        r"""PyFixity's own documentation: "It changes on every check, so keep it OUTSIDE a tree
+        that gets uploaded or synced" -- and this tree is the one that gets uploaded."""
+        TOOL.fixity_over(self.folder, self.work, report=lambda *_a: None)
+        self.assertTrue(any(name.endswith(".fixity.csv") for name in os.listdir(self.work)))
+        self.assertFalse(os.path.exists(os.path.join(self.folder, ".fixity-index.csv")))
+
+    def test_the_digests_are_the_real_ones(self):
+        """Not a stub: the file's sha256 has to be the sha256 of its bytes."""
+        TOOL.fixity_over(self.folder, self.work, report=lambda *_a: None)
+        with io.open(os.path.join(self.folder, "unit.part01.rar"), "rb") as handle:
+            want = hashlib.sha256(handle.read()).hexdigest()
+        with io.open(os.path.join(self.folder, common.SUMS_FILE), encoding="utf-8") as handle:
+            self.assertIn(want, handle.read())
+
+    def test_a_missing_PyFixity_is_reported_and_not_silently_skipped(self):
+        r"""A unit uploaded without its own checksums is one nobody can check after the fact, so
+        the absence has to be loud."""
+        said = []
+        was = TOOL.exists
+        try:
+            TOOL.exists = lambda path: False if path.endswith("pyfixity.py") else was(path)
+            got = TOOL.fixity_over(self.folder, self.work, report=said.append)
+        finally:
+            TOOL.exists = was
+        self.assertFalse(got)
+        self.assertIn("no PyFixity", " ".join(said))
+
+    def test_IT_RUNS_LAST_SO_IT_COVERS_THE_INDEX(self):
+        """The index CSV is placed first and must be inside the manifests, so the order matters."""
+        with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
+            text = handle.read()
+        call = text.index("fixity_over(os.path.dirname(")
+        self.assertLess(text.index("place_index_beside(step)"), call)
+
+    def test_THE_LOGS_ARE_NOT_COVERED(self):
+        r"""The owner's decision on 2026-10-06: he stripped their lines out of all three manifests
+        by hand. A manifest describes the UPLOADABLE set, and `pack.log` is a local record of how
+        the volumes came to be -- 82 MB on misc, one line per file. Covering it would also make
+        the manifest stale the moment anything appended to the log.
+        """
+        TOOL.fixity_over(self.folder, self.work, report=lambda *_a: None)
+        with io.open(os.path.join(self.folder, common.SUMS_FILE), encoding="utf-8") as handle:
+            text = handle.read()
+        self.assertNotIn("pack.log", text)
+        self.assertIn("unit.part01.rar", text)
+
+    def test_A_STEP_WITH_NO_INDEX_PATH_DOES_NOT_REACH_THE_CALL(self):
+        r"""THE BUG THAT KILLED A SEVEN-HOUR RUN. The index archive's own step carries no
+        index_path, and the call site unpacked it with os.path.dirname() before calling -- so
+        `dirname(None)` raised TypeError after vendors had packed 399 GB, passed `rar t` and
+        passed the cross-check. The archive was fine; the run died before placing its index or
+        writing its checksums.
+
+        place_index_beside() already answered that case gracefully and a test said so. The call
+        site did not, which is the difference between testing a function and testing its use.
+        """
+        with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
+            text = handle.read()
+        call = text.index("fixity_over(os.path.dirname(")
+        guard = text.rindex("if step.get(\"index_path\"):", 0, call)
+        self.assertLess(guard, call)
+        # and nothing between the guard and the call that could run unguarded
+        self.assertNotIn("dirname(step[", text[guard:call])
+
+    def test_and_it_runs_only_after_the_checks_pass(self):
+        with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
+            text = handle.read()
+        call = text.index("fixity_over(os.path.dirname(")
+        self.assertLess(text.index("CRC32 and file count agree"), call)
 
 
 if __name__ == "__main__":
