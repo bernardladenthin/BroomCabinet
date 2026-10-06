@@ -121,6 +121,15 @@ ALLOWED = {
     "pdf_test.py": {
         "C:": "a PDF string-escape fixture: b\"C:\" + two backslashes + b\"tmp\"",
     },
+    "rar-verify-content.py": {
+        "C:": "'C:/Program Files/WinRAR' and its (x86) sibling -- where WinRAR's installer puts "
+              "Rar.exe, the same candidate-list shape b2-pack.py and iso-second-opinion.py use. "
+              "A vendor's default location, not a path of ours",
+        "X:": "the default --scratch, 'X:/verify': this check unpacks a whole unit somewhere, and "
+              "a default that is not the collection's drive is the point of naming one",
+        "Q:": "the docstring line saying Q: is read for the .sha256sum files and nothing else -- "
+              "the one promise this tool makes about the collection",
+    },
     "tar-subtree.py": {
         "C:": "'C:/Program Files/Git/usr/bin/tar.exe' -- GNU tar's location from the Git for "
               "Windows installer, in the same candidate shape as b2-pack.py's Rar.exe. It is "
