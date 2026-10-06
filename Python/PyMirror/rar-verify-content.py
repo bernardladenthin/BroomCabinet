@@ -78,7 +78,8 @@ import subprocess
 import sys
 import time
 
-from common import MIRROR_ROOT, SUMS_FILE, exists, human, long_path, relative_to, say
+from common import (BOOKKEEPING_FILES, MIRROR_ROOT, OWN_FILES, SUMS_FILE, exists, human,
+                    long_path, relative_to, say)
 
 GNU_RAR_NAMES = ("Rar.exe",)
 RAR_DIRS = (os.path.join("C:" + os.sep, "Program Files", "WinRAR"),
@@ -158,7 +159,7 @@ def extract(rar, archive, into, report=say):
 
 
 def compare(root_dir, want, report=say):
-    r"""-> (checked, [(path, why)]) hashing everything under `root_dir` against `want`.
+    r"""-> (checked, [(path, why)], [our own records]) hashing everything under `root_dir`.
 
     THE WALK IS THE AUTHORITY FOR WHAT IS THERE and `want` for what should be, so the two
     directions are reported separately: a file present with the wrong bytes is a different fault
@@ -203,10 +204,25 @@ def compare(root_dir, want, report=say):
             rate = seen_bytes / max(1e-6, time.time() - started)
             report("         %d files, %s, %.0f MB/s" % (checked, human(seen_bytes), rate / 1e6))
 
+    # OUR OWN BOOKKEEPING IS EXPECTED IN THE ARCHIVE AND IS IN NO .sha256sum, because a manifest
+    # does not list itself. b2-pack's CRC32 check counts those separately and calls them "ours";
+    # this one reported them as problems, so the end-to-end run in the scratchpad came back with
+    # one fault for a four-file archive -- and on misc it would have been 367, enough to make
+    # every real run read as a failure and the check as noise.
+    #
+    # BOTH SETS, because the two exist for different reasons: OWN_FILES is what a tree skips at
+    # its top (the index, the four manifests), BOOKKEEPING_FILES the wider set of records that are
+    # walked and therefore indexed. A file packed with a unit can be either.
+    ours = []
     for rel in sorted(seen):
-        if rel not in want:
-            bad.append((rel, "in the archive, in no .sha256sum"))
-    return checked, bad
+        if rel in want:
+            continue
+        base = rel.rsplit("/", 1)[-1]
+        if base in OWN_FILES or base in BOOKKEEPING_FILES:
+            ours.append(rel)
+            continue
+        bad.append((rel, "in the archive, in no .sha256sum"))
+    return checked, bad, ours
 
 
 def main(argv=None):
@@ -270,8 +286,9 @@ def main(argv=None):
     if not extract(rar, first, where):
         return 1
     say("     hashing every file against %s..." % SUMS_FILE)
-    checked, bad = compare(where, want)
-    say("     %d of %d file(s) hashed, %d problem(s)" % (checked, len(want), len(bad)))
+    checked, bad, ours = compare(where, want)
+    say("     %d of %d file(s) hashed, %d of our own record(s), %d problem(s)"
+        % (checked, len(want), len(ours), len(bad)))
     kinds = {}
     for _rel, why in bad:
         kinds[why] = kinds.get(why, 0) + 1

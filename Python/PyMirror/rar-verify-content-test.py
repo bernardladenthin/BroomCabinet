@@ -14,6 +14,7 @@ import io
 import os
 import shutil
 import sys
+import subprocess
 import tempfile
 import unittest
 
@@ -55,7 +56,7 @@ class Extracted(unittest.TestCase):
 
     def test_everything_matching_reports_no_problem(self):
         want = self.build({"arch/a.txt": b"one", "arch/sub/b.bin": b"two"})
-        checked, bad = TOOL.compare(self.root, want, report=lambda *_a: None)
+        checked, bad, _ours = TOOL.compare(self.root, want, report=lambda *_a: None)
         self.assertEqual((checked, bad), (2, []))
 
     def test_a_file_with_the_wrong_bytes_is_named(self):
@@ -63,7 +64,7 @@ class Extracted(unittest.TestCase):
         is internally consistent and holds content that is not what we packed."""
         want = self.build({"arch/a.txt": b"one"})
         want["arch/a.txt"] = sha(b"something else")
-        checked, bad = TOOL.compare(self.root, want, report=lambda *_a: None)
+        checked, bad, _ours = TOOL.compare(self.root, want, report=lambda *_a: None)
         self.assertEqual(checked, 1)
         self.assertEqual(bad, [("arch/a.txt", "sha256 differs")])
 
@@ -71,7 +72,7 @@ class Extracted(unittest.TestCase):
         """Present-with-wrong-bytes and never-arrived read differently and are counted apart."""
         want = self.build({"arch/a.txt": b"one"})
         want["arch/gone.txt"] = sha(b"never packed")
-        _checked, bad = TOOL.compare(self.root, want, report=lambda *_a: None)
+        _checked, bad, _ours = TOOL.compare(self.root, want, report=lambda *_a: None)
         self.assertIn(("arch/gone.txt", "not extracted"), bad)
 
     def test_a_file_no_manifest_names_is_reported_too(self):
@@ -80,7 +81,7 @@ class Extracted(unittest.TestCase):
         would be how a stray file got into a unit."""
         want = self.build({"arch/a.txt": b"one"})
         write(os.path.join(self.root, "arch", "extra.txt"), b"not in any manifest")
-        _checked, bad = TOOL.compare(self.root, want, report=lambda *_a: None)
+        _checked, bad, _ours = TOOL.compare(self.root, want, report=lambda *_a: None)
         self.assertIn(("arch/extra.txt", "in the archive, in no .sha256sum"), bad)
 
     def test_BOTH_DIRECTIONS_ARE_WALKED(self):
@@ -90,7 +91,7 @@ class Extracted(unittest.TestCase):
         want = self.build({"arch/a.txt": b"one"})
         want["arch/missing.txt"] = sha(b"x")
         write(os.path.join(self.root, "arch", "surplus.txt"), b"y")
-        _checked, bad = TOOL.compare(self.root, want, report=lambda *_a: None)
+        _checked, bad, _ours = TOOL.compare(self.root, want, report=lambda *_a: None)
         whys = sorted(why for _rel, why in bad)
         self.assertEqual(whys, ["in the archive, in no .sha256sum", "not extracted"])
 
@@ -104,7 +105,7 @@ class Extracted(unittest.TestCase):
         """
         self.build({"arch/Thing.txt": b"one"})
         want = {"arch/thing.txt": sha(b"one")}
-        _checked, bad = TOOL.compare(self.root, want, report=lambda *_a: None)
+        _checked, bad, _ours = TOOL.compare(self.root, want, report=lambda *_a: None)
         whys = sorted(why for _rel, why in bad)
         self.assertEqual(whys, ["in the archive, in no .sha256sum", "not extracted"])
 
@@ -112,7 +113,7 @@ class Extracted(unittest.TestCase):
         r"""CRC32 of zero bytes is 00000000 and that ambiguity cost an afternoon in the header
         check; SHA-256 of zero bytes is e3b0c442... and is ambiguous with nothing."""
         want = self.build({"arch/empty.bin": b""})
-        checked, bad = TOOL.compare(self.root, want, report=lambda *_a: None)
+        checked, bad, _ours = TOOL.compare(self.root, want, report=lambda *_a: None)
         self.assertEqual((checked, bad), (1, []))
         self.assertTrue(want["arch/empty.bin"].startswith("e3b0c442"))
 
@@ -289,6 +290,137 @@ class WhatWindowsCannotExtract(unittest.TestCase):
         doc = TOOL.__doc__
         self.assertIn("Linux filesystem", doc)
         self.assertIn("rar p", doc)
+
+
+class EndToEndWithARealArchive(unittest.TestCase):
+    r"""The whole chain on a tiny archive, built with the production switches.
+
+    THE DELETE QUESTION IS ANSWERED HERE AND NOT BY READING THE SOURCE. The other tests assert
+    that `rmtree` does not appear; this one runs the tool with --apply --clean to a successful
+    exit -- the path where a removal would be most plausible -- and then checks that the
+    extraction is still on disk.
+
+    EVERYTHING IS UNDER tempfile.mkdtemp() ON C:. The owner's instruction on 2026-10-06 was that
+    no test may run a delete operation on the packing drive, and the fixture this removes is one
+    it created in the system temp directory two lines earlier.
+
+    IT ALSO EXERCISES WHAT THE UNIT TESTS CANNOT: -oi1 collapsing a real duplicate, an empty file
+    whose sha256 is e3b0c442..., a real volume split with -rr1 and -rv2, and a manifest that does
+    not list itself. The last of those is what the first end-to-end run found: our own bookkeeping
+    was being reported as a fault, which on misc would have been 367 of them and would have made
+    every real run read as a failure.
+    """
+
+    class FakeUnit(object):
+        name = "tiny"
+
+        def archives(self):
+            return ["arch"]
+
+        def claims(self, _archive, _rel):
+            return True
+
+    class FakePacker(object):
+        @staticmethod
+        def first_volume(archive):
+            import glob
+            found = sorted(glob.glob(glob.escape(archive[:-4]) + ".part*.rar"))
+            return found[0] if found else archive
+
+    def setUp(self):
+        if not TOOL.find_rar():
+            self.skipTest("no Rar.exe on this machine")
+        self.base = tempfile.mkdtemp(prefix="rvc-e2e-")
+        self.was = TOOL.load_packer
+
+    def tearDown(self):
+        TOOL.load_packer = self.was
+        shutil.rmtree(self.base, ignore_errors=True)
+
+    def build(self):
+        root = os.path.join(self.base, "mirror")
+        tree = os.path.join(root, "arch")
+        os.makedirs(os.path.join(tree, "sub"))
+        payload = os.urandom(300 * 1024)
+        files = {"one.txt": b"the first file\n", "sub/two.bin": payload,
+                 "sub/empty.bin": b"", "sub/dup.bin": payload}
+        lines = []
+        for rel in sorted(files):
+            write(os.path.join(tree, *rel.split("/")), files[rel])
+            lines.append("%s *%s" % (sha(files[rel]), rel))
+        write(os.path.join(tree, common.SUMS_FILE), "\n".join(lines) + "\n")
+        return root
+
+    def pack(self, root):
+        out = os.path.join(self.base, "packed")
+        os.makedirs(out)
+        archive = os.path.join(out, "tiny.rar")
+        done = subprocess.run(
+            [TOOL.find_rar(), "a", "-ma5", "-m5", "-md256m", "-s", "-oi1", "-v200000b",
+             "-rr1", "-rv2", "-k", "-scfl", "-idq", archive, "arch"],
+            cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        self.assertEqual(done.returncode, 0,
+                         done.stdout.decode("utf-8", "replace")[:300])
+        return archive
+
+    def run_tool(self, root, archive, *extra):
+        packer = self.FakePacker()
+        packer.UNITS = [self.FakeUnit()]
+        TOOL.load_packer = lambda: packer
+        scratch = os.path.join(self.base, "verify")
+        return TOOL.main(["--archive", archive, "--unit", "tiny", "--root", root,
+                          "--scratch", scratch] + list(extra)), os.path.join(scratch, "tiny")
+
+    def test_the_whole_chain_comes_out_clean(self):
+        root = self.build()
+        archive = self.pack(root)
+        code, _where = self.run_tool(root, archive, "--apply")
+        self.assertEqual(code, 0)
+
+    def test_AND_CLEAN_DOES_NOT_REMOVE_THE_EXTRACTION(self):
+        r"""THE POINT OF THIS CLASS. Exit 0 is the path where a removal would be most plausible."""
+        root = self.build()
+        archive = self.pack(root)
+        code, where = self.run_tool(root, archive, "--apply", "--clean")
+        self.assertEqual(code, 0)
+        self.assertTrue(os.path.isdir(where), "the extraction was removed")
+        got = [f for _d, _s, fs in os.walk(where) for f in fs]
+        self.assertEqual(len(got), 5)        # four files and the manifest
+
+    def test_a_duplicate_and_an_empty_file_both_verify(self):
+        r"""-oi1 turns the duplicate into a reference with no CRC32 of its own, and the empty file
+        is the shape that confused the CRC32 check for an afternoon. Both hash correctly."""
+        root = self.build()
+        archive = self.pack(root)
+        code, where = self.run_tool(root, archive, "--apply")
+        self.assertEqual(code, 0)
+        with io.open(os.path.join(where, "arch", "sub", "dup.bin"), "rb") as handle:
+            dup = handle.read()
+        with io.open(os.path.join(where, "arch", "sub", "two.bin"), "rb") as handle:
+            self.assertEqual(dup, handle.read())
+        self.assertEqual(os.path.getsize(os.path.join(where, "arch", "sub", "empty.bin")), 0)
+
+    def test_OUR_OWN_MANIFEST_IS_COUNTED_AND_NOT_FAULTED(self):
+        r"""What the first end-to-end run found: `.sha256sum` is in the archive and in no
+        `.sha256sum`, because a manifest does not list itself. Reported as a fault it would have
+        been 367 of them on misc, and every real run would have read as a failure."""
+        root = self.build()
+        archive = self.pack(root)
+        code, where = self.run_tool(root, archive, "--apply")
+        self.assertEqual(code, 0)
+        self.assertTrue(os.path.exists(os.path.join(where, "arch", common.SUMS_FILE)))
+
+    def test_a_tampered_file_fails_the_check(self):
+        r"""And the whole thing is worthless if it cannot fail. One byte changed in the manifest's
+        expectation, and the run must come back non-zero."""
+        root = self.build()
+        manifest = os.path.join(root, "arch", common.SUMS_FILE)
+        with io.open(manifest, encoding="utf-8") as handle:
+            text = handle.read()
+        write(manifest, text.replace(text[:8], "ffffffff", 1))
+        archive = self.pack(root)
+        code, _where = self.run_tool(root, archive, "--apply")
+        self.assertEqual(code, 1)
 
 
 class TheDocumentedReasons(unittest.TestCase):

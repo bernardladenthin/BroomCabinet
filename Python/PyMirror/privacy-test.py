@@ -121,6 +121,11 @@ ALLOWED = {
     "pdf_test.py": {
         "C:": "a PDF string-escape fixture: b\"C:\" + two backslashes + b\"tmp\"",
     },
+    "rar-verify-content-test.py": {
+        "C:": "the sentence saying every fixture here lives in the system temp directory on C:, "
+              "which is the promise that no test of this file writes or deletes on the packing "
+              "drive -- the owner's instruction on 2026-10-06",
+    },
     "rar-verify-content.py": {
         "C:": "'C:/Program Files/WinRAR' and its (x86) sibling -- where WinRAR's installer puts "
               "Rar.exe, the same candidate-list shape b2-pack.py and iso-second-opinion.py use. "
