@@ -1440,5 +1440,85 @@ class TheCrossCheckUnderstandsOi1References(unittest.TestCase):
         self.assertEqual(getattr(TOOL.crc32_complaint, "references", 0), 0)
 
 
+class TheOtherResourceAPackCanRunOutOf(unittest.TestCase):
+    r"""Memory, which until 2026-10-06 nothing here looked at.
+
+    WHAT HAPPENED. A workstations run was killed before it wrote a single volume: 0.52 GB free of
+    63.34 GB, with an editor holding 39.59 GB. The run had not reached Rar.exe, so its own output
+    said nothing at all -- the log was zero bytes -- and the cause had to be found by listing
+    processes afterwards. The same shape six hours into the 638 GB vendors unit would have cost
+    the six hours and left the same silence.
+
+    The free DISK space has been in the plan since the beginning. This is the other one.
+    """
+
+    def test_free_memory_answers_a_plausible_number_here(self):
+        got = TOOL.free_memory()
+        if got is None:
+            self.skipTest("this host does not answer")
+        self.assertGreater(got, 1 << 20)                  # more than a megabyte
+        self.assertLess(got, 1 << 50)                     # less than a petabyte
+
+    def test_it_returns_None_rather_than_raising_where_it_cannot_ask(self):
+        """A plan must still print when the figure is unavailable, so the failure is a None."""
+        self.assertIn("or None where it cannot be asked", TOOL.free_memory.__doc__)
+
+    def test_THE_ESTIMATE_IS_LABELLED_AS_ONE(self):
+        r"""rar.txt gives two points -- about 7 GB for 1 GB and about 96 GB for 64 GB -- and calls
+        both "grob geschaetzt". A straight line between two rough figures is not a measurement and
+        the note says so, because the next reader will otherwise treat 12.07 GB as a requirement.
+        """
+        self.assertIn("rough", TOOL.memory_note("4g", free=50 * (1 << 30)))
+        near = TOOL.memory_estimate("4g") / float(1 << 30)
+        self.assertGreater(near, 10.0)
+        self.assertLess(near, 14.0)
+
+    def test_the_estimate_follows_rar_txts_two_points(self):
+        """1 GB -> about 7, 64 GB -> about 96, which is the line's definition."""
+        self.assertAlmostEqual(TOOL.memory_estimate("1g") / float(1 << 30), 7.0, places=1)
+        self.assertAlmostEqual(TOOL.memory_estimate("64g") / float(1 << 30), 96.0, places=1)
+
+    def test_IT_REFUSES_ONLY_BELOW_A_FLOOR_NOTHING_CAN_ARGUE_WITH(self):
+        r"""Less free memory than the dictionary itself. A 4 GB window cannot live in 3 GB.
+
+        Not at the estimate: refusing a run on an interpolation between two figures the vendor
+        calls rough would stop packs that would have worked.
+        """
+        self.assertIsNotNone(TOOL.memory_complaint("4g", free=3 * (1 << 30)))
+        self.assertIsNone(TOOL.memory_complaint("4g", free=5 * (1 << 30)))
+
+    def test_the_complaint_names_both_numbers(self):
+        got = TOOL.memory_complaint("4g", free=2 * (1 << 30))
+        self.assertIn("2.15 GB", got)
+        self.assertIn("4g", got)
+
+    def test_no_dictionary_means_no_opinion(self):
+        """The index archive is packed with -m5 and no -md; there is nothing to refuse it for."""
+        self.assertIsNone(TOOL.memory_complaint("", free=1 << 20))
+        self.assertIsNone(TOOL.memory_complaint(None, free=1 << 20))
+
+    def test_an_unanswerable_host_is_not_a_refusal(self):
+        r"""THE FAILURE MODE TO AVOID: a tool that cannot read the figure must not therefore
+        decline to pack. Refusing on a missing measurement is worse than packing without one."""
+        self.assertIsNone(TOOL.memory_complaint("4g", free=None)
+                          if TOOL.free_memory() is None else None)
+
+    def source(self):
+        with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
+            return handle.read()
+
+    def test_the_plan_prints_the_line_unconditionally(self):
+        """Including on a dry run, which is where a reader looks before committing six hours."""
+        text = self.source()
+        self.assertIn("say(\"  %s\" % memory_note(", text)
+        self.assertLess(text.index("memory_note(DEFAULTS.dictionary)"),
+                        text.index("NOTHING WAS RUN"))
+
+    def test_and_the_refusal_comes_before_rar_is_even_located(self):
+        """So a short-memory run costs nothing, not even the search for Rar.exe."""
+        text = self.source()
+        self.assertLess(text.index("short = memory_complaint("), text.index("rar = find_rar()"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

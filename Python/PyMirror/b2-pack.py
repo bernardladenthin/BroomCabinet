@@ -113,7 +113,7 @@ import subprocess
 import sys
 
 from common import (BOOKKEEPING_FILES, INDEX_FILE, MIRROR_ROOT, SFV_FILE, find_tool, human,
-                    read_index, read_sfv, relative_to, say, split_archive)
+                    parse_size, read_index, read_sfv, relative_to, say, split_archive)
 
 # THE VOLUME SIZE IS THE OWNER'S AND IT IS 199 MiB, MEASURED RATHER THAN RECALLED. It was
 # 24 200 000 000 bytes until 2026-10-04, then 995 000 000 for a few hours, and that middle figure
@@ -854,6 +854,104 @@ def rows_for(unit, root, cache=None):
 RAR_CANDIDATES = (r"C:\Program Files\WinRAR\Rar.exe", "rar", "Rar.exe")
 
 
+def free_memory():
+    r"""-> free physical bytes, or None where it cannot be asked.
+
+    THROUGH ctypes AND THE STANDARD LIBRARY ONLY, because this project has no dependencies and a
+    packing run must not acquire one in order to tell the truth about why it died.
+
+    WHY IT IS ASKED AT ALL. On 2026-10-06 a workstations run was killed before it wrote a single
+    volume: 0.52 GB free of 63.34 GB, with an editor holding 39.59 GB. The run had not reached
+    Rar.exe, so nothing in its own output said anything about the cause -- and the same shape six
+    hours into a 638 GB unit would have wasted the six hours. The free DISK space has been in the
+    plan from the beginning; this is the other resource a pack can run out of.
+    """
+    if os.name != "nt":
+        try:
+            with io.open("/proc/meminfo") as handle:
+                for line in handle:
+                    if line.startswith("MemAvailable:"):
+                        return int(line.split()[1]) * 1024
+        except (OSError, ValueError, IndexError):
+            return None
+        return None
+    try:
+        import ctypes
+
+        class Status(ctypes.Structure):
+            _fields_ = [("dwLength", ctypes.c_ulong),
+                        ("dwMemoryLoad", ctypes.c_ulong),
+                        ("ullTotalPhys", ctypes.c_ulonglong),
+                        ("ullAvailPhys", ctypes.c_ulonglong),
+                        ("ullTotalPageFile", ctypes.c_ulonglong),
+                        ("ullAvailPageFile", ctypes.c_ulonglong),
+                        ("ullTotalVirtual", ctypes.c_ulonglong),
+                        ("ullAvailVirtual", ctypes.c_ulonglong),
+                        ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+
+        status = Status()
+        status.dwLength = ctypes.sizeof(Status)
+        if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+            return None
+        return int(status.ullAvailPhys)
+    # NAMED EXCEPTIONS AND NOT `Exception`, which common_test.py refuses for a reason this very
+    # function proves: a bare catch here would have swallowed a misspelled field name in Status
+    # and reported "cannot tell how much memory is free" for a bug in this file. AttributeError is
+    # the honest one to expect -- `ctypes.windll` does not exist off Windows -- and OSError covers
+    # the call itself failing.
+    except (AttributeError, OSError, ValueError):
+        return None
+
+
+def memory_estimate(dictionary):
+    """-> rar.txt's rough figure for packing with `dictionary`, in bytes, or None.
+
+    TWO POINTS AND A STRAIGHT LINE BETWEEN THEM, which is all the documentation offers: about
+    7 GB for a 1 GB dictionary and about 96 GB for 64 GB, both called "grob geschaetzt" there.
+    That is roughly 1.4 GB of memory per GB of dictionary, so 4g lands near 11 GB.
+    """
+    want = parse_size(dictionary) if dictionary else 0
+    if not want:
+        return None
+    gb = want / float(1 << 30)
+    return int((7.0 + (gb - 1.0) * (96.0 - 7.0) / (64.0 - 1.0)) * (1 << 30))
+
+
+def memory_complaint(dictionary, free=None):
+    r"""-> a complaint about there being too little memory, or None.
+
+    THE REFUSAL IS AT A FLOOR NOTHING CAN ARGUE WITH: less free memory than the dictionary itself.
+    A 4 GB window cannot live in 3 GB, whatever an estimate says.
+
+    AND NOT AT THE ESTIMATE, deliberately. memory_estimate() interpolates between two figures
+    rar.txt itself calls rough, and refusing a run on an interpolation between two estimates would
+    stop a pack that would have worked. Above the floor the numbers are printed and the decision
+    is the owner's -- he is the one who knows whether the editor holding 39 GB is about to close.
+    """
+    if free is None:
+        free = free_memory()
+    if free is None:
+        return None
+    want = parse_size(dictionary) if dictionary else 0
+    if want and free < want:
+        return ("only %s of memory free, which is less than the %s dictionary itself -- packing "
+                "would fail or page" % (human(free), dictionary))
+    return None
+
+
+def memory_note(dictionary, free=None):
+    """-> one line for the plan: what is free, and the documented estimate for this dictionary."""
+    if free is None:
+        free = free_memory()
+    if free is None:
+        return "cannot tell how much memory is free"
+    guess = memory_estimate(dictionary)
+    if guess is None:
+        return "%s of memory free" % human(free)
+    return ("%s of memory free; rar.txt's two rough estimates put a %s dictionary near %s"
+            % (human(free), dictionary, human(guess)))
+
+
 def find_rar(candidates=RAR_CANDIDATES):
     """-> the first candidate that answers, or None. Nothing is packed without one."""
     return find_tool(candidates)
@@ -1445,6 +1543,15 @@ def main(argv=None):
             say("--execute needs --password-file: a unit asks for encrypted headers, and the "
                 "password is never a command-line argument")
             return 2
+        # AND BELOW THE FLOOR IT REFUSES, before a six-hour run starts. The floor is the
+        # dictionary size itself, which no estimate can argue with; everything above it is the
+        # owner's call and printed rather than enforced.
+        short = memory_complaint(DEFAULTS.dictionary)
+        if short:
+            say("REFUSING: %s" % short)
+            say("  Close what is holding it, or pass a unit whose options use a smaller "
+                "dictionary.")
+            return 2
         rar = find_rar()
         if rar is None:
             say("REFUSING TO RUN: no rar executable found.")
@@ -1501,6 +1608,12 @@ def main(argv=None):
         return 0
 
     report(steps, verbose=args.verbose)
+
+    # MEMORY IS REPORTED IN THE PLAN, beside the volume and disc counts, because it is the other
+    # resource a pack can run out of and the only one whose exhaustion leaves no trace in the
+    # run's own output. On 2026-10-06 a workstations run was killed with 0.52 GB free of 63.34,
+    # before Rar.exe had started, and nothing it printed said why.
+    say("  %s" % memory_note(DEFAULTS.dictionary))
 
     if not args.execute:
         say("")
