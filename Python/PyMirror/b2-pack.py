@@ -878,9 +878,11 @@ def fixity_over(folder, work, report=say):
     -- "It changes on every check, so keep it OUTSIDE a tree that gets uploaded or synced" -- and
     this tree is the one that gets uploaded.
 
-    IT COVERS THE WHOLE UNIT FOLDER: the volumes, the .rev files, `<unit>.index.csv` and the logs.
-    Everything that goes to B2 is then described by one `.sha256sum` beside it, and that file is
-    what makes an upload verifiable without fetching 101 GB back.
+    IT COVERS WHAT GOES TO B2 AND NOTHING ELSE: the volumes, the .rev files and
+    `<unit>.index.csv`, all in one flat directory, with `*.log` excluded. One `.sha256sum` beside
+    them is what makes an upload verifiable without fetching 101 GB back -- and the owner uploads
+    that directory as it stands, so a manifest naming a file he does not upload would be a
+    manifest that fails on the far side.
     """
     tool = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                         "PyFixity", "pyfixity.py")
@@ -889,7 +891,13 @@ def fixity_over(folder, work, report=say):
         return False
     index = os.path.join(work, os.path.basename(folder.rstrip("\\/")) + ".fixity.csv")
     started = time.time()
-    done = subprocess.run([sys.executable, tool, "index", folder, "--index", index],
+    # THE LOGS ARE EXCLUDED, which is the owner's decision of 2026-10-06: he stripped their lines
+    # out of the manifests by hand. A manifest describes the UPLOADABLE set -- the volumes, the
+    # .rev files and the index CSV -- and `pack.log` is a local record of how they came to be, 82
+    # to 95 MB of one line per file. Covering it would also make the manifest go stale the moment
+    # a run appended to the log.
+    done = subprocess.run([sys.executable, tool, "index", folder, "--index", index,
+                           "--exclude-glob", "*.log"],
                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     text = done.stdout.decode("utf-8", "replace")
     if done.returncode != 0:
@@ -931,7 +939,11 @@ def place_index_beside(step, report=say):
     source = step.get("index_path")
     if not source or not exists(source):
         return None
-    folder = os.path.dirname(os.path.dirname(step["archive"]))
+    # BESIDE THE VOLUMES AND IN THE SAME DIRECTORY, which is the shape the owner built by hand on
+    # 2026-10-06 and the one he uploads: `<out>/<unit>/` holding the .rar, the .rev, the index CSV
+    # and the four manifests, all flat. An earlier version put the index one level up, on the
+    # assumption that the volumes had a directory of their own -- they do, and it IS the unit's.
+    folder = os.path.dirname(step["archive"])
     target = os.path.join(folder, os.path.basename(source))
     if exists(target):
         if filecmp.cmp(long_path(source), long_path(target), shallow=False):
@@ -1565,7 +1577,7 @@ def execute(steps, rar, password):
             # checksums written. The guard belongs at the call site, because the step for the
             # index archive legitimately has nothing to place and nothing to describe.
             if step.get("index_path"):
-                fixity_over(os.path.dirname(os.path.dirname(step["archive"])),
+                fixity_over(os.path.dirname(step["archive"]),
                             os.path.dirname(step["index_path"]))
         if checked.returncode != 0:
             say("  THE ARCHIVE DOES NOT TEST CLEAN (rar t exited %d) -- stopping before the next "

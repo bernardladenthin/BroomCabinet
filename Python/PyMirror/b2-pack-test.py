@@ -1561,6 +1561,9 @@ class TheIndexGoesBesideTheVolumes(unittest.TestCase):
     def setUp(self):
         self.base = tempfile.mkdtemp(prefix="b2p-idx-")
         self.work = os.path.join(self.base, "work")
+        # ONE FLAT DIRECTORY PER UNIT, which is the shape the owner built by hand on 2026-10-06
+        # and uploads as it stands: <out>/<unit>/ holding the volumes, the .rev files, the index
+        # CSV and the four manifests, all side by side.
         self.out = os.path.join(self.base, "out", "unit")
         os.makedirs(self.work)
         os.makedirs(self.out)
@@ -1581,15 +1584,17 @@ class TheIndexGoesBesideTheVolumes(unittest.TestCase):
             return handle.read()
 
     def target(self):
-        return os.path.join(os.path.dirname(self.out), "unit.index.csv")
+        return os.path.join(self.out, "unit.index.csv")
 
     def source_text(self):
         with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
             return handle.read()
 
-    def test_it_lands_beside_the_volume_directory_and_not_inside_it(self):
-        r"""One level up from the volumes: the unit folder holds the archive's own directory, and
-        the index belongs with the logs, where a reader looks first."""
+    def test_IT_LANDS_IN_THE_SAME_DIRECTORY_AS_THE_VOLUMES(self):
+        r"""Flat, beside the .rar and .rev files. An earlier version put it one level up, on the
+        assumption that the volumes had a directory of their own below the unit's -- they do not,
+        and the owner flattened the three finished units by hand to prove the point. He uploads
+        that directory as it stands, so anything not in it is not uploaded."""
         got = TOOL.place_index_beside(self.step, report=lambda *_a: None)
         self.assertEqual(got, self.target())
         self.assertTrue(os.path.exists(self.target()))
@@ -1660,12 +1665,15 @@ class TheArchiveGetsItsOwnChecksums(unittest.TestCase):
         self.base = tempfile.mkdtemp(prefix="b2p-fix-")
         self.folder = os.path.join(self.base, "unit")
         self.work = os.path.join(self.base, "work")
-        os.makedirs(os.path.join(self.folder, "unit"))
+        os.makedirs(self.folder)
         os.makedirs(self.work)
-        # the shape a packed unit has: volumes in their own directory, the index beside them
+        # the shape a packed unit has: everything flat in one directory, plus a log that must NOT
+        # be covered -- the owner stripped those lines out of all three manifests by hand.
         for name in ("unit.part01.rar", "unit.part02.rar", "unit.part01.rev"):
-            with io.open(os.path.join(self.folder, "unit", name), "wb") as handle:
+            with io.open(os.path.join(self.folder, name), "wb") as handle:
                 handle.write(os.urandom(4096))
+        with io.open(os.path.join(self.folder, "pack.log"), "w", encoding="utf-8") as handle:
+            handle.write("one line per file, 82 MB of it on misc\n")
         with io.open(os.path.join(self.folder, "unit.index.csv"), "w",
                      encoding="utf-8", newline="\n") as handle:
             handle.write("archive,path,size,sha256\narch,a.bff,12,ab\n")
@@ -1706,7 +1714,7 @@ class TheArchiveGetsItsOwnChecksums(unittest.TestCase):
     def test_the_digests_are_the_real_ones(self):
         """Not a stub: the file's sha256 has to be the sha256 of its bytes."""
         TOOL.fixity_over(self.folder, self.work, report=lambda *_a: None)
-        with io.open(os.path.join(self.folder, "unit", "unit.part01.rar"), "rb") as handle:
+        with io.open(os.path.join(self.folder, "unit.part01.rar"), "rb") as handle:
             want = hashlib.sha256(handle.read()).hexdigest()
         with io.open(os.path.join(self.folder, common.SUMS_FILE), encoding="utf-8") as handle:
             self.assertIn(want, handle.read())
@@ -1730,6 +1738,18 @@ class TheArchiveGetsItsOwnChecksums(unittest.TestCase):
             text = handle.read()
         call = text.index("fixity_over(os.path.dirname(")
         self.assertLess(text.index("place_index_beside(step)"), call)
+
+    def test_THE_LOGS_ARE_NOT_COVERED(self):
+        r"""The owner's decision on 2026-10-06: he stripped their lines out of all three manifests
+        by hand. A manifest describes the UPLOADABLE set, and `pack.log` is a local record of how
+        the volumes came to be -- 82 MB on misc, one line per file. Covering it would also make
+        the manifest stale the moment anything appended to the log.
+        """
+        TOOL.fixity_over(self.folder, self.work, report=lambda *_a: None)
+        with io.open(os.path.join(self.folder, common.SUMS_FILE), encoding="utf-8") as handle:
+            text = handle.read()
+        self.assertNotIn("pack.log", text)
+        self.assertIn("unit.part01.rar", text)
 
     def test_A_STEP_WITH_NO_INDEX_PATH_DOES_NOT_REACH_THE_CALL(self):
         r"""THE BUG THAT KILLED A SEVEN-HOUR RUN. The index archive's own step carries no
