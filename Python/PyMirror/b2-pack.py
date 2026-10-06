@@ -1559,8 +1559,14 @@ def execute(steps, rar, password):
             # AND THEN THE ARCHIVE'S OWN CHECKSUMS, last of all, because they have to cover the
             # index that was just placed. Everything before this describes what is inside the
             # archive; this describes the files that go to B2.
-            fixity_over(os.path.dirname(os.path.dirname(step["archive"])),
-                        os.path.dirname(step["index_path"]))
+            # THE INDEX ARCHIVE'S STEP HAS NO index_path AND THIS CRASHED A SEVEN-HOUR RUN ON IT.
+            # `os.path.dirname(None)` raises TypeError, so vendors packed 399 GB, passed `rar t`
+            # and passed the cross-check, and then died before its index was placed or its
+            # checksums written. The guard belongs at the call site, because the step for the
+            # index archive legitimately has nothing to place and nothing to describe.
+            if step.get("index_path"):
+                fixity_over(os.path.dirname(os.path.dirname(step["archive"])),
+                            os.path.dirname(step["index_path"]))
         if checked.returncode != 0:
             say("  THE ARCHIVE DOES NOT TEST CLEAN (rar t exited %d) -- stopping before the next "
                 "unit." % checked.returncode)

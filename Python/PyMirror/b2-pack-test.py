@@ -1731,6 +1731,24 @@ class TheArchiveGetsItsOwnChecksums(unittest.TestCase):
         call = text.index("fixity_over(os.path.dirname(")
         self.assertLess(text.index("place_index_beside(step)"), call)
 
+    def test_A_STEP_WITH_NO_INDEX_PATH_DOES_NOT_REACH_THE_CALL(self):
+        r"""THE BUG THAT KILLED A SEVEN-HOUR RUN. The index archive's own step carries no
+        index_path, and the call site unpacked it with os.path.dirname() before calling -- so
+        `dirname(None)` raised TypeError after vendors had packed 399 GB, passed `rar t` and
+        passed the cross-check. The archive was fine; the run died before placing its index or
+        writing its checksums.
+
+        place_index_beside() already answered that case gracefully and a test said so. The call
+        site did not, which is the difference between testing a function and testing its use.
+        """
+        with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
+            text = handle.read()
+        call = text.index("fixity_over(os.path.dirname(")
+        guard = text.rindex("if step.get(\"index_path\"):", 0, call)
+        self.assertLess(guard, call)
+        # and nothing between the guard and the call that could run unguarded
+        self.assertNotIn("dirname(step[", text[guard:call])
+
     def test_and_it_runs_only_after_the_checks_pass(self):
         with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
             text = handle.read()
