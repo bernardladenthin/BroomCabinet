@@ -166,31 +166,45 @@ class TheRealTableIsAPartition(unittest.TestCase):
                 seen.setdefault(archive, unit.name)
         self.assertIn("bitsavers", seen)
 
-    def test_the_bitsavers_split_is_exhaustive_by_construction(self):
-        """The remainder unit must name `bitsavers` bare and exclude exactly the named subtrees."""
-        rest = [u for u in TOOL.UNITS if u.name == "bitsavers-software"][0]
-        self.assertEqual(rest.members, ("bitsavers",))
-        named = set()
-        for unit in TOOL.UNITS:
-            for m in unit.members:
-                if m.startswith("bitsavers/"):
-                    named.add(m)
-        self.assertEqual(set(rest.exclude), named)
+    def test_BITSAVERS_IS_ONE_UNIT_WITH_NOTHING_TO_GET_RIGHT(self):
+        r"""It was split into paper and software until 2026-10-07, and the remainder unit had to
+        name `bitsavers` bare while excluding exactly the paper subtrees -- a subtraction that had
+        to be correct every time the mirror was re-fetched, and that decided which side a new
+        top-level directory upstream landed on.
+
+        One directory, one unit, no exclusion: there is nothing left to get right. The test that
+        checked the subtraction is replaced by one that checks the subtraction is GONE.
+        """
+        unit = [u for u in TOOL.UNITS if u.name == "bitsavers"][0]
+        self.assertEqual(unit.members, ("bitsavers",))
+        self.assertEqual(tuple(unit.exclude or ()), ())
+        # and no other unit may reach into it, or the one-directory-one-unit claim is false
+        for other in TOOL.UNITS:
+            if other.name == "bitsavers":
+                continue
+            for member in other.members:
+                self.assertFalse(member == "bitsavers" or member.startswith("bitsavers/"),
+                                 "%s also names %s" % (other.name, member))
 
     def test_every_unit_has_members_and_a_reason(self):
         for unit in TOOL.UNITS:
             self.assertTrue(unit.members, unit.name)
             self.assertGreater(len(unit.why), 60, "%s: a reason, not a label" % unit.name)
 
-    def test_there_are_ten(self):
-        """Not decoration -- the count is the thing that was agreed, and a silent eleventh unit
-        means an upload nobody planned for.
+    def test_there_are_nine(self):
+        """Not decoration -- the count is the thing that was agreed, and a silent tenth unit means
+        an upload nobody planned for.
 
-        NINETEEN UNTIL 2026-10-04. The owner's rule was that a subject should be one unpack:
-        "wenn man an AIX Sachen arbeitet, entpackt man vermutlich komplett AIX". Measured, the
-        merge is worth 16 GB of 4 581 -- the bytes came from the volume size, not from this -- so
-        the count changed for the reader and not for the bill."""
-        self.assertEqual(len(TOOL.UNITS), 10)
+        NINETEEN UNTIL 2026-10-04, TEN UNTIL 2026-10-07. The owner's rule was that a subject
+        should be one unpack: "wenn man an AIX Sachen arbeitet, entpackt man vermutlich komplett
+        AIX". Measured, the first merge was worth 16 GB of 4 581 -- the bytes came from the volume
+        size, not from this -- so the count changed for the reader and not for the bill.
+
+        THE LAST MERGE WAS bitsavers, paper and software into one, and its reason is different:
+        not unpacking but UPDATING. bitsavers is the one mirror here that changes constantly, so
+        it is the one that will be re-fetched and re-packed, and a split meant two packs, two sets
+        of manifests and a subtraction to get right every time."""
+        self.assertEqual(len(TOOL.UNITS), 9)
 
     def test_the_names_are_usable_as_directory_names(self):
         for unit in TOOL.UNITS:

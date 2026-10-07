@@ -673,25 +673,26 @@ UNITS = (
          "every name a held page gives is held or recorded as gone."),
 
     # ---------------------------------------------------------------- bitsavers
-    Unit("bitsavers-paper", ["bitsavers/pdf", "bitsavers/magazines"],
-         "844 GB of scanned paper in 96 678 files -- the manuals and the magazines, which are the "
-         "largest single files in the collection. Stored: these are image streams inside an "
-         "already-compressed container, and -m1 would spend hours to find nothing. "
-         "THE TWO WERE SEPARATE UNTIL 2026-10-04 and the reason they were has expired: "
-         "`bitsavers/magazines` stood alone because it `grows a few scans at a time`, and a "
-         "multi-volume RAR cannot be appended to. After B2 nothing is appended to anything, so "
-         "the split had nothing left to buy -- one .rev file, 995 MB."),
-
-    Unit("bitsavers-software", ["bitsavers"],
-         "352 GB of bitsavers that is software rather than paper: bits, which holds the part of "
-         "bitsavers with real duplicate mass against the rest of the collection, plus components, "
-         "projects, test_equipment, communications and two dozen small branches. "
-         "EXPRESSED AS `bitsavers` MINUS THE PAPER UNIT, so a new top-level directory upstream "
-         "lands here instead of being silently dropped -- the partition test is what makes that "
-         "safe. Two units became one on 2026-10-04 and it saves nothing measurable: 36 .rev apart, "
-         "36 merged. They are one unit because they are one kind of thing, and because the "
-         "subtraction only reads clearly against a single counterpart.",
-         exclude=["bitsavers/pdf", "bitsavers/magazines"]),
+    Unit("bitsavers", ["bitsavers"],
+         "1196.66 GB in 176 028 files -- the whole mirror, and the largest unit by a long way. "
+         "844 GB of it is scanned paper (pdf, magazines), holding the largest single files in the "
+         "collection; the rest is software: bits, components, projects, test_equipment, "
+         "communications and two dozen small branches. "
+         "THREE UNITS BECAME TWO ON 2026-10-04 AND TWO BECAME ONE ON 2026-10-07, each time "
+         "because the reason for the split had expired. `bitsavers/magazines` first stood alone "
+         "because it grows a few scans at a time and a multi-volume RAR cannot be appended to -- "
+         "after B2 nothing is appended to anything. Paper and software then stood apart because "
+         "they are different kinds of thing, which is true and turned out not to matter: the "
+         "measured difference was 36 .rev files either way. "
+         "WHAT DECIDED IT IS UPDATING, which is the owner's reason and the only one that survives "
+         "contact with the next five years: bitsavers is the one mirror here that changes "
+         "constantly, so it is the one that will be re-fetched and re-packed. A split meant two "
+         "packs, two sets of manifests and a subtraction (`bitsavers` MINUS the paper subtrees) "
+         "that had to be got right every time -- and a new top-level directory upstream landing "
+         "on the correct side of it. One directory, one unit: there is nothing to get right. "
+         "THE PRICE IS A 1.2 TB UNIT, which is sizeable to fetch back. It costs less than it "
+         "looks: the solid stream runs through the whole set anyway, so even the old 844 GB unit "
+         "had to be fetched from its first volume. 337 volumes rather than 238 plus 100."),
 
     # ---------------------------------------------------------------- multi-vendor collections
     Unit("vendors", ["fsck-vendors", "vtda"],
