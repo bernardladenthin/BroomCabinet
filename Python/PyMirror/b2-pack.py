@@ -1156,8 +1156,28 @@ def plan(units, root, out, work, rar="rar", with_dirs=True):
 
 
 def write_list(step, dry_run=True):
-    """The `@list` file and the unit's index, both OUTSIDE the collection."""
+    r"""The `@list` file and the unit's index, both OUTSIDE the collection.
+
+    THE INDEX ARCHIVE HAS NEITHER AND THAT CRASHED EVERY --execute RUN THERE HAS BEEN. It packs
+    `*.index.csv` by wildcard rather than from a list, so both paths are None and
+    `os.path.dirname(None)` raised TypeError -- after the unit had packed, passed `rar t` and
+    passed the cross-check. misc, vendors and oldskool all ended that way, each with exit 1 and a
+    traceback nobody read, because the archive was finished and correct by then and the three
+    checks had already said so.
+
+    THE INDEX ARCHIVE WAS THEREFORE NEVER BUILT. That is the real cost: the small archive that
+    bundles every unit's `*.index.csv`, the one meant to be fetched INSTEAD of a unit. It only
+    matters once all ten exist, which is why nothing missed it.
+
+    AND I BLAMED MY OWN CODE FOR IT FIRST. The vendors traceback named `write_list` and I read it
+    as a guard I had left out in `fixity_over` an hour earlier -- committed that as the cause, and
+    was wrong. The line numbers in that traceback pointed at comments, because the file had been
+    edited while the run was going, and I read the names rather than checking which call actually
+    raised.
+    """
     if dry_run:
+        return
+    if not step.get("list_path") or not step.get("index_path"):
         return
     for path in (step["list_path"], step["index_path"]):
         parent = os.path.dirname(path)

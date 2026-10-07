@@ -1776,5 +1776,66 @@ class TheArchiveGetsItsOwnChecksums(unittest.TestCase):
         self.assertLess(text.index("CRC32 and file count agree"), call)
 
 
+class TheIndexArchiveStepHasNoList(unittest.TestCase):
+    r"""It packs `*.index.csv` by wildcard, so both of its paths are None.
+
+    THIS CRASHED EVERY --execute RUN THERE HAS BEEN. `write_list` called
+    `os.path.dirname(step["list_path"])` unconditionally, so misc, vendors and oldskool each
+    packed, passed `rar t`, passed the CRC32 cross-check and then died with exit 1 and a traceback
+    nobody read -- because by then the archive was finished and three checks had said it was
+    correct.
+
+    THE COST WAS THE INDEX ARCHIVE ITSELF, never built: the small archive bundling every unit's
+    index CSV, the one meant to be fetched instead of a unit. It only matters once all ten exist,
+    which is why its absence went unnoticed for three units.
+
+    AND THE FIRST DIAGNOSIS WAS WRONG. The vendors traceback named `write_list` and I attributed
+    it to a guard I had left out in `fixity_over` an hour earlier, committed that as the cause,
+    and was mistaken -- the line numbers pointed at comments because the file had been edited
+    while the run was going, and I read the function names instead of checking which call raised.
+    """
+
+    def test_a_step_with_no_list_path_is_skipped_rather_than_raising(self):
+        TOOL.write_list({"list_path": None, "index_path": None, "rows": []}, dry_run=False)
+
+    def test_a_step_with_no_index_path_is_skipped_too(self):
+        TOOL.write_list({"list_path": "somewhere.list", "index_path": None, "rows": []},
+                        dry_run=False)
+
+    def test_AND_IT_WRITES_NOTHING_WHEN_IT_SKIPS(self):
+        r"""A half-written list would be worse than none: RAR would pack whatever it held."""
+        folder = tempfile.mkdtemp(prefix="b2p-wl-")
+        try:
+            path = os.path.join(folder, "unit.list")
+            TOOL.write_list({"list_path": path, "index_path": None, "rows": []}, dry_run=False)
+            self.assertFalse(os.path.exists(path))
+        finally:
+            shutil.rmtree(folder, ignore_errors=True)
+
+    def test_a_real_step_still_writes_both(self):
+        folder = tempfile.mkdtemp(prefix="b2p-wl2-")
+        try:
+            step = {"list_path": os.path.join(folder, "unit.list"),
+                    "index_path": os.path.join(folder, "unit.index.csv"),
+                    "rows": [{"archive": "arch", "path": "a.bff", "size": 1, "digest": "ab"}],
+                    "bookkeeping": [], "empty_dirs": []}
+            TOOL.write_list(step, dry_run=False)
+            self.assertTrue(os.path.exists(step["list_path"]))
+            self.assertTrue(os.path.exists(step["index_path"]))
+        finally:
+            shutil.rmtree(folder, ignore_errors=True)
+
+    def test_a_dry_run_writes_nothing_at_all(self):
+        folder = tempfile.mkdtemp(prefix="b2p-wl3-")
+        try:
+            step = {"list_path": os.path.join(folder, "unit.list"),
+                    "index_path": os.path.join(folder, "unit.index.csv"), "rows": [],
+                    "bookkeeping": [], "empty_dirs": []}
+            TOOL.write_list(step)
+            self.assertEqual(os.listdir(folder), [])
+        finally:
+            shutil.rmtree(folder, ignore_errors=True)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
