@@ -139,39 +139,67 @@ class CountingHowFarRarHasGot(Fixture):
 
 
 class TheEstimate(Fixture):
-    def test_bytes_are_summed_up_to_the_counted_file(self):
-        order = ["a\\1", "a\\2", "a\\3"]
-        sizes = {"a\\1": 100, "a\\2": 200, "a\\3": 700}
-        position, done, total = TOOL.progress(order, sizes, 2)
-        self.assertEqual((position, done, total), (1, 300, 1000))
+    r"""The share is by FILE COUNT, and the two attempts at bytes before it both failed.
 
-    def test_BYTES_AND_NOT_FILE_COUNT(self):
-        r"""THE MEASUREMENT THAT MADE THIS TOOL. On 2026-10-07 oldskool stood at file 77 286 of
-        77 631 -- 99.6 % by count -- while only 86.7 % of its bytes had been read, because the
-        last few hundred files were the large ones. A count-based figure would have promised two
-        minutes where twenty-five were left.
-        """
-        order = ["a\\1", "a\\2", "a\\3"]
-        sizes = {"a\\1": 1, "a\\2": 1, "a\\3": 998}
-        position, done, total = TOOL.progress(order, sizes, 2)
-        self.assertEqual(position, 1)
-        self.assertEqual(done / float(total), 0.002)
+    1. A name lookup could not find a long path, because RAR truncates the name to its output
+       column. It reported 87.7 % and then 49.0 % minutes later.
+    2. Counting the lines fixed the position, but summing the first N entries of the LIST still
+       added up the wrong files, because RAR DOES NOT PACK IN LIST ORDER. rar.txt: "Normalerweise
+       werden Dateien in soliden Archiven nach ihrer Erweiterung sortiert" -- sorted BY EXTENSION,
+       which is what makes -s worth having. Measured on ibm-aix-opensource: all .txt first, .rpm
+       much later, while the tool claimed 0.3 % of bytes with 25 GB already written.
+
+    THE SORT COULD BE REPLICATED AND IS NOT. "By extension" is all the documentation gives, the
+    tie-breaking is unstated, and a rarfiles.lst may override it -- a byte share built on a
+    guessed sort would be wrong invisibly, which is worse than a count that is right about what it
+    measures.
+    """
+
+    def test_the_position_is_the_count_clamped_to_the_list(self):
+        self.assertEqual(TOOL.progress(["a\\1", "a\\2", "a\\3"], 2), (2, 3))
 
     def test_nothing_named_yet_is_None(self):
-        self.assertIsNone(TOOL.progress(["a\\1"], {"a\\1": 5}, 0))
+        self.assertIsNone(TOOL.progress(["a\\1"], 0))
 
     def test_MORE_NAMED_THAN_THE_LIST_HOLDS_DOES_NOT_RUN_OFF_THE_END(self):
-        r"""Measured: oldskool's log held 77 632 `Archiviere` lines for 77 631 files, because the
-        index CSV is passed to RAR as an extra argument beside the @list. One too many must clamp
-        rather than raise."""
-        order = ["a\\1", "a\\2"]
-        sizes = {"a\\1": 10, "a\\2": 90}
-        position, done, total = TOOL.progress(order, sizes, 3)
-        self.assertEqual((position, done, total), (1, 100, 100))
+        r"""Measured: ibm-aix-opensource's log held 184 472 names for 184 465 files and oldskool's
+        77 632 for 77 631 -- the index CSV goes to RAR as an extra argument beside the @list."""
+        self.assertEqual(TOOL.progress(["a\\1", "a\\2"], 7), (2, 2))
 
-    def test_a_file_the_index_does_not_size_counts_as_zero_rather_than_raising(self):
-        position, done, _total = TOOL.progress(["a\\1", "a\\2"], {"a\\2": 5}, 2)
-        self.assertEqual((position, done), (1, 5))
+    def test_NO_SIZES_ARE_CONSULTED(self):
+        r"""The signature itself is the guard: a byte share cannot be computed from a list whose
+        order is not the packing order, so the function is not given the sizes at all."""
+        import inspect
+        self.assertEqual(list(inspect.signature(TOOL.progress).parameters), ["order", "named"])
+
+
+class WhatIsWrittenSoFar(Fixture):
+    r"""The one physical fact available, reported beside the count and not extrapolated from.
+
+    Without knowing the final ratio it says nothing about the remainder -- the five units so far
+    came out between 52.5 % and 80.4 % of their source -- so it is printed and left alone.
+    """
+
+    def test_it_sums_the_volumes_and_the_rev_files(self):
+        folder = os.path.join(self.work, "out")
+        os.makedirs(folder)
+        for name, size in (("u.part01.rar", 100), ("u.part02.rar", 200), ("u.part01.rev", 50)):
+            with io.open(os.path.join(folder, name), "wb") as handle:
+                handle.write(b"x" * size)
+        self.assertEqual(TOOL.written_bytes(folder), 350)
+
+    def test_it_ignores_everything_else(self):
+        r"""The index CSV and the manifests sit in the same directory and are not archive bytes."""
+        folder = os.path.join(self.work, "out2")
+        os.makedirs(folder)
+        for name in ("u.part01.rar", "u.index.csv", common.SUMS_FILE, "pack.log"):
+            with io.open(os.path.join(folder, name), "wb") as handle:
+                handle.write(b"x" * 10)
+        self.assertEqual(TOOL.written_bytes(folder), 10)
+
+    def test_a_directory_that_is_not_there_yet_is_None_and_not_zero(self):
+        """Nothing written and no directory are different states, and only one is worth a line."""
+        self.assertIsNone(TOOL.written_bytes(os.path.join(self.work, "never")))
 
 
 class TheReport(Fixture):
@@ -184,8 +212,8 @@ class TheReport(Fixture):
         code, text = self.said()
         self.assertEqual(code, 0)
         self.assertIn("file 2 of 3", text)
-        self.assertIn("20.0 %", text)
-        self.assertIn("left for packing", text)
+        self.assertIn("66.7 % of the work list", text)
+        self.assertIn("IF THE REST AVERAGES THE SAME", text)
 
     def test_it_says_when_packing_is_done(self):
         self.build([("a", "1", 100)], ["Archiviere a\\1      99%", "Teste a\\1    OK"])
@@ -239,8 +267,8 @@ class HowTheDurationReads(unittest.TestCase):
 class TheDocumentedReasons(unittest.TestCase):
     def test_it_records_why_bytes_and_not_count(self):
         doc = TOOL.__doc__
-        self.assertIn("99.6 %", doc)
-        self.assertIn("86.7 %", doc)
+        self.assertIn("87.7 %", doc)
+        self.assertIn("nach ihrer Erweiterung sortiert", doc)
 
     def flat(self, text):
         """Docstrings wrap, and an assertion against a wrapped sentence tests the wrapping."""
@@ -260,7 +288,7 @@ class TheDocumentedReasons(unittest.TestCase):
                       self.flat(self.source()))
 
     def test_it_records_what_a_Teste_line_means(self):
-        self.assertIn("PACKING IS OVER", self.flat(TOOL.__doc__))
+        self.assertIn("PACKING IS OVER", self.flat(TOOL.files_named.__doc__))
 
 
 if __name__ == "__main__":
