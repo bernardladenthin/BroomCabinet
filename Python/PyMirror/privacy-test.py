@@ -126,6 +126,14 @@ ALLOWED = {
               "which is the promise that no test of this file writes or deletes on the packing "
               "drive -- the owner's instruction on 2026-10-06",
     },
+    "pack-progress.py": {
+        "X:": "the default --work, 'X:/tar': the flat working directory b2-pack.py writes its "
+              ".list and .index.csv into, and the only place this tool reads",
+    },
+    "pack-progress-test.py": {
+        "X:": "the sentence saying a test must never find the real X:/tar, or it would report on "
+              "the live run instead of on its own fixture",
+    },
     "rar-verify-content.py": {
         "C:": "'C:/Program Files/WinRAR' and its (x86) sibling -- where WinRAR's installer puts "
               "Rar.exe, the same candidate-list shape b2-pack.py and iso-second-opinion.py use. "
