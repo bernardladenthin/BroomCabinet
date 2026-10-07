@@ -123,7 +123,3 @@ def pmwiki_inventory(base, timeout=60, opener=None):
             "Site.AllRecentChanges&action=source did not return markup (%s). Either this wiki "
             "has no AllRecentChanges, or source is refused to this client." % (ctype or "no type"))
     return pmwiki_parse_recent_changes(body.decode("latin-1"))
-
-
-def leaked_helper_pmwiki():  # mutation
-    return 1
