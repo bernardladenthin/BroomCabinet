@@ -438,6 +438,50 @@ class Options(object):
 # The settings that are right for most of 4.06 TB: fast, because two thirds of it cannot be
 # compressed anyway, but NOT stored -- `-m0` would also switch off the duplicate collapse, and the
 # duplicates are worth more than the compression.
+# ---------------------------------------------------------------------------------------------
+# WHAT THE SWITCHES ACTUALLY BOUGHT: six units packed between 2026-10-06 and 2026-10-07, every
+# figure read off the run that produced it. The settings below were argued from rar.txt and from
+# small measurements; this is what they did to 2 011.71 GB of real data.
+#
+#   unit                   source      archive        %   avg file   -oi1 refs   volumes
+#   ibm-aix-opensource   207.96 GB    73    GB    35.1 %   1.13 MB      40 012        20
+#   workstations         169.46 GB    89    GB    52.5 %   0.40 MB      30 445        25
+#   ibm-aix              702.51 GB   395    GB    56.2 %  13.45 MB       2 657       115
+#   vendors              638.39 GB   399    GB    62.5 %  16.31 MB       1 698       118
+#   misc                 144.17 GB    93.88 GB    65.1 %   0.42 MB       8 777        27
+#   oldskool             149.22 GB   120    GB    80.4 %   1.92 MB       3 120        35
+#   ------------------------------------------------------------------------------------------
+#   total              2 011.71 GB  1 169.88 GB   58.2 %
+#
+# DEDUPLICATION DECIDES, NOT COMPRESSION, and the table says it twice over. The best rate came
+# from a package repository that multiplies itself -- 40 012 references, 35.1 % -- and the worst
+# from a tree of driver archives that are already compressed and hold almost nothing twice:
+# 3 120 references, 80.4 %. The two units with the LARGEST files compressed WORSE than the two
+# with the smallest, which is the opposite of what a dictionary-first reading would predict.
+#
+# SO -oi1 IS THE SWITCH THAT EARNS ITS PLACE, and -md4g is only large enough not to be in the
+# way. The order in `switches()` reflects that: -m5 and -md4g are the compressor's settings, -s
+# makes the solid stream, and -oi1 operates on top of all three by replacing whole files with
+# references -- independent of the dictionary, which the 256m measurement showed, and independent
+# of the volume boundary, which the solid reset closes.
+#
+# WHAT THE RUNS COST IN MEMORY, measured on the two largest: 0.19 GB while -oi1 pre-hashes every
+# file, 10.00 GB once compression starts, 4.02 GB during `rar t`. The dictionary is allocated when
+# the first block is compressed, not at launch, so a run looks free in its first minutes. rar.txt's
+# interpolation for 4g is about 12 GB; 10.00 GB is as close as two figures it calls rough can be
+# asked to come.
+#
+# AND WHAT THEY PROVED ABOUT THE EDGES:
+#
+#   a 98.98 GB member          byCompID.tar spans 28 volumes and passed `rar t` and the CRC32
+#                              cross-check without special handling.
+#   five members over a volume  vendors holds files of 9.74, 4.40, 4.30, 4.21 and 3.57 GB against
+#                              a 3.557 GB volume. Splitting is invisible to both checks.
+#   420 307 files              workstations, the largest file count, pre-hashed by -oi1 without
+#                              trouble -- the open question from the research pass, now closed.
+#   921 empty files            misc. CRC32 of zero bytes is 00000000, which is also what a -oi1
+#                              reference carries, and the cross-check had to learn the difference.
+# ---------------------------------------------------------------------------------------------
 DEFAULTS = Options(
     archive_format="5",
     # -m5, REVERSED FROM -m1 ON 2026-10-04. The old default was fast because two thirds of the

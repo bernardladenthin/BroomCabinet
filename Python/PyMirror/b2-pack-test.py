@@ -1899,5 +1899,79 @@ class WhereTheIndexCsvLandsInsideTheArchive(unittest.TestCase):
         self.assertIn("a named place inside the archive", text)
 
 
+class WhatTheSwitchesActuallyBought(unittest.TestCase):
+    r"""Six units, 2 011.71 GB of real data, every figure read off the run that produced it.
+
+    The settings were argued from rar.txt and from 600 MiB measurements. This class exists so the
+    arguments cannot quietly outlive the evidence: if the record in b2-pack.py is edited, these
+    fail, and whoever edits it has to say what measurement replaced which.
+    """
+
+    # unit -> (source GB, archive GB, -oi1 references)
+    MEASURED = {
+        "ibm-aix-opensource": (207.96, 73.0, 40012),
+        "workstations": (169.46, 89.0, 30445),
+        "ibm-aix": (702.51, 395.0, 2657),
+        "vendors": (638.39, 399.0, 1698),
+        "misc": (144.17, 93.88, 8777),
+        "oldskool": (149.22, 120.0, 3120),
+    }
+
+    def source(self):
+        with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
+            return " ".join(handle.read().split())
+
+    def test_every_measured_unit_is_in_the_record(self):
+        text = self.source()
+        for name in self.MEASURED:
+            self.assertIn(name, text)
+
+    def test_and_so_is_its_reference_count(self):
+        r"""The reference count is the one figure that is only knowable from a real run."""
+        text = self.source()
+        for name, (_src, _arc, refs) in self.MEASURED.items():
+            grouped = "%d %03d" % (refs // 1000, refs % 1000) if refs >= 1000 else str(refs)
+            self.assertIn(grouped, text, "%s: %s" % (name, grouped))
+
+    def test_DEDUPLICATION_DECIDES_AND_NOT_COMPRESSION(self):
+        r"""The claim the record makes, checked against its own numbers: the unit with the most
+        references has the best ratio and the one with the fewest among the small-file units has
+        the worst."""
+        best = min(self.MEASURED, key=lambda n: self.MEASURED[n][1] / self.MEASURED[n][0])
+        most = max(self.MEASURED, key=lambda n: self.MEASURED[n][2])
+        self.assertEqual(best, most)
+        worst = max(self.MEASURED, key=lambda n: self.MEASURED[n][1] / self.MEASURED[n][0])
+        self.assertEqual(worst, "oldskool")
+
+    def test_the_largest_files_compressed_worse_than_the_smallest(self):
+        r"""Which is the opposite of what a dictionary-first reading predicts, and the reason
+        -oi1 rather than -md6g is where the gain came from."""
+        big = self.MEASURED["vendors"][1] / self.MEASURED["vendors"][0]
+        small = self.MEASURED["workstations"][1] / self.MEASURED["workstations"][0]
+        self.assertGreater(big, small)
+
+    def test_the_total_matches_the_parts(self):
+        total_src = sum(v[0] for v in self.MEASURED.values())
+        total_arc = sum(v[1] for v in self.MEASURED.values())
+        self.assertAlmostEqual(total_src, 2011.71, places=1)
+        self.assertAlmostEqual(total_arc, 1169.88, places=1)
+        self.assertIn("2 011.71 GB", self.source())
+        self.assertIn("1 169.88 GB", self.source())
+
+    def test_the_memory_figures_are_recorded_with_their_phase(self):
+        r"""0.19 GB while -oi1 pre-hashes, 10.00 GB packing, 4.02 GB testing -- and the point is
+        the phase, because a run looks free in its first minutes."""
+        text = self.source()
+        for figure in ("0.19 GB", "10.00 GB", "4.02 GB"):
+            self.assertIn(figure, text)
+        self.assertIn("allocated when the first block is compressed", text)
+
+    def test_the_edge_cases_are_recorded(self):
+        text = self.source()
+        self.assertIn("98.98 GB", text)          # one member over 28 volumes
+        self.assertIn("420 307 files", text)     # the largest file count, pre-hashed by -oi1
+        self.assertIn("921 empty files", text)   # CRC32 00000000, same as a reference
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
