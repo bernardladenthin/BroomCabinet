@@ -324,8 +324,8 @@ class Options(object):
     # THE THRESHOLDS ARE IN VOLUMES because that is what a .rev replaces, and they fall between the
     # real units rather than being round numbers for their own sake:
     #
-    #     small   < 1 200   misc 698, oldskool 722, workstations 820, aix-opensource 1 007
-    #     medium  < 3 000   aix-support 1 561, bitsavers-software 1 705, ibm-pc 2 568
+    #     small   < 1 200   misc 698, oldskool 722, workstations 820, ibm-aix-opensource 1 007
+    #     medium  < 3 000   ibm-aix-support 1 561, bitsavers-software 1 705, ibm-pc 2 568
     #     large   >=3 000   vendors 3 090, ibm-aix 3 400, bitsavers-paper 4 087
     #
     # WHAT IT COSTS AND WHAT IT GIVES UP, stated plainly: 95 .rev files in all, 19.8 GB, against
@@ -450,7 +450,7 @@ DEFAULTS = Options(
     #   IT COVERS EVERY DUPLICATE IN THE COLLECTION. A solid block collapses two byte-identical
     #   files only if the window still reaches the first one, and `sort_key` puts them adjacent.
     #   Measured per unit on 2026-10-04, the largest duplicate anywhere is 2 000.5 MB (vendors),
-    #   then 1 997.5 (ibm-aix) and 1 346.4 (aix-support). 6 GB clears all of them with room, and
+    #   then 1 997.5 (ibm-aix) and 1 346.4 (ibm-aix-support). 6 GB clears all of them with room, and
     #   rar.txt says that where the duplicates fit the dictionary, plain -s is the better tool
     #   than -oi: no references, no first-file dependency between volumes.
     #
@@ -501,7 +501,7 @@ DEFAULTS = Options(
     # switches off the solid block, so identical files are then stored twice in full. Measured per
     # unit on 2026-10-04:
     #
-    #   aix-opensource   208.0 GB holding 116.9 GB of byte-identical files -- 56.2 %
+    #   ibm-aix-opensource   208.0 GB holding 116.9 GB of byte-identical files -- 56.2 %
     #   bitsavers-paper  844.4 GB holding   2.0 GB                         --  0.2 %
     #
     # SO -m0 WAS COSTING 117 GB on one of them. I had argued the opposite as recently as the same
@@ -599,10 +599,10 @@ UNITS = (
          "STILL ALONE AFTER THE 2026-10-04 REGROUPING, and the old reason for it has expired. The "
          "old sentence said `most likely to be re-fetched, and nothing else should be repacked "
          "when it is` -- that argument RETIRED with B2, where nothing is repacked ever again. "
-         "What keeps it separate now is the method: folded into aix-support it would save ONE "
+         "What keeps it separate now is the method: folded into ibm-aix-support it would save ONE "
          ".rev file, 995 MB, and cost 702 GB its -m5 -md1g."),
 
-    Unit("aix-support", ["fsck-aix-media", "fsck-aix-apps",
+    Unit("ibm-aix-support", ["fsck-aix-media", "fsck-aix-apps",
                          "bull-rpms", "bull-srpms", "bullfreeware", "ia-bullfreeware",
                          "ia-bull-toolbox-43", "ia-bull-aix433-2013", "ia-bull-aix433-2005",
                          "biblionik-bull", "biblionik-goupil",
@@ -642,9 +642,9 @@ UNITS = (
          "method above 0 provides, and the media third is already compressed. Three settings "
          "cannot apply to one unit, so the middle one does."),
 
-    Unit("aix-opensource", ["oss4aix.org"],
+    Unit("ibm-aix-opensource", ["oss4aix.org"],
          "208 GB that is 100 % rpm. Stored rather than compressed: there is nothing to win and "
-         "-m0 turns the longest packing job in the plan into a copy. NOT folded into aix-support "
+         "-m0 turns the longest packing job in the plan into a copy. NOT folded into ibm-aix-support "
          "on 2026-10-04 although the subject is the same, because -m0 and -m3 are the difference "
          "between a copy and a day of CPU, and this archive holds no internal duplication for a "
          "solid block to find -- it appears in none of b2-cluster.py's sharing pairs. "
@@ -1139,6 +1139,23 @@ def plan(units, root, out, work, rar="rar", with_dirs=True):
         archive = os.path.join(out, unit.name, unit.name + ".rar")
         size = sum(r["size"] for r in rows)
         volumes = volume_count(size, unit.options)
+        # THE INDEX CSV LANDS INSIDE THE ARCHIVE AS `tar\<unit>.index.csv` AND THAT IS DELIBERATE.
+        # It is passed by ABSOLUTE path, and RAR then stores every component below the drive
+        # letter -- `X:\tar\misc.index.csv` becomes `tar\misc.index.csv`. The same behaviour is
+        # why WORK_MUST_BE_FLAT: a work directory under a profile would write the account name
+        # into every archive.
+        #
+        # THE THREE WAYS TO MAKE IT TOP-LEVEL WERE LOOKED AT ON 2026-10-07 AND NONE IS WORTH IT.
+        # `-ep` strips ALL paths, which for a unit of 342 386 entries means basenames colliding
+        # and overwriting each other on extraction, with `rar t` reporting "Alles OK" over it.
+        # `-ap<path>` applies to every file in the command, so it would move the 342 385 from the
+        # list as well. And adding the CSV in a second `rar a` with cwd=<work> would have to
+        # happen BEFORE `-k`, which means locking afterwards -- measured as fatal: a later
+        # `rar k` reported every volume as a checksum failure and recovery as impossible.
+        #
+        # SO IT STAYS, on the owner's reasoning: `tar/` is then a named place inside the archive
+        # that more can go into later, which is worth more than a flat name obtained by any of
+        # the above. The copy beside the volumes is the one a reader actually uses.
         argv = ([rar, "a"] + unit.options.switches(volumes)
                 + [archive, "@" + list_path, index_path])
         steps.append({"unit": unit, "argv": argv, "cwd": root, "list_path": list_path,

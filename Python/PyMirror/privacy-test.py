@@ -104,7 +104,18 @@ ALLOWED = {
     "iso-second-opinion.py": {
         "C:": "where 7-Zip's installer puts 7z.exe; a candidate list, not a machine of ours",
     },
+    "b2-pack-test.py": {
+        "X:": "the work and out roots passed to plan() so the index-CSV tests read the real unit "
+              "table without inventing one -- the call only builds a command line, it runs "
+              "nothing and writes nothing",
+        "Q:": "the docstring naming Q: as read-only to this tool, which is why the index CSV "
+              "cannot be passed by a path relative to the collection",
+    },
     "b2-pack.py": {
+        "X:": "the comment explaining that the index CSV is passed by absolute path and RAR then "
+              "stores every component below the drive letter, so X:/tar/<unit>.index.csv becomes "
+              "tar/<unit>.index.csv inside the archive -- the example needs the drive to make "
+              "sense, and it is the same behaviour WORK_MUST_BE_FLAT exists for",
         "C:": "where WinRAR's installer puts Rar.exe, in the same candidate list shape as "
               "iso-second-opinion.py -- a vendor's default location, not a path of ours",
         "D:": "the example in --work's help text and in its refusal message. A tool that forbids "

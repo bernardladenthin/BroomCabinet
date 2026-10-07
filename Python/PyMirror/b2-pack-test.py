@@ -921,7 +921,7 @@ class TheVolumeSizeFitsTheMedium(unittest.TestCase):
         A solid block collapses two byte-identical files only if the window still reaches back to
         the first one, and `sort_key` puts them adjacent -- so the dictionary has to be at least as
         large as the duplicate. Measured per unit on 2026-10-04: vendors 2 000.5 MB, ibm-aix
-        1 997.5, aix-support 1 346.4, ibm-pc 669.5, oldskool 611.1, bitsavers-software 525.4,
+        1 997.5, ibm-aix-support 1 346.4, ibm-pc 669.5, oldskool 611.1, bitsavers-software 525.4,
         workstations 420.9, misc 152.0.
 
         WHICH IS ALSO WHY -oi IS NOT USED. rar.txt: where the identical files fit the dictionary,
@@ -939,7 +939,7 @@ class TheVolumeSizeFitsTheMedium(unittest.TestCase):
 
         Two units were -m0, stored rather than compressed, because their content is already
         compressed. -m0 also switches off the solid block, so identical files are stored twice in
-        full -- and measured per unit, aix-opensource is 208.0 GB holding 116.9 GB of byte-identical
+        full -- and measured per unit, ibm-aix-opensource is 208.0 GB holding 116.9 GB of byte-identical
         files, 56.2 %. Storing it was costing 117 GB. I had argued for -m0 there the same
         afternoon on the grounds that it "appears in none of b2-cluster.py's sharing pairs", which
         is true and was the wrong measurement: those pairs count duplication BETWEEN archives, and
@@ -1849,6 +1849,54 @@ class TheIndexArchiveStepHasNoList(unittest.TestCase):
             self.assertEqual(os.listdir(folder), [])
         finally:
             shutil.rmtree(folder, ignore_errors=True)
+
+
+class WhereTheIndexCsvLandsInsideTheArchive(unittest.TestCase):
+    r"""`tar\<unit>.index.csv`, and it is a decision rather than an oversight.
+
+    The CSV is passed by ABSOLUTE path, and RAR stores every component below the drive letter --
+    so `X:\tar\misc.index.csv` becomes `tar\misc.index.csv`. Verified on the real misc archive:
+    the entry sits in part04 of 27, because RAR orders by its own sort and not by argument order,
+    which is why looking in the last volume found nothing.
+
+    THREE WAYS TO FLATTEN IT WERE LOOKED AT AND REJECTED. `-ep` strips ALL paths, which for
+    342 386 entries means basenames colliding on extraction with `rar t` saying "Alles OK" over
+    it. `-ap<path>` applies to every file in the command. A second `rar a` with cwd=<work> would
+    have to run before `-k`, and locking afterwards is measured fatal.
+
+    IT STAYS ON THE OWNER'S REASONING: `tar/` is a named place inside the archive that more can go
+    into later. The copy beside the volumes is the one a reader uses.
+    """
+
+    def test_the_index_is_passed_by_absolute_path(self):
+        r"""Which is what puts it under `tar\`; a relative name would need the CSV to sit in the
+        collection, and Q: is read-only to this tool."""
+        unit = [u for u in TOOL.UNITS if u.name == "ibm-aix-opensource"][0]
+        steps = TOOL.plan([unit], TOOL.MIRROR_ROOT,
+                          os.path.join("X:" + os.sep, "tarTarget"),
+                          os.path.join("X:" + os.sep, "tar"), with_dirs=False)
+        argv = steps[0]["argv"]
+        index = argv[-1]
+        self.assertTrue(os.path.isabs(index), index)
+        self.assertTrue(index.lower().endswith(".index.csv"), index)
+
+    def test_AND_NO_SWITCH_STRIPS_THE_PATH(self):
+        r"""-ep would flatten the 342 385 entries from the @list too, which is the failure this
+        whole collection was rebuilt to remove."""
+        unit = [u for u in TOOL.UNITS if u.name == "ibm-aix-opensource"][0]
+        steps = TOOL.plan([unit], TOOL.MIRROR_ROOT,
+                          os.path.join("X:" + os.sep, "tarTarget"),
+                          os.path.join("X:" + os.sep, "tar"), with_dirs=False)
+        argv = steps[0]["argv"]
+        self.assertNotIn("-ep", argv)
+        self.assertFalse([one for one in argv if one.startswith("-ap")])
+
+    def test_the_decision_is_written_down_where_the_command_is_built(self):
+        """So the next reader does not file it as a bug and reach for -ep."""
+        with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
+            text = " ".join(handle.read().split())
+        self.assertIn("THAT IS DELIBERATE", text)
+        self.assertIn("a named place inside the archive", text)
 
 
 if __name__ == "__main__":
