@@ -49,6 +49,7 @@ import argparse
 import hashlib
 import io
 import os
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -71,7 +72,32 @@ BLOCK = 10240          # tar's own block size; a short final read means a trunca
 # with its four-line usage text and exit 1. Measured: check 2 therefore ran not once, parsed that
 # usage text for "Contents differ", found none, and reported the tar verified. A check that cannot
 # fail is worse than no check, so the binary is named outright and its version is asserted below.
-GNU_TAR = r"C:\Program Files\Git\usr\bin\tar.exe"
+def find_gnu_tar():
+    r"""-> a path to GNU tar, or None.
+
+    NOT A BARE `tar`. Windows resolves `tar.exe` through System32 FIRST, and that is bsdtar, which
+    has no `-d` -- so the comparison check would silently never run. Measured 2026-10-06: it
+    reported success having compared nothing. The Git for Windows install is an MSYS GNU build and
+    is named explicitly for that reason.
+
+    ON POSIX `tar` IS GNU TAR and there is no System32 to get in the way, so the PATH is the right
+    answer there. This was a hardcoded Windows path until 2026-10-10, which made all 51 tests in
+    this file error out on a Linux runner with a FileNotFoundError naming `C:\Program Files`.
+
+    `check_tar_binary()` still asserts "GNU tar" in `--version` whichever one is found, because
+    the point was never where the binary lives but what it is.
+    """
+    candidates = [os.path.join("C:" + os.sep, "Program Files", "Git", "usr", "bin", "tar.exe"),
+                  os.path.join(os.sep + "usr", "bin", "tar"),
+                  os.path.join(os.sep + "bin", "tar")]
+    for path in candidates:
+        if os.path.isfile(path):
+            return path
+    found = shutil.which("gtar") or (shutil.which("tar") if os.name != "nt" else None)
+    return found
+
+
+GNU_TAR = find_gnu_tar()
 
 
 def posix(path):

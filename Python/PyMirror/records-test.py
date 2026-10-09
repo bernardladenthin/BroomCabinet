@@ -240,11 +240,25 @@ class NoToolBuildsARelativePathWithTheNormalisingHelper(unittest.TestCase):
         # asserted the stripping unconditionally: it passed on the machine the collection lives on
         # and failed on CI, which is a test reading the platform instead of the behaviour.
         #
-        # ntpath IS PURE STRING WORK AND BEHAVES THE SAME ON BOTH, so naming it tests the real
-        # hazard everywhere instead of only where it bites. 33 files in the collection end in a
-        # dot, and relative_to exists for them.
-        self.assertEqual(ntpath.relpath(ntpath.join("mirror", "an-archive", "sub", "readme."),
-                                        ntpath.join("mirror", "an-archive")), "sub" + chr(92) + "readme")
+        # "ntpath IS PURE STRING WORK AND BEHAVES THE SAME ON BOTH" WAS WRONG, AND MEASURED SO
+        # ON 2026-10-10. It was written to make this case portable and it moved the failure
+        # instead:
+        #
+        #     ntpath.relpath("m/a/sub/readme.", "m/a")   Windows 'sub\readme'   Linux 'sub\readme.'
+        #     ntpath.normpath("m/a/readme.")             Windows 'm\a\readme.'  Linux 'm\a\readme.'
+        #
+        # `ntpath.relpath` reaches `nt._path_normpath`, a C function that exists only on Windows;
+        # on POSIX it falls back to Python and keeps the dot. `normpath` keeps it on both, which is
+        # why the earlier note about normpath is still right and the one about relpath was not.
+        #
+        # SO THE HAZARD IS ASSERTED WHERE IT EXISTS and its absence is asserted too, rather than
+        # guessing which platform is running. 33 files in the collection end in a dot, and
+        # `relative_to` exists for them -- that part is checked above and holds everywhere.
+        stripped = ntpath.relpath(ntpath.join("m", "a", "sub", "readme."), ntpath.join("m", "a"))
+        self.assertIn(stripped, ("sub" + chr(92) + "readme", "sub" + chr(92) + "readme."))
+        if stripped.endswith("."):
+            self.assertNotEqual(os.name, "nt", "Windows is where the stripping happens")
+        self.assertEqual(ntpath.normpath("m/a/readme."), "m" + chr(92) + "a" + chr(92) + "readme.")
         self.assertEqual(posixpath.relpath("mirror/an-archive/sub/readme.",
                                            "mirror/an-archive"), "sub/readme.")
 
