@@ -44,8 +44,24 @@ against the archive's own `.sfv` with each `-oi1` reference judged through its t
 nine, 123 662 references resolved. Each unit's directory also holds its `*.index.csv` and the four
 manifests (`.sha256sum`, `.sha1sum`, `.md5sum`, `.sfv`) beside the volumes.
 
-STILL OPEN: the index archive -- the small archive carrying all nine `*.index.csv` so the
-collection can be searched without fetching a 1 TB unit -- has never been built.
+## The index archive
+
+Built 2026-10-09, after nine `--execute` runs had each crashed on that step. It is what you fetch
+INSTEAD of a unit: 133 MB holding every unit's `*.index.csv` plus `all-units.index.csv`, which is
+the same 1 688 131 rows with the UNIT NAMED FIRST. The nine answer "what is in this unit"; the
+combined one answers "which unit do I fetch to get this file", which is the question that sends
+anyone here.
+
+ONE DEFECT WAS FOUND BY BUILDING IT. 4 476 of those 1 688 131 paths contain a comma, and the CSVs
+were written without quoting, so `csv.DictReader` read `size` as `bin` and dropped the digest.
+The SOURCE indexes quote correctly, so no packing plan ever missed a file -- only the derived
+listing was wrong, and `rar t`, the CRC32 cross-check and the four manifests all describe the
+ARCHIVE rather than this file.
+
+The corrected CSVs were placed beside the volumes with their manifests rewritten, and all nine
+verified (`vendors` re-read in full: 122 files, 0 errors). NOTHING WAS REPACKED, so the copy
+inside each unit's own archive is still the unquoted one -- 70 hours of repacking for 0.265 % of
+rows in a convenience copy, when the authoritative copies sit beside the volumes and in here.
 
 ## The mirror tree
 
