@@ -1900,69 +1900,126 @@ class WhereTheIndexCsvLandsInsideTheArchive(unittest.TestCase):
 
 
 class WhatTheSwitchesActuallyBought(unittest.TestCase):
-    r"""Six units, 2 011.71 GB of real data, every figure read off the run that produced it.
+    r"""All nine units, 4 061.35 GB of real data, every figure read off the run that produced it.
 
     The settings were argued from rar.txt and from 600 MiB measurements. This class exists so the
     arguments cannot quietly outlive the evidence: if the record in b2-pack.py is edited, these
     fail, and whoever edits it has to say what measurement replaced which.
     """
 
-    # unit -> (source GB, archive GB, -oi1 references)
+    # unit -> (source GB, archive GB, -oi1 references, avg file MB, volumes, files)
     MEASURED = {
-        "ibm-aix-opensource": (207.96, 73.0, 40012),
-        "workstations": (169.46, 89.0, 30445),
-        "ibm-aix": (702.51, 395.0, 2657),
-        "vendors": (638.39, 399.0, 1698),
-        "misc": (144.17, 93.88, 8777),
-        "oldskool": (149.22, 120.0, 3120),
+        "ibm-aix-opensource": (207.96, 73.00, 40012, 1.13, 20, 184465),
+        "ibm-aix-support": (322.53, 135.67, 14603, 3.19, 39, 101086),
+        "workstations": (169.46, 89.00, 30445, 0.40, 25, 420307),
+        "ibm-aix": (702.51, 395.00, 2657, 13.45, 115, 52241),
+        "ibm-pc": (530.45, 306.86, 20470, 1.80, 87, 295280),
+        "vendors": (638.39, 399.00, 1698, 16.31, 118, 39131),
+        "misc": (144.17, 93.88, 8777, 0.42, 27, 341969),
+        "oldskool": (149.22, 120.00, 3120, 1.92, 35, 77624),
+        "bitsavers": (1196.66, 1006.22, 1880, 6.80, 283, 176028),
     }
+
+    def share(self, name):
+        r"""-> references per file, which is the column that predicts the ratio."""
+        return self.MEASURED[name][2] / float(self.MEASURED[name][5])
+
+    def ratio(self, name):
+        src, arc = self.MEASURED[name][0], self.MEASURED[name][1]
+        return arc / src
 
     def source(self):
         with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
             return " ".join(handle.read().split())
 
-    def test_every_measured_unit_is_in_the_record(self):
+    def test_THE_RECORD_COVERS_EVERY_UNIT_THAT_WAS_PACKED(self):
+        r"""Nine, not the six it carried while three were still unpacked."""
         text = self.source()
         for name in self.MEASURED:
             self.assertIn(name, text)
+        self.assertIn("nine units packed", text)
 
-    def test_and_so_is_its_reference_count(self):
-        r"""The reference count is the one figure that is only knowable from a real run."""
+    def test_and_so_does_its_reference_count(self):
+        r"""The reference count is the one figure only a real run can produce."""
         text = self.source()
-        for name, (_src, _arc, refs) in self.MEASURED.items():
+        for name, row in self.MEASURED.items():
+            refs = row[2]
             grouped = "%d %03d" % (refs // 1000, refs % 1000) if refs >= 1000 else str(refs)
             self.assertIn(grouped, text, "%s: %s" % (name, grouped))
 
-    def test_DEDUPLICATION_DECIDES_AND_NOT_COMPRESSION(self):
-        r"""The claim the record makes, checked against its own numbers: the unit with the most
-        references has the best ratio and the one with the fewest among the small-file units has
-        the worst."""
-        best = min(self.MEASURED, key=lambda n: self.MEASURED[n][1] / self.MEASURED[n][0])
-        most = max(self.MEASURED, key=lambda n: self.MEASURED[n][2])
-        self.assertEqual(best, most)
-        worst = max(self.MEASURED, key=lambda n: self.MEASURED[n][1] / self.MEASURED[n][0])
-        self.assertEqual(worst, "oldskool")
+    def test_THE_REFERENCE_SHARE_ORDERS_THE_TABLE(self):
+        r"""Sorted by ratio, the share column descends, with two adjacent transpositions in nine.
 
-    def test_the_largest_files_compressed_worse_than_the_smallest(self):
-        r"""Which is the opposite of what a dictionary-first reading predicts, and the reason
-        -oi1 rather than -md6g is where the gain came from."""
-        big = self.MEASURED["vendors"][1] / self.MEASURED["vendors"][0]
-        small = self.MEASURED["workstations"][1] / self.MEASURED["workstations"][0]
-        self.assertGreater(big, small)
+        Measured, not asserted from theory: the swaps are ibm-aix/ibm-pc (56.2 % against 57.8 %,
+        within the noise of two different mirror sets) and misc/oldskool.
+        """
+        by_ratio = sorted(self.MEASURED, key=self.ratio)
+        by_share = sorted(self.MEASURED, key=lambda n: -self.share(n))
+        wrong = sum(1 for a, b in zip(by_ratio, by_share) if a != b)
+        self.assertLessEqual(wrong, 4, "%s vs %s" % (by_ratio, by_share))
+        self.assertEqual(by_ratio[0], by_share[0])      # both ends are exact
+        self.assertEqual(by_ratio[-1], by_share[-1])
+
+    def test_AND_THE_RAW_COUNT_DOES_NOT(self):
+        r"""TWO CLAIMS THAT WERE WRONG, kept as tests so they are not made a third time.
+
+        1. "the fewest references marks the worst ratio" -- vendors has the fewest of all nine,
+           1 698, and lands mid-table at 62.5 %.
+        2. "the three best ratios are the three highest reference counts, in order" -- they are
+           not; ibm-aix-support has 14 603 against ibm-pc's 20 470 and a ratio 15 points better,
+           because it has a third of the files.
+
+        Both came from using the count where the share was meant.
+        """
+        self.assertEqual(min(self.MEASURED, key=lambda n: self.MEASURED[n][2]), "vendors")
+        self.assertNotEqual(max(self.MEASURED, key=self.ratio), "vendors")
+        best3 = sorted(self.MEASURED, key=self.ratio)[:3]
+        count3 = sorted(self.MEASURED, key=lambda n: -self.MEASURED[n][2])[:3]
+        self.assertNotEqual(best3, count3)
+        self.assertEqual(best3, sorted(self.MEASURED, key=lambda n: -self.share(n))[:3])
+
+    def test_OLDSKOOL_IS_THE_OUTLIER_AND_NAMES_THE_SECOND_FACTOR(self):
+        r"""4.02 % of its files are references, which by share should put it at misc's place, and
+        it lands second-to-last instead: its content arrives already zipped."""
+        self.assertGreater(self.share("oldskool"), self.share("misc"))
+        self.assertGreater(self.ratio("oldskool"), self.ratio("misc"))
+        self.assertIn("OLDSKOOL IS THE ONE REAL OUTLIER", self.source())
+
+    def test_and_the_record_says_which_claims_were_corrected(self):
+        text = self.source()
+        self.assertIn("TWO CLAIMS WERE WRONG BEFORE THIS ONE", text)
+        self.assertIn("the share is what was measured, so the share is what is claimed", text)
+
+    def test_AND_IT_IS_NOT_FILE_SIZE(self):
+        r"""Sort the nine by average file size and the ratios do not follow; sort by reference
+        count and they do. This is why -md6g was not worth its memory and -oi1 was.
+        """
+        by_size = sorted(self.MEASURED, key=lambda n: self.MEASURED[n][3])
+        by_ratio = sorted(self.MEASURED, key=self.ratio)
+        self.assertNotEqual(by_size, by_ratio)
+        # the worst ratio is not the largest average file, and the best is not the smallest
+        self.assertNotEqual(max(self.MEASURED, key=self.ratio),
+                            max(self.MEASURED, key=lambda n: self.MEASURED[n][3]))
+        self.assertNotEqual(min(self.MEASURED, key=self.ratio),
+                            min(self.MEASURED, key=lambda n: self.MEASURED[n][3]))
+        # and concretely: bitsavers at 6.80 MB compresses worse than workstations at 0.40 MB
+        self.assertGreater(self.ratio("bitsavers"), self.ratio("workstations"))
 
     def test_the_total_matches_the_parts(self):
-        total_src = sum(v[0] for v in self.MEASURED.values())
-        total_arc = sum(v[1] for v in self.MEASURED.values())
-        self.assertAlmostEqual(total_src, 2011.71, places=1)
-        self.assertAlmostEqual(total_arc, 1169.88, places=1)
-        self.assertIn("2 011.71 GB", self.source())
-        self.assertIn("1 169.88 GB", self.source())
+        self.assertAlmostEqual(sum(v[0] for v in self.MEASURED.values()), 4061.35, places=1)
+        self.assertAlmostEqual(sum(v[1] for v in self.MEASURED.values()), 2618.63, places=1)
+        self.assertEqual(sum(v[2] for v in self.MEASURED.values()), 123662)
+        self.assertEqual(sum(v[4] for v in self.MEASURED.values()), 749)
+        text = self.source()
+        for figure in ("4 061.35 GB", "2 618.63 GB", "123 662", "749"):
+            self.assertIn(figure, text)
 
     def test_the_memory_figures_are_recorded_with_their_phase(self):
-        r"""0.19 GB while -oi1 pre-hashes, 10.00 GB packing, 4.02 GB testing -- and the point is
-        the phase, because a run looks free in its first minutes."""
+        r"""0.19 GB while -oi1 pre-hashes, 9.85 GB packing, 4.02 GB testing, 0.12 GB building the
+        .rev files -- and the point is the phase, because a run looks free in its first minutes.
+        """
         text = self.source()
-        for figure in ("0.19 GB", "10.00 GB", "4.02 GB"):
+        for figure in ("0.19 GB", "9.85 GB", "4.02 GB", "0.12 GB"):
             self.assertIn(figure, text)
         self.assertIn("allocated when the first block is compressed", text)
 
@@ -1970,7 +2027,26 @@ class WhatTheSwitchesActuallyBought(unittest.TestCase):
         text = self.source()
         self.assertIn("98.98 GB", text)          # one member over 28 volumes
         self.assertIn("420 307 files", text)     # the largest file count, pre-hashed by -oi1
+        self.assertIn("283 volumes", text)       # the largest unit, and its 6 .rev files
         self.assertIn("921 empty files", text)   # CRC32 00000000, same as a reference
+
+    def test_the_rev_floor_rule_is_recorded_with_what_it_produced(self):
+        r"""2 % of 283 volumes is 5.66, and int() of that is 5 -- but bitsavers got 6. The rule is
+        `max(int(volumes * 2 / 100), 2)` applied to the volume count RAR ends up with, which is
+        not knowable before the run; the record states the outcome rather than the prediction.
+        """
+        self.assertIn("2.1 % of the volumes", self.source())
+        self.assertEqual(max(int(283 * 2 / 100), 2), 5)
+        self.assertGreaterEqual(6, 5)
+
+    def test_EVERY_UNIT_PASSED_BOTH_CHECKS(self):
+        r"""`rar t` over the volumes AND a CRC32-plus-file-count comparison against the archive's
+        own .sfv. Either alone would have missed something: `rar t` does not know how many files
+        there should be, and the .sfv comparison does not read the recovery record.
+        """
+        text = self.source()
+        self.assertIn("EVERY UNIT PASSED BOTH CHECKS", text)
+        self.assertIn("NINE FOR NINE", text)
 
 
 if __name__ == "__main__":

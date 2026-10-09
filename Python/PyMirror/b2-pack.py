@@ -439,39 +439,86 @@ class Options(object):
 # compressed anyway, but NOT stored -- `-m0` would also switch off the duplicate collapse, and the
 # duplicates are worth more than the compression.
 # ---------------------------------------------------------------------------------------------
-# WHAT THE SWITCHES ACTUALLY BOUGHT: six units packed between 2026-10-06 and 2026-10-07, every
-# figure read off the run that produced it. The settings below were argued from rar.txt and from
-# small measurements; this is what they did to 2 011.71 GB of real data.
+# WHAT THE SWITCHES ACTUALLY BOUGHT: THE WHOLE COLLECTION, nine units packed between 2026-10-06
+# and 2026-10-09, every figure read off the run that produced it. The settings below were argued
+# from rar.txt and from 600 MiB measurements; this is what they did to 4 061.35 GB of real data.
 #
 #   unit                   source      archive        %   avg file   -oi1 refs   volumes
-#   ibm-aix-opensource   207.96 GB    73    GB    35.1 %   1.13 MB      40 012        20
-#   workstations         169.46 GB    89    GB    52.5 %   0.40 MB      30 445        25
-#   ibm-aix              702.51 GB   395    GB    56.2 %  13.45 MB       2 657       115
-#   vendors              638.39 GB   399    GB    62.5 %  16.31 MB       1 698       118
-#   misc                 144.17 GB    93.88 GB    65.1 %   0.42 MB       8 777        27
-#   oldskool             149.22 GB   120    GB    80.4 %   1.92 MB       3 120        35
+#   ibm-aix-opensource   207.96 GB      73.00 GB   35.1 %   1.13 MB      40 012        20
+#   ibm-aix-support      322.53 GB     135.67 GB   42.1 %   3.19 MB      14 603        39
+#   workstations         169.46 GB      89.00 GB   52.5 %   0.40 MB      30 445        25
+#   ibm-aix              702.51 GB     395.00 GB   56.2 %  13.45 MB       2 657       115
+#   ibm-pc               530.45 GB     306.86 GB   57.8 %   1.80 MB      20 470        87
+#   vendors              638.39 GB     399.00 GB   62.5 %  16.31 MB       1 698       118
+#   misc                 144.17 GB      93.88 GB   65.1 %   0.42 MB       8 777        27
+#   oldskool             149.22 GB     120.00 GB   80.4 %   1.92 MB       3 120        35
+#   bitsavers          1 196.66 GB   1 006.22 GB   84.1 %   6.80 MB       1 880       283
 #   ------------------------------------------------------------------------------------------
-#   total              2 011.71 GB  1 169.88 GB   58.2 %
+#   total              4 061.35 GB   2 618.63 GB   64.5 %              123 662       749
 #
-# DEDUPLICATION DECIDES, NOT COMPRESSION, and the table says it twice over. The best rate came
-# from a package repository that multiplies itself -- 40 012 references, 35.1 % -- and the worst
-# from a tree of driver archives that are already compressed and hold almost nothing twice:
-# 3 120 references, 80.4 %. The two units with the LARGEST files compressed WORSE than the two
-# with the smallest, which is the opposite of what a dictionary-first reading would predict.
+# plus 69 GB of .rev across the nine units, so 2 688 GB is what leaves for cold storage.
 #
-# SO -oi1 IS THE SWITCH THAT EARNS ITS PLACE, and -md4g is only large enough not to be in the
-# way. The order in `switches()` reflects that: -m5 and -md4g are the compressor's settings, -s
-# makes the solid stream, and -oi1 operates on top of all three by replacing whole files with
+# WHAT PREDICTS THE RATIO IS THE REFERENCE SHARE, and nothing else in the table does.
+#
+# References per file, not references. The nine units differ in file count by a factor of ten, so
+# the raw count compares nothing: bitsavers has MORE references than vendors (1 880 vs 1 698) and
+# the worst ratio of all nine, because it also has four times the files.
+#
+#   unit                 files    refs   ref/file    ratio
+#   ibm-aix-opensource  184 465  40 012    21.69 %   35.1 %
+#   ibm-aix-support     101 086  14 603    14.45 %   42.1 %
+#   workstations        420 307  30 445     7.24 %   52.5 %
+#   ibm-aix              52 241   2 657     5.09 %   56.2 %
+#   ibm-pc              295 280  20 470     6.93 %   57.8 %
+#   vendors              39 131   1 698     4.34 %   62.5 %
+#   misc                341 969   8 777     2.57 %   65.1 %
+#   oldskool             77 624   3 120     4.02 %   80.4 %
+#   bitsavers           176 028   1 880     1.07 %   84.1 %
+#
+# SORTED BY RATIO, THE SHARE COLUMN DESCENDS, with two adjacent transpositions in nine: ibm-aix
+# and ibm-pc (56.2 % against 57.8 %, which is within the noise of two different mirror sets), and
+# misc and oldskool. Both ends are exact -- the best ratio has the highest share by a factor of
+# three over second place, and the worst has the lowest.
+#
+# OLDSKOOL IS THE ONE REAL OUTLIER and it names the second factor: 4.02 % of its files are
+# references, which should put it at misc's place, and it lands second-to-last instead. Its
+# content arrives ALREADY ZIPPED -- driver archives downloaded as .zip -- so there is nothing left
+# for -m5 to find even where files are unique. bitsavers has the same problem (1.2 TB of JPEG
+# streams inside PDF) on top of the lowest share, and the two effects compound into 84.1 %.
+#
+# TWO CLAIMS WERE WRONG BEFORE THIS ONE, and both were caught by the tests in b2-pack-test.py
+# rather than by reading:
+#
+#   "the fewest references marks the worst ratio" -- vendors has the fewest of all nine, 1 698,
+#   and lands mid-table at 62.5 %. Few references only means a unit holds little twice.
+#
+#   "the three best ratios are the three highest reference counts, in order" -- they are not.
+#   ibm-aix-support has 14 603 references against ibm-pc's 20 470 and a ratio 15 points better,
+#   because it has a third of the files.
+#
+# Both failures came from using the count where the share was meant, and the correction is in the
+# table above: the share is what was measured, so the share is what is claimed.
+#
+# FILE SIZE PREDICTS NOTHING HERE. bitsavers averages 6.80 MB and compresses worst; workstations
+# averages 0.40 MB and third best; vendors holds the largest files in the collection at 16.31 MB
+# and lands in the middle. A dictionary-first reading expects otherwise, which is why -md6g was
+# not worth its memory and -oi1 was.
+#
+# SO THE ORDER IN `switches()` REFLECTS WHAT MATTERS: -m5 and -md4g are the compressor's settings,
+# -s makes the solid stream, and -oi1 operates on top of all three by replacing whole files with
 # references -- independent of the dictionary, which the 256m measurement showed, and independent
 # of the volume boundary, which the solid reset closes.
 #
-# WHAT THE RUNS COST IN MEMORY, measured on the two largest: 0.19 GB while -oi1 pre-hashes every
-# file, 10.00 GB once compression starts, 4.02 GB during `rar t`. The dictionary is allocated when
-# the first block is compressed, not at launch, so a run looks free in its first minutes. rar.txt's
-# interpolation for 4g is about 12 GB; 10.00 GB is as close as two figures it calls rough can be
-# asked to come.
+# MEMORY, BY PHASE, reproduced across several units: 0.19 GB while -oi1 pre-hashes every file,
+# 9.85 GB once compression starts, 4.02 GB during `rar t`, and 0.12 GB while the .rev files are
+# built. The dictionary is allocated when the first block is compressed, not at launch, so a run
+# looks free in its first minutes and the .rev phase needs almost nothing. rar.txt's interpolation
+# for 4g is about 12 GB; 9.85 GB is as close as two figures it calls rough can be asked to come.
 #
-# AND WHAT THEY PROVED ABOUT THE EDGES:
+# TIME, for planning: bitsavers took 19.1 h to pack, then 1.5 h for `rar t` and 1.1 h for the four
+# manifests -- 21.7 h for 1.2 TB. The whole collection was about 70 h of wall clock.
+#
+# AND WHAT THE RUNS PROVED ABOUT THE EDGES:
 #
 #   a 98.98 GB member          byCompID.tar spans 28 volumes and passed `rar t` and the CRC32
 #                              cross-check without special handling.
@@ -479,8 +526,14 @@ class Options(object):
 #                              a 3.557 GB volume. Splitting is invisible to both checks.
 #   420 307 files              workstations, the largest file count, pre-hashed by -oi1 without
 #                              trouble -- the open question from the research pass, now closed.
+#   283 volumes                bitsavers, the largest unit. -rv at 2 % gave it 6 .rev files, which
+#                              is 2.1 % of the volumes: `max(int(volumes * 2 / 100), 2)` holds.
 #   921 empty files            misc. CRC32 of zero bytes is 00000000, which is also what a -oi1
 #                              reference carries, and the cross-check had to learn the difference.
+#
+# EVERY UNIT PASSED BOTH CHECKS: `rar t` over the volumes, and a CRC32-plus-file-count comparison
+# against the archive's own .sfv, with each -oi1 reference judged through its target.
+# NINE FOR NINE, and 123 662 references resolved through their targets.
 # ---------------------------------------------------------------------------------------------
 DEFAULTS = Options(
     archive_format="5",
