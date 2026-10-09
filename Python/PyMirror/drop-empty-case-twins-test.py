@@ -53,6 +53,22 @@ def write(path, data=b""):
     return path
 
 
+def case_insensitive(folder):
+    """-> True when this filesystem folds case, measured on it rather than guessed from os.name.
+
+    `os.name == "nt"` is the wrong question twice over: a Windows NTFS volume can be mounted
+    case-sensitive per directory, and a Linux runner can hold a case-insensitive mount. The only
+    answer that is true for the directory in hand is the one the directory gives.
+    """
+    probe = os.path.join(folder, "CaseProbe.tmp")
+    with io.open(probe, "wb") as handle:
+        handle.write(b"")
+    try:
+        return os.path.exists(os.path.join(folder, "caseprobe.tmp"))
+    finally:
+        os.remove(probe)
+
+
 class Tree(object):
     r"""A throwaway archive with an index, built from {relative path: bytes}.
 
@@ -171,12 +187,41 @@ class WhatCountsAsAnEmptyTwin(unittest.TestCase):
         self.assertEqual(TOOL.disk_size(os.path.join(self.tree.dir, "a.txt")), 1)
         self.assertIsNone(TOOL.disk_size(os.path.join(self.tree.dir, "nope")))
 
-    def test_AND_THE_FIXTURE_CANNOT_BE_BUILT_ON_A_NORMAL_DIRECTORY(self):
-        """Which is why `size_of` is injectable at all, and it is worth asserting rather than
-        explaining: writing both casings into an ordinary temp directory leaves ONE file."""
+    def test_WHETHER_THE_FIXTURE_CAN_BE_BUILT_DEPENDS_ON_THE_FILESYSTEM(self):
+        r"""Which is why `size_of` is injectable at all -- and the answer is NOT the same everywhere.
+
+        This test used to assert that writing both casings into a temp directory leaves ONE file.
+        That is true on Windows and macOS and FALSE on Linux, so it passed on the owner's machine
+        and failed in CI with `2 != 1 : ['a.TBL', 'A.TBL']`. A test that encodes the platform it
+        was written on is worse than no test: it reports the author's filesystem, not the tool's
+        requirement.
+
+        THE REQUIREMENT IS THE INJECTION, AND IT HOLDS EITHER WAY. The collection lives on
+        Windows, where the two spellings ARE one file, so a twin's second spelling cannot be read
+        from disk and its size has to come from the index. The tool must work there, so `size_of`
+        is a seam -- and the tests must run on a case-sensitive runner, so the seam is also what
+        makes them portable. Both facts, one mechanism.
+
+        So: measure the filesystem, assert what that filesystem must then do, and say which one
+        this run saw.
+        """
         self.tree = Tree({"d/A.TBL": b"", "d/a.TBL": b"content here"})
         here = os.path.join(self.tree.dir, "d")
-        self.assertEqual(len(os.listdir(here)), 1, os.listdir(here))
+        names = sorted(os.listdir(here))
+        if case_insensitive(here):
+            self.assertEqual(len(names), 1, names)
+            # and the second write won, so the name on disk is whichever was created first
+            self.assertEqual(len(set(n.lower() for n in names)), 1)
+        else:
+            self.assertEqual(names, ["A.TBL", "a.TBL"], names)
+            self.assertEqual(len(set(n.lower() for n in names)), 1,
+                             "both spellings differ only in case")
+
+    def test_AND_THE_TWIN_LOGIC_IS_THE_SAME_ON_BOTH(self):
+        r"""The point of the seam: with `size_of` supplied, the decision does not depend on which
+        filesystem the test is running on, which is the whole reason it is injectable."""
+        self.tree = Tree({"d/A.TBL": b"", "d/a.TBL": b"content here"})
+        self.assertEqual(self.tree.twins(), [("d/A.TBL", "d/a.TBL", 12)])
 
     def test_the_largest_filled_member_is_named_as_the_keeper(self):
         """With three members the record has to point somewhere definite, and the biggest is the
