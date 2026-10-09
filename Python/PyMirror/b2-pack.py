@@ -105,6 +105,7 @@ doing its work during a repair.
 import argparse
 import collections
 import filecmp
+import csv
 import glob
 import io
 import math
@@ -1331,10 +1332,75 @@ def write_list(step, dry_run=True):
             fh.write(path + chr(10))
         for path in step["empty_dirs"]:
             fh.write(path + chr(10))
-    with io.open(step["index_path"], "w", encoding="utf-8", newline="\n") as fh:
-        fh.write("archive,path,size,sha256\n")
-        for row in sorted(step["rows"], key=lambda r: (r["archive"], r["path"])):
-            fh.write("%s,%s,%d,%s\n" % (row["archive"], row["path"], row["size"], row["digest"]))
+    write_unit_index(step["index_path"], step["rows"])
+
+
+INDEX_COLUMNS = ("archive", "path", "size", "sha256")
+ALL_UNITS_COLUMNS = ("unit",) + INDEX_COLUMNS
+ALL_UNITS_INDEX = "all-units" + INDEX_SUFFIX
+
+
+# NOT `common.COLLECTION_INDEX`, WHICH IS A DIFFERENT FILE ONE CHARACTER AWAY. The library's
+# `collection-index.csv` is written by `checksums.py` over the whole tree with the columns
+# `path,size,mtime_ns,sha256`, relative to the collection root, and `dedupe-docs.py` reads it.
+# This one is `unit,archive,path,size,sha256` and exists to answer which ARCHIVE FILE to fetch.
+# Naming it `collection.index.csv` would have put two unrelated files one hyphen apart, and the
+# gate's shadowing check is what caught the first attempt at exactly that.
+
+
+def write_unit_index(path, rows, unit=None):
+    r"""Write one index CSV. THROUGH `csv.writer`, BECAUSE 4 476 PATHS CONTAIN A COMMA.
+
+    This used to be `fh.write("%s,%s,%d,%s\n" % ...)` and the result was not CSV. Measured on the
+    nine units' output, 2026-10-09: 4 476 of 1 688 131 rows carry a comma inside the path, for
+    example `bits/DEC/pdp1/papertapeImages/20040106/floatingpoint/sys1_floatlib_6-20,bin`, and
+    `csv.DictReader` then read `size` as `bin` and `sha256` as `8306`. Silently, on 0.27 % of the
+    rows, in the one file whose whole job is to be read later by something that is not this tool.
+
+    THE SOURCE WAS ALWAYS RIGHT. `Q:\mirror\<archive>\.mirror-index.csv` quotes those paths
+    (1 229 of them in bitsavers alone), so `common.read_index` read them correctly through the same
+    `csv` module and NOTHING WAS MISSING FROM ANY PACKING PLAN. Only the derived file was broken,
+    which is why no check caught it: `rar t`, the CRC32 cross-check and the four manifests all
+    describe the archive, and this describes its contents to a reader.
+
+    `unit` prepends the unit column, for the combined index. Left out, the four original columns
+    are written unchanged, so an archive's own copy keeps its shape.
+    """
+    columns = ALL_UNITS_COLUMNS if unit else INDEX_COLUMNS
+    with io.open(path, "w", encoding="utf-8", newline="") as fh:
+        writer = csv.writer(fh, lineterminator="\n")
+        writer.writerow(columns)
+        for row in sorted(rows, key=lambda r: (r["archive"], r["path"])):
+            line = [row["archive"], row["path"], row["size"], row["digest"]]
+            writer.writerow(([unit] + line) if unit else line)
+
+
+def write_collection_index(steps, work, report=say):
+    r"""Write `<work>/collection.index.csv`: every unit's rows with the UNIT NAMED FIRST.
+
+    WHY ONE FILE AND NOT NINE. The index archive carries each unit's own CSV, which answers "what
+    is in this unit" -- but the question that sends anyone to the index archive is the other one:
+    "which unit do I have to fetch to get this file". Nine files cannot answer it without knowing
+    the answer first. One file with a `unit` column answers it with one search.
+
+    The nine stay beside it: they are byte-identical to the copy inside each unit's own archive, so
+    they are what you check that copy against.
+    """
+    rows = []
+    for step in steps:
+        if step["unit"] is None:
+            continue
+        for row in step["rows"]:
+            rows.append(dict(row, unit=step["unit"].name))
+    path = os.path.join(work, ALL_UNITS_INDEX)
+    with io.open(path, "w", encoding="utf-8", newline="") as fh:
+        writer = csv.writer(fh, lineterminator="\n")
+        writer.writerow(ALL_UNITS_COLUMNS)
+        for row in sorted(rows, key=lambda r: (r["unit"], r["archive"], r["path"])):
+            writer.writerow([row["unit"], row["archive"], row["path"], row["size"], row["digest"]])
+    report("  %s: %d row(s) over %d unit(s)"
+           % (ALL_UNITS_INDEX, len(rows), sum(1 for st in steps if st["unit"])))
+    return path
 
 
 def report(steps, verbose=False, stream=None):
@@ -1923,6 +1989,15 @@ def main(argv=None):
 
     steps = plan(units, args.root, args.out, args.work, rar=rar,
                  with_dirs=not args.no_empty_dirs)
+
+    # BUILDING THE INDEX ARCHIVE READS ALL NINE UNITS, whatever `--only` narrowed the run to. The
+    # archive describes the whole collection -- that is the point of fetching it instead of a unit
+    # -- so its CSVs have to be rebuilt from every unit's index, not from the ones this run packs.
+    # The CSVs are cheap: reading the per-archive indexes takes under a minute and writes 226 MB.
+    index_steps = steps
+    if args.execute and steps and steps[-1]["unit"] is None and len(units) < len(UNITS):
+        index_steps = plan(UNITS, args.root, args.out, args.work, rar=rar,
+                           with_dirs=not args.no_empty_dirs)
     if args.sizes:
         for step in steps[:-1]:
             say("%-24s %10s  %7d files"
@@ -1971,6 +2046,15 @@ def main(argv=None):
                 say("REFUSING: the password file is inside %s and would be uploaded with the "
                     "archives." % label)
                 return 2
+    if steps and steps[-1]["unit"] is None:
+        # EVERY UNIT'S CSV, REWRITTEN, AND THEN THE COMBINED ONE. `write_list()` only writes the
+        # index for a unit it is packing, so a `--only index` run would otherwise pack whatever
+        # CSVs happened to be left in the work directory from earlier runs -- including, until
+        # 2026-10-09, nine unquoted ones.
+        for step in index_steps:
+            if step["unit"] is not None:
+                write_unit_index(step["index_path"], step["rows"])
+        write_collection_index(index_steps, args.work)
     return execute(steps, rar, password)
 
 

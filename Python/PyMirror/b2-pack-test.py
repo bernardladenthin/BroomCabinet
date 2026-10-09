@@ -30,6 +30,7 @@ almost matches a subtree, and a file with no extension.
 """
 import hashlib
 import importlib.util
+import csv
 import io
 import os
 import shutil
@@ -728,13 +729,30 @@ class TheArchiveCarriesItsOwnFixityRecords(unittest.TestCase):
         self.assertEqual(got, [])
 
     def test_they_go_into_the_LIST_and_not_into_the_unit_index(self):
-        """The index's columns are archive, path, size and sha256, and these files have no sha256
-        recorded anywhere. A row with an empty digest is one no auditor could act on."""
-        src = io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8").read()
-        write_list = src[src.index("def write_list("):src.index("def report(")]
-        self.assertIn('for path in step["bookkeeping"]:', write_list)
-        after = write_list[write_list.index('fh.write("archive,path,size,sha256'):]
-        self.assertNotIn("bookkeeping", after)
+        r"""The index's columns are archive, path, size and sha256, and these files have no sha256
+        recorded anywhere. A row with an empty digest is one no auditor could act on.
+
+        MEASURED, NOT GREPPED. This used to search b2-pack.py's own source for the header literal
+        and assert "bookkeeping" appeared nowhere after it. That broke the moment the write moved
+        into `write_unit_index()` for quoting -- a change the test should not have noticed. So it
+        writes a step now and reads the two files back.
+        """
+        work = tempfile.mkdtemp(prefix="b2-pack-bk-")
+        try:
+            step = {"list_path": os.path.join(work, "u.list"),
+                    "index_path": os.path.join(work, "u" + TOOL.INDEX_SUFFIX),
+                    "rows": [{"archive": "a", "path": "real.bin", "size": 7,
+                              "digest": "d" * 64}],
+                    "bookkeeping": [os.path.join("a", "CASE-FILES-RENAMED.txt")],
+                    "empty_dirs": [], "argv": [], "cwd": work}
+            TOOL.write_list(step, dry_run=False)
+            listed = io.open(step["list_path"], encoding="utf-8").read()
+            indexed = io.open(step["index_path"], encoding="utf-8").read()
+            self.assertIn("CASE-FILES-RENAMED.txt", listed)
+            self.assertNotIn("CASE-FILES-RENAMED.txt", indexed)
+            self.assertIn("real.bin", indexed)
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
 
     def test_the_count_is_reported_so_a_reader_sees_it_happened(self):
         src = io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8").read()
@@ -2144,6 +2162,138 @@ class TheIndexArchiveStep(unittest.TestCase):
         self.assertFalse([a for a in self.step["argv"] if a.startswith("-v")])
         self.assertIsNone(self.step["volumes"])
         self.assertEqual(self.step["recovery_volumes"], 0)
+
+
+class TheIndexCsvIsRealCsv(unittest.TestCase):
+    r"""4 476 of 1 688 131 paths contain a comma, and for a while the index CSV lied about them.
+
+    Written with `fh.write("%s,%s,%d,%s")`, a path like
+    `bits/DEC/pdp1/papertapeImages/20040106/floatingpoint/sys1_floatlib_6-20,bin` made
+    `csv.DictReader` read `size` as `bin` and `sha256` as `8306` -- silently, on 0.27 % of rows,
+    in the one file whose job is to be read later by something that is not this tool.
+
+    THE SOURCE WAS ALWAYS RIGHT: `.mirror-index.csv` quotes those paths, so `read_index` read them
+    correctly and no packing plan ever missed a file. Only the derived file was broken, which is
+    why nothing caught it -- `rar t`, the cross-check and the manifests all describe the ARCHIVE.
+    """
+
+    ROWS = [{"archive": "bitsavers", "path": "bits/x/sys1_floatlib_6-20,bin",
+             "size": 8306, "digest": "c" * 64},
+            {"archive": "bitsavers", "path": "plain.txt", "size": 1, "digest": "d" * 64}]
+
+    def setUp(self):
+        self.work = tempfile.mkdtemp(prefix="b2-pack-csv-")
+
+    def tearDown(self):
+        shutil.rmtree(self.work, ignore_errors=True)
+
+    def written(self):
+        path = os.path.join(self.work, "u" + TOOL.INDEX_SUFFIX)
+        TOOL.write_unit_index(path, self.ROWS)
+        return path
+
+    def read_back(self, path):
+        with io.open(path, encoding="utf-8", newline="") as fh:
+            return list(csv.DictReader(fh))
+
+    def test_A_PATH_WITH_A_COMMA_SURVIVES_A_ROUND_TRIP(self):
+        got = self.read_back(self.written())
+        self.assertEqual(got[0]["path"], "bits/x/sys1_floatlib_6-20,bin")
+        self.assertEqual(got[0]["size"], "8306")
+        self.assertEqual(got[0]["sha256"], "c" * 64)
+        self.assertIsNone(got[0].get(None), "no overflow column")
+
+    def test_and_the_broken_form_is_what_it_replaces(self):
+        r"""The old line, reproduced, so the defect lives in the suite and not only in a story."""
+        row = self.ROWS[0]
+        broken = ("archive,path,size,sha256\n"
+                  + "%s,%s,%d,%s\n" % (row["archive"], row["path"], row["size"], row["digest"]))
+        got = next(csv.DictReader(io.StringIO(broken)))
+        self.assertEqual(got["size"], "bin")           # not 8306
+        self.assertEqual(got["sha256"], "8306")        # not the digest
+        self.assertIsNotNone(got.get(None))            # the digest fell off the end
+
+    def test_a_plain_path_is_not_quoted_for_nothing(self):
+        r"""csv.writer quotes only what needs it, so the other 1 683 655 rows are unchanged and a
+        diff against an older index shows only the rows that were actually wrong."""
+        text = io.open(self.written(), encoding="utf-8").read()
+        self.assertIn("bitsavers,plain.txt,1,", text)
+        self.assertIn('"bits/x/sys1_floatlib_6-20,bin"', text)
+
+    def test_the_header_and_the_order_are_unchanged(self):
+        r"""An archive's own copy must keep its shape: the same four columns, the same sort."""
+        path = self.written()
+        with io.open(path, encoding="utf-8") as fh:
+            self.assertEqual(fh.readline().strip(), ",".join(TOOL.INDEX_COLUMNS))
+        got = [r["path"] for r in self.read_back(path)]
+        self.assertEqual(got, sorted(got))
+
+    def test_LF_AND_NOT_CRLF(self):
+        r"""csv.writer defaults to CRLF, which would have rewritten every line of every index on a
+        Windows run -- the mistake `common.py` keeps a rule about. lineterminator is set for it."""
+        with io.open(self.written(), "rb") as fh:
+            self.assertNotIn(b"\r\n", fh.read())
+
+
+class TheCombinedIndex(unittest.TestCase):
+    r"""One CSV with the UNIT NAMED FIRST, because that is the question the index archive is for.
+
+    The nine per-unit CSVs answer "what is in this unit". The question that sends anyone to the
+    index archive is the other one -- "which unit do I fetch to get this file" -- and nine files
+    cannot answer it without knowing the answer first.
+    """
+
+    def setUp(self):
+        self.root = fixture()
+        self.out = tempfile.mkdtemp(prefix="b2-pack-out-")
+        self.work = tempfile.mkdtemp(prefix="b2-pack-work-")
+        self.steps = TOOL.plan(test_units(), self.root, self.out, self.work)
+
+    def tearDown(self):
+        shutil.rmtree(self.out, ignore_errors=True)
+        shutil.rmtree(self.work, ignore_errors=True)
+
+    def write(self):
+        return TOOL.write_collection_index(self.steps, self.work, report=lambda *a, **k: None)
+
+    def test_IT_HOLDS_EVERY_ROW_OF_EVERY_UNIT(self):
+        with io.open(self.write(), encoding="utf-8", newline="") as fh:
+            rows = list(csv.DictReader(fh))
+        self.assertEqual(len(rows), sum(len(st["rows"]) for st in self.steps if st["unit"]))
+
+    def test_and_names_the_unit_in_the_first_column(self):
+        path = self.write()
+        with io.open(path, encoding="utf-8") as fh:
+            self.assertEqual(fh.readline().strip(), ",".join(TOOL.ALL_UNITS_COLUMNS))
+        self.assertEqual(TOOL.ALL_UNITS_COLUMNS[0], "unit")
+        with io.open(path, encoding="utf-8", newline="") as fh:
+            named = set(r["unit"] for r in csv.DictReader(fh))
+        packed = set(st["unit"].name for st in self.steps if st["unit"] and st["rows"])
+        self.assertEqual(named, packed)
+
+    def test_its_name_ends_in_index_csv_so_the_glob_picks_it_up(self):
+        r"""The index step globs `*.index.csv` in the work directory. The combined file is named to
+        be caught by that rather than added to the command, so there is one rule and not two."""
+        self.assertTrue(TOOL.ALL_UNITS_INDEX.endswith(TOOL.INDEX_SUFFIX))
+        self.assertIn("*" + TOOL.INDEX_SUFFIX, self.steps[-1]["argv"])
+
+    def test_it_is_deterministic(self):
+        r"""Two runs must be byte-identical, or a rebuilt index cannot be diffed against the old."""
+        first = io.open(self.write(), "rb").read()
+        second = io.open(self.write(), "rb").read()
+        self.assertEqual(first, second)
+
+    def test_a_comma_in_a_path_survives_here_too(self):
+        r"""The combined file has one more column in front of the path, so the quoting has to hold
+        with the offset as well -- the per-unit test alone would not show that."""
+        path = os.path.join(self.work, TOOL.ALL_UNITS_INDEX)
+        TOOL.write_unit_index(path, [{"archive": "a", "path": "x,y.bin", "size": 3,
+                                      "digest": "e" * 64}], unit="misc")
+        with io.open(path, encoding="utf-8", newline="") as fh:
+            got = next(csv.DictReader(fh))
+        self.assertEqual(got["unit"], "misc")
+        self.assertEqual(got["path"], "x,y.bin")
+        self.assertEqual(got["size"], "3")
 
 
 if __name__ == "__main__":
