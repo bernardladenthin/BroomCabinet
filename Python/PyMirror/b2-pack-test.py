@@ -1013,11 +1013,27 @@ class TheCommands(unittest.TestCase):
             self.assertIn(step["index_path"], step["argv"])
 
     def test_the_last_step_is_the_index_archive_and_packs_only_indexes(self):
+        r"""THIS TEST PINNED THE BUG INSTEAD OF THE REQUIREMENT until 2026-10-09.
+
+        It asserted `cwd == OUT/index` -- the archive's own output directory -- which is where the
+        code put it and nowhere the CSVs are. `write_list()` writes them to `<work>`, so the glob
+        matched nothing. A test that copies the implementation cannot fail when the implementation
+        is wrong, and this one was written from the code rather than from where the files are; the
+        pairing below is what it should have asserted from the start.
+        """
         last = self.steps[-1]
         self.assertIsNone(last["unit"])
         self.assertIn("*" + TOOL.INDEX_SUFFIX, last["argv"])
-        self.assertEqual(last["cwd"], os.path.join("OUT", TOOL.INDEX_DIR))
+        self.assertEqual(last["cwd"], "WORK")
+        self.assertNotEqual(last["cwd"], os.path.join("OUT", TOOL.INDEX_DIR))
         self.assertIn("-ep", last["argv"])
+
+    def test_AND_THE_GLOB_MATCHES_WHERE_THE_INDEXES_ARE_WRITTEN(self):
+        r"""The pairing the old test missed: every unit step writes its index into the directory
+        the index step globs. Either half alone proves nothing."""
+        last = self.steps[-1]
+        for step in self.steps[:-1]:
+            self.assertEqual(os.path.dirname(step["index_path"]), last["cwd"])
 
     def test_there_is_one_step_per_unit_plus_the_index(self):
         self.assertEqual(len(self.steps), len(test_units()) + 1)
@@ -1765,23 +1781,42 @@ class TheArchiveGetsItsOwnChecksums(unittest.TestCase):
         self.assertNotIn("pack.log", text)
         self.assertIn("unit.part01.rar", text)
 
-    def test_A_STEP_WITH_NO_INDEX_PATH_DOES_NOT_REACH_THE_CALL(self):
-        r"""THE BUG THAT KILLED A SEVEN-HOUR RUN. The index archive's own step carries no
-        index_path, and the call site unpacked it with os.path.dirname() before calling -- so
-        `dirname(None)` raised TypeError after vendors had packed 399 GB, passed `rar t` and
-        passed the cross-check. The archive was fine; the run died before placing its index or
-        writing its checksums.
+    def test_A_STEP_WITH_NO_INDEX_PATH_STILL_GETS_ITS_MANIFESTS(self):
+        r"""THE BUG THAT KILLED A SEVEN-HOUR RUN, AND THE OVERCORRECTION THAT FOLLOWED IT.
 
-        place_index_beside() already answered that case gracefully and a test said so. The call
-        site did not, which is the difference between testing a function and testing its use.
+        The call site read `os.path.dirname(step["index_path"])` directly, which raises TypeError
+        on the index archive's step -- and it raised it AFTER vendors had packed 399 GB, passed
+        `rar t` and passed the cross-check. The archive was fine; the run died before placing its
+        index or writing its checksums.
+
+        The fix was a guard that SKIPPED THE MANIFESTS ENTIRELY for that step, with a comment
+        claiming the index archive "has nothing to place and nothing to describe". Half right: it
+        has no index to place, because it IS the index. It still has itself to describe -- it is
+        uploaded like any unit, and without the four manifests a corrupted `index.rar` could only
+        be found by opening it.
+
+        And the test for the guard searched b2-pack.py's own source for the `if` statement, which
+        pinned the shape of the code instead of what it has to do, so it failed when the shape
+        changed for the right reason. `fixity_work_for()` is the thing to ask instead.
         """
-        with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
-            text = handle.read()
-        call = text.index("fixity_over(os.path.dirname(")
-        guard = text.rindex("if step.get(\"index_path\"):", 0, call)
-        self.assertLess(guard, call)
-        # and nothing between the guard and the call that could run unguarded
-        self.assertNotIn("dirname(step[", text[guard:call])
+        self.assertEqual(TOOL.fixity_work_for({"index_path": None, "cwd": "WORK"}), "WORK")
+        self.assertEqual(TOOL.fixity_work_for({"cwd": "WORK"}), "WORK")
+        self.assertEqual(
+            TOOL.fixity_work_for({"index_path": os.path.join("W", "u.index.csv"), "cwd": "C"}),
+            "W")
+
+    def test_and_the_index_archive_is_a_step_with_no_index_path(self):
+        r"""Which is what makes the case above the real one and not a hypothetical."""
+        root = fixture()
+        out = tempfile.mkdtemp(prefix="b2-pack-out-")
+        work = tempfile.mkdtemp(prefix="b2-pack-work-")
+        try:
+            last = TOOL.plan(test_units(), root, out, work)[-1]
+            self.assertIsNone(last["index_path"])
+            self.assertEqual(TOOL.fixity_work_for(last), work)
+        finally:
+            shutil.rmtree(out, ignore_errors=True)
+            shutil.rmtree(work, ignore_errors=True)
 
     def test_and_it_runs_only_after_the_checks_pass(self):
         with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
@@ -2047,6 +2082,68 @@ class WhatTheSwitchesActuallyBought(unittest.TestCase):
         text = self.source()
         self.assertIn("EVERY UNIT PASSED BOTH CHECKS", text)
         self.assertIn("NINE FOR NINE", text)
+
+
+class TheIndexArchiveStep(unittest.TestCase):
+    r"""The step that had never run, and the two separate bugs that kept it from running.
+
+    It is the thing you fetch INSTEAD of a unit: every unit's `*.index.csv` in one small archive,
+    so the collection can be searched without pulling 1 TB out of cold storage.
+    """
+
+    def setUp(self):
+        self.root = fixture()
+        self.out = tempfile.mkdtemp(prefix="b2-pack-out-")
+        self.work = tempfile.mkdtemp(prefix="b2-pack-work-")
+        self.step = TOOL.plan(test_units(), self.root, self.out, self.work)[-1]
+
+    def tearDown(self):
+        shutil.rmtree(self.out, ignore_errors=True)
+        shutil.rmtree(self.work, ignore_errors=True)
+
+    def test_IT_GLOBS_THE_WORK_DIRECTORY_AND_NOT_ITS_OWN_OUTPUT(self):
+        r"""THE BUG FOUND BY FINALLY RUNNING IT, 2026-10-09.
+
+        `write_list()` puts each unit's index at `<work>/<unit>.index.csv`, so that is the only
+        place `*.index.csv` matches. The cwd pointed at `<out>/index` instead -- the archive's own
+        directory, which does not exist yet -- so the glob matched nothing.
+        """
+        self.assertEqual(self.step["cwd"], self.work)
+        self.assertNotEqual(self.step["cwd"], os.path.join(self.out, TOOL.INDEX_DIR))
+
+    def test_and_the_glob_is_what_write_list_actually_produces(self):
+        r"""The two halves have to agree, and nothing else checked that they did."""
+        self.assertIn("*" + TOOL.INDEX_SUFFIX, self.step["argv"])
+        steps = TOOL.plan(test_units(), self.root, self.out, self.work)
+        for unit_step in steps[:-1]:
+            self.assertEqual(os.path.dirname(unit_step["index_path"]), self.step["cwd"])
+            self.assertTrue(unit_step["index_path"].endswith(TOOL.INDEX_SUFFIX))
+
+    def test_and_it_writes_into_its_own_directory(self):
+        self.assertEqual(self.step["archive"],
+                         os.path.join(self.out, TOOL.INDEX_DIR, "index.rar"))
+
+    def test_it_carries_no_list_and_no_index_of_its_own(self):
+        r"""THE FIRST BUG: `write_list()` was called on this step and crashed on the empty path.
+
+        That happened AFTER every unit was packed and verified, so every `--execute` run ever made
+        ended in a traceback with all its real work already done. Both guards stay.
+        """
+        self.assertIsNone(self.step["list_path"])
+        self.assertIsNone(self.step["index_path"])
+        self.assertIsNone(TOOL.write_list(self.step, dry_run=True))
+
+    def test_it_strips_paths_because_a_handful_of_basenames_cannot_collide(self):
+        r"""-ep is safe HERE and nowhere else: one file per unit, all differently named. The same
+        switch over a unit's 342 386 entries would collide basenames and overwrite on extraction,
+        with `rar t` reporting "Alles OK" over the result."""
+        self.assertIn("-ep", self.step["argv"])
+
+    def test_it_is_not_split_into_volumes(self):
+        r"""It is meant to be fetched whole, so no -v and no .rev."""
+        self.assertFalse([a for a in self.step["argv"] if a.startswith("-v")])
+        self.assertIsNone(self.step["volumes"])
+        self.assertEqual(self.step["recovery_volumes"], 0)
 
 
 if __name__ == "__main__":

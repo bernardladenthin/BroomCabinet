@@ -1016,6 +1016,21 @@ def fixity_over(folder, work, report=say):
     return True
 
 
+def fixity_work_for(step):
+    r"""-> the directory PyFixity may use as scratch for this step. Never `dirname(None)`.
+
+    THE BUG THIS REPLACES A TEXT SEARCH FOR. The call site used to read
+    `os.path.dirname(step["index_path"])` directly, which raises TypeError on the index archive's
+    step because that step has no index to place -- and it raised it AFTER vendors had packed
+    399 GB, passed `rar t` and passed the cross-check. A guard was added at the call site and a
+    test asserted the guard by searching b2-pack.py's own source for it, which pinned the shape of
+    the code rather than what it has to do. This function is the thing to ask instead.
+    """
+    if step.get("index_path"):
+        return os.path.dirname(step["index_path"])
+    return step["cwd"]
+
+
 def place_index_beside(step, report=say):
     r"""Copy the unit's own index CSV next to its volumes. -> the destination, or None.
 
@@ -1260,9 +1275,14 @@ def plan(units, root, out, work, rar="rar", with_dirs=True):
                       "volumes": volumes, "recovery_volumes": unit.options.recovery_volumes(volumes),
                       "empty_dirs": dirs, "bookkeeping": bookkeeping_for(unit, root, rows)})
     index_archive = os.path.join(out, INDEX_DIR, "index.rar")
+    # THE CWD IS THE WORK DIRECTORY, NOT THE OUTPUT ONE. `write_list()` puts each unit's index at
+    # `<work>/<unit>.index.csv`, so that is the only place `*.index.csv` matches. Pointing the cwd
+    # at the archive's own directory -- which is what this step did until 2026-10-09 -- globs an
+    # empty or absent directory and packs nothing. It was never caught because the step crashed
+    # earlier, in `write_list()`, in every `--execute` run ever made.
     steps.append({"unit": None, "argv": [rar, "a", "-ep"] + INDEX_OPTIONS.switches()
                   + [index_archive, "*" + INDEX_SUFFIX],
-                  "cwd": os.path.join(out, INDEX_DIR), "list_path": None, "index_path": None,
+                  "cwd": work, "list_path": None, "index_path": None,
                   "archive": index_archive, "rows": [],
                   # Every step carries the same keys, so a caller never has to ask which kind it
                   # is before reading one. The index archive has no volumes and no directories.
@@ -1641,8 +1661,18 @@ def execute(steps, rar, password):
     for step in steps:
         write_list(step, dry_run=False)
         argv = list(step["argv"])
-        encrypted = step["unit"] is None or step["unit"].options.encrypt_headers
+        # THE INDEX STEP TAKES INDEX_OPTIONS, and `unit is None` is how it is recognised -- but it
+        # USED TO SHORT-CIRCUIT THE WHOLE TEST: `step["unit"] is None or ...` made the index
+        # archive unconditionally encrypted, whatever INDEX_OPTIONS said, and then crashed on
+        # `"-hp" + None` because `wants_password` below only asks the UNITS. Found 2026-10-09, the
+        # first time this step ever ran. Read the options first, then ask them.
         unit_options = step["unit"].options if step["unit"] is not None else INDEX_OPTIONS
+        encrypted = unit_options.encrypt_headers
+        if encrypted and not password:
+            # Refusing beats packing in the clear what was marked for encryption.
+            say("  %s wants encrypted headers and no password was given -- stopping"
+                % (step["unit"].name if step["unit"] else "the index archive"))
+            return 2
         if encrypted:
             argv.insert(2, "-hp" + password)
         parent = os.path.dirname(step["archive"])
@@ -1709,11 +1739,25 @@ def execute(steps, rar, password):
             # THE INDEX ARCHIVE'S STEP HAS NO index_path AND THIS CRASHED A SEVEN-HOUR RUN ON IT.
             # `os.path.dirname(None)` raises TypeError, so vendors packed 399 GB, passed `rar t`
             # and passed the cross-check, and then died before its index was placed or its
-            # checksums written. The guard belongs at the call site, because the step for the
-            # index archive legitimately has nothing to place and nothing to describe.
-            if step.get("index_path"):
-                fixity_over(os.path.dirname(step["archive"]),
-                            os.path.dirname(step["index_path"]))
+            # checksums written.
+            #
+            # BUT THE GUARD THEN SKIPPED THE MANIFESTS TOO, and the comment here claimed the index
+            # archive "has nothing to place and nothing to describe". Half right: it has no index
+            # to place, because it IS the index. It still has itself to describe -- it is uploaded
+            # like any unit, and without the four manifests a corrupted `index.rar` could only be
+            # found by opening it. Corrected 2026-10-09, the first time this step ran at all.
+            fixity_over(os.path.dirname(step["archive"]), fixity_work_for(step))
+        elif checked.returncode == 0:
+            # THE INDEX ARCHIVE, WHICH CANNOT HAVE THE CROSS-CHECK AND STILL NEEDS THE MANIFESTS.
+            # Its members are the units' index CSVs, written by this tool into the work directory;
+            # they were never part of the collection, so no .sfv exists to hold their stored CRC32s
+            # against. SAID OUT LOUD RATHER THAN SKIPPED SILENTLY: a reader comparing this log with
+            # a unit's would otherwise wonder which check went missing and why.
+            say("  no CRC32 cross-check for the index archive -- its members are not in the "
+                "collection, so there is no .sfv to hold them against")
+            say("   and the -rr10 recovery record are its checks, and the four manifests "
+                "below describe the archive itself")
+            fixity_over(os.path.dirname(step["archive"]), fixity_work_for(step))
         if checked.returncode != 0:
             say("  THE ARCHIVE DOES NOT TEST CLEAN (rar t exited %d) -- stopping before the next "
                 "unit." % checked.returncode)
@@ -1806,7 +1850,8 @@ def main(argv=None):
     # public hosts, so encryption protects nothing and adds the one way this could become
     # unreadable: a lost key. The demand is kept, driven by the units themselves, so a unit that
     # is one day marked encrypt_headers=True cannot be packed in the clear by accident.
-    wants_password = args.execute and any(u.options.encrypt_headers for u in UNITS)
+    wants_password = args.execute and (INDEX_OPTIONS.encrypt_headers
+                                       or any(u.options.encrypt_headers for u in UNITS))
     if args.execute:
         if wants_password and not args.password_file:
             say("--execute needs --password-file: a unit asks for encrypted headers, and the "
@@ -1829,11 +1874,20 @@ def main(argv=None):
     units = UNITS
     if args.only:
         wanted = set(args.only)
+        # `--only index` SELECTS THE INDEX ARCHIVE AND NO UNITS. It is the last step of every plan
+        # and the only one that is not a unit, so there was no way to ask for it alone -- and it is
+        # the step most likely to be wanted alone, because it is rebuilt whenever ANY unit is
+        # repacked while the other eight archives stay as they are. `index` cannot collide with a
+        # unit name: `UNITS` is checked for it below, which fails the gate rather than a run.
+        index_only = INDEX_DIR in wanted
+        wanted.discard(INDEX_DIR)
         unknown = wanted - set(u.name for u in UNITS)
         if unknown:
             say("no such unit: %s" % ", ".join(sorted(unknown)))
             return 2
         units = tuple(u for u in UNITS if u.name in wanted)
+        if index_only and not units:
+            say("  the index archive only -- no unit is repacked")
 
     # An archive whose index is missing would plan as an EMPTY unit, because `common.read_index`
     # answers {} rather than raising -- right for a cache, wrong for a packing plan. Checked here,
