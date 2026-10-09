@@ -386,5 +386,129 @@ class VerifyTreeTest(unittest.TestCase):
             self.assertEqual((r.diff.left_count, r.diff.identical), (1, 1))
 
 
+class AwkwardNamesSurviveEveryFormat(unittest.TestCase):
+    r"""A path is DATA, and every format here has a delimiter a path may contain.
+
+    WHY THIS CLASS EXISTS. On 2026-10-09 PyMirror's `<unit>.index.csv` was found to be broken for
+    4 476 of 1 688 131 rows: it was written with `"%s,%s,%d,%s" % (...)` and 4 476 paths in that
+    collection contain a comma, so `csv.DictReader` read `size` as `bin` and the digest fell into
+    the overflow column. Silently, on 0.265 % of rows, for weeks, in the file whose whole job is to
+    be read later by something that is not the tool that wrote it.
+
+    PyFixity was already correct -- `csv.writer` for the index, `rpartition(" ")` for the .sfv,
+    GNU's backslash escape for the sum files -- and `IndexTest.test_roundtrip` covers the index.
+    THE MANIFESTS WERE NOT COVERED, and they are the formats with the nastier delimiters: the sum
+    files put the digest FIRST and the .sfv puts it LAST, so one must be split from the left and
+    the other from the right. Nothing failed; these are here so nothing starts to.
+
+    Names Windows actually permits, which is the only set worth testing: a space, a comma, a
+    quote, a semicolon, multiple spaces, and a tail that looks like the field it sits next to.
+    Backslash and newline cannot occur in a Windows name but the escape exists, so it is checked
+    too.
+    """
+
+    NAMES = [
+        "a/b c.txt",                      # a space -- the .sfv delimiter
+        'quote "and, comma".bin',         # a comma and a quote -- the CSV delimiters
+        "two  spaces.bin",                # consecutive spaces: rpartition must take the LAST
+        "trailing 0000ABCD.bin",          # a tail shaped like a CRC32, beside a CRC32 field
+        "; not a comment.bin",            # a leading semicolon is an .sfv comment marker
+        "star *name.bin",                 # `*` is the sum files' binary-mode marker
+        "equals = sign.bin",              # harmless, and the kind of thing that surprises later
+    ]
+
+    def entries(self):
+        return [E(name, 7, 10 ** 18, "s" * 64, "h" * 40, "m" * 32, "0000ABCD")
+                for name in self.NAMES]
+
+    def test_THE_SFV_ROUND_TRIPS_A_NAME_WITH_SPACES(self):
+        r"""`<name> <CRC32>` -- the columns the other way round from sha256sum, so a reader must
+        split from the RIGHT. A name with its own spaces is what proves it does."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fx.write_manifests(root, self.entries())
+            got = fx.read_sfv(root / fx.MANIFEST_FILES["crc32"])
+            self.assertEqual(sorted(got), sorted(self.NAMES))
+            for name in self.NAMES:
+                self.assertEqual(got[name], "0000ABCD")
+
+    def test_and_the_sum_files_round_trip_the_same_names(self):
+        r"""Here the digest comes FIRST, so these must be split from the left -- the opposite rule
+        in the same directory, which is exactly how one of them gets written wrong one day."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fx.write_manifests(root, self.entries())
+            for algo in ("sha256", "sha1", "md5"):
+                got = fx.read_sums(root / fx.MANIFEST_FILES[algo])
+                self.assertEqual(sorted(got), sorted(self.NAMES), algo)
+
+    def test_and_the_index_round_trips_them(self):
+        r"""Already covered for two names by IndexTest.test_roundtrip; repeated over the whole set
+        so the three formats are checked against ONE list and cannot drift apart."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "i.csv"
+            fx.write_index(path, self.entries())
+            self.assertEqual([e.path for e in fx.read_index(path)], sorted(self.NAMES))
+
+    def test_A_SEMICOLON_NAME_IS_NOT_READ_AS_AN_SFV_COMMENT(self):
+        r"""`;` starts a comment in an .sfv, and `write_manifests` does not write one -- so a file
+        whose name begins with `;` must still come back. If a header is ever added, it has to go
+        where this test still passes."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fx.write_manifests(root, self.entries())
+            got = fx.read_sfv(root / fx.MANIFEST_FILES["crc32"])
+            self.assertIn("; not a comment.bin", got)
+
+    def test_a_backslash_or_newline_takes_GNUs_escape(self):
+        r"""Neither can occur in a Windows file name, so this is about the FORMAT being right
+        rather than a file that exists: `sha256sum -c` expects the leading backslash."""
+        line = fx.sums_line("d" * 64, "has" + chr(92) + "back.bin")
+        self.assertTrue(line.startswith(chr(92)))
+        self.assertIn(chr(92) * 2, line)
+        newline = fx.sums_line("d" * 64, "two" + chr(10) + "lines.bin")
+        self.assertTrue(newline.startswith(chr(92)))
+        self.assertEqual(newline.count(chr(10)), 1, "only the line's own terminator")
+        self.assertIn(chr(92) + "n", newline)
+
+    def test_and_a_plain_name_gets_no_escape_for_nothing(self):
+        r"""The escape must apply only where it is needed, or every line of every manifest changes
+        and `sha256sum -c` reads the backslash as part of the digest."""
+        self.assertEqual(fx.sums_line("d" * 64, "plain.bin"), "d" * 64 + " *plain.bin" + chr(10))
+        self.assertFalse(fx.sums_line("d" * 64, "a/b c.txt").startswith(chr(92)))
+
+    def test_A_CRC32_SHAPED_TAIL_IS_WHAT_RESCUES_A_SEMICOLON_NAME(self):
+        r"""The rule read_sfv applies, stated as its own case: a `;` line that ends in eight hex
+        digits is an entry, and one that does not is a comment."""
+        self.assertTrue(fx.looks_like_a_crc32("0000ABCD"))
+        self.assertTrue(fx.looks_like_a_crc32("deadbeef"))
+        self.assertFalse(fx.looks_like_a_crc32("0000ABC"))      # seven
+        self.assertFalse(fx.looks_like_a_crc32("0000ABCDE"))    # nine
+        self.assertFalse(fx.looks_like_a_crc32("0000ABCG"))     # not hex
+
+    def test_and_an_ordinary_comment_is_still_a_comment(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "x.sfv"
+            p.write_text("; written by something\nfile.bin 0000ABCD\n", encoding="utf-8")
+            self.assertEqual(fx.read_sfv(p), {"file.bin": "0000ABCD"})
+
+    def test_THE_MANIFESTS_AGREE_WITH_THE_INDEX_ON_EVERY_NAME(self):
+        r"""THE CHECK THE PYMIRROR DEFECT WOULD HAVE FAILED. Four files written from one list must
+        name the same set of paths; a quoting bug in any one of them shows up as a difference here
+        and nowhere else, because each file on its own looks plausible.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            entries = self.entries()
+            fx.write_manifests(root, entries)
+            index = Path(tmp) / "i.csv"
+            fx.write_index(index, entries)
+            from_index = set(e.path for e in fx.read_index(index))
+            self.assertEqual(set(fx.read_sfv(root / fx.MANIFEST_FILES["crc32"])), from_index)
+            for algo in ("sha256", "sha1", "md5"):
+                self.assertEqual(set(fx.read_sums(root / fx.MANIFEST_FILES[algo])), from_index,
+                                 algo)
+
+
 if __name__ == "__main__":
     unittest.main()
