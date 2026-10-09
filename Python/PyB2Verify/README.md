@@ -18,7 +18,9 @@ These tools answer both, and **never upload, change or delete anything in B2**.
 | `b2verify.py` | the command line: index each side, compare them, re-read either side against its index |
 | `b2lib.py` | the B2 side without the network: what B2 states about a file, its checksum file, how a difference is explained, unfinished uploads, and the one-time move of first-version local checksums onto PyFixity |
 | `b2lib_test.py` | covers `b2lib.py`, including that move — adopted without reading, and damage since then still reported |
-| `b2verify_test.py` | drives `hash-local`, `verify-local` and `compare` end to end through the real command line, on a throwaway tree with a flipped byte |
+| `b2verify_test.py` | drives `hash-local`, `verify-local`, `compare` and `vault` end to end through the real command line, on a throwaway tree with a flipped byte |
+| `cryptomator.py` | a Cryptomator vault as B2 holds it: open it, walk and check its directory tree, decrypt a file as a stream — read-only, without the network |
+| `cryptomator_test.py` | covers `cryptomator.py` with vaults written by an encrypting test helper, including every inconsistency the walk must name |
 | `privacy_test.py` | refuses drive letters, keys, e-mail addresses and home directories in this project |
 
 **The local side is [PyFixity](../PyFixity/README.md)**, imported from beside this project: one read
@@ -28,8 +30,9 @@ root of each bucket directory, which OpenHashTab and `sha256sum -c` read. The ma
 uploaded with the data; both sides of every comparison leave them out, because they describe a
 bucket rather than belong to it.
 
-Needs `b2sdk` and `boto3` (`requirements.txt`) for the commands that talk to B2. `--help`, both
-libraries and every test run on the standard library alone.
+Needs `b2sdk` and `boto3` (`requirements.txt`) for the commands that talk to B2, and
+`cryptography` for Cryptomator vaults. `--help` runs on the standard library alone; the tests need
+only `cryptography` (`requirements-test.txt`).
 
 ## Setup
 
@@ -177,6 +180,44 @@ Progress is written every 30 seconds, so an interruption costs at most that much
 download stream is often slow (a few MB/s); threads help with many files, not with one large one.
 A whole collection is better verified in portions — one bucket per night with `--older-than 90`.
 
+## Cryptomator vaults: checked without comparing a single B2 checksum
+
+A bucket can hold a [Cryptomator](https://cryptomator.org) vault (format 8, `SIV_GCM`) — uploaded
+by a client such as Cyberduck — while the same files lie in clear on the local disk. B2's
+checksums then describe ciphertext, and Cryptomator encrypts every file with a random key and
+random nonces: the same file never encrypts to the same bytes twice, so no local checksum can ever
+be compared with a B2 checksum. What can be compared is what the vault *decrypts to*.
+
+    vaults=example-vault-bucket/films           <bucket>/<directory>, comma-separated
+    vaultKey.example-vault-bucket/films=D:/backup/films.key     optional
+
+Locally the cleartext is `<localRoot>/<bucket>/<directory>`; the passphrase file defaults to
+`<localRoot>/<bucket>/<directory>.key`, beside the cleartext directory and never inside it, so it
+is neither indexed nor uploaded. Then:
+
+| | |
+|---|---|
+| `hash-local` | indexes the cleartext directory (`checksums/local/<bucket>-<directory>.csv`) and writes the four manifests into it — so they are encrypted and uploaded with it |
+| `vault` | opens the vault (the passphrase unlocks the keys; the configuration's signature proves it unchanged), decrypts the whole directory tree and checks that it fits together, then compares every name and **exact cleartext size** with the index — without downloading any content |
+| `vault --download` | also streams every file and decrypts it. Every 32 KiB block carries an AES-GCM tag bound to its position, so decrypting *is* the integrity check; the cleartext is hashed on the way and compared with the index |
+| `verify-local` | re-reads the cleartext directory against its index |
+| `hash-b2`, `verify-b2` | unchanged: they check the ciphertext, which is what B2 stores |
+| `check`, `compare` | skip the bucket, saying why |
+
+**Why the structure is checked.** B2 has no directories and no transactions. One vault directory
+is several objects — a pointer (`dir.c9r`) in the parent, then the directory itself under `d/` — and
+a client that stops between them leaves a pointer into nothing. That happened during a real
+upload: the client stalled exactly there, and from then on hung every time the directory was
+opened or deleted. `vault` names such a directory, an entry with neither pointer nor content, a
+name that does not decrypt, an orphaned directory and a ciphertext size no complete file can have.
+Folders that only hold B2's `.bzEmpty` placeholders are what deleting a directory leaves behind;
+they are harmless and only counted.
+
+The sizes alone already prove a lot: the cleartext size follows exactly from the ciphertext size
+(a 68-byte header, then 32 KiB blocks with 28 bytes of nonce and tag each), so a truncated upload
+shows. A bit flipped inside B2 does not — only `--download` finds that, by the block's tag.
+Opening a vault needs the `cryptography` package.
+
 ## Things it deals with that are easy to get wrong
 
 | | |
@@ -192,7 +233,11 @@ A whole collection is better verified in portions — one bucket per night with 
 
     python b2lib_test.py
     python b2verify_test.py
+    python cryptomator_test.py
     python privacy_test.py
 
 No B2 account is needed. The commands that do need one — `hash-b2`, `verify-b2` and `check` — were
-run against real buckets of several terabytes while this was written.
+run against real buckets of several terabytes while this was written. The vault tests need
+`cryptography` (`requirements-test.txt`); their vaults are written by an encrypting test helper,
+and the reading side was run against real vaults of a Cryptomator client — every name decrypted,
+every size matched to the byte, decrypted content matched its SHA-256.

@@ -34,6 +34,12 @@ COMMANDS
         --download              also stream every file from B2, hash it and compare it with what
                                 B2's metadata states -- straight from the network, no temp files
     compare [bucket ...]        local index against saved B2 checksums, 1:1
+    vault [bucket ...]          a Cryptomator vault in B2 (see CRYPTOMATOR VAULTS below): open
+                                it, decrypt the directory tree and check that it is consistent,
+                                then compare names and exact sizes with the local index -- all
+                                without downloading any content
+        --download              also stream every file, decrypt it (which authenticates every
+                                block) and compare its checksums with the local index
 
 VERIFICATION RUNS (verify-local, verify-b2 --download, hash-b2 --download-unknown)
     --threads N                 files in parallel (default: local 1, B2 4)
@@ -59,6 +65,24 @@ variable B2VERIFY_CONFIG. It holds the credentials, so it must never be committe
     flatBuckets=example-flat-bucket         optional; buckets uploaded without directories
     ignoreDirs=scratch                      optional; directories below localRoot that are no bucket
                                             (stateDir and reportDir are recognised by themselves)
+    vaults=example-vault-bucket/films       optional; <bucket>/<directory> holding a Cryptomator
+                                            vault (comma-separated), see below
+    vaultKey.example-vault-bucket/films=D:/backup/films.key
+                                            optional; the file with the vault's passphrase
+                                            (default: <localRoot>/<bucket>/<directory>.key)
+
+CRYPTOMATOR VAULTS. The bucket holds a vault in <directory>; locally the same files lie in clear
+in <localRoot>/<bucket>/<directory>. B2's checksums describe the ciphertext, which never repeats,
+so they cannot be compared with local ones. For such a bucket:
+
+    hash-local      indexes the cleartext directory (<stateDir>/checksums/local/<bucket>-<directory>.csv)
+                    and writes the manifests into it, so they are encrypted and uploaded with it
+    verify-local    re-reads the cleartext directory against that index
+    vault           checks the vault in B2 against that index
+    hash-b2, verify-b2   work as for any bucket -- on the ciphertext, which is what B2 stores
+    check, compare  skip the bucket: a ciphertext listing has nothing to compare with
+The passphrase file holds the passphrase as its only line. Keep it out of every uploaded tree.
+Opening a vault needs the 'cryptography' package (requirements.txt).
 
 The four manifests are uploaded with the data but are not compared: they describe a bucket rather
 than belong to it. A local checksum file of the first version (<bucket>.tsv) is moved onto the
@@ -91,7 +115,8 @@ CONFIG_ENV = "B2VERIFY_CONFIG"
 SKIP_DIRS = {"__pycache__"}
 # The placeholder the B2 web interface creates for an empty folder.
 B2_FOLDER_PLACEHOLDER = ".bzEmpty"
-COMMANDS = ("check", "hash-local", "hash-b2", "verify-local", "verify-b2", "compare")
+VAULT_SKIP = "a Cryptomator vault - B2 holds ciphertext, which is checked by 'vault' instead"
+COMMANDS = ("check", "hash-local", "hash-b2", "verify-local", "verify-b2", "compare", "vault")
 LOCAL_COMMANDS = {"check", "hash-local", "verify-local"}
 
 
@@ -122,6 +147,21 @@ def load_properties(path: Path) -> dict[str, str]:
 
 def split_list(value: str) -> list[str]:
     return [v.strip() for v in value.split(",") if v.strip()]
+
+
+def parse_vaults(value: str) -> dict[str, list[str]]:
+    """vaults=<bucket>/<directory>,... -> bucket -> vault directories."""
+    vaults: dict[str, list[str]] = {}
+    for item in split_list(value):
+        bucket, sep, directory = item.strip("/").partition("/")
+        if not sep or not bucket or not directory.strip("/"):
+            fail(f"vaults: '{item}' is not <bucket>/<directory>")
+        vaults.setdefault(bucket, []).append(directory.strip("/"))
+    return vaults
+
+
+def slug(directory: str) -> str:
+    return directory.replace("/", "-")
 
 
 # --------------------------------------------------------------------------- B2 and S3
@@ -443,6 +483,7 @@ class Context:
         self.excludes = split_list(self.props.get("exclude", ""))
         self.flat_buckets = set(split_list(self.props.get("flatBuckets", "")))
         self.ignore_dirs = SKIP_DIRS | set(split_list(self.props.get("ignoreDirs", "")))
+        self.vaults = parse_vaults(self.props.get("vaults", ""))
         self.filter = self._build_filter(args)
         self._api = None
         self._s3: S3Info | None = None
@@ -503,12 +544,36 @@ class Context:
                   f"{dropped} to be read again; the next hash-local adds SHA-256, MD5 and CRC32")
         return index
 
+    def vault_index(self, bucket: str, directory: str) -> Path:
+        """PyFixity's index of a vault's cleartext directory."""
+        return self.checksum_dir / "local" / f"{bucket}-{slug(directory)}.csv"
+
+    def vault_key(self, bucket: str, directory: str) -> Path:
+        explicit = self.props.get(f"vaultKey.{bucket}/{directory}")
+        if explicit:
+            return Path(explicit)
+        if self.local_root is None:
+            fail(f"no passphrase file for the vault {bucket}/{directory}: set "
+                 f"'vaultKey.{bucket}/{directory}' or 'localRoot'")
+        return self.local_root / bucket / f"{directory}.key"
+
+    def local_trees(self, name: str) -> list[tuple[str, Path, Path]]:
+        """(label, directory, index) of what is indexed locally for a bucket: the bucket directory,
+        or for a vault bucket each cleartext vault directory."""
+        if name in self.vaults:
+            return [(f"{name}/{d}", self.local_root / name / d, self.vault_index(name, d))
+                    for d in self.vaults[name]]
+        return [(name, self.local_root / name, self.local_index(name))]
+
     def b2_names(self) -> list[str]:
         return sorted(p.stem for p in (self.checksum_dir / "b2").glob("*.tsv"))
 
     def local_names(self) -> list[str]:
         d = self.checksum_dir / "local"
-        return sorted({p.stem for p in d.glob("*.csv")} | {p.stem for p in d.glob("*.tsv")})
+        names = {p.stem for p in d.glob("*.csv")} | {p.stem for p in d.glob("*.tsv")}
+        vault_indexes = {self.vault_index(b, v).stem for b, vs in self.vaults.items() for v in vs}
+        indexed_vaults = {b for b, vs in self.vaults.items() if any(self.vault_index(b, v).is_file() for v in vs)}
+        return sorted((names - vault_indexes - set(self.vaults)) | indexed_vaults)
 
     def threads(self, default: int) -> int:
         return getattr(self.args, "threads", None) or default
@@ -577,6 +642,9 @@ def cmd_check(ctx: Context) -> int:
 
     any_diff = False
     for name in sorted(names):
+        if name in ctx.vaults:
+            print(f"\n{name}: {VAULT_SKIP}")
+            continue
         flat = ctx.is_flat(name)
         print(f"\nchecking {name}{' (flat)' if flat else ''} ...", flush=True)
         if not (ctx.local_root / name).is_dir():
@@ -612,29 +680,34 @@ def cmd_hash_local(ctx: Context) -> int:
     names = ctx.args.buckets or sorted(ctx.local_dirs())
     any_damage = False
     for name in names:
-        root = ctx.local_root / name
-        if not root.is_dir():
-            print(f"\n{name}: local directory missing ({root})")
-            continue
-        print(flush=True)
-        index = ctx.local_index(name)
-        layouts = b2_part_layouts(ctx, name)
-        if not layouts and not ctx.snapshot_path(name).is_file():
-            print("  note: no B2 checksums yet - large files without a SHA-1 in B2 become checkable "
-                  "after 'hash-b2' and another 'hash-local'.")
-        key = fixity.basename if ctx.is_flat(name) else (lambda p: p)
-        r = fixity.update_index(root, index, ctx.excludes, layouts, key, ctx.args.force,
-                                out=lambda line: print(line, flush=True))
-        print(f"  -> {index}  ({r.summary}){'' if r.complete else '  INCOMPLETE'}")
-        for manifest, what in r.manifests.items():
-            print(f"  {manifest}: {what}")
-        if r.damaged:
-            any_damage = True
-            print(f"  WARNING: {len(r.damaged)} file(s) with different content at the same size and time "
-                  f"(possible silent damage); the saved checksums were kept. Details and the state in "
-                  f"B2: verify-local {name}")
-            for e, _new in r.damaged:
-                print(f"    ! {e.path}")
+        vault = name in ctx.vaults
+        for label, root, index in ctx.local_trees(name):
+            if not root.is_dir():
+                print(f"\n{label}: local directory missing ({root})")
+                continue
+            print(flush=True)
+            if vault:
+                # The B2 part layouts describe the ciphertext: nothing to hash along.
+                print(f"{label}: the cleartext of a Cryptomator vault")
+                layouts: fixity.Layouts = {}
+            else:
+                layouts = b2_part_layouts(ctx, name)
+                if not layouts and not ctx.snapshot_path(name).is_file():
+                    print("  note: no B2 checksums yet - large files without a SHA-1 in B2 become checkable "
+                          "after 'hash-b2' and another 'hash-local'.")
+            key = fixity.basename if ctx.is_flat(name) and not vault else (lambda p: p)
+            r = fixity.update_index(root, index, ctx.excludes, layouts, key, ctx.args.force,
+                                    out=lambda line: print(line, flush=True))
+            print(f"  -> {index}  ({r.summary}){'' if r.complete else '  INCOMPLETE'}")
+            for manifest, what in r.manifests.items():
+                print(f"  {manifest}: {what}")
+            if r.damaged:
+                any_damage = True
+                print(f"  WARNING: {len(r.damaged)} file(s) with different content at the same size and time "
+                      f"(possible silent damage); the saved checksums were kept. Details"
+                      f"{'' if vault else ' and the state in B2'}: verify-local {name}")
+                for e, _new in r.damaged:
+                    print(f"    ! {e.path}")
     return 1 if any_damage else 0
 
 
@@ -726,30 +799,30 @@ def cmd_verify_local(ctx: Context) -> int:
         return 2
     any_diff = False
     for name in names:
-        root = ctx.local_root / name
-        if not root.is_dir():
-            print(f"\n{name}: local directory missing")
-            any_diff = True
-            continue
-        index = ctx.local_index(name)
-        if not index.is_file():
-            print(f"\n{name}: no local index - run 'hash-local {name}' first")
-            any_diff = True
-            continue
-        state = fixity.read_state(index)
-        print(f"\nverifying {name} locally against its index ({saved_info(state)}) ...", flush=True)
-        r = fixity.verify_tree(root, index, ctx.excludes, ctx.filter, ctx.args.quick, ctx.args.resume,
-                               ctx.args.older_than, ctx.threads(1), out=lambda line: print(line, flush=True))
-        info = [f"- **Local index:** {saved_info(state)}"]
-        if r.summary:
-            print(f"  read: {r.summary}")
-        if r.plan:
-            info += plan_text(r.plan, ctx.filter)
-        if r.diff.checksum:
-            add_b2_notes(ctx, r.diff, name, info)
-        options = ["modification time"] + ([] if ctx.args.quick else ["checksum"])
-        ctx.report(name, r.diff, options, info, suffix=".local", title=f"{name} - local against its index")
-        any_diff |= r.diff.has_differences()
+        for label, root, index in ctx.local_trees(name):
+            if not root.is_dir():
+                print(f"\n{label}: local directory missing")
+                any_diff = True
+                continue
+            if not index.is_file():
+                print(f"\n{label}: no local index - run 'hash-local {name}' first")
+                any_diff = True
+                continue
+            state = fixity.read_state(index)
+            print(f"\nverifying {label} locally against its index ({saved_info(state)}) ...", flush=True)
+            r = fixity.verify_tree(root, index, ctx.excludes, ctx.filter, ctx.args.quick, ctx.args.resume,
+                                   ctx.args.older_than, ctx.threads(1), out=lambda line: print(line, flush=True))
+            info = [f"- **Local index:** {saved_info(state)}"]
+            if r.summary:
+                print(f"  read: {r.summary}")
+            if r.plan:
+                info += plan_text(r.plan, ctx.filter)
+            if r.diff.checksum and name not in ctx.vaults:  # B2's checksums of a vault are ciphertext
+                add_b2_notes(ctx, r.diff, name, info)
+            options = ["modification time"] + ([] if ctx.args.quick else ["checksum"])
+            ctx.report(slug(label), r.diff, options, info, suffix=".local",
+                       title=f"{label} - local against its index")
+            any_diff |= r.diff.has_differences()
     print("\nresult:", "differences found." if any_diff else "nothing changed.")
     return 1 if any_diff else 0
 
@@ -870,6 +943,9 @@ def cmd_compare(ctx: Context) -> int:
 
     any_diff = False
     for name in names:
+        if name in ctx.vaults:
+            print(f"\n{name}: {VAULT_SKIP}")
+            continue
         lp = ctx.checksum_dir / "local" / f"{name}.csv"
         if not lp.is_file() and lp.with_suffix(".tsv").is_file():
             lp = ctx.local_index(name)  # moves a first-version file onto the index
@@ -901,6 +977,154 @@ def cmd_compare(ctx: Context) -> int:
 
     print("\nresult:", "differences found." if any_diff else "everything in sync.")
     return 1 if any_diff else 0
+
+
+DECRYPTED_VS_LOCAL = fixity.Labels("Decrypted", "Local", "Decrypted only", "Not decrypted")
+
+
+def vault_objects(bucket, prefix: str) -> dict[str, tuple[int, str]]:
+    """Every current object below a vault's root: name relative to it -> (size, file id)."""
+    objects = {}
+    for fv, _folder in bucket.ls(prefix, latest_only=True, recursive=True):
+        if fv.action == "upload" and fv.file_name.startswith(prefix):
+            objects[fv.file_name[len(prefix):]] = (fv.size, fv.id_)
+    return objects
+
+
+def read_passphrase(path: Path) -> str:
+    if not path.is_file():
+        raise FileNotFoundError(f"passphrase file missing: {path}")
+    passphrase = path.read_text(encoding="utf-8-sig").rstrip("\r\n")
+    if not passphrase:
+        raise ValueError(f"passphrase file is empty: {path}")
+    return passphrase
+
+
+def vault_content(ctx: Context, cryptomator, name: str, vault, objects: dict, files: list,
+                  local: dict[str, fixity.Entry]) -> fixity.Diff:
+    """Stream, decrypt and hash each file; compare its checksums with the local index."""
+    threads = ctx.threads(4)
+    total = sum(f.cipher_size for f in files)
+    print(f"  decrypting {len(files)} files ({fixity.fmt_size(total)} of ciphertext) on {threads} thread(s) ...",
+          flush=True)
+    progress = fixity.Progress(len(files), sum(local[f.path].size for f in files),
+                               out=lambda line: print(line, flush=True))
+    content: dict[str, fixity.Entry] = {}
+    errors: dict[str, str] = {}
+
+    def work(f, stop: threading.Event):
+        chunks = b2_chunks(ctx.thread_bucket(name), objects[f.object_name][1])
+        return fixity.hash_chunks(vault.decrypt_chunks(chunks), stop=stop)
+
+    def done(f, result, err: Exception | None) -> None:
+        exp = local[f.path]
+        if err:
+            damaged = isinstance(err, cryptomator.DamagedError)
+            errors[f.path] = f"DAMAGED in B2: {err}" if damaged else f"download error: {err}"
+            content[f.path] = fixity.Entry(f.path, exp.size, 0)  # nothing known -> reported as an error
+            progress.step("DAMAGED" if damaged else "ERROR", exp)
+            return
+        digests, _etag, size = result
+        content[f.path] = got = fixity.Entry(f.path, size, 0)
+        got.set_digests(digests)
+        match = fixity.checksums_match(got, exp)[0]
+        progress.step({True: "OK", False: "MISMATCH", None: "UNKNOWN"}[match], exp)
+
+    fixity.run_parallel(files, work, threads, done)
+    print(f"  read: {progress.summary()}")
+    diff = fixity.compare(list(content.values()), [local[p] for p in content], check_sum=True,
+                          labels=DECRYPTED_VS_LOCAL)
+    diff.attach_errors(errors)
+    return diff
+
+
+def check_vault(ctx: Context, cryptomator, name: str, directory: str, bucket,
+                unfinished: list[str] | None) -> bool:
+    """One vault: open, walk, compare with the local index; True if anything is wrong."""
+    label = f"{name}/{directory}"
+    print(f"\nchecking the vault {label} ...", flush=True)
+    objects = vault_objects(bucket, directory + "/")
+    missing = [f for f in cryptomator.VAULT_FILES if f not in objects]
+    if missing:
+        print(f"  no vault here: {', '.join(missing)} missing in {label}/")
+        return True
+
+    def read(rel: str) -> bytes:
+        return b"".join(b2_chunks(bucket, objects[rel][1]))
+
+    try:
+        vault = cryptomator.Vault.open(read(cryptomator.VAULT_FILES[0]), read(cryptomator.VAULT_FILES[1]),
+                                       read_passphrase(ctx.vault_key(name, directory)))
+    except (cryptomator.VaultError, OSError, ValueError) as e:
+        print(f"  cannot open the vault: {e}")
+        return True
+    tree = cryptomator.walk(vault, {n: s for n, (s, _id) in objects.items() if n not in cryptomator.VAULT_FILES},
+                            read, [B2_FOLDER_PLACEHOLDER])
+    print(f"  opened: format 8, SIV_GCM, keys and signature verified; {len(tree.files)} files in "
+          f"{tree.directories} directories")
+    info = [f"- **Vault:** {label}, {len(tree.files)} files in {tree.directories} directories"]
+    for p in tree.problems:
+        print(f"  PROBLEM: {p}")
+        info.append(f"- **Problem:** {p}")
+    if tree.leftovers:
+        line = (f"{len(tree.leftovers)} unreferenced directory folder(s) holding only placeholders - "
+                f"harmless leftovers of deleted directories")
+        print(f"  note: {line}")
+        info.append(f"- **Note:** {line}")
+    mine = [n for n in unfinished or [] if n.startswith(directory + "/")]
+    for line in unfinished_report(mine, {directory + "/" + n for n in objects}):
+        print(f"  {line}")
+        info.append(f"- {line.strip()}")
+
+    index = ctx.vault_index(name, directory)
+    if not index.is_file():
+        print(f"  no local index ({index}) - run 'hash-local {name}' to compare names and sizes")
+        return bool(tree.problems or mine)
+    state = fixity.read_state(index)
+    print(f"  local index as of: {saved_info(state)}")
+    info.append(f"- **Local index:** {saved_info(state)}")
+    keep = lambda p: not is_root_manifest(p) and not fixity.is_excluded(p, ctx.excludes)  # noqa: E731
+    local = ctx.filter.apply([e for e in fixity.read_index(index) if keep(e.path)])
+    # An impossible ciphertext size is already a problem; -1 makes it a size difference as well.
+    remote = ctx.filter.apply([fixity.Entry(p, f.size if f.size is not None else -1, 0)
+                               for p, f in tree.files.items() if keep(p)])
+    diff = fixity.compare(local, remote, labels=LOCAL_VS_B2)
+    ctx.report(name, diff, [], info, suffix=f".vault-{slug(directory)}",
+               title=f"{label} - Cryptomator vault in B2 against the local index")
+    bad = bool(tree.problems or mine) or diff.has_differences()
+    if ctx.args.download:
+        by_path = {e.path: e for e in local}
+        same = [tree.files[e.path] for e in remote if e.path in by_path and by_path[e.path].size == e.size]
+        cdiff = vault_content(ctx, cryptomator, name, vault, objects, same, by_path)
+        ctx.report(name, cdiff, ["checksum"], info, suffix=f".vault-{slug(directory)}-content",
+                   title=f"{label} - decrypted content against the local index")
+        bad |= cdiff.has_differences()
+    return bad
+
+
+def cmd_vault(ctx: Context) -> int:
+    import cryptomator  # imported here, like b2sdk, so that --help needs nothing
+    try:
+        cryptomator.require()
+    except ImportError as e:
+        fail(f"checking a Cryptomator vault needs the 'cryptography' package ({e}); "
+             f"pip install -r requirements.txt")
+    names = ctx.args.buckets or sorted(ctx.vaults)
+    if not names:
+        print("no vaults configured - add 'vaults=<bucket>/<directory>' to the configuration.")
+        return 2
+    any_bad = False
+    for name in names:
+        if name not in ctx.vaults:
+            print(f"\n{name}: not configured as a vault (vaults=<bucket>/<directory>)")
+            any_bad = True
+            continue
+        bucket = ctx.api.get_bucket_by_name(name)
+        unfinished = unfinished_uploads(bucket)
+        for directory in ctx.vaults[name]:
+            any_bad |= check_vault(ctx, cryptomator, name, directory, bucket, unfinished)
+    print("\nresult:", "problems found." if any_bad else "every vault is consistent and matches.")
+    return 1 if any_bad else 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -946,6 +1170,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--download", action="store_true",
                    help="stream the content from B2 and check it against the B2 metadata (costs download traffic)")
     sub.add_parser("compare", parents=[common, selection], help="local index against saved B2 checksums")
+    p = sub.add_parser("vault", parents=[common, selection],
+                       help="a Cryptomator vault in B2: structure, names and sizes against the local index")
+    p.add_argument("--download", action="store_true",
+                   help="also decrypt every file and compare its checksums (costs download traffic)")
+    p.add_argument("--threads", type=int, metavar="N", help="parallel downloads with --download (default 4)")
     return ap
 
 
@@ -957,7 +1186,7 @@ def main(argv: list[str] | None = None) -> int:
     ctx = Context(args)
     return {"check": cmd_check, "hash-local": cmd_hash_local, "hash-b2": cmd_hash_b2,
             "verify-local": cmd_verify_local, "verify-b2": cmd_verify_b2,
-            "compare": cmd_compare}[args.command](ctx)
+            "compare": cmd_compare, "vault": cmd_vault}[args.command](ctx)
 
 
 if __name__ == "__main__":

@@ -21,6 +21,7 @@ import time
 import types
 import unicodedata
 import unittest
+import unittest.mock
 from pathlib import Path
 
 import b2lib as lib
@@ -354,6 +355,155 @@ class CommandTest(unittest.TestCase):
         code, out = self.cmd("verify-local", "example-bucket", "--no-report", "--threads", "3")
         self.assertEqual(code, 0, out)
         self.assertIn("checksum identical: 3", out)
+
+
+class FakeVaultBucket:
+    """Stands in for a b2sdk bucket holding a vault: listing, downloads, unfinished uploads."""
+
+    def __init__(self, objects: dict[str, bytes]):
+        self.objects = objects
+
+    def ls(self, prefix="", latest_only=True, recursive=False):
+        for i, (name, data) in enumerate(sorted(self.objects.items())):
+            if name.startswith(prefix):
+                yield types.SimpleNamespace(file_name=name, size=len(data), id_=name, action="upload"), None
+
+    def download_file_by_id(self, file_id):
+        data = self.objects[file_id]
+        response = types.SimpleNamespace(
+            iter_content=lambda n: (data[i:i + n] for i in range(0, len(data), n)), close=lambda: None)
+        return types.SimpleNamespace(response=response)
+
+    def list_unfinished_large_files(self):
+        return []
+
+
+class VaultCommandTest(unittest.TestCase):
+    """The vault command end to end, against a vault written by VaultBuilder and served by a fake
+    bucket: the local cleartext tree, its index, the configuration -- all real."""
+
+    PASSPHRASE = "correct horse battery"
+
+    def setUp(self):
+        from cryptomator_test import VaultBuilder
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+        self.clear = self.tmp / "data" / "example-vault-bucket" / "films"
+        self.vault = VaultBuilder(self.PASSPHRASE)
+        for rel, data in (("Film One/film.mkv", os.urandom(100_000)), ("Film One/film.nfo", b"info"),
+                          ("Short.mp4", os.urandom(40_000))):
+            p = self.clear / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(data)
+            self.vault.add_file(rel, data)
+        # The passphrase lies beside the cleartext directory, not in it: never indexed, never uploaded.
+        (self.clear.parent / "films.key").write_text(self.PASSPHRASE + "\n", encoding="utf-8")
+        self.config = self.tmp / "b2.properties"
+        self.config.write_text(f"keyId=x\napplicationKey=y\nlocalRoot={(self.tmp / 'data').as_posix()}\n"
+                               f"stateDir={(self.tmp / 'state').as_posix()}\n"
+                               f"vaults=example-vault-bucket/films\n", encoding="utf-8")
+        self.bucket = FakeVaultBucket({})
+        self.upload()
+        api = types.SimpleNamespace(get_bucket_by_name=lambda name: self.bucket)
+        self._patches = [unittest.mock.patch.object(b2verify.Context, "api", property(lambda ctx: api)),
+                         unittest.mock.patch.object(b2verify.Context, "thread_bucket", lambda ctx, name: self.bucket)]
+        for p in self._patches:
+            p.start()
+
+    def tearDown(self):
+        for p in self._patches:
+            p.stop()
+        self._tmp.cleanup()
+
+    def upload(self) -> None:
+        """What the client has in B2: the builder's objects below the vault directory."""
+        self.bucket.objects = {f"films/{n}": b for n, b in self.vault.objects.items()}
+
+    def cmd(self, *argv: str) -> tuple[int, str]:
+        return run(*argv, "--config", str(self.config), "--no-report")
+
+    def test_hash_local_indexes_the_cleartext_and_the_vault_matches(self):
+        code, out = self.cmd("hash-local", "example-vault-bucket")
+        self.assertEqual(code, 0, out)
+        index = self.tmp / "state" / "checksums" / "local" / "example-vault-bucket-films.csv"
+        self.assertEqual(sorted(e.path for e in fixity.read_index(index)),
+                         ["Film One/film.mkv", "Film One/film.nfo", "Short.mp4"])  # no passphrase file
+        self.assertTrue((self.clear / ".sha256sum").is_file())
+
+        code, out = self.cmd("vault")
+        self.assertEqual(code, 0, out)
+        self.assertIn("keys and signature verified; 3 files in 1 directories", out)
+        self.assertIn("in sync", out)
+        self.assertIn("every vault is consistent and matches", out)
+
+        code, out = self.cmd("vault", "--download", "--threads", "2")
+        self.assertEqual(code, 0, out)
+        self.assertIn("checksum identical: 3  (sha256 3)", out)
+
+    def test_a_flipped_bit_in_b2_is_found_only_by_decrypting(self):
+        self.cmd("hash-local", "example-vault-bucket")
+        obj = next(n for n in self.bucket.objects if n.endswith(".c9r") and len(self.bucket.objects[n]) > 90_000)
+        data = bytearray(self.bucket.objects[obj])
+        data[50_000] ^= 0x10
+        self.bucket.objects[obj] = bytes(data)
+        code, out = self.cmd("vault")
+        self.assertEqual(code, 0, out)  # names and sizes cannot see it
+        code, out = self.cmd("vault", "--download")
+        self.assertEqual(code, 1, out)
+        self.assertIn("DAMAGED", out)
+        self.assertIn("does not authenticate", out)
+
+    def test_an_interrupted_upload_leaves_a_pointer_into_nothing(self):
+        # Seen on 2026-10-09: the client stalled between the pointer and the directory.
+        self.vault.add_dir("Film Two/Extras")
+        target = self.vault.dir_path(self.vault.ids["Film Two/Extras"])
+        for n in [n for n in self.vault.objects if n.startswith(target + "/")]:
+            del self.vault.objects[n]
+        self.upload()
+        self.cmd("hash-local", "example-vault-bucket")
+        code, out = self.cmd("vault")
+        self.assertEqual(code, 1, out)
+        self.assertIn("PROBLEM: directory 'Film Two/Extras': points to", out)
+
+    def test_a_file_not_yet_uploaded_and_a_wrong_size(self):
+        self.cmd("hash-local", "example-vault-bucket")
+        (self.clear / "Later.mkv").write_bytes(b"not uploaded yet")
+        (self.clear / "Short.mp4").write_bytes(os.urandom(40_001))
+        self.cmd("hash-local", "example-vault-bucket")
+        code, out = self.cmd("vault")
+        self.assertEqual(code, 1, out)
+        self.assertIn("+ Later.mkv", out)
+        self.assertIn("Short.mp4", out)
+
+    def test_a_wrong_passphrase_is_reported(self):
+        (self.clear.parent / "films.key").write_text("not the passphrase", encoding="utf-8")
+        code, out = self.cmd("vault")
+        self.assertEqual(code, 1, out)
+        self.assertIn("wrong passphrase", out)
+
+    def test_ciphertext_buckets_are_skipped_by_check_and_compare(self):
+        for command in ("check", "compare"):
+            code, out = self.cmd(command, "example-vault-bucket")
+            self.assertEqual(code, 0, out)
+            self.assertIn("a Cryptomator vault - B2 holds ciphertext", out)
+
+    def test_verify_local_reads_the_cleartext_directory(self):
+        self.cmd("hash-local", "example-vault-bucket")
+        code, out = self.cmd("verify-local")
+        self.assertEqual(code, 0, out)
+        self.assertIn("verifying example-vault-bucket/films locally", out)
+        self.assertIn("checksum identical: 3", out)
+        damage(self.clear / "Short.mp4")
+        code, out = self.cmd("verify-local", "example-vault-bucket")
+        self.assertEqual(code, 1, out)
+        self.assertIn("! Short.mp4", out)
+
+    def test_a_malformed_vault_entry_in_the_configuration_is_refused(self):
+        self.config.write_text(self.config.read_text(encoding="utf-8").replace(
+            "vaults=example-vault-bucket/films", "vaults=example-vault-bucket"), encoding="utf-8")
+        code, out = self.cmd("vault")
+        self.assertEqual(code, 2, out)
+        self.assertIn("is not <bucket>/<directory>", out)
 
 
 if __name__ == "__main__":
