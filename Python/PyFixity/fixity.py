@@ -47,6 +47,7 @@ from __future__ import annotations
 import csv
 import fnmatch
 import hashlib
+import io
 import ntpath
 import os
 import queue
@@ -73,6 +74,11 @@ DIGESTS = ("sha256", "sha1", "md5", "crc32")
 # algorithm -> manifest file name. The names are the tools' own, and the same as PyMirror's.
 MANIFEST_FILES = {"sha256": ".sha256sum", "sha1": ".sha1sum", "md5": ".md5sum", "crc32": ".sfv"}
 ETAG_MANIFEST = ".s3etag"
+# The sixth file: the folder's own state -- sizes, times, last checks, run state -- beside its five
+# manifests, so a folder carries everything about itself from machine to machine. No digest is
+# kept in it that a manifest holds (see write_folder_state).
+STATE_FILE = ".fixity-state.csv"
+# The index of earlier versions when none was named; read once and replaced by STATE_FILE.
 DEFAULT_INDEX = ".fixity-index.csv"
 # B2's recommendedPartSize, the part size of the b2 command line tool, and Cyberduck's fixed chunk.
 S3_PART_SIZE = 100_000_000
@@ -525,7 +531,7 @@ def hash_file(path: str | os.PathLike, parts: list[int] | None = None, multipart
 
 def own_files(root: Path, index_path: Path | None = None) -> set[str]:
     """Relative paths at the root of the tree that belong to this tool and are never content."""
-    manifests = set(MANIFEST_FILES.values()) | {ETAG_MANIFEST}
+    manifests = set(MANIFEST_FILES.values()) | {ETAG_MANIFEST, STATE_FILE}
     own = manifests | {DEFAULT_INDEX, DEFAULT_INDEX + ".state"}
     if index_path is not None:
         try:
@@ -560,18 +566,40 @@ def scan_tree(root: Path, excludes: Iterable[str] = (), skip: Iterable[str] = ()
 
 # --------------------------------------------------------------------------- the index
 
-def write_index(path: Path, entries: list[Entry]) -> None:
+def index_text(entries: list[Entry], header: dict[str, str] | None = None) -> str:
+    out = io.StringIO()
+    for key, value in (header or {}).items():
+        out.write(f"# {key}: {value}\n")
+    w = csv.writer(out, lineterminator="\n")
+    w.writerow(INDEX_COLUMNS)
+    for e in sorted(entries, key=lambda x: x.path):
+        w.writerow([e.path, e.size, e.mtime_ns, e.sha256 or "", e.sha1 or "", e.md5 or "",
+                    e.crc32 or "", e.etag or "", encode_parts(e.parts), e.verified])
+    return out.getvalue()
+
+
+def write_index(path: Path, entries: list[Entry], header: dict[str, str] | None = None) -> None:
     """CSV, written to a temporary name and renamed, so an interruption never leaves a half-written
-    index that still looks complete."""
+    index that still looks complete. `header`: run state as `# key: value` lines before the CSV --
+    what the folder's state file carries instead of a separate .state file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
     with open(long_path(tmp), "w", encoding="utf-8", newline="") as f:
-        w = csv.writer(f, lineterminator="\n")
-        w.writerow(INDEX_COLUMNS)
-        for e in sorted(entries, key=lambda x: x.path):
-            w.writerow([e.path, e.size, e.mtime_ns, e.sha256 or "", e.sha1 or "", e.md5 or "",
-                        e.crc32 or "", e.etag or "", encode_parts(e.parts), e.verified])
+        f.write(index_text(entries, header))
     os.replace(long_path(tmp), long_path(path))
+
+
+def _split_header(text: str) -> tuple[dict[str, str], str]:
+    """Leading `# key: value` lines -> (state, the CSV after them). Only LEADING ones: a file
+    whose name starts with '#' is a CSV row like any other."""
+    state, lines = {}, text.splitlines(keepends=True)
+    i = 0
+    while i < len(lines) and lines[i].startswith("#"):
+        key, sep, value = lines[i][1:].partition(":")
+        if sep:
+            state[key.strip()] = value.strip()
+        i += 1
+    return state, "".join(lines[i:])
 
 
 def read_index(path: Path) -> list[Entry]:
@@ -579,13 +607,14 @@ def read_index(path: Path) -> list[Entry]:
     (path,size,mtime_ns,sha256) reads as one whose other digests are simply not known yet."""
     if not Path(path).is_file():
         return []
-    entries = []
     with open(long_path(path), encoding="utf-8", newline="") as f:
-        for r in csv.DictReader(f):
-            entries.append(Entry(r["path"], int(r["size"]), int(r["mtime_ns"]),
-                                 r.get("sha256") or None, r.get("sha1") or None, r.get("md5") or None,
-                                 r.get("crc32") or None, r.get("etag") or None,
-                                 decode_parts(r.get("parts")), r.get("verified") or ""))
+        _state, body = _split_header(f.read())
+    entries = []
+    for r in csv.DictReader(io.StringIO(body, newline="")):
+        entries.append(Entry(r["path"], int(r["size"]), int(r["mtime_ns"]),
+                             r.get("sha256") or None, r.get("sha1") or None, r.get("md5") or None,
+                             r.get("crc32") or None, r.get("etag") or None,
+                             decode_parts(r.get("parts")), r.get("verified") or ""))
     return entries
 
 
@@ -594,12 +623,18 @@ def state_path(index_path: Path) -> Path:
 
 
 def read_state(index_path: Path) -> dict[str, str]:
-    """Run state beside the index (created, complete, verify_start, verify_complete), `key: value`."""
+    """Run state (created, complete, verify_start, verify_complete), `key: value`: from the .state
+    file beside an index, or from the header of a folder's state file."""
     p = state_path(index_path)
-    if not p.is_file():
+    if p.is_file():
+        text = p.read_text(encoding="utf-8")
+    elif Path(index_path).is_file():
+        with open(long_path(index_path), encoding="utf-8", newline="") as f:
+            return _split_header(f.read())[0]
+    else:
         return {}
     state = {}
-    for line in p.read_text(encoding="utf-8").splitlines():
+    for line in text.splitlines():
         key, sep, value = line.partition(":")
         if sep:
             state[key.strip()] = value.strip()
@@ -621,11 +656,13 @@ class IndexSaver:
     keep: which entries are written (for example only those already hashed).
     """
 
-    def __init__(self, index_path: Path, state: dict[str, str], entries: list[Entry],
+    def __init__(self, index_path: Path | None, state: dict[str, str], entries: list[Entry],
                  complete_key: str = "complete", keep: Callable[[Entry], object] = lambda e: True,
-                 interval: float = SAVE_INTERVAL) -> None:
+                 interval: float = SAVE_INTERVAL, folder: Path | None = None) -> None:
+        """index_path None and folder given: the folder's own state file (see write_folder_state)."""
         self.index_path, self.state, self.entries = index_path, state, entries
         self.complete_key, self.keep, self.interval = complete_key, keep, interval
+        self.folder = folder
         self.last = time.monotonic()
 
     def maybe_save(self) -> None:
@@ -634,8 +671,12 @@ class IndexSaver:
 
     def save(self, complete: bool) -> None:
         self.state[self.complete_key] = YES if complete else INCOMPLETE
-        write_index(self.index_path, [e for e in self.entries if self.keep(e)])
-        write_state(self.index_path, self.state)
+        kept = [e for e in self.entries if self.keep(e)]
+        if self.index_path is None:
+            write_folder_state(self.folder, kept, self.state)
+        else:
+            write_index(self.index_path, kept)
+            write_state(self.index_path, self.state)
         self.last = time.monotonic()
 
 
@@ -727,6 +768,88 @@ def write_manifests(root: Path, entries: list[Entry], want: Iterable[str] = DIGE
         else:
             result[ETAG_MANIFEST] = why
     return result
+
+
+# --------------------------------------------------------------------------- the folder's own record
+
+def manifest_digests(root: Path) -> tuple[dict[str, dict[str, str]], dict[str, tuple[str, list[int] | None]]]:
+    """What the manifests of a folder say -> ({path: {digest: value}}, {path: (etag, parts)})."""
+    digests: dict[str, dict[str, str]] = {}
+    for algo, name in MANIFEST_FILES.items():
+        values = read_sfv(Path(root) / name) if algo == "crc32" else read_sums(Path(root) / name)
+        for rel, value in values.items():
+            digests.setdefault(norm(rel), {})[algo] = value
+    part_size, etags = read_etags(Path(root) / ETAG_MANIFEST)
+    layout = S3Layout(part_size, 0) if part_size else None  # listed = above the cutoff: cut it
+    return digests, {norm(rel): (etag, layout) for rel, etag in etags.items()}
+
+
+def _with_manifests(e: Entry, digests: dict, etags: dict) -> Entry:
+    """An entry completed from the manifests: what the state file leaves out, they hold."""
+    for algo, value in digests.get(e.path, {}).items():
+        if not getattr(e, algo):
+            setattr(e, algo, value)
+    if not e.etag and e.path in etags:
+        etag, layout = etags[e.path]
+        parts = layout.parts(e.size) if layout else None
+        if parts:
+            e.etag, e.parts = etag, parts
+    return e
+
+
+def write_folder_state(root: Path, entries: list[Entry], state: dict[str, str]) -> None:
+    """The folder's state file: sizes, times and last checks -- and NO digest the manifests
+    already hold, so nothing is recorded twice. A digest stays in it only while the manifests do
+    not have it yet (an interrupted run), and an ETag only when it is not the one .s3etag lists
+    (an explicit layout of an older upload)."""
+    digests, etags = manifest_digests(root)
+    lean = []
+    for e in entries:
+        c = replace(e)
+        listed = digests.get(e.path, {})
+        for algo in DIGESTS:
+            if getattr(c, algo) and listed.get(algo, "").lower() == getattr(c, algo).lower():
+                setattr(c, algo, None)
+        if c.etag and e.path in etags and etags[e.path][0] == c.etag:
+            layout = etags[e.path][1]
+            if layout and layout.parts(c.size) == c.parts:
+                c.etag, c.parts = None, None
+        lean.append(c)
+    target = Path(root) / STATE_FILE
+    # Rewritten only when something besides the time of this run changed: the state file travels
+    # with the folder, and a run that found nothing new must not hand a sync tool a new version.
+    if os.path.isfile(long_path(target)):
+        with open(long_path(target), encoding="utf-8", newline="") as f:
+            old_state, old_body = _split_header(f.read())
+        drop = lambda s: {k: v for k, v in s.items() if k != "created"}  # noqa: E731
+        if drop(old_state) == drop(state) and old_body == index_text(lean):
+            return
+    write_index(target, lean, header=state)
+
+
+def folder_record(root: Path, excludes: Iterable[str] = (), adopt: bool = True) -> tuple[list[Entry], dict[str, str]]:
+    """A folder's record and run state: its state file completed from its manifests.
+
+    Without a state file -- manifests made before it existed, or a folder copied without it --
+    the record is ADOPTED from the manifests and the files' current sizes and times, reading
+    nothing: but only for a file not modified after the manifests were written. A file changed
+    since then has no trustworthy digest in them and is left without one, to be read."""
+    root = Path(root)
+    digests, etags = manifest_digests(root)
+    state_file = root / STATE_FILE
+    if state_file.is_file():
+        entries = [_with_manifests(e, digests, etags) for e in read_index(state_file)]
+        return entries, read_state(state_file)
+    if not adopt or not digests:
+        return [], {}
+    times = [os.stat(long_path(root / n)).st_mtime_ns for n in MANIFEST_FILES.values()
+             if os.path.isfile(long_path(root / n))]
+    written = min(times) if times else 0
+    entries = []
+    for e in scan_tree(root, excludes, own_files(root)):
+        if e.path in digests and e.mtime_ns <= written:
+            entries.append(_with_manifests(e, digests, etags))
+    return entries, {}
 
 
 def read_etags(path: Path) -> tuple[int | None, dict[str, str]]:
@@ -1004,12 +1127,41 @@ class UpdateResult:
     summary: str
 
 
-def update_index(root: Path, index_path: Path, excludes: Iterable[str] = (),
+def previous_record(root: Path, index_path: Path | None, excludes: Iterable[str] = (),
+                    seed: Path | None = None) -> tuple[list[Entry], dict[str, str], list[Path]]:
+    """What is known about a tree before a run -> (entries, run state, files it replaces).
+
+    With an index_path: that index. Without one, the folder keeps its own record (STATE_FILE
+    beside the manifests), and the first time it has none it is taken over WITHOUT READING, in
+    this order: `seed` (an index kept elsewhere so far), the index of earlier versions inside the
+    tree (DEFAULT_INDEX), and finally the manifests themselves (folder_record). The files taken
+    over from inside the tree are returned, so a successful run can remove them: their content
+    then lives in the manifests and the state file."""
+    if index_path is not None:
+        return read_index(index_path), read_state(index_path), []
+    root = Path(root)
+    if (root / STATE_FILE).is_file():
+        entries, state = folder_record(root, excludes)
+        return entries, state, []
+    if seed is not None and Path(seed).is_file():
+        return read_index(seed), read_state(seed), []
+    legacy = root / DEFAULT_INDEX
+    if legacy.is_file():
+        return read_index(legacy), read_state(legacy), [legacy, state_path(legacy)]
+    entries, state = folder_record(root, excludes)
+    return entries, state, []
+
+
+def update_index(root: Path, index_path: Path | None, excludes: Iterable[str] = (),
                  layouts: Layouts | None = None, layout_key: Callable[[str], str] = lambda p: p,
                  force: bool = False, manifests: bool = True,
                  out: Callable[[str], None] = print, s3: S3Layout | None = DEFAULT_S3,
-                 threads: int = 1, hash_threads: int = HASH_THREADS) -> UpdateResult:
-    """Bring the index of a tree up to date, then its manifests.
+                 threads: int = 1, hash_threads: int = HASH_THREADS,
+                 seed: Path | None = None) -> UpdateResult:
+    """Bring the record of a tree up to date, then its manifests.
+
+    index_path None: the folder's own record -- the five manifests plus STATE_FILE -- and nothing
+    outside it (see previous_record for the first run). Otherwise an index kept elsewhere.
 
     A file is read again only when its size or mtime moved, when a digest is missing, or when a
     part layout asks for an ETag the index does not hold. With `force` every file is read -- and a
@@ -1023,10 +1175,11 @@ def update_index(root: Path, index_path: Path, excludes: Iterable[str] = (),
     threads: files read at once, finished in their order (run_ordered); hash_threads: threads the
     digests of each file are spread over (StreamHasher). 2 x 5 keeps ten cores busy.
     """
-    root, index_path = Path(root), Path(index_path)
+    root = Path(root)
+    index_path = Path(index_path) if index_path is not None else None
     layouts = layouts or {}
-    prev = {e.path: e for e in read_index(index_path)}
-    state = read_state(index_path)
+    known, state, replaced = previous_record(root, index_path, excludes, seed)
+    prev = {e.path: e for e in known}
     entries = scan_tree(root, excludes, own_files(root, index_path))
     todo: list[tuple[Entry, list[int] | None, bool]] = []
     for e in entries:
@@ -1049,7 +1202,7 @@ def update_index(root: Path, index_path: Path, excludes: Iterable[str] = (),
         f"({fmt_size(sum(e.size for e, _p, _m in todo))}, {sum(1 for _e, p, _m in todo if p)} with part MD5s)")
 
     state = {**state, "created": now_ts()}
-    saver = IndexSaver(index_path, state, entries, keep=lambda e: e.has_all_digests())
+    saver = IndexSaver(index_path, state, entries, keep=lambda e: e.has_all_digests(), folder=root)
     progress = Progress(len(todo), sum(e.size for e, _p, _m in todo), out)
     damaged: list[tuple[Entry, dict[str, str]]] = []
     hashed: list[Entry] = []
@@ -1088,6 +1241,13 @@ def update_index(root: Path, index_path: Path, excludes: Iterable[str] = (),
         complete = all(e.has_all_digests() for e in entries)
         saver.save(complete)
     written = write_manifests(root, entries, s3=s3) if manifests and complete else {}
+    if index_path is None:
+        saver.save(complete)  # again, now that the manifests hold the digests: they leave the state file
+        if complete and manifests:
+            for old in replaced:
+                if os.path.isfile(long_path(old)):
+                    os.remove(long_path(old))
+                    written[old.name] = f"replaced by {STATE_FILE}"
     return UpdateResult(entries, hashed, damaged, complete, written, progress.summary())
 
 
@@ -1098,20 +1258,21 @@ class VerifyResult:
     summary: str
 
 
-def verify_tree(root: Path, index_path: Path, excludes: Iterable[str] = (),
+def verify_tree(root: Path, index_path: Path | None, excludes: Iterable[str] = (),
                 selection: FileFilter | None = None, quick: bool = False, resume: bool = False,
                 older_than: float | None = None, threads: int = 1,
                 out: Callable[[str], None] = print, hash_threads: int = HASH_THREADS) -> VerifyResult:
-    """Re-read a tree against its index: new, gone, resized, re-dated and damaged files.
+    """Re-read a tree against its record: new, gone, resized, re-dated and damaged files.
 
+    index_path None: the folder's own record (manifests + STATE_FILE), as in update_index.
     Only files of unchanged size are read; new, gone or resized ones are reported anyway. Known
     part sizes are hashed along, so a caller can judge a difference against a cloud copy's ETag.
     A file that fails loses its 'last checked' time, so every later run reads it again.
     """
-    root, index_path = Path(root), Path(index_path)
+    root = Path(root)
+    index_path = Path(index_path) if index_path is not None else None
     selection = selection or FileFilter()
-    all_saved = read_index(index_path)
-    state = read_state(index_path)
+    all_saved, state, _replaced = previous_record(root, index_path, excludes)
     saved = selection.apply([e for e in all_saved if not is_excluded(e.path, excludes)])
     by_path = {e.path: e for e in saved}
     current = selection.apply(scan_tree(root, excludes, own_files(root, index_path)))
@@ -1132,7 +1293,7 @@ def verify_tree(root: Path, index_path: Path, excludes: Iterable[str] = (),
         out(f"  reading {len(todo)} files ({fmt_size(sum(e.size for e, _p in todo))}) on "
             f"{threads} thread(s), {len(plan.skipped)} skipped")
         state["verify_start"] = plan.run_start
-        saver = IndexSaver(index_path, state, all_saved, complete_key="verify_complete")
+        saver = IndexSaver(index_path, state, all_saved, complete_key="verify_complete", folder=root)
         progress = Progress(len(todo), sum(e.size for e, _p in todo), out)
 
         def work(pair, stop):

@@ -21,8 +21,37 @@ second a *fixity check*. This project is both, for one directory tree.
 
 Standard library only; no dependencies. Works on Windows and on POSIX.
 
-    python pyfixity.py index  D:\data\photos --index D:\data-state\photos.csv
-    python pyfixity.py verify D:\data\photos --index D:\data-state\photos.csv --older-than 90
+    python pyfixity.py index  D:\data\photos
+    python pyfixity.py verify D:\data\photos --older-than 90
+
+## Every folder carries its own record
+
+Six files at the root of the folder, and nothing about it anywhere else:
+
+| | |
+|---|---|
+| `.sha256sum` `.sha1sum` `.md5sum` `.sfv` | the digests, in the formats every checking tool reads |
+| `.s3etag` | the S3 / B2 ETags of the large files (below) |
+| `.fixity-state.csv` | sizes, modification times, the last successful check of each file, and the run state — **no digest the manifests hold** |
+
+So the folder is self-contained. Copied, synced or uploaded, its record goes along, and on
+another machine the next run reads only what changed there (a copy that did not keep the
+modification times is read once, to be safe). Nothing is recorded twice: a digest stays in the
+state file only while an interrupted run has not written the manifests yet, and an ETag only when
+it was taken over a layout other than the one `.s3etag` lists. A run that finds nothing new does
+not rewrite the state file, so it does not hand a sync tool a new version.
+
+Taking a folder over costs no reading:
+
+- **manifests but no state file** (made before it existed, or copied without it): a file not
+  modified since the manifests were written is trusted; a newer one is read;
+- **an index of an earlier version inside the tree** (`.fixity-index.csv` and its `.state`) is
+  taken over with its last checks, and removed once the state file holds everything;
+- **an index kept elsewhere** can seed it the same way (`seed=` in the library; PyB2Verify uses it
+  to move off `checksums/local`).
+
+`--index FILE` still keeps the record outside the tree instead, for a tree that must not be
+written to apart from its manifests.
 
 ## One read, four digests — and the ETag the cloud will report
 
@@ -64,7 +93,8 @@ identical. `hashlib` and `zlib` release the GIL on large buffers, which is why t
 
 | | where | what | changes when |
 |---|---|---|---|
-| **index** | `--index FILE`, best **outside** the tree | CSV: size, mtime, all four digests, ETag and part sizes, time of the last successful check | every check |
+| **state file** | `.fixity-state.csv` at the root of the tree (the default) | CSV: size, mtime, time of the last successful check; run state in `#` lines at the top | a check that found or confirmed something |
+| **index** | `--index FILE`, outside the tree | the same, plus all four digests, ETag and part sizes; run state in a `.state` file beside it | every check |
 | **manifests** | `.sha256sum` `.sha1sum` `.md5sum` `.sfv` at the root of the tree | the standard formats of `sha256sum`, `sha1sum`, `md5sum` and RHash / QuickSFV | only when content changes |
 | **`.s3etag`** | beside them | the ETags of the files above the cutoff, in `md5sum`'s layout, under a header naming the part size | only when content changes |
 
@@ -84,7 +114,7 @@ size and mtime that make the next run fast. Its first columns are `path,size,mti
 named as PyMirror names them, so tools that read PyMirror's index read this one too — and
 `read_index` reads a PyMirror index as one whose other digests are not known yet.
 
-**No file describes itself.** The five manifests never list themselves, the index or its state file.
+**No file describes itself.** The five manifests never list themselves, the state file or an index.
 A manifest containing its own checksum could never be right. The index, which lives elsewhere,
 does list the manifests — so a copy of them in a backup can be checked like any other file.
 

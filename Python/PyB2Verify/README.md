@@ -55,6 +55,8 @@ The configuration is a properties file **outside this repository**; it holds the
     exclude=Thumbs.db,desktop.ini,*.lnk     optional; glob patterns that are never compared
     flatBuckets=example-flat-bucket         optional; buckets uploaded without their directories
     ignoreDirs=scratch                      optional; directories below localRoot that are no bucket
+    localIndex=folder                       optional; each bucket directory keeps its own record
+                                            (see below); default 'checksums' = <stateDir>/checksums/local
 
 The checksum and report directories may live inside `localRoot`; they are recognised by their
 configured path and never taken for a bucket. Pass the file with `--config FILE`, or set
@@ -133,6 +135,14 @@ sizes, file id, last check); the local side in PyFixity's index `<stateDir>/chec
 (all four digests, ETag, part sizes, last check) plus the five manifests in the bucket directory;
 and every check writes one Markdown report per bucket.
 
+**With `localIndex=folder` there is no `checksums/local`:** each bucket directory carries its own
+record — the five manifests and PyFixity's `.fixity-state.csv` (sizes, times, last checks; no
+digest twice). Copied to another machine or restored from B2, a bucket directory brings everything
+needed to check it. The first `hash-local` in this mode takes an existing `checksums/local` index
+over — last checks and ETags included, reading only what changed — and says that the old file can
+then be deleted. `compare` and `vault` read the bucket directories in this mode, so they need
+`localRoot`; the B2 side stays in `checksums/b2`.
+
 A local `<bucket>.tsv` from the first version of this tool is moved onto the index the first time
 it is needed, **without reading any file**: an entry is adopted while the file keeps its recorded
 size and time. It has only SHA-1, so the next `hash-local` reads every file once more to add SHA-256,
@@ -204,7 +214,7 @@ is neither indexed nor uploaded. Then:
 
 | | |
 |---|---|
-| `hash-local` | indexes the cleartext directory (`checksums/local/<bucket>-<directory>.csv`) and writes the four manifests into it — so they are encrypted and uploaded with it |
+| `hash-local` | indexes the cleartext directory (`checksums/local/<bucket>-<directory>.csv`, or with `localIndex=folder` its own state file) and writes the manifests into it — so they are encrypted and uploaded with it |
 | `vault` | opens the vault (the passphrase unlocks the keys; the configuration's signature proves it unchanged), decrypts the whole directory tree and checks that it fits together, then compares every name and **exact cleartext size** with the index — without downloading any content |
 | `vault --download` | also streams every file and decrypts it. Every 32 KiB block carries an AES-GCM tag bound to its position, so decrypting *is* the integrity check; the cleartext is hashed on the way and compared with the index |
 | `verify-local` | re-reads the cleartext directory against its index |

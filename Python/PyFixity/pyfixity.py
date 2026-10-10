@@ -6,12 +6,21 @@
 
 r"""Checksums for a directory tree in one read, kept current, and re-read later to catch damage.
 
-    python pyfixity.py index  D:\data\photos --index D:\data-state\photos.csv
-    python pyfixity.py verify D:\data\photos --index D:\data-state\photos.csv --older-than 90
-    python pyfixity.py manifests D:\data\photos --index D:\data-state\photos.csv
+    python pyfixity.py index  D:\data\photos
+    python pyfixity.py verify D:\data\photos --older-than 90
+
+EVERY FOLDER CARRIES ITS OWN RECORD: six files at its root, and nothing about it anywhere else.
+    .sha256sum .sha1sum .md5sum .sfv   the digests, in the formats sha256sum -c and QuickSFV read
+    .s3etag                            the S3 / B2 ETags of the large files (below)
+    .fixity-state.csv                  sizes, times, last checks and run state -- no digest the
+                                       manifests hold. Copied, synced or uploaded with the folder,
+                                       the record goes along: another machine reads only what changed.
+A folder with manifests but no state file (older, or copied without it) is taken over without
+reading: a file not modified since the manifests is trusted, a newer one is read. An index of an
+earlier version inside the tree (.fixity-index.csv) is taken over and then removed.
 
 COMMANDS
-    index TREE      bring the index up to date (reads only what changed), then write the
+    index TREE      bring the record up to date (reads only what changed), then write the
                     manifests .sha256sum .sha1sum .md5sum .sfv and .s3etag at the root of TREE
         --force     read every file; a saved checksum is NEVER replaced when size and mtime are
                     unchanged -- that is damage, and it is reported (exit status 1)
@@ -31,8 +40,9 @@ S3 / B2 ETAGS (index and manifests), ON BY DEFAULT
     --s3-cutoff SIZE      default 200M: larger files are uploaded in parts (Cyberduck's rule)
 
 COMMON
-    --index FILE        the index (default: TREE/.fixity-index.csv). It changes on every check,
-                        so keep it OUTSIDE a tree that gets uploaded or synced.
+    --index FILE        keep the record in an index OUTSIDE the tree instead of the state file
+                        (with all digests, and a .state file beside it) -- for a tree that must
+                        not be written to apart from its manifests
     --exclude-glob P    never look at files matching P (name or relative path; repeatable)
 
 SPEED (index and verify). The CPU, not the disk, is usually the limit: all digests in one thread
@@ -114,7 +124,8 @@ def print_diff(name: str, d: fixity.Diff, limit: int) -> None:
 def build_parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("tree", type=Path, help="the directory tree")
-    common.add_argument("--index", type=Path, help="index file (default: TREE/.fixity-index.csv)")
+    common.add_argument("--index", type=Path,
+                        help=f"an index outside the tree (default: the folder's own {fixity.STATE_FILE})")
     common.add_argument("--exclude-glob", action="append", default=[], metavar="PATTERN",
                         help="never look at files matching PATTERN (name or relative path)")
     common.add_argument("--limit", type=int, default=50, help="max. lines per category (0 = all)")
@@ -165,7 +176,8 @@ def main(argv: list[str] | None = None) -> int:
     tree: Path = args.tree
     if not tree.is_dir():
         fail(f"not a directory: {tree}")
-    index = args.index or tree / fixity.DEFAULT_INDEX
+    index = args.index  # None: the folder's own record
+    record = index or tree / fixity.STATE_FILE
 
     if args.command == "index":
         layouts = read_layouts(args.parts, args.parts_by_name) if args.parts else None
@@ -173,7 +185,7 @@ def main(argv: list[str] | None = None) -> int:
         r = fixity.update_index(tree, index, args.exclude_glob, layouts, key, args.force,
                                 manifests=not args.no_manifests, s3=s3_layout(args),
                                 threads=max(1, args.threads), hash_threads=max(1, args.hash_threads))
-        print(f"  -> {index}  ({r.summary}){'' if r.complete else '  INCOMPLETE'}")
+        print(f"  -> {record}  ({r.summary}){'' if r.complete else '  INCOMPLETE'}")
         for name, what in r.manifests.items():
             print(f"  {name}: {what}")
         if r.damaged:
@@ -185,7 +197,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "manifests":
-        entries = fixity.read_index(index)
+        entries = fixity.read_index(index) if index else fixity.folder_record(tree, args.exclude_glob)[0]
         live = {e.path for e in fixity.scan_tree(tree, args.exclude_glob, fixity.own_files(tree, index))}
         entries = [e for e in entries if e.path in live]
         for name, what in fixity.write_manifests(tree, entries, s3=s3_layout(args)).items():
@@ -199,7 +211,7 @@ def main(argv: list[str] | None = None) -> int:
             max_size=fixity.parse_size(args.max_size) if args.max_size else None)
     except (ValueError, re.error) as e:
         fail(f"invalid selection: {e}")
-    print(f"verifying {tree} against {index} ...")
+    print(f"verifying {tree} against {record} ...")
     r = fixity.verify_tree(tree, index, args.exclude_glob, selection, args.quick, args.resume,
                            args.older_than, max(1, args.threads), hash_threads=max(1, args.hash_threads))
     if r.summary:

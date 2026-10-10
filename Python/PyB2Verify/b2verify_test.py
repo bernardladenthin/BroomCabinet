@@ -382,6 +382,64 @@ class CommandTest(unittest.TestCase):
         self.assertIn("checksum identical: 3", out)
 
 
+class FolderRecordCommandTest(unittest.TestCase):
+    """localIndex=folder: every bucket directory carries its own record -- five manifests and
+    PyFixity's state file -- and <stateDir>/checksums/local is not needed any more."""
+
+    # The same throwaway tree and helpers as CommandTest, without running its tests twice.
+    setUp, tearDown, cmd = CommandTest.setUp, CommandTest.tearDown, CommandTest.cmd
+    write_b2_checksums = CommandTest.write_b2_checksums
+
+    def folder_mode(self) -> None:
+        self.config.write_text(self.config.read_text(encoding="utf-8") + "localIndex=folder\n", encoding="utf-8")
+
+    def test_the_bucket_directory_holds_everything_and_compare_reads_it(self):
+        self.folder_mode()
+        self.write_b2_checksums()
+        code, out = self.cmd("hash-local", "example-bucket", "--no-report")
+        self.assertEqual(code, 0, out)
+        self.assertTrue((self.bucket / fixity.STATE_FILE).is_file())
+        self.assertFalse((self.checksums / "local").exists())
+        code, out = self.cmd("compare", "example-bucket", "--no-report")
+        self.assertEqual(code, 0, out)
+        self.assertIn("checksum identical: 3  (etag 1, sha1 2)", out)
+        code, out = self.cmd("compare", "--no-report")  # without names: the directories with a record
+        self.assertEqual(code, 0, out)
+        damage(self.bucket / "sub" / "b.bin")
+        code, out = self.cmd("verify-local", "example-bucket", "--no-report")
+        self.assertEqual(code, 1, out)
+        self.assertIn("! sub/b.bin", out)
+
+    def test_an_index_in_checksums_local_is_taken_over_with_its_last_checks(self):
+        self.write_b2_checksums()
+        self.cmd("hash-local", "example-bucket", "--no-report")  # the old way: checksums/local
+        old = self.checksums / "local" / "example-bucket.csv"
+        verified = {e.path: e.verified for e in fixity.read_index(old)}
+        self.folder_mode()
+        code, out = self.cmd("hash-local", "example-bucket", "--no-report")
+        self.assertEqual(code, 0, out)
+        self.assertIn("0 to read", out)  # nothing read again
+        self.assertIn("can be deleted", out)
+        entries, _state = fixity.folder_record(self.bucket)
+        self.assertEqual({e.path: e.verified for e in entries}, verified)
+        old.unlink()
+        fixity.state_path(old).unlink()
+        code, out = self.cmd("compare", "example-bucket", "--no-report")
+        self.assertEqual(code, 0, out)
+        self.assertIn("checksum identical: 3", out)
+
+    def test_folder_mode_needs_the_local_directories_and_a_known_value(self):
+        self.config.write_text("keyId=x\napplicationKey=y\nlocalIndex=folder\n"
+                               f"stateDir={(self.tmp / 'state').as_posix()}\n", encoding="utf-8")
+        code, out = self.cmd("compare", "example-bucket")
+        self.assertEqual(code, 2, out)
+        self.assertIn("'localRoot' is missing", out)
+        self.config.write_text("keyId=x\napplicationKey=y\nlocalIndex=somewhere\n", encoding="utf-8")
+        code, out = self.cmd("compare")
+        self.assertEqual(code, 2, out)
+        self.assertIn("localIndex must be 'checksums' or 'folder'", out)
+
+
 class FakeVaultBucket:
     """Stands in for a b2sdk bucket holding a vault: listing, downloads, unfinished uploads."""
 
@@ -523,6 +581,16 @@ class VaultCommandTest(unittest.TestCase):
         code, out = self.cmd("verify-local", "example-vault-bucket")
         self.assertEqual(code, 1, out)
         self.assertIn("! Short.mp4", out)
+
+    def test_in_folder_mode_the_cleartext_directory_carries_the_record(self):
+        self.config.write_text(self.config.read_text(encoding="utf-8") + "localIndex=folder\n", encoding="utf-8")
+        code, out = self.cmd("hash-local", "example-vault-bucket")
+        self.assertEqual(code, 0, out)
+        self.assertTrue((self.clear / fixity.STATE_FILE).is_file())  # encrypted and uploaded with the vault
+        self.assertFalse((self.tmp / "state" / "checksums" / "local").exists())
+        code, out = self.cmd("vault")
+        self.assertEqual(code, 0, out)
+        self.assertIn("in sync", out)
 
     def test_a_malformed_vault_entry_in_the_configuration_is_refused(self):
         self.config.write_text(self.config.read_text(encoding="utf-8").replace(
