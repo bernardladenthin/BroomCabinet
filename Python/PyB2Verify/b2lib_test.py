@@ -52,6 +52,13 @@ class SnapshotTest(unittest.TestCase):
         self.assertTrue(lib.is_root_manifest(".sha256sum"))
         self.assertFalse(lib.is_root_manifest("sub/.sha256sum"))  # only the tree's own
 
+    def test_every_file_pyfixity_keeps_at_the_root_is_one(self):
+        # Whatever PyFixity never counts as content must not be counted on the B2 side either.
+        own_at_root = {n for n in fixity.own_files(Path("tree")) if "/" not in n and not n.endswith(".tmp")
+                       and not n.startswith(fixity.DEFAULT_INDEX)}
+        self.assertEqual(own_at_root, set(lib.ROOT_MANIFESTS))
+        self.assertTrue(lib.is_root_manifest(fixity.STATE_FILE))
+
 
 class MigrationTest(unittest.TestCase):
     def test_first_version_tsv_moves_onto_the_index_without_reading(self):
