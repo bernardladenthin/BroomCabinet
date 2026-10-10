@@ -30,6 +30,7 @@ almost matches a subtree, and a file with no extension.
 """
 import hashlib
 import importlib.util
+import csv
 import io
 import os
 import shutil
@@ -166,31 +167,45 @@ class TheRealTableIsAPartition(unittest.TestCase):
                 seen.setdefault(archive, unit.name)
         self.assertIn("bitsavers", seen)
 
-    def test_the_bitsavers_split_is_exhaustive_by_construction(self):
-        """The remainder unit must name `bitsavers` bare and exclude exactly the named subtrees."""
-        rest = [u for u in TOOL.UNITS if u.name == "bitsavers-software"][0]
-        self.assertEqual(rest.members, ("bitsavers",))
-        named = set()
-        for unit in TOOL.UNITS:
-            for m in unit.members:
-                if m.startswith("bitsavers/"):
-                    named.add(m)
-        self.assertEqual(set(rest.exclude), named)
+    def test_BITSAVERS_IS_ONE_UNIT_WITH_NOTHING_TO_GET_RIGHT(self):
+        r"""It was split into paper and software until 2026-10-07, and the remainder unit had to
+        name `bitsavers` bare while excluding exactly the paper subtrees -- a subtraction that had
+        to be correct every time the mirror was re-fetched, and that decided which side a new
+        top-level directory upstream landed on.
+
+        One directory, one unit, no exclusion: there is nothing left to get right. The test that
+        checked the subtraction is replaced by one that checks the subtraction is GONE.
+        """
+        unit = [u for u in TOOL.UNITS if u.name == "bitsavers"][0]
+        self.assertEqual(unit.members, ("bitsavers",))
+        self.assertEqual(tuple(unit.exclude or ()), ())
+        # and no other unit may reach into it, or the one-directory-one-unit claim is false
+        for other in TOOL.UNITS:
+            if other.name == "bitsavers":
+                continue
+            for member in other.members:
+                self.assertFalse(member == "bitsavers" or member.startswith("bitsavers/"),
+                                 "%s also names %s" % (other.name, member))
 
     def test_every_unit_has_members_and_a_reason(self):
         for unit in TOOL.UNITS:
             self.assertTrue(unit.members, unit.name)
             self.assertGreater(len(unit.why), 60, "%s: a reason, not a label" % unit.name)
 
-    def test_there_are_ten(self):
-        """Not decoration -- the count is the thing that was agreed, and a silent eleventh unit
-        means an upload nobody planned for.
+    def test_there_are_nine(self):
+        """Not decoration -- the count is the thing that was agreed, and a silent tenth unit means
+        an upload nobody planned for.
 
-        NINETEEN UNTIL 2026-10-04. The owner's rule was that a subject should be one unpack:
-        "wenn man an AIX Sachen arbeitet, entpackt man vermutlich komplett AIX". Measured, the
-        merge is worth 16 GB of 4 581 -- the bytes came from the volume size, not from this -- so
-        the count changed for the reader and not for the bill."""
-        self.assertEqual(len(TOOL.UNITS), 10)
+        NINETEEN UNTIL 2026-10-04, TEN UNTIL 2026-10-07. The owner's rule was that a subject
+        should be one unpack: "wenn man an AIX Sachen arbeitet, entpackt man vermutlich komplett
+        AIX". Measured, the first merge was worth 16 GB of 4 581 -- the bytes came from the volume
+        size, not from this -- so the count changed for the reader and not for the bill.
+
+        THE LAST MERGE WAS bitsavers, paper and software into one, and its reason is different:
+        not unpacking but UPDATING. bitsavers is the one mirror here that changes constantly, so
+        it is the one that will be re-fetched and re-packed, and a split meant two packs, two sets
+        of manifests and a subtraction to get right every time."""
+        self.assertEqual(len(TOOL.UNITS), 9)
 
     def test_the_names_are_usable_as_directory_names(self):
         for unit in TOOL.UNITS:
@@ -714,13 +729,30 @@ class TheArchiveCarriesItsOwnFixityRecords(unittest.TestCase):
         self.assertEqual(got, [])
 
     def test_they_go_into_the_LIST_and_not_into_the_unit_index(self):
-        """The index's columns are archive, path, size and sha256, and these files have no sha256
-        recorded anywhere. A row with an empty digest is one no auditor could act on."""
-        src = io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8").read()
-        write_list = src[src.index("def write_list("):src.index("def report(")]
-        self.assertIn('for path in step["bookkeeping"]:', write_list)
-        after = write_list[write_list.index('fh.write("archive,path,size,sha256'):]
-        self.assertNotIn("bookkeeping", after)
+        r"""The index's columns are archive, path, size and sha256, and these files have no sha256
+        recorded anywhere. A row with an empty digest is one no auditor could act on.
+
+        MEASURED, NOT GREPPED. This used to search b2-pack.py's own source for the header literal
+        and assert "bookkeeping" appeared nowhere after it. That broke the moment the write moved
+        into `write_unit_index()` for quoting -- a change the test should not have noticed. So it
+        writes a step now and reads the two files back.
+        """
+        work = tempfile.mkdtemp(prefix="b2-pack-bk-")
+        try:
+            step = {"list_path": os.path.join(work, "u.list"),
+                    "index_path": os.path.join(work, "u" + TOOL.INDEX_SUFFIX),
+                    "rows": [{"archive": "a", "path": "real.bin", "size": 7,
+                              "digest": "d" * 64}],
+                    "bookkeeping": [os.path.join("a", "CASE-FILES-RENAMED.txt")],
+                    "empty_dirs": [], "argv": [], "cwd": work}
+            TOOL.write_list(step, dry_run=False)
+            listed = io.open(step["list_path"], encoding="utf-8").read()
+            indexed = io.open(step["index_path"], encoding="utf-8").read()
+            self.assertIn("CASE-FILES-RENAMED.txt", listed)
+            self.assertNotIn("CASE-FILES-RENAMED.txt", indexed)
+            self.assertIn("real.bin", indexed)
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
 
     def test_the_count_is_reported_so_a_reader_sees_it_happened(self):
         src = io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8").read()
@@ -907,7 +939,7 @@ class TheVolumeSizeFitsTheMedium(unittest.TestCase):
         A solid block collapses two byte-identical files only if the window still reaches back to
         the first one, and `sort_key` puts them adjacent -- so the dictionary has to be at least as
         large as the duplicate. Measured per unit on 2026-10-04: vendors 2 000.5 MB, ibm-aix
-        1 997.5, aix-support 1 346.4, ibm-pc 669.5, oldskool 611.1, bitsavers-software 525.4,
+        1 997.5, ibm-aix-support 1 346.4, ibm-pc 669.5, oldskool 611.1, bitsavers-software 525.4,
         workstations 420.9, misc 152.0.
 
         WHICH IS ALSO WHY -oi IS NOT USED. rar.txt: where the identical files fit the dictionary,
@@ -925,7 +957,7 @@ class TheVolumeSizeFitsTheMedium(unittest.TestCase):
 
         Two units were -m0, stored rather than compressed, because their content is already
         compressed. -m0 also switches off the solid block, so identical files are stored twice in
-        full -- and measured per unit, aix-opensource is 208.0 GB holding 116.9 GB of byte-identical
+        full -- and measured per unit, ibm-aix-opensource is 208.0 GB holding 116.9 GB of byte-identical
         files, 56.2 %. Storing it was costing 117 GB. I had argued for -m0 there the same
         afternoon on the grounds that it "appears in none of b2-cluster.py's sharing pairs", which
         is true and was the wrong measurement: those pairs count duplication BETWEEN archives, and
@@ -999,11 +1031,27 @@ class TheCommands(unittest.TestCase):
             self.assertIn(step["index_path"], step["argv"])
 
     def test_the_last_step_is_the_index_archive_and_packs_only_indexes(self):
+        r"""THIS TEST PINNED THE BUG INSTEAD OF THE REQUIREMENT until 2026-10-09.
+
+        It asserted `cwd == OUT/index` -- the archive's own output directory -- which is where the
+        code put it and nowhere the CSVs are. `write_list()` writes them to `<work>`, so the glob
+        matched nothing. A test that copies the implementation cannot fail when the implementation
+        is wrong, and this one was written from the code rather than from where the files are; the
+        pairing below is what it should have asserted from the start.
+        """
         last = self.steps[-1]
         self.assertIsNone(last["unit"])
         self.assertIn("*" + TOOL.INDEX_SUFFIX, last["argv"])
-        self.assertEqual(last["cwd"], os.path.join("OUT", TOOL.INDEX_DIR))
+        self.assertEqual(last["cwd"], "WORK")
+        self.assertNotEqual(last["cwd"], os.path.join("OUT", TOOL.INDEX_DIR))
         self.assertIn("-ep", last["argv"])
+
+    def test_AND_THE_GLOB_MATCHES_WHERE_THE_INDEXES_ARE_WRITTEN(self):
+        r"""The pairing the old test missed: every unit step writes its index into the directory
+        the index step globs. Either half alone proves nothing."""
+        last = self.steps[-1]
+        for step in self.steps[:-1]:
+            self.assertEqual(os.path.dirname(step["index_path"]), last["cwd"])
 
     def test_there_is_one_step_per_unit_plus_the_index(self):
         self.assertEqual(len(self.steps), len(test_units()) + 1)
@@ -1751,29 +1799,501 @@ class TheArchiveGetsItsOwnChecksums(unittest.TestCase):
         self.assertNotIn("pack.log", text)
         self.assertIn("unit.part01.rar", text)
 
-    def test_A_STEP_WITH_NO_INDEX_PATH_DOES_NOT_REACH_THE_CALL(self):
-        r"""THE BUG THAT KILLED A SEVEN-HOUR RUN. The index archive's own step carries no
-        index_path, and the call site unpacked it with os.path.dirname() before calling -- so
-        `dirname(None)` raised TypeError after vendors had packed 399 GB, passed `rar t` and
-        passed the cross-check. The archive was fine; the run died before placing its index or
-        writing its checksums.
+    def test_A_STEP_WITH_NO_INDEX_PATH_STILL_GETS_ITS_MANIFESTS(self):
+        r"""THE BUG THAT KILLED A SEVEN-HOUR RUN, AND THE OVERCORRECTION THAT FOLLOWED IT.
 
-        place_index_beside() already answered that case gracefully and a test said so. The call
-        site did not, which is the difference between testing a function and testing its use.
+        The call site read `os.path.dirname(step["index_path"])` directly, which raises TypeError
+        on the index archive's step -- and it raised it AFTER vendors had packed 399 GB, passed
+        `rar t` and passed the cross-check. The archive was fine; the run died before placing its
+        index or writing its checksums.
+
+        The fix was a guard that SKIPPED THE MANIFESTS ENTIRELY for that step, with a comment
+        claiming the index archive "has nothing to place and nothing to describe". Half right: it
+        has no index to place, because it IS the index. It still has itself to describe -- it is
+        uploaded like any unit, and without the four manifests a corrupted `index.rar` could only
+        be found by opening it.
+
+        And the test for the guard searched b2-pack.py's own source for the `if` statement, which
+        pinned the shape of the code instead of what it has to do, so it failed when the shape
+        changed for the right reason. `fixity_work_for()` is the thing to ask instead.
         """
-        with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
-            text = handle.read()
-        call = text.index("fixity_over(os.path.dirname(")
-        guard = text.rindex("if step.get(\"index_path\"):", 0, call)
-        self.assertLess(guard, call)
-        # and nothing between the guard and the call that could run unguarded
-        self.assertNotIn("dirname(step[", text[guard:call])
+        self.assertEqual(TOOL.fixity_work_for({"index_path": None, "cwd": "WORK"}), "WORK")
+        self.assertEqual(TOOL.fixity_work_for({"cwd": "WORK"}), "WORK")
+        self.assertEqual(
+            TOOL.fixity_work_for({"index_path": os.path.join("W", "u.index.csv"), "cwd": "C"}),
+            "W")
+
+    def test_and_the_index_archive_is_a_step_with_no_index_path(self):
+        r"""Which is what makes the case above the real one and not a hypothetical."""
+        root = fixture()
+        out = tempfile.mkdtemp(prefix="b2-pack-out-")
+        work = tempfile.mkdtemp(prefix="b2-pack-work-")
+        try:
+            last = TOOL.plan(test_units(), root, out, work)[-1]
+            self.assertIsNone(last["index_path"])
+            self.assertEqual(TOOL.fixity_work_for(last), work)
+        finally:
+            shutil.rmtree(out, ignore_errors=True)
+            shutil.rmtree(work, ignore_errors=True)
 
     def test_and_it_runs_only_after_the_checks_pass(self):
         with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
             text = handle.read()
         call = text.index("fixity_over(os.path.dirname(")
         self.assertLess(text.index("CRC32 and file count agree"), call)
+
+
+class TheIndexArchiveStepHasNoList(unittest.TestCase):
+    r"""It packs `*.index.csv` by wildcard, so both of its paths are None.
+
+    THIS CRASHED EVERY --execute RUN THERE HAS BEEN. `write_list` called
+    `os.path.dirname(step["list_path"])` unconditionally, so misc, vendors and oldskool each
+    packed, passed `rar t`, passed the CRC32 cross-check and then died with exit 1 and a traceback
+    nobody read -- because by then the archive was finished and three checks had said it was
+    correct.
+
+    THE COST WAS THE INDEX ARCHIVE ITSELF, never built: the small archive bundling every unit's
+    index CSV, the one meant to be fetched instead of a unit. It only matters once all ten exist,
+    which is why its absence went unnoticed for three units.
+
+    AND THE FIRST DIAGNOSIS WAS WRONG. The vendors traceback named `write_list` and I attributed
+    it to a guard I had left out in `fixity_over` an hour earlier, committed that as the cause,
+    and was mistaken -- the line numbers pointed at comments because the file had been edited
+    while the run was going, and I read the function names instead of checking which call raised.
+    """
+
+    def test_a_step_with_no_list_path_is_skipped_rather_than_raising(self):
+        TOOL.write_list({"list_path": None, "index_path": None, "rows": []}, dry_run=False)
+
+    def test_a_step_with_no_index_path_is_skipped_too(self):
+        TOOL.write_list({"list_path": "somewhere.list", "index_path": None, "rows": []},
+                        dry_run=False)
+
+    def test_AND_IT_WRITES_NOTHING_WHEN_IT_SKIPS(self):
+        r"""A half-written list would be worse than none: RAR would pack whatever it held."""
+        folder = tempfile.mkdtemp(prefix="b2p-wl-")
+        try:
+            path = os.path.join(folder, "unit.list")
+            TOOL.write_list({"list_path": path, "index_path": None, "rows": []}, dry_run=False)
+            self.assertFalse(os.path.exists(path))
+        finally:
+            shutil.rmtree(folder, ignore_errors=True)
+
+    def test_a_real_step_still_writes_both(self):
+        folder = tempfile.mkdtemp(prefix="b2p-wl2-")
+        try:
+            step = {"list_path": os.path.join(folder, "unit.list"),
+                    "index_path": os.path.join(folder, "unit.index.csv"),
+                    "rows": [{"archive": "arch", "path": "a.bff", "size": 1, "digest": "ab"}],
+                    "bookkeeping": [], "empty_dirs": []}
+            TOOL.write_list(step, dry_run=False)
+            self.assertTrue(os.path.exists(step["list_path"]))
+            self.assertTrue(os.path.exists(step["index_path"]))
+        finally:
+            shutil.rmtree(folder, ignore_errors=True)
+
+    def test_a_dry_run_writes_nothing_at_all(self):
+        folder = tempfile.mkdtemp(prefix="b2p-wl3-")
+        try:
+            step = {"list_path": os.path.join(folder, "unit.list"),
+                    "index_path": os.path.join(folder, "unit.index.csv"), "rows": [],
+                    "bookkeeping": [], "empty_dirs": []}
+            TOOL.write_list(step)
+            self.assertEqual(os.listdir(folder), [])
+        finally:
+            shutil.rmtree(folder, ignore_errors=True)
+
+
+class WhereTheIndexCsvLandsInsideTheArchive(unittest.TestCase):
+    r"""`tar\<unit>.index.csv`, and it is a decision rather than an oversight.
+
+    The CSV is passed by ABSOLUTE path, and RAR stores every component below the drive letter --
+    so `X:\tar\misc.index.csv` becomes `tar\misc.index.csv`. Verified on the real misc archive:
+    the entry sits in part04 of 27, because RAR orders by its own sort and not by argument order,
+    which is why looking in the last volume found nothing.
+
+    THREE WAYS TO FLATTEN IT WERE LOOKED AT AND REJECTED. `-ep` strips ALL paths, which for
+    342 386 entries means basenames colliding on extraction with `rar t` saying "Alles OK" over
+    it. `-ap<path>` applies to every file in the command. A second `rar a` with cwd=<work> would
+    have to run before `-k`, and locking afterwards is measured fatal.
+
+    IT STAYS ON THE OWNER'S REASONING: `tar/` is a named place inside the archive that more can go
+    into later. The copy beside the volumes is the one a reader uses.
+    """
+
+    def test_the_index_is_passed_by_absolute_path(self):
+        r"""Which is what puts it under `tar\`; a relative name would need the CSV to sit in the
+        collection, and Q: is read-only to this tool."""
+        unit = [u for u in TOOL.UNITS if u.name == "ibm-aix-opensource"][0]
+        steps = TOOL.plan([unit], TOOL.MIRROR_ROOT,
+                          os.path.join("X:" + os.sep, "tarTarget"),
+                          os.path.join("X:" + os.sep, "tar"), with_dirs=False)
+        argv = steps[0]["argv"]
+        index = argv[-1]
+        self.assertTrue(os.path.isabs(index), index)
+        self.assertTrue(index.lower().endswith(".index.csv"), index)
+
+    def test_AND_NO_SWITCH_STRIPS_THE_PATH(self):
+        r"""-ep would flatten the 342 385 entries from the @list too, which is the failure this
+        whole collection was rebuilt to remove."""
+        unit = [u for u in TOOL.UNITS if u.name == "ibm-aix-opensource"][0]
+        steps = TOOL.plan([unit], TOOL.MIRROR_ROOT,
+                          os.path.join("X:" + os.sep, "tarTarget"),
+                          os.path.join("X:" + os.sep, "tar"), with_dirs=False)
+        argv = steps[0]["argv"]
+        self.assertNotIn("-ep", argv)
+        self.assertFalse([one for one in argv if one.startswith("-ap")])
+
+    def test_the_decision_is_written_down_where_the_command_is_built(self):
+        """So the next reader does not file it as a bug and reach for -ep."""
+        with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
+            text = " ".join(handle.read().split())
+        self.assertIn("THAT IS DELIBERATE", text)
+        self.assertIn("a named place inside the archive", text)
+
+
+class WhatTheSwitchesActuallyBought(unittest.TestCase):
+    r"""All nine units, 4 061.35 GB of real data, every figure read off the run that produced it.
+
+    The settings were argued from rar.txt and from 600 MiB measurements. This class exists so the
+    arguments cannot quietly outlive the evidence: if the record in b2-pack.py is edited, these
+    fail, and whoever edits it has to say what measurement replaced which.
+    """
+
+    # unit -> (source GB, archive GB, -oi1 references, avg file MB, volumes, files)
+    MEASURED = {
+        "ibm-aix-opensource": (207.96, 73.00, 40012, 1.13, 20, 184465),
+        "ibm-aix-support": (322.53, 135.67, 14603, 3.19, 39, 101086),
+        "workstations": (169.46, 89.00, 30445, 0.40, 25, 420307),
+        "ibm-aix": (702.51, 395.00, 2657, 13.45, 115, 52241),
+        "ibm-pc": (530.45, 306.86, 20470, 1.80, 87, 295280),
+        "vendors": (638.39, 399.00, 1698, 16.31, 118, 39131),
+        "misc": (144.17, 93.88, 8777, 0.42, 27, 341969),
+        "oldskool": (149.22, 120.00, 3120, 1.92, 35, 77624),
+        "bitsavers": (1196.66, 1006.22, 1880, 6.80, 283, 176028),
+    }
+
+    def share(self, name):
+        r"""-> references per file, which is the column that predicts the ratio."""
+        return self.MEASURED[name][2] / float(self.MEASURED[name][5])
+
+    def ratio(self, name):
+        src, arc = self.MEASURED[name][0], self.MEASURED[name][1]
+        return arc / src
+
+    def source(self):
+        with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
+            return " ".join(handle.read().split())
+
+    def test_THE_RECORD_COVERS_EVERY_UNIT_THAT_WAS_PACKED(self):
+        r"""Nine, not the six it carried while three were still unpacked."""
+        text = self.source()
+        for name in self.MEASURED:
+            self.assertIn(name, text)
+        self.assertIn("nine units packed", text)
+
+    def test_and_so_does_its_reference_count(self):
+        r"""The reference count is the one figure only a real run can produce."""
+        text = self.source()
+        for name, row in self.MEASURED.items():
+            refs = row[2]
+            grouped = "%d %03d" % (refs // 1000, refs % 1000) if refs >= 1000 else str(refs)
+            self.assertIn(grouped, text, "%s: %s" % (name, grouped))
+
+    def test_THE_REFERENCE_SHARE_ORDERS_THE_TABLE(self):
+        r"""Sorted by ratio, the share column descends, with two adjacent transpositions in nine.
+
+        Measured, not asserted from theory: the swaps are ibm-aix/ibm-pc (56.2 % against 57.8 %,
+        within the noise of two different mirror sets) and misc/oldskool.
+        """
+        by_ratio = sorted(self.MEASURED, key=self.ratio)
+        by_share = sorted(self.MEASURED, key=lambda n: -self.share(n))
+        wrong = sum(1 for a, b in zip(by_ratio, by_share) if a != b)
+        self.assertLessEqual(wrong, 4, "%s vs %s" % (by_ratio, by_share))
+        self.assertEqual(by_ratio[0], by_share[0])      # both ends are exact
+        self.assertEqual(by_ratio[-1], by_share[-1])
+
+    def test_AND_THE_RAW_COUNT_DOES_NOT(self):
+        r"""TWO CLAIMS THAT WERE WRONG, kept as tests so they are not made a third time.
+
+        1. "the fewest references marks the worst ratio" -- vendors has the fewest of all nine,
+           1 698, and lands mid-table at 62.5 %.
+        2. "the three best ratios are the three highest reference counts, in order" -- they are
+           not; ibm-aix-support has 14 603 against ibm-pc's 20 470 and a ratio 15 points better,
+           because it has a third of the files.
+
+        Both came from using the count where the share was meant.
+        """
+        self.assertEqual(min(self.MEASURED, key=lambda n: self.MEASURED[n][2]), "vendors")
+        self.assertNotEqual(max(self.MEASURED, key=self.ratio), "vendors")
+        best3 = sorted(self.MEASURED, key=self.ratio)[:3]
+        count3 = sorted(self.MEASURED, key=lambda n: -self.MEASURED[n][2])[:3]
+        self.assertNotEqual(best3, count3)
+        self.assertEqual(best3, sorted(self.MEASURED, key=lambda n: -self.share(n))[:3])
+
+    def test_OLDSKOOL_IS_THE_OUTLIER_AND_NAMES_THE_SECOND_FACTOR(self):
+        r"""4.02 % of its files are references, which by share should put it at misc's place, and
+        it lands second-to-last instead: its content arrives already zipped."""
+        self.assertGreater(self.share("oldskool"), self.share("misc"))
+        self.assertGreater(self.ratio("oldskool"), self.ratio("misc"))
+        self.assertIn("OLDSKOOL IS THE ONE REAL OUTLIER", self.source())
+
+    def test_and_the_record_says_which_claims_were_corrected(self):
+        text = self.source()
+        self.assertIn("TWO CLAIMS WERE WRONG BEFORE THIS ONE", text)
+        self.assertIn("the share is what was measured, so the share is what is claimed", text)
+
+    def test_AND_IT_IS_NOT_FILE_SIZE(self):
+        r"""Sort the nine by average file size and the ratios do not follow; sort by reference
+        count and they do. This is why -md6g was not worth its memory and -oi1 was.
+        """
+        by_size = sorted(self.MEASURED, key=lambda n: self.MEASURED[n][3])
+        by_ratio = sorted(self.MEASURED, key=self.ratio)
+        self.assertNotEqual(by_size, by_ratio)
+        # the worst ratio is not the largest average file, and the best is not the smallest
+        self.assertNotEqual(max(self.MEASURED, key=self.ratio),
+                            max(self.MEASURED, key=lambda n: self.MEASURED[n][3]))
+        self.assertNotEqual(min(self.MEASURED, key=self.ratio),
+                            min(self.MEASURED, key=lambda n: self.MEASURED[n][3]))
+        # and concretely: bitsavers at 6.80 MB compresses worse than workstations at 0.40 MB
+        self.assertGreater(self.ratio("bitsavers"), self.ratio("workstations"))
+
+    def test_the_total_matches_the_parts(self):
+        self.assertAlmostEqual(sum(v[0] for v in self.MEASURED.values()), 4061.35, places=1)
+        self.assertAlmostEqual(sum(v[1] for v in self.MEASURED.values()), 2618.63, places=1)
+        self.assertEqual(sum(v[2] for v in self.MEASURED.values()), 123662)
+        self.assertEqual(sum(v[4] for v in self.MEASURED.values()), 749)
+        text = self.source()
+        for figure in ("4 061.35 GB", "2 618.63 GB", "123 662", "749"):
+            self.assertIn(figure, text)
+
+    def test_the_memory_figures_are_recorded_with_their_phase(self):
+        r"""0.19 GB while -oi1 pre-hashes, 9.85 GB packing, 4.02 GB testing, 0.12 GB building the
+        .rev files -- and the point is the phase, because a run looks free in its first minutes.
+        """
+        text = self.source()
+        for figure in ("0.19 GB", "9.85 GB", "4.02 GB", "0.12 GB"):
+            self.assertIn(figure, text)
+        self.assertIn("allocated when the first block is compressed", text)
+
+    def test_the_edge_cases_are_recorded(self):
+        text = self.source()
+        self.assertIn("98.98 GB", text)          # one member over 28 volumes
+        self.assertIn("420 307 files", text)     # the largest file count, pre-hashed by -oi1
+        self.assertIn("283 volumes", text)       # the largest unit, and its 6 .rev files
+        self.assertIn("921 empty files", text)   # CRC32 00000000, same as a reference
+
+    def test_the_rev_floor_rule_is_recorded_with_what_it_produced(self):
+        r"""2 % of 283 volumes is 5.66, and int() of that is 5 -- but bitsavers got 6. The rule is
+        `max(int(volumes * 2 / 100), 2)` applied to the volume count RAR ends up with, which is
+        not knowable before the run; the record states the outcome rather than the prediction.
+        """
+        self.assertIn("2.1 % of the volumes", self.source())
+        self.assertEqual(max(int(283 * 2 / 100), 2), 5)
+        self.assertGreaterEqual(6, 5)
+
+    def test_EVERY_UNIT_PASSED_BOTH_CHECKS(self):
+        r"""`rar t` over the volumes AND a CRC32-plus-file-count comparison against the archive's
+        own .sfv. Either alone would have missed something: `rar t` does not know how many files
+        there should be, and the .sfv comparison does not read the recovery record.
+        """
+        text = self.source()
+        self.assertIn("EVERY UNIT PASSED BOTH CHECKS", text)
+        self.assertIn("NINE FOR NINE", text)
+
+
+class TheIndexArchiveStep(unittest.TestCase):
+    r"""The step that had never run, and the two separate bugs that kept it from running.
+
+    It is the thing you fetch INSTEAD of a unit: every unit's `*.index.csv` in one small archive,
+    so the collection can be searched without pulling 1 TB out of cold storage.
+    """
+
+    def setUp(self):
+        self.root = fixture()
+        self.out = tempfile.mkdtemp(prefix="b2-pack-out-")
+        self.work = tempfile.mkdtemp(prefix="b2-pack-work-")
+        self.step = TOOL.plan(test_units(), self.root, self.out, self.work)[-1]
+
+    def tearDown(self):
+        shutil.rmtree(self.out, ignore_errors=True)
+        shutil.rmtree(self.work, ignore_errors=True)
+
+    def test_IT_GLOBS_THE_WORK_DIRECTORY_AND_NOT_ITS_OWN_OUTPUT(self):
+        r"""THE BUG FOUND BY FINALLY RUNNING IT, 2026-10-09.
+
+        `write_list()` puts each unit's index at `<work>/<unit>.index.csv`, so that is the only
+        place `*.index.csv` matches. The cwd pointed at `<out>/index` instead -- the archive's own
+        directory, which does not exist yet -- so the glob matched nothing.
+        """
+        self.assertEqual(self.step["cwd"], self.work)
+        self.assertNotEqual(self.step["cwd"], os.path.join(self.out, TOOL.INDEX_DIR))
+
+    def test_and_the_glob_is_what_write_list_actually_produces(self):
+        r"""The two halves have to agree, and nothing else checked that they did."""
+        self.assertIn("*" + TOOL.INDEX_SUFFIX, self.step["argv"])
+        steps = TOOL.plan(test_units(), self.root, self.out, self.work)
+        for unit_step in steps[:-1]:
+            self.assertEqual(os.path.dirname(unit_step["index_path"]), self.step["cwd"])
+            self.assertTrue(unit_step["index_path"].endswith(TOOL.INDEX_SUFFIX))
+
+    def test_and_it_writes_into_its_own_directory(self):
+        self.assertEqual(self.step["archive"],
+                         os.path.join(self.out, TOOL.INDEX_DIR, "index.rar"))
+
+    def test_it_carries_no_list_and_no_index_of_its_own(self):
+        r"""THE FIRST BUG: `write_list()` was called on this step and crashed on the empty path.
+
+        That happened AFTER every unit was packed and verified, so every `--execute` run ever made
+        ended in a traceback with all its real work already done. Both guards stay.
+        """
+        self.assertIsNone(self.step["list_path"])
+        self.assertIsNone(self.step["index_path"])
+        self.assertIsNone(TOOL.write_list(self.step, dry_run=True))
+
+    def test_it_strips_paths_because_a_handful_of_basenames_cannot_collide(self):
+        r"""-ep is safe HERE and nowhere else: one file per unit, all differently named. The same
+        switch over a unit's 342 386 entries would collide basenames and overwrite on extraction,
+        with `rar t` reporting "Alles OK" over the result."""
+        self.assertIn("-ep", self.step["argv"])
+
+    def test_it_is_not_split_into_volumes(self):
+        r"""It is meant to be fetched whole, so no -v and no .rev."""
+        self.assertFalse([a for a in self.step["argv"] if a.startswith("-v")])
+        self.assertIsNone(self.step["volumes"])
+        self.assertEqual(self.step["recovery_volumes"], 0)
+
+
+class TheIndexCsvIsRealCsv(unittest.TestCase):
+    r"""4 476 of 1 688 131 paths contain a comma, and for a while the index CSV lied about them.
+
+    Written with `fh.write("%s,%s,%d,%s")`, a path like
+    `bits/DEC/pdp1/papertapeImages/20040106/floatingpoint/sys1_floatlib_6-20,bin` made
+    `csv.DictReader` read `size` as `bin` and `sha256` as `8306` -- silently, on 0.27 % of rows,
+    in the one file whose job is to be read later by something that is not this tool.
+
+    THE SOURCE WAS ALWAYS RIGHT: `.mirror-index.csv` quotes those paths, so `read_index` read them
+    correctly and no packing plan ever missed a file. Only the derived file was broken, which is
+    why nothing caught it -- `rar t`, the cross-check and the manifests all describe the ARCHIVE.
+    """
+
+    ROWS = [{"archive": "bitsavers", "path": "bits/x/sys1_floatlib_6-20,bin",
+             "size": 8306, "digest": "c" * 64},
+            {"archive": "bitsavers", "path": "plain.txt", "size": 1, "digest": "d" * 64}]
+
+    def setUp(self):
+        self.work = tempfile.mkdtemp(prefix="b2-pack-csv-")
+
+    def tearDown(self):
+        shutil.rmtree(self.work, ignore_errors=True)
+
+    def written(self):
+        path = os.path.join(self.work, "u" + TOOL.INDEX_SUFFIX)
+        TOOL.write_unit_index(path, self.ROWS)
+        return path
+
+    def read_back(self, path):
+        with io.open(path, encoding="utf-8", newline="") as fh:
+            return list(csv.DictReader(fh))
+
+    def test_A_PATH_WITH_A_COMMA_SURVIVES_A_ROUND_TRIP(self):
+        got = self.read_back(self.written())
+        self.assertEqual(got[0]["path"], "bits/x/sys1_floatlib_6-20,bin")
+        self.assertEqual(got[0]["size"], "8306")
+        self.assertEqual(got[0]["sha256"], "c" * 64)
+        self.assertIsNone(got[0].get(None), "no overflow column")
+
+    def test_and_the_broken_form_is_what_it_replaces(self):
+        r"""The old line, reproduced, so the defect lives in the suite and not only in a story."""
+        row = self.ROWS[0]
+        broken = ("archive,path,size,sha256\n"
+                  + "%s,%s,%d,%s\n" % (row["archive"], row["path"], row["size"], row["digest"]))
+        got = next(csv.DictReader(io.StringIO(broken)))
+        self.assertEqual(got["size"], "bin")           # not 8306
+        self.assertEqual(got["sha256"], "8306")        # not the digest
+        self.assertIsNotNone(got.get(None))            # the digest fell off the end
+
+    def test_a_plain_path_is_not_quoted_for_nothing(self):
+        r"""csv.writer quotes only what needs it, so the other 1 683 655 rows are unchanged and a
+        diff against an older index shows only the rows that were actually wrong."""
+        text = io.open(self.written(), encoding="utf-8").read()
+        self.assertIn("bitsavers,plain.txt,1,", text)
+        self.assertIn('"bits/x/sys1_floatlib_6-20,bin"', text)
+
+    def test_the_header_and_the_order_are_unchanged(self):
+        r"""An archive's own copy must keep its shape: the same four columns, the same sort."""
+        path = self.written()
+        with io.open(path, encoding="utf-8") as fh:
+            self.assertEqual(fh.readline().strip(), ",".join(TOOL.INDEX_COLUMNS))
+        got = [r["path"] for r in self.read_back(path)]
+        self.assertEqual(got, sorted(got))
+
+    def test_LF_AND_NOT_CRLF(self):
+        r"""csv.writer defaults to CRLF, which would have rewritten every line of every index on a
+        Windows run -- the mistake `common.py` keeps a rule about. lineterminator is set for it."""
+        with io.open(self.written(), "rb") as fh:
+            self.assertNotIn(b"\r\n", fh.read())
+
+
+class TheCombinedIndex(unittest.TestCase):
+    r"""One CSV with the UNIT NAMED FIRST, because that is the question the index archive is for.
+
+    The nine per-unit CSVs answer "what is in this unit". The question that sends anyone to the
+    index archive is the other one -- "which unit do I fetch to get this file" -- and nine files
+    cannot answer it without knowing the answer first.
+    """
+
+    def setUp(self):
+        self.root = fixture()
+        self.out = tempfile.mkdtemp(prefix="b2-pack-out-")
+        self.work = tempfile.mkdtemp(prefix="b2-pack-work-")
+        self.steps = TOOL.plan(test_units(), self.root, self.out, self.work)
+
+    def tearDown(self):
+        shutil.rmtree(self.out, ignore_errors=True)
+        shutil.rmtree(self.work, ignore_errors=True)
+
+    def write(self):
+        return TOOL.write_collection_index(self.steps, self.work, report=lambda *a, **k: None)
+
+    def test_IT_HOLDS_EVERY_ROW_OF_EVERY_UNIT(self):
+        with io.open(self.write(), encoding="utf-8", newline="") as fh:
+            rows = list(csv.DictReader(fh))
+        self.assertEqual(len(rows), sum(len(st["rows"]) for st in self.steps if st["unit"]))
+
+    def test_and_names_the_unit_in_the_first_column(self):
+        path = self.write()
+        with io.open(path, encoding="utf-8") as fh:
+            self.assertEqual(fh.readline().strip(), ",".join(TOOL.ALL_UNITS_COLUMNS))
+        self.assertEqual(TOOL.ALL_UNITS_COLUMNS[0], "unit")
+        with io.open(path, encoding="utf-8", newline="") as fh:
+            named = set(r["unit"] for r in csv.DictReader(fh))
+        packed = set(st["unit"].name for st in self.steps if st["unit"] and st["rows"])
+        self.assertEqual(named, packed)
+
+    def test_its_name_ends_in_index_csv_so_the_glob_picks_it_up(self):
+        r"""The index step globs `*.index.csv` in the work directory. The combined file is named to
+        be caught by that rather than added to the command, so there is one rule and not two."""
+        self.assertTrue(TOOL.ALL_UNITS_INDEX.endswith(TOOL.INDEX_SUFFIX))
+        self.assertIn("*" + TOOL.INDEX_SUFFIX, self.steps[-1]["argv"])
+
+    def test_it_is_deterministic(self):
+        r"""Two runs must be byte-identical, or a rebuilt index cannot be diffed against the old."""
+        first = io.open(self.write(), "rb").read()
+        second = io.open(self.write(), "rb").read()
+        self.assertEqual(first, second)
+
+    def test_a_comma_in_a_path_survives_here_too(self):
+        r"""The combined file has one more column in front of the path, so the quoting has to hold
+        with the offset as well -- the per-unit test alone would not show that."""
+        path = os.path.join(self.work, TOOL.ALL_UNITS_INDEX)
+        TOOL.write_unit_index(path, [{"archive": "a", "path": "x,y.bin", "size": 3,
+                                      "digest": "e" * 64}], unit="misc")
+        with io.open(path, encoding="utf-8", newline="") as fh:
+            got = next(csv.DictReader(fh))
+        self.assertEqual(got["unit"], "misc")
+        self.assertEqual(got["path"], "x,y.bin")
+        self.assertEqual(got["size"], "3")
 
 
 if __name__ == "__main__":

@@ -105,6 +105,7 @@ doing its work during a repair.
 import argparse
 import collections
 import filecmp
+import csv
 import glob
 import io
 import math
@@ -324,8 +325,8 @@ class Options(object):
     # THE THRESHOLDS ARE IN VOLUMES because that is what a .rev replaces, and they fall between the
     # real units rather than being round numbers for their own sake:
     #
-    #     small   < 1 200   misc 698, oldskool 722, workstations 820, aix-opensource 1 007
-    #     medium  < 3 000   aix-support 1 561, bitsavers-software 1 705, ibm-pc 2 568
+    #     small   < 1 200   misc 698, oldskool 722, workstations 820, ibm-aix-opensource 1 007
+    #     medium  < 3 000   ibm-aix-support 1 561, bitsavers-software 1 705, ibm-pc 2 568
     #     large   >=3 000   vendors 3 090, ibm-aix 3 400, bitsavers-paper 4 087
     #
     # WHAT IT COSTS AND WHAT IT GIVES UP, stated plainly: 95 .rev files in all, 19.8 GB, against
@@ -438,6 +439,103 @@ class Options(object):
 # The settings that are right for most of 4.06 TB: fast, because two thirds of it cannot be
 # compressed anyway, but NOT stored -- `-m0` would also switch off the duplicate collapse, and the
 # duplicates are worth more than the compression.
+# ---------------------------------------------------------------------------------------------
+# WHAT THE SWITCHES ACTUALLY BOUGHT: THE WHOLE COLLECTION, nine units packed between 2026-10-06
+# and 2026-10-09, every figure read off the run that produced it. The settings below were argued
+# from rar.txt and from 600 MiB measurements; this is what they did to 4 061.35 GB of real data.
+#
+#   unit                   source      archive        %   avg file   -oi1 refs   volumes
+#   ibm-aix-opensource   207.96 GB      73.00 GB   35.1 %   1.13 MB      40 012        20
+#   ibm-aix-support      322.53 GB     135.67 GB   42.1 %   3.19 MB      14 603        39
+#   workstations         169.46 GB      89.00 GB   52.5 %   0.40 MB      30 445        25
+#   ibm-aix              702.51 GB     395.00 GB   56.2 %  13.45 MB       2 657       115
+#   ibm-pc               530.45 GB     306.86 GB   57.8 %   1.80 MB      20 470        87
+#   vendors              638.39 GB     399.00 GB   62.5 %  16.31 MB       1 698       118
+#   misc                 144.17 GB      93.88 GB   65.1 %   0.42 MB       8 777        27
+#   oldskool             149.22 GB     120.00 GB   80.4 %   1.92 MB       3 120        35
+#   bitsavers          1 196.66 GB   1 006.22 GB   84.1 %   6.80 MB       1 880       283
+#   ------------------------------------------------------------------------------------------
+#   total              4 061.35 GB   2 618.63 GB   64.5 %              123 662       749
+#
+# plus 69 GB of .rev across the nine units, so 2 688 GB is what leaves for cold storage.
+#
+# WHAT PREDICTS THE RATIO IS THE REFERENCE SHARE, and nothing else in the table does.
+#
+# References per file, not references. The nine units differ in file count by a factor of ten, so
+# the raw count compares nothing: bitsavers has MORE references than vendors (1 880 vs 1 698) and
+# the worst ratio of all nine, because it also has four times the files.
+#
+#   unit                 files    refs   ref/file    ratio
+#   ibm-aix-opensource  184 465  40 012    21.69 %   35.1 %
+#   ibm-aix-support     101 086  14 603    14.45 %   42.1 %
+#   workstations        420 307  30 445     7.24 %   52.5 %
+#   ibm-aix              52 241   2 657     5.09 %   56.2 %
+#   ibm-pc              295 280  20 470     6.93 %   57.8 %
+#   vendors              39 131   1 698     4.34 %   62.5 %
+#   misc                341 969   8 777     2.57 %   65.1 %
+#   oldskool             77 624   3 120     4.02 %   80.4 %
+#   bitsavers           176 028   1 880     1.07 %   84.1 %
+#
+# SORTED BY RATIO, THE SHARE COLUMN DESCENDS, with two adjacent transpositions in nine: ibm-aix
+# and ibm-pc (56.2 % against 57.8 %, which is within the noise of two different mirror sets), and
+# misc and oldskool. Both ends are exact -- the best ratio has the highest share by a factor of
+# three over second place, and the worst has the lowest.
+#
+# OLDSKOOL IS THE ONE REAL OUTLIER and it names the second factor: 4.02 % of its files are
+# references, which should put it at misc's place, and it lands second-to-last instead. Its
+# content arrives ALREADY ZIPPED -- driver archives downloaded as .zip -- so there is nothing left
+# for -m5 to find even where files are unique. bitsavers has the same problem (1.2 TB of JPEG
+# streams inside PDF) on top of the lowest share, and the two effects compound into 84.1 %.
+#
+# TWO CLAIMS WERE WRONG BEFORE THIS ONE, and both were caught by the tests in b2-pack-test.py
+# rather than by reading:
+#
+#   "the fewest references marks the worst ratio" -- vendors has the fewest of all nine, 1 698,
+#   and lands mid-table at 62.5 %. Few references only means a unit holds little twice.
+#
+#   "the three best ratios are the three highest reference counts, in order" -- they are not.
+#   ibm-aix-support has 14 603 references against ibm-pc's 20 470 and a ratio 15 points better,
+#   because it has a third of the files.
+#
+# Both failures came from using the count where the share was meant, and the correction is in the
+# table above: the share is what was measured, so the share is what is claimed.
+#
+# FILE SIZE PREDICTS NOTHING HERE. bitsavers averages 6.80 MB and compresses worst; workstations
+# averages 0.40 MB and third best; vendors holds the largest files in the collection at 16.31 MB
+# and lands in the middle. A dictionary-first reading expects otherwise, which is why -md6g was
+# not worth its memory and -oi1 was.
+#
+# SO THE ORDER IN `switches()` REFLECTS WHAT MATTERS: -m5 and -md4g are the compressor's settings,
+# -s makes the solid stream, and -oi1 operates on top of all three by replacing whole files with
+# references -- independent of the dictionary, which the 256m measurement showed, and independent
+# of the volume boundary, which the solid reset closes.
+#
+# MEMORY, BY PHASE, reproduced across several units: 0.19 GB while -oi1 pre-hashes every file,
+# 9.85 GB once compression starts, 4.02 GB during `rar t`, and 0.12 GB while the .rev files are
+# built. The dictionary is allocated when the first block is compressed, not at launch, so a run
+# looks free in its first minutes and the .rev phase needs almost nothing. rar.txt's interpolation
+# for 4g is about 12 GB; 9.85 GB is as close as two figures it calls rough can be asked to come.
+#
+# TIME, for planning: bitsavers took 19.1 h to pack, then 1.5 h for `rar t` and 1.1 h for the four
+# manifests -- 21.7 h for 1.2 TB. The whole collection was about 70 h of wall clock.
+#
+# AND WHAT THE RUNS PROVED ABOUT THE EDGES:
+#
+#   a 98.98 GB member          byCompID.tar spans 28 volumes and passed `rar t` and the CRC32
+#                              cross-check without special handling.
+#   five members over a volume  vendors holds files of 9.74, 4.40, 4.30, 4.21 and 3.57 GB against
+#                              a 3.557 GB volume. Splitting is invisible to both checks.
+#   420 307 files              workstations, the largest file count, pre-hashed by -oi1 without
+#                              trouble -- the open question from the research pass, now closed.
+#   283 volumes                bitsavers, the largest unit. -rv at 2 % gave it 6 .rev files, which
+#                              is 2.1 % of the volumes: `max(int(volumes * 2 / 100), 2)` holds.
+#   921 empty files            misc. CRC32 of zero bytes is 00000000, which is also what a -oi1
+#                              reference carries, and the cross-check had to learn the difference.
+#
+# EVERY UNIT PASSED BOTH CHECKS: `rar t` over the volumes, and a CRC32-plus-file-count comparison
+# against the archive's own .sfv, with each -oi1 reference judged through its target.
+# NINE FOR NINE, and 123 662 references resolved through their targets.
+# ---------------------------------------------------------------------------------------------
 DEFAULTS = Options(
     archive_format="5",
     # -m5, REVERSED FROM -m1 ON 2026-10-04. The old default was fast because two thirds of the
@@ -450,7 +548,7 @@ DEFAULTS = Options(
     #   IT COVERS EVERY DUPLICATE IN THE COLLECTION. A solid block collapses two byte-identical
     #   files only if the window still reaches the first one, and `sort_key` puts them adjacent.
     #   Measured per unit on 2026-10-04, the largest duplicate anywhere is 2 000.5 MB (vendors),
-    #   then 1 997.5 (ibm-aix) and 1 346.4 (aix-support). 6 GB clears all of them with room, and
+    #   then 1 997.5 (ibm-aix) and 1 346.4 (ibm-aix-support). 6 GB clears all of them with room, and
     #   rar.txt says that where the duplicates fit the dictionary, plain -s is the better tool
     #   than -oi: no references, no first-file dependency between volumes.
     #
@@ -501,7 +599,7 @@ DEFAULTS = Options(
     # switches off the solid block, so identical files are then stored twice in full. Measured per
     # unit on 2026-10-04:
     #
-    #   aix-opensource   208.0 GB holding 116.9 GB of byte-identical files -- 56.2 %
+    #   ibm-aix-opensource   208.0 GB holding 116.9 GB of byte-identical files -- 56.2 %
     #   bitsavers-paper  844.4 GB holding   2.0 GB                         --  0.2 %
     #
     # SO -m0 WAS COSTING 117 GB on one of them. I had argued the opposite as recently as the same
@@ -599,10 +697,10 @@ UNITS = (
          "STILL ALONE AFTER THE 2026-10-04 REGROUPING, and the old reason for it has expired. The "
          "old sentence said `most likely to be re-fetched, and nothing else should be repacked "
          "when it is` -- that argument RETIRED with B2, where nothing is repacked ever again. "
-         "What keeps it separate now is the method: folded into aix-support it would save ONE "
+         "What keeps it separate now is the method: folded into ibm-aix-support it would save ONE "
          ".rev file, 995 MB, and cost 702 GB its -m5 -md1g."),
 
-    Unit("aix-support", ["fsck-aix-media", "fsck-aix-apps",
+    Unit("ibm-aix-support", ["fsck-aix-media", "fsck-aix-apps",
                          "bull-rpms", "bull-srpms", "bullfreeware", "ia-bullfreeware",
                          "ia-bull-toolbox-43", "ia-bull-aix433-2013", "ia-bull-aix433-2005",
                          "biblionik-bull", "biblionik-goupil",
@@ -642,9 +740,9 @@ UNITS = (
          "method above 0 provides, and the media third is already compressed. Three settings "
          "cannot apply to one unit, so the middle one does."),
 
-    Unit("aix-opensource", ["oss4aix.org"],
+    Unit("ibm-aix-opensource", ["oss4aix.org"],
          "208 GB that is 100 % rpm. Stored rather than compressed: there is nothing to win and "
-         "-m0 turns the longest packing job in the plan into a copy. NOT folded into aix-support "
+         "-m0 turns the longest packing job in the plan into a copy. NOT folded into ibm-aix-support "
          "on 2026-10-04 although the subject is the same, because -m0 and -m3 are the difference "
          "between a copy and a day of CPU, and this archive holds no internal duplication for a "
          "solid block to find -- it appears in none of b2-cluster.py's sharing pairs. "
@@ -673,25 +771,26 @@ UNITS = (
          "every name a held page gives is held or recorded as gone."),
 
     # ---------------------------------------------------------------- bitsavers
-    Unit("bitsavers-paper", ["bitsavers/pdf", "bitsavers/magazines"],
-         "844 GB of scanned paper in 96 678 files -- the manuals and the magazines, which are the "
-         "largest single files in the collection. Stored: these are image streams inside an "
-         "already-compressed container, and -m1 would spend hours to find nothing. "
-         "THE TWO WERE SEPARATE UNTIL 2026-10-04 and the reason they were has expired: "
-         "`bitsavers/magazines` stood alone because it `grows a few scans at a time`, and a "
-         "multi-volume RAR cannot be appended to. After B2 nothing is appended to anything, so "
-         "the split had nothing left to buy -- one .rev file, 995 MB."),
-
-    Unit("bitsavers-software", ["bitsavers"],
-         "352 GB of bitsavers that is software rather than paper: bits, which holds the part of "
-         "bitsavers with real duplicate mass against the rest of the collection, plus components, "
-         "projects, test_equipment, communications and two dozen small branches. "
-         "EXPRESSED AS `bitsavers` MINUS THE PAPER UNIT, so a new top-level directory upstream "
-         "lands here instead of being silently dropped -- the partition test is what makes that "
-         "safe. Two units became one on 2026-10-04 and it saves nothing measurable: 36 .rev apart, "
-         "36 merged. They are one unit because they are one kind of thing, and because the "
-         "subtraction only reads clearly against a single counterpart.",
-         exclude=["bitsavers/pdf", "bitsavers/magazines"]),
+    Unit("bitsavers", ["bitsavers"],
+         "1196.66 GB in 176 028 files -- the whole mirror, and the largest unit by a long way. "
+         "844 GB of it is scanned paper (pdf, magazines), holding the largest single files in the "
+         "collection; the rest is software: bits, components, projects, test_equipment, "
+         "communications and two dozen small branches. "
+         "THREE UNITS BECAME TWO ON 2026-10-04 AND TWO BECAME ONE ON 2026-10-07, each time "
+         "because the reason for the split had expired. `bitsavers/magazines` first stood alone "
+         "because it grows a few scans at a time and a multi-volume RAR cannot be appended to -- "
+         "after B2 nothing is appended to anything. Paper and software then stood apart because "
+         "they are different kinds of thing, which is true and turned out not to matter: the "
+         "measured difference was 36 .rev files either way. "
+         "WHAT DECIDED IT IS UPDATING, which is the owner's reason and the only one that survives "
+         "contact with the next five years: bitsavers is the one mirror here that changes "
+         "constantly, so it is the one that will be re-fetched and re-packed. A split meant two "
+         "packs, two sets of manifests and a subtraction (`bitsavers` MINUS the paper subtrees) "
+         "that had to be got right every time -- and a new top-level directory upstream landing "
+         "on the correct side of it. One directory, one unit: there is nothing to get right. "
+         "THE PRICE IS A 1.2 TB UNIT, which is sizeable to fetch back. It costs less than it "
+         "looks: the solid stream runs through the whole set anyway, so even the old 844 GB unit "
+         "had to be fetched from its first volume. 337 volumes rather than 238 plus 100."),
 
     # ---------------------------------------------------------------- multi-vendor collections
     Unit("vendors", ["fsck-vendors", "vtda"],
@@ -918,6 +1017,21 @@ def fixity_over(folder, work, report=say):
     return True
 
 
+def fixity_work_for(step):
+    r"""-> the directory PyFixity may use as scratch for this step. Never `dirname(None)`.
+
+    THE BUG THIS REPLACES A TEXT SEARCH FOR. The call site used to read
+    `os.path.dirname(step["index_path"])` directly, which raises TypeError on the index archive's
+    step because that step has no index to place -- and it raised it AFTER vendors had packed
+    399 GB, passed `rar t` and passed the cross-check. A guard was added at the call site and a
+    test asserted the guard by searching b2-pack.py's own source for it, which pinned the shape of
+    the code rather than what it has to do. This function is the thing to ask instead.
+    """
+    if step.get("index_path"):
+        return os.path.dirname(step["index_path"])
+    return step["cwd"]
+
+
 def place_index_beside(step, report=say):
     r"""Copy the unit's own index CSV next to its volumes. -> the destination, or None.
 
@@ -1138,6 +1252,23 @@ def plan(units, root, out, work, rar="rar", with_dirs=True):
         archive = os.path.join(out, unit.name, unit.name + ".rar")
         size = sum(r["size"] for r in rows)
         volumes = volume_count(size, unit.options)
+        # THE INDEX CSV LANDS INSIDE THE ARCHIVE AS `tar\<unit>.index.csv` AND THAT IS DELIBERATE.
+        # It is passed by ABSOLUTE path, and RAR then stores every component below the drive
+        # letter -- `X:\tar\misc.index.csv` becomes `tar\misc.index.csv`. The same behaviour is
+        # why WORK_MUST_BE_FLAT: a work directory under a profile would write the account name
+        # into every archive.
+        #
+        # THE THREE WAYS TO MAKE IT TOP-LEVEL WERE LOOKED AT ON 2026-10-07 AND NONE IS WORTH IT.
+        # `-ep` strips ALL paths, which for a unit of 342 386 entries means basenames colliding
+        # and overwriting each other on extraction, with `rar t` reporting "Alles OK" over it.
+        # `-ap<path>` applies to every file in the command, so it would move the 342 385 from the
+        # list as well. And adding the CSV in a second `rar a` with cwd=<work> would have to
+        # happen BEFORE `-k`, which means locking afterwards -- measured as fatal: a later
+        # `rar k` reported every volume as a checksum failure and recovery as impossible.
+        #
+        # SO IT STAYS, on the owner's reasoning: `tar/` is then a named place inside the archive
+        # that more can go into later, which is worth more than a flat name obtained by any of
+        # the above. The copy beside the volumes is the one a reader actually uses.
         argv = ([rar, "a"] + unit.options.switches(volumes)
                 + [archive, "@" + list_path, index_path])
         steps.append({"unit": unit, "argv": argv, "cwd": root, "list_path": list_path,
@@ -1145,9 +1276,14 @@ def plan(units, root, out, work, rar="rar", with_dirs=True):
                       "volumes": volumes, "recovery_volumes": unit.options.recovery_volumes(volumes),
                       "empty_dirs": dirs, "bookkeeping": bookkeeping_for(unit, root, rows)})
     index_archive = os.path.join(out, INDEX_DIR, "index.rar")
+    # THE CWD IS THE WORK DIRECTORY, NOT THE OUTPUT ONE. `write_list()` puts each unit's index at
+    # `<work>/<unit>.index.csv`, so that is the only place `*.index.csv` matches. Pointing the cwd
+    # at the archive's own directory -- which is what this step did until 2026-10-09 -- globs an
+    # empty or absent directory and packs nothing. It was never caught because the step crashed
+    # earlier, in `write_list()`, in every `--execute` run ever made.
     steps.append({"unit": None, "argv": [rar, "a", "-ep"] + INDEX_OPTIONS.switches()
                   + [index_archive, "*" + INDEX_SUFFIX],
-                  "cwd": os.path.join(out, INDEX_DIR), "list_path": None, "index_path": None,
+                  "cwd": work, "list_path": None, "index_path": None,
                   "archive": index_archive, "rows": [],
                   # Every step carries the same keys, so a caller never has to ask which kind it
                   # is before reading one. The index archive has no volumes and no directories.
@@ -1156,8 +1292,28 @@ def plan(units, root, out, work, rar="rar", with_dirs=True):
 
 
 def write_list(step, dry_run=True):
-    """The `@list` file and the unit's index, both OUTSIDE the collection."""
+    r"""The `@list` file and the unit's index, both OUTSIDE the collection.
+
+    THE INDEX ARCHIVE HAS NEITHER AND THAT CRASHED EVERY --execute RUN THERE HAS BEEN. It packs
+    `*.index.csv` by wildcard rather than from a list, so both paths are None and
+    `os.path.dirname(None)` raised TypeError -- after the unit had packed, passed `rar t` and
+    passed the cross-check. misc, vendors and oldskool all ended that way, each with exit 1 and a
+    traceback nobody read, because the archive was finished and correct by then and the three
+    checks had already said so.
+
+    THE INDEX ARCHIVE WAS THEREFORE NEVER BUILT. That is the real cost: the small archive that
+    bundles every unit's `*.index.csv`, the one meant to be fetched INSTEAD of a unit. It only
+    matters once all ten exist, which is why nothing missed it.
+
+    AND I BLAMED MY OWN CODE FOR IT FIRST. The vendors traceback named `write_list` and I read it
+    as a guard I had left out in `fixity_over` an hour earlier -- committed that as the cause, and
+    was wrong. The line numbers in that traceback pointed at comments, because the file had been
+    edited while the run was going, and I read the names rather than checking which call actually
+    raised.
+    """
     if dry_run:
+        return
+    if not step.get("list_path") or not step.get("index_path"):
         return
     for path in (step["list_path"], step["index_path"]):
         parent = os.path.dirname(path)
@@ -1176,10 +1332,75 @@ def write_list(step, dry_run=True):
             fh.write(path + chr(10))
         for path in step["empty_dirs"]:
             fh.write(path + chr(10))
-    with io.open(step["index_path"], "w", encoding="utf-8", newline="\n") as fh:
-        fh.write("archive,path,size,sha256\n")
-        for row in sorted(step["rows"], key=lambda r: (r["archive"], r["path"])):
-            fh.write("%s,%s,%d,%s\n" % (row["archive"], row["path"], row["size"], row["digest"]))
+    write_unit_index(step["index_path"], step["rows"])
+
+
+INDEX_COLUMNS = ("archive", "path", "size", "sha256")
+ALL_UNITS_COLUMNS = ("unit",) + INDEX_COLUMNS
+ALL_UNITS_INDEX = "all-units" + INDEX_SUFFIX
+
+
+# NOT `common.COLLECTION_INDEX`, WHICH IS A DIFFERENT FILE ONE CHARACTER AWAY. The library's
+# `collection-index.csv` is written by `checksums.py` over the whole tree with the columns
+# `path,size,mtime_ns,sha256`, relative to the collection root, and `dedupe-docs.py` reads it.
+# This one is `unit,archive,path,size,sha256` and exists to answer which ARCHIVE FILE to fetch.
+# Naming it `collection.index.csv` would have put two unrelated files one hyphen apart, and the
+# gate's shadowing check is what caught the first attempt at exactly that.
+
+
+def write_unit_index(path, rows, unit=None):
+    r"""Write one index CSV. THROUGH `csv.writer`, BECAUSE 4 476 PATHS CONTAIN A COMMA.
+
+    This used to be `fh.write("%s,%s,%d,%s\n" % ...)` and the result was not CSV. Measured on the
+    nine units' output, 2026-10-09: 4 476 of 1 688 131 rows carry a comma inside the path, for
+    example `bits/DEC/pdp1/papertapeImages/20040106/floatingpoint/sys1_floatlib_6-20,bin`, and
+    `csv.DictReader` then read `size` as `bin` and `sha256` as `8306`. Silently, on 0.27 % of the
+    rows, in the one file whose whole job is to be read later by something that is not this tool.
+
+    THE SOURCE WAS ALWAYS RIGHT. `Q:\mirror\<archive>\.mirror-index.csv` quotes those paths
+    (1 229 of them in bitsavers alone), so `common.read_index` read them correctly through the same
+    `csv` module and NOTHING WAS MISSING FROM ANY PACKING PLAN. Only the derived file was broken,
+    which is why no check caught it: `rar t`, the CRC32 cross-check and the four manifests all
+    describe the archive, and this describes its contents to a reader.
+
+    `unit` prepends the unit column, for the combined index. Left out, the four original columns
+    are written unchanged, so an archive's own copy keeps its shape.
+    """
+    columns = ALL_UNITS_COLUMNS if unit else INDEX_COLUMNS
+    with io.open(path, "w", encoding="utf-8", newline="") as fh:
+        writer = csv.writer(fh, lineterminator="\n")
+        writer.writerow(columns)
+        for row in sorted(rows, key=lambda r: (r["archive"], r["path"])):
+            line = [row["archive"], row["path"], row["size"], row["digest"]]
+            writer.writerow(([unit] + line) if unit else line)
+
+
+def write_collection_index(steps, work, report=say):
+    r"""Write `<work>/collection.index.csv`: every unit's rows with the UNIT NAMED FIRST.
+
+    WHY ONE FILE AND NOT NINE. The index archive carries each unit's own CSV, which answers "what
+    is in this unit" -- but the question that sends anyone to the index archive is the other one:
+    "which unit do I have to fetch to get this file". Nine files cannot answer it without knowing
+    the answer first. One file with a `unit` column answers it with one search.
+
+    The nine stay beside it: they are byte-identical to the copy inside each unit's own archive, so
+    they are what you check that copy against.
+    """
+    rows = []
+    for step in steps:
+        if step["unit"] is None:
+            continue
+        for row in step["rows"]:
+            rows.append(dict(row, unit=step["unit"].name))
+    path = os.path.join(work, ALL_UNITS_INDEX)
+    with io.open(path, "w", encoding="utf-8", newline="") as fh:
+        writer = csv.writer(fh, lineterminator="\n")
+        writer.writerow(ALL_UNITS_COLUMNS)
+        for row in sorted(rows, key=lambda r: (r["unit"], r["archive"], r["path"])):
+            writer.writerow([row["unit"], row["archive"], row["path"], row["size"], row["digest"]])
+    report("  %s: %d row(s) over %d unit(s)"
+           % (ALL_UNITS_INDEX, len(rows), sum(1 for st in steps if st["unit"])))
+    return path
 
 
 def report(steps, verbose=False, stream=None):
@@ -1506,8 +1727,18 @@ def execute(steps, rar, password):
     for step in steps:
         write_list(step, dry_run=False)
         argv = list(step["argv"])
-        encrypted = step["unit"] is None or step["unit"].options.encrypt_headers
+        # THE INDEX STEP TAKES INDEX_OPTIONS, and `unit is None` is how it is recognised -- but it
+        # USED TO SHORT-CIRCUIT THE WHOLE TEST: `step["unit"] is None or ...` made the index
+        # archive unconditionally encrypted, whatever INDEX_OPTIONS said, and then crashed on
+        # `"-hp" + None` because `wants_password` below only asks the UNITS. Found 2026-10-09, the
+        # first time this step ever ran. Read the options first, then ask them.
         unit_options = step["unit"].options if step["unit"] is not None else INDEX_OPTIONS
+        encrypted = unit_options.encrypt_headers
+        if encrypted and not password:
+            # Refusing beats packing in the clear what was marked for encryption.
+            say("  %s wants encrypted headers and no password was given -- stopping"
+                % (step["unit"].name if step["unit"] else "the index archive"))
+            return 2
         if encrypted:
             argv.insert(2, "-hp" + password)
         parent = os.path.dirname(step["archive"])
@@ -1574,11 +1805,25 @@ def execute(steps, rar, password):
             # THE INDEX ARCHIVE'S STEP HAS NO index_path AND THIS CRASHED A SEVEN-HOUR RUN ON IT.
             # `os.path.dirname(None)` raises TypeError, so vendors packed 399 GB, passed `rar t`
             # and passed the cross-check, and then died before its index was placed or its
-            # checksums written. The guard belongs at the call site, because the step for the
-            # index archive legitimately has nothing to place and nothing to describe.
-            if step.get("index_path"):
-                fixity_over(os.path.dirname(step["archive"]),
-                            os.path.dirname(step["index_path"]))
+            # checksums written.
+            #
+            # BUT THE GUARD THEN SKIPPED THE MANIFESTS TOO, and the comment here claimed the index
+            # archive "has nothing to place and nothing to describe". Half right: it has no index
+            # to place, because it IS the index. It still has itself to describe -- it is uploaded
+            # like any unit, and without the four manifests a corrupted `index.rar` could only be
+            # found by opening it. Corrected 2026-10-09, the first time this step ran at all.
+            fixity_over(os.path.dirname(step["archive"]), fixity_work_for(step))
+        elif checked.returncode == 0:
+            # THE INDEX ARCHIVE, WHICH CANNOT HAVE THE CROSS-CHECK AND STILL NEEDS THE MANIFESTS.
+            # Its members are the units' index CSVs, written by this tool into the work directory;
+            # they were never part of the collection, so no .sfv exists to hold their stored CRC32s
+            # against. SAID OUT LOUD RATHER THAN SKIPPED SILENTLY: a reader comparing this log with
+            # a unit's would otherwise wonder which check went missing and why.
+            say("  no CRC32 cross-check for the index archive -- its members are not in the "
+                "collection, so there is no .sfv to hold them against")
+            say("   and the -rr10 recovery record are its checks, and the four manifests "
+                "below describe the archive itself")
+            fixity_over(os.path.dirname(step["archive"]), fixity_work_for(step))
         if checked.returncode != 0:
             say("  THE ARCHIVE DOES NOT TEST CLEAN (rar t exited %d) -- stopping before the next "
                 "unit." % checked.returncode)
@@ -1671,7 +1916,8 @@ def main(argv=None):
     # public hosts, so encryption protects nothing and adds the one way this could become
     # unreadable: a lost key. The demand is kept, driven by the units themselves, so a unit that
     # is one day marked encrypt_headers=True cannot be packed in the clear by accident.
-    wants_password = args.execute and any(u.options.encrypt_headers for u in UNITS)
+    wants_password = args.execute and (INDEX_OPTIONS.encrypt_headers
+                                       or any(u.options.encrypt_headers for u in UNITS))
     if args.execute:
         if wants_password and not args.password_file:
             say("--execute needs --password-file: a unit asks for encrypted headers, and the "
@@ -1694,11 +1940,20 @@ def main(argv=None):
     units = UNITS
     if args.only:
         wanted = set(args.only)
+        # `--only index` SELECTS THE INDEX ARCHIVE AND NO UNITS. It is the last step of every plan
+        # and the only one that is not a unit, so there was no way to ask for it alone -- and it is
+        # the step most likely to be wanted alone, because it is rebuilt whenever ANY unit is
+        # repacked while the other eight archives stay as they are. `index` cannot collide with a
+        # unit name: `UNITS` is checked for it below, which fails the gate rather than a run.
+        index_only = INDEX_DIR in wanted
+        wanted.discard(INDEX_DIR)
         unknown = wanted - set(u.name for u in UNITS)
         if unknown:
             say("no such unit: %s" % ", ".join(sorted(unknown)))
             return 2
         units = tuple(u for u in UNITS if u.name in wanted)
+        if index_only and not units:
+            say("  the index archive only -- no unit is repacked")
 
     # An archive whose index is missing would plan as an EMPTY unit, because `common.read_index`
     # answers {} rather than raising -- right for a cache, wrong for a packing plan. Checked here,
@@ -1734,6 +1989,15 @@ def main(argv=None):
 
     steps = plan(units, args.root, args.out, args.work, rar=rar,
                  with_dirs=not args.no_empty_dirs)
+
+    # BUILDING THE INDEX ARCHIVE READS ALL NINE UNITS, whatever `--only` narrowed the run to. The
+    # archive describes the whole collection -- that is the point of fetching it instead of a unit
+    # -- so its CSVs have to be rebuilt from every unit's index, not from the ones this run packs.
+    # The CSVs are cheap: reading the per-archive indexes takes under a minute and writes 226 MB.
+    index_steps = steps
+    if args.execute and steps and steps[-1]["unit"] is None and len(units) < len(UNITS):
+        index_steps = plan(UNITS, args.root, args.out, args.work, rar=rar,
+                           with_dirs=not args.no_empty_dirs)
     if args.sizes:
         for step in steps[:-1]:
             say("%-24s %10s  %7d files"
@@ -1782,6 +2046,15 @@ def main(argv=None):
                 say("REFUSING: the password file is inside %s and would be uploaded with the "
                     "archives." % label)
                 return 2
+    if steps and steps[-1]["unit"] is None:
+        # EVERY UNIT'S CSV, REWRITTEN, AND THEN THE COMBINED ONE. `write_list()` only writes the
+        # index for a unit it is packing, so a `--only index` run would otherwise pack whatever
+        # CSVs happened to be left in the work directory from earlier runs -- including, until
+        # 2026-10-09, nine unquoted ones.
+        for step in index_steps:
+            if step["unit"] is not None:
+                write_unit_index(step["index_path"], step["rows"])
+        write_collection_index(index_steps, args.work)
     return execute(steps, rar, password)
 
 

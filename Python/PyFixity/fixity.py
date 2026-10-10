@@ -558,18 +558,39 @@ def read_sums(path: Path) -> dict[str, str]:
     return out
 
 
+def looks_like_a_crc32(text: str) -> bool:
+    """-> True for exactly eight hex digits, which is what every .sfv writes."""
+    return len(text) == 8 and all(c in "0123456789abcdefABCDEF" for c in text)
+
+
 def read_sfv(path: Path) -> dict[str, str]:
-    """-> {relative path: CRC32} from an .sfv. Split from the RIGHT; `;` lines are comments."""
+    """-> {relative path: CRC32} from an .sfv. Split from the RIGHT.
+
+    `;` STARTS A COMMENT, AND A FILE NAME MAY START WITH `;`. The format has no escape for that --
+    it is `<name> <CRC32>` and nothing else -- so a line beginning with `;` is ambiguous, and
+    skipping all of them made a real file vanish from the manifest without a word. Found by a test
+    on 2026-10-09, after the same class of defect (a path containing the format's own delimiter)
+    had been found unescaped in PyMirror's index CSV for 4 476 real paths.
+
+    SO A LEADING `;` IS A COMMENT ONLY WHEN THE LINE DOES NOT END IN A CRC32. The failure modes
+    are not symmetric: a dropped entry is silent, while a comment misread as an entry shows up in
+    the next `verify` run as a file that is listed and not there. Loud beats silent. A comment
+    whose last word is exactly eight hex digits is the one case this gets wrong, and it announces
+    itself.
+    """
     out = {}
     if not os.path.isfile(long_path(path)):
         return out
     with open(long_path(path), encoding="utf-8", newline="") as f:
         for line in f.read().splitlines():
-            if not line or line.startswith(";"):
+            if not line:
                 continue
             rel, sep, crc = line.rpartition(" ")
-            if sep:
-                out[rel] = crc.upper()
+            if not sep:
+                continue
+            if line.startswith(";") and not looks_like_a_crc32(crc):
+                continue
+            out[rel] = crc.upper()
     return out
 
 
