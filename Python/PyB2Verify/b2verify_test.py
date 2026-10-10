@@ -456,6 +456,121 @@ class FolderRecordCommandTest(unittest.TestCase):
         self.assertIn("localIndex must be 'checksums' or 'folder'", out)
 
 
+class FakeListingBucket:
+    """Stands in for a b2sdk bucket for check and hash-b2: a listing with SHA-1s, nothing unfinished."""
+
+    def __init__(self, objects: dict[str, bytes]):
+        self.objects = objects
+
+    def ls(self, prefix="", latest_only=True, recursive=False):
+        for name, data in sorted(self.objects.items()):
+            sha1 = hashlib.sha1(data).hexdigest()
+            yield types.SimpleNamespace(file_name=name, size=len(data), id_="id-" + sha1, action="upload",
+                                        mod_time_millis=0, get_content_sha1=lambda s=sha1: s), None
+
+    def list_unfinished_large_files(self):
+        return []
+
+
+class SubfolderBucketTest(unittest.TestCase):
+    """bucketDir and subfolderRecords: a bucket kept outside localRoot whose top-level folders each
+    carry their own record -- an archive collection packed per folder -- checked end to end."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+        (self.tmp / "data" / "example-archive").mkdir(parents=True)  # empty: the bucket lives elsewhere
+        self.archive = self.tmp / "elsewhere" / "archive"
+        for rel, size in (("alpha/a.bin", 3000), ("alpha/b.bin", 500), ("beta/c.bin", 1200)):
+            p = self.archive / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(os.urandom(size))
+        self.config = self.tmp / "b2.properties"
+        self.config.write_text(f"keyId=x\napplicationKey=y\nlocalRoot={(self.tmp / 'data').as_posix()}\n"
+                               f"stateDir={(self.tmp / 'state').as_posix()}\nlocalIndex=folder\n"
+                               f"bucketDir.example-archive={self.archive.as_posix()}\n"
+                               f"subfolderRecords=example-archive\n", encoding="utf-8")
+        self.bucket = FakeListingBucket({})
+        api = types.SimpleNamespace(get_bucket_by_name=lambda name: self.bucket,
+                                    list_buckets=lambda: [types.SimpleNamespace(name="example-archive")])
+        self._patch = unittest.mock.patch.object(b2verify.Context, "api", property(lambda ctx: api))
+        self._patch.start()
+
+    def tearDown(self):
+        self._patch.stop()
+        self._tmp.cleanup()
+
+    def cmd(self, *argv: str) -> tuple[int, str]:
+        return run(*argv, "--config", str(self.config), "--no-report")
+
+    def upload(self) -> None:
+        """Everything in the archive directory, as an upload of it puts it into B2."""
+        self.bucket.objects = {p.relative_to(self.archive).as_posix(): p.read_bytes()
+                               for p in self.archive.rglob("*") if p.is_file()}
+
+    def test_each_folder_gets_its_own_record_and_the_bucket_matches_b2(self):
+        code, out = self.cmd("hash-local")  # without names: the bucket from bucketDir
+        self.assertEqual(code, 0, out)
+        for sub in ("alpha", "beta"):
+            self.assertTrue((self.archive / sub / ".sha256sum").is_file(), sub)
+            self.assertTrue((self.archive / sub / fixity.STATE_FILE).is_file(), sub)
+        self.assertFalse((self.archive / ".sha256sum").exists())
+        self.assertEqual(list((self.tmp / "data" / "example-archive").iterdir()), [])  # untouched
+        self.upload()
+
+        code, out = self.cmd("check", "example-archive")
+        self.assertEqual(code, 0, out)  # the folders' record files are neither local-only nor B2-only
+        code, out = self.cmd("hash-b2", "example-archive")
+        self.assertEqual(code, 0, out)
+        self.assertIn("3 files", out)
+        self.assertIn("10 record files", out)
+        code, out = self.cmd("compare", "example-archive")
+        self.assertEqual(code, 0, out)
+        self.assertIn("checksum identical: 3", out)
+        self.assertIn("record files in B2: 10 identical", out)
+        code, out = self.cmd("verify-local", "example-archive")
+        self.assertEqual(code, 0, out)
+        self.assertIn("verifying example-archive/alpha locally", out)
+
+    def test_a_manifest_missing_in_b2_fails_a_state_file_behind_is_noted(self):
+        # Seen 2026-10-10: dot files skipped by an upload were found only by a separate script.
+        self.cmd("hash-local", "example-archive")
+        self.upload()
+        del self.bucket.objects["alpha/.sha1sum"]
+        self.cmd("hash-b2", "example-archive")
+        code, out = self.cmd("compare", "example-archive")
+        self.assertEqual(code, 1, out)
+        self.assertIn("! alpha/.sha1sum: not in B2 - upload it", out)
+        self.upload()
+        self.cmd("hash-b2", "example-archive")
+        state = self.archive / "beta" / fixity.STATE_FILE
+        state.write_text("# a later check\n" + state.read_text(encoding="utf-8"), encoding="utf-8")
+        code, out = self.cmd("compare", "example-archive")
+        self.assertEqual(code, 0, out)
+        self.assertIn("note: beta/.fixity-state.csv: the copy in B2 differs - upload it", out)
+
+    def test_damage_in_b2_is_found_by_path_inside_its_folder(self):
+        self.cmd("hash-local", "example-archive")
+        self.upload()
+        self.bucket.objects["beta/c.bin"] = os.urandom(1200)  # same size, other bytes
+        self.cmd("hash-b2", "example-archive")
+        code, out = self.cmd("compare", "example-archive")
+        self.assertEqual(code, 1, out)
+        self.assertIn("! beta/c.bin", out)
+
+    def test_b2_checksums_from_before_the_record_files_only_say_so(self):
+        self.cmd("hash-local", "example-archive")
+        self.upload()
+        self.cmd("hash-b2", "example-archive")
+        sp = self.tmp / "state" / "checksums" / "b2" / "example-archive.tsv"
+        meta, entries = lib.read_snapshot(sp)
+        meta.pop("records")
+        lib.write_snapshot(sp, meta, [e for e in entries if not e.path.endswith(fixity.STATE_FILE)])
+        code, out = self.cmd("compare", "example-archive")
+        self.assertEqual(code, 0, out)
+        self.assertIn("do not include the record files - run hash-b2", out)
+
+
 class FakeVaultBucket:
     """Stands in for a b2sdk bucket holding a vault: listing, downloads, unfinished uploads."""
 
@@ -521,6 +636,14 @@ class VaultCommandTest(unittest.TestCase):
     def cmd(self, *argv: str) -> tuple[int, str]:
         return run(*argv, "--config", str(self.config), "--no-report")
 
+    def upload_record(self) -> None:
+        """What the client does after hash-local: the cleartext directory's own files go into
+        the vault with everything else."""
+        for name in sorted(lib.ROOT_MANIFESTS):
+            if (self.clear / name).is_file():
+                self.vault.add_file(name, (self.clear / name).read_bytes())
+        self.upload()
+
     def test_hash_local_indexes_the_cleartext_and_the_vault_matches(self):
         code, out = self.cmd("hash-local", "example-vault-bucket")
         self.assertEqual(code, 0, out)
@@ -529,10 +652,11 @@ class VaultCommandTest(unittest.TestCase):
         self.assertEqual(sorted(e.path for e in fixity.read_index(index)),
                          ["Film One/film.mkv", "Film One/film.nfo", "Short.mp4"])  # no passphrase file
         self.assertTrue((self.clear / ".sha256sum").is_file())
+        self.upload_record()
 
         code, out = self.cmd("vault")
         self.assertEqual(code, 0, out)
-        self.assertIn("keys and signature verified; 3 files in 1 directories", out)
+        self.assertIn("keys and signature verified; 7 files in 1 directories", out)  # 3 + the 4 manifests
         self.assertIn("in sync", out)
         self.assertIn("every vault is consistent and matches", out)
 
@@ -542,6 +666,7 @@ class VaultCommandTest(unittest.TestCase):
 
     def test_a_flipped_bit_in_b2_is_found_only_by_decrypting(self):
         self.cmd("hash-local", "example-vault-bucket")
+        self.upload_record()
         obj = next(n for n in self.bucket.objects if n.endswith(".c9r") and len(self.bucket.objects[n]) > 90_000)
         data = bytearray(self.bucket.objects[obj])
         data[50_000] ^= 0x10
@@ -604,9 +729,35 @@ class VaultCommandTest(unittest.TestCase):
         self.assertEqual(code, 0, out)
         self.assertTrue((self.clear / fixity.STATE_FILE).is_file())  # encrypted and uploaded with the vault
         self.assertFalse((self.tmp / "state" / "checksums" / "local").exists())
+        self.upload_record()
         code, out = self.cmd("vault")
         self.assertEqual(code, 0, out)
         self.assertIn("in sync", out)
+        self.assertIn("record files in the vault: 5 identical", out)  # four manifests and the state file
+
+    def test_the_vaults_own_files_are_decrypted_and_compared(self):
+        # Seen 2026-10-10: whether the manifests had reached the vault took a separate script.
+        self.cmd("hash-local", "example-vault-bucket")
+        self.upload_record()
+        code, out = self.cmd("vault")
+        self.assertEqual(code, 0, out)
+        self.assertIn("record files in the vault: 4 identical", out)
+        del self.vault.objects[self.vault.entry(".md5sum")]  # a manifest that never arrived
+        self.upload()
+        code, out = self.cmd("vault")
+        self.assertEqual(code, 1, out)
+        self.assertIn("! .md5sum: not in the vault - upload it", out)
+
+    def test_an_outdated_state_file_in_the_vault_is_only_noted(self):
+        self.config.write_text(self.config.read_text(encoding="utf-8") + "localIndex=folder\n", encoding="utf-8")
+        self.cmd("hash-local", "example-vault-bucket")
+        self.upload_record()
+        (self.clear / fixity.STATE_FILE).write_text("# changed by a later check\n" +
+                                                    (self.clear / fixity.STATE_FILE).read_text(encoding="utf-8"),
+                                                    encoding="utf-8")
+        code, out = self.cmd("vault")
+        self.assertEqual(code, 0, out)  # every check changes it: outdated until the next upload, as expected
+        self.assertIn("note: .fixity-state.csv: the copy in the vault differs", out)
 
     def test_a_malformed_vault_entry_in_the_configuration_is_refused(self):
         self.config.write_text(self.config.read_text(encoding="utf-8").replace(
