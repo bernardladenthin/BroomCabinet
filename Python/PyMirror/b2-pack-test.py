@@ -54,6 +54,9 @@ def load(name):
 
 TOOL = load("b2-pack")
 HERE_DIR = os.path.dirname(os.path.abspath(__file__))
+# PyFixity's names for the files a folder keeps about itself, from the library that writes them.
+sys.path.insert(0, os.path.join(os.path.dirname(HERE_DIR), "PyFixity"))
+import fixity as PYFIXITY  # noqa: E402
 
 DIGEST_A = "a" * 64
 DIGEST_B = "b" * 64
@@ -1738,7 +1741,7 @@ class TheArchiveGetsItsOwnChecksums(unittest.TestCase):
         return [name for name in want if os.path.exists(os.path.join(self.folder, name))]
 
     def test_ALL_FOUR_MANIFESTS_LAND_BESIDE_THE_UNIT(self):
-        got = TOOL.fixity_over(self.folder, self.work, report=lambda *_a: None)
+        got = TOOL.fixity_over(self.folder, report=lambda *_a: None)
         self.assertTrue(got)
         self.assertEqual(self.manifests(),
                          [common.MANIFEST_FILES[a] for a in common.DIGESTS])
@@ -1746,23 +1749,26 @@ class TheArchiveGetsItsOwnChecksums(unittest.TestCase):
     def test_they_cover_the_volumes_AND_the_index_beside_them(self):
         r"""One .sha256sum describing everything that goes to B2 is the point: the volumes, the
         .rev files and the index CSV a reader fetches instead of the archive."""
-        TOOL.fixity_over(self.folder, self.work, report=lambda *_a: None)
+        TOOL.fixity_over(self.folder, report=lambda *_a: None)
         with io.open(os.path.join(self.folder, common.SUMS_FILE), encoding="utf-8") as handle:
             text = handle.read()
         self.assertIn("unit.part01.rar", text)
         self.assertIn("unit.part01.rev", text)
         self.assertIn("unit.index.csv", text)
 
-    def test_THE_INDEX_FILE_GOES_TO_THE_WORK_DIRECTORY_AND_NOT_THE_TREE(self):
-        r"""PyFixity's own documentation: "It changes on every check, so keep it OUTSIDE a tree
-        that gets uploaded or synced" -- and this tree is the one that gets uploaded."""
-        TOOL.fixity_over(self.folder, self.work, report=lambda *_a: None)
-        self.assertTrue(any(name.endswith(".fixity.csv") for name in os.listdir(self.work)))
-        self.assertFalse(os.path.exists(os.path.join(self.folder, ".fixity-index.csv")))
+    def test_THE_FOLDER_CARRIES_ITS_OWN_RECORD_AND_THE_WORK_DIRECTORY_NOTHING(self):
+        r"""Since 2026-10-10 every folder of the collection keeps its own record: the manifests,
+        `.s3etag` and PyFixity's state file beside them, uploaded with the volumes. The index used
+        to go to the work directory, which left those state files stale after every run and kept
+        the work directory from being scratch."""
+        TOOL.fixity_over(self.folder, report=lambda *_a: None)
+        self.assertTrue(os.path.exists(os.path.join(self.folder, PYFIXITY.STATE_FILE)))
+        self.assertEqual(os.listdir(self.work), [])
+        self.assertFalse(os.path.exists(os.path.join(self.folder, PYFIXITY.DEFAULT_INDEX)))
 
     def test_the_digests_are_the_real_ones(self):
         """Not a stub: the file's sha256 has to be the sha256 of its bytes."""
-        TOOL.fixity_over(self.folder, self.work, report=lambda *_a: None)
+        TOOL.fixity_over(self.folder, report=lambda *_a: None)
         with io.open(os.path.join(self.folder, "unit.part01.rar"), "rb") as handle:
             want = hashlib.sha256(handle.read()).hexdigest()
         with io.open(os.path.join(self.folder, common.SUMS_FILE), encoding="utf-8") as handle:
@@ -1775,7 +1781,7 @@ class TheArchiveGetsItsOwnChecksums(unittest.TestCase):
         was = TOOL.exists
         try:
             TOOL.exists = lambda path: False if path.endswith("pyfixity.py") else was(path)
-            got = TOOL.fixity_over(self.folder, self.work, report=said.append)
+            got = TOOL.fixity_over(self.folder, report=said.append)
         finally:
             TOOL.exists = was
         self.assertFalse(got)
@@ -1794,7 +1800,7 @@ class TheArchiveGetsItsOwnChecksums(unittest.TestCase):
         the volumes came to be -- 82 MB on misc, one line per file. Covering it would also make
         the manifest stale the moment anything appended to the log.
         """
-        TOOL.fixity_over(self.folder, self.work, report=lambda *_a: None)
+        TOOL.fixity_over(self.folder, report=lambda *_a: None)
         with io.open(os.path.join(self.folder, common.SUMS_FILE), encoding="utf-8") as handle:
             text = handle.read()
         self.assertNotIn("pack.log", text)
@@ -1815,14 +1821,25 @@ class TheArchiveGetsItsOwnChecksums(unittest.TestCase):
         be found by opening it.
 
         And the test for the guard searched b2-pack.py's own source for the `if` statement, which
-        pinned the shape of the code instead of what it has to do, so it failed when the shape
-        changed for the right reason. `fixity_work_for()` is the thing to ask instead.
+        pinned the shape of the code instead of what it has to do. Since 2026-10-10 PyFixity needs
+        no work directory at all, so the call takes the archive's folder and nothing that a step
+        without an index could lack -- which is what this asserts, by running it.
         """
-        self.assertEqual(TOOL.fixity_work_for({"index_path": None, "cwd": "WORK"}), "WORK")
-        self.assertEqual(TOOL.fixity_work_for({"cwd": "WORK"}), "WORK")
-        self.assertEqual(
-            TOOL.fixity_work_for({"index_path": os.path.join("W", "u.index.csv"), "cwd": "C"}),
-            "W")
+        root = fixture()
+        out = tempfile.mkdtemp(prefix="b2-pack-out-")
+        work = tempfile.mkdtemp(prefix="b2-pack-work-")
+        try:
+            last = TOOL.plan(test_units(), root, out, work)[-1]
+            folder = os.path.dirname(last["archive"])
+            os.makedirs(folder)
+            with io.open(os.path.join(folder, "index.rar"), "wb") as handle:
+                handle.write(os.urandom(2048))
+            self.assertTrue(TOOL.fixity_over(folder, report=lambda *_a: None))
+            self.assertEqual(os.listdir(work), [])
+        finally:
+            shutil.rmtree(out, ignore_errors=True)
+            shutil.rmtree(work, ignore_errors=True)
+            shutil.rmtree(root, ignore_errors=True)
 
     def test_and_the_index_archive_is_a_step_with_no_index_path(self):
         r"""Which is what makes the case above the real one and not a hypothetical."""
@@ -1830,18 +1847,70 @@ class TheArchiveGetsItsOwnChecksums(unittest.TestCase):
         out = tempfile.mkdtemp(prefix="b2-pack-out-")
         work = tempfile.mkdtemp(prefix="b2-pack-work-")
         try:
-            last = TOOL.plan(test_units(), root, out, work)[-1]
-            self.assertIsNone(last["index_path"])
-            self.assertEqual(TOOL.fixity_work_for(last), work)
+            self.assertIsNone(TOOL.plan(test_units(), root, out, work)[-1]["index_path"])
         finally:
             shutil.rmtree(out, ignore_errors=True)
             shutil.rmtree(work, ignore_errors=True)
+            shutil.rmtree(root, ignore_errors=True)
 
     def test_and_it_runs_only_after_the_checks_pass(self):
         with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
             text = handle.read()
         call = text.index("fixity_over(os.path.dirname(")
         self.assertLess(text.index("CRC32 and file count agree"), call)
+
+
+class TheWorkDirectoryIsScratch(unittest.TestCase):
+    r"""After a successful run the work directory holds nothing the run left behind.
+
+    On 2026-10-10 it held 900 MB after ten units -- lists, unit indexes and the collection index,
+    every byte of it already inside the archives -- and the owner emptied it by hand. Its PATH has
+    to stay (it is stored inside every archive), its CONTENTS are scratch.
+    """
+
+    def setUp(self):
+        self.root = fixture()
+        self.out = tempfile.mkdtemp(prefix="b2-pack-out-")
+        self.work = tempfile.mkdtemp(prefix="b2-pack-work-")
+        self.steps = TOOL.plan(test_units(), self.root, self.out, self.work)
+        for step in self.steps:
+            for path in (step["list_path"], step["index_path"]):
+                if path:
+                    with io.open(path, "w", encoding="utf-8") as handle:
+                        handle.write("written by the run\n")
+        with io.open(os.path.join(self.work, TOOL.ALL_UNITS_INDEX), "w", encoding="utf-8") as handle:
+            handle.write("written by the run\n")
+
+    def tearDown(self):
+        for path in (self.root, self.out, self.work):
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_a_successful_run_removes_what_it_wrote_and_the_empty_directory(self):
+        said = []
+        self.assertEqual(TOOL.finish(0, self.work, self.steps, report=said.append), 0)
+        self.assertFalse(os.path.exists(self.work))
+        self.assertIn("directory removed", " ".join(said))
+
+    def test_what_somebody_else_put_there_is_left_and_so_is_the_directory(self):
+        with io.open(os.path.join(self.work, "notes.txt"), "w", encoding="utf-8") as handle:
+            handle.write("not the packer's\n")
+        said = []
+        TOOL.finish(0, self.work, self.steps, report=said.append)
+        self.assertEqual(os.listdir(self.work), ["notes.txt"])
+        self.assertIn("1 other file(s) left", " ".join(said))
+
+    def test_a_failed_run_keeps_everything_for_the_diagnosis(self):
+        before = sorted(os.listdir(self.work))
+        said = []
+        self.assertEqual(TOOL.finish(2, self.work, self.steps, report=said.append), 2)
+        self.assertEqual(sorted(os.listdir(self.work)), before)
+        self.assertIn("kept", " ".join(said))
+
+    def test_main_hands_every_run_to_finish(self):
+        r"""The one call site, read rather than run: an --execute run needs rar and hours."""
+        with io.open(os.path.join(HERE_DIR, "b2-pack.py"), encoding="utf-8") as handle:
+            text = handle.read()
+        self.assertIn("return finish(execute(steps, rar, password), args.work", text)
 
 
 class TheIndexArchiveStepHasNoList(unittest.TestCase):
