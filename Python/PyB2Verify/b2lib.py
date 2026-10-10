@@ -47,7 +47,7 @@ LEGACY_META_KEYS = {"seite": "side", "erzeugt": "created", "vollstaendig": "comp
 
 # The manifests PyFixity writes at the root of a tree. They are uploaded with the tree, but they
 # describe it rather than belong to it, so neither side's comparison counts them.
-ROOT_MANIFESTS = frozenset(fixity.MANIFEST_FILES.values())
+ROOT_MANIFESTS = frozenset(fixity.MANIFEST_FILES.values()) | {fixity.ETAG_MANIFEST}
 
 
 @dataclass

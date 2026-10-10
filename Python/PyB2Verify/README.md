@@ -24,9 +24,10 @@ These tools answer both, and **never upload, change or delete anything in B2**.
 | `privacy_test.py` | refuses drive letters, keys, e-mail addresses and home directories in this project |
 
 **The local side is [PyFixity](../PyFixity/README.md)**, imported from beside this project: one read
-of each file gives SHA-256, SHA-1, MD5, CRC32 and — with the part sizes `hash-b2` recorded — the S3
-ETag; the result is PyFixity's index and the manifests `.sha256sum .sha1sum .md5sum .sfv` at the
-root of each bucket directory, which OpenHashTab and `sha256sum -c` read. The manifests are
+of each file gives SHA-256, SHA-1, MD5, CRC32 and the S3 ETag — over the part sizes `hash-b2`
+recorded, else over PyFixity's default (parts of 100 000 000 bytes above 200 MiB, the rule real
+uploads follow); the result is PyFixity's index and the manifests `.sha256sum .sha1sum .md5sum .sfv`
+and `.s3etag` at the root of each bucket directory, which OpenHashTab and `sha256sum -c` read. The manifests are
 uploaded with the data; both sides of every comparison leave them out, because they describe a
 bucket rather than belong to it.
 
@@ -129,7 +130,7 @@ Each side is indexed on its own, so either can be refreshed or re-read without t
 
 What B2 states lands in `<stateDir>/checksums/b2/<bucket>.tsv` (size, time, SHA-1, ETag, part
 sizes, file id, last check); the local side in PyFixity's index `<stateDir>/checksums/local/<bucket>.csv`
-(all four digests, ETag, part sizes, last check) plus the four manifests in the bucket directory;
+(all four digests, ETag, part sizes, last check) plus the five manifests in the bucket directory;
 and every check writes one Markdown report per bucket.
 
 A local `<bucket>.tsv` from the first version of this tool is moved onto the index the first time
@@ -137,8 +138,10 @@ it is needed, **without reading any file**: an entry is adopted while the file k
 size and time. It has only SHA-1, so the next `hash-local` reads every file once more to add SHA-256,
 MD5 and CRC32 — checking the old SHA-1 on the way. The old file stays as `<bucket>.tsv.migrated`.
 
-Run `hash-b2` **before** `hash-local`: the part sizes come from B2, and the local file is cut the
-same way while it is read anyway.
+Run `hash-b2` **before** `hash-local` when a bucket may have been uploaded with another part
+size: the real part sizes come from B2 and take precedence. Without them `hash-local` uses
+PyFixity's default, which every multipart file in fifteen real buckets matched — so a tree hashed
+before its upload is already comparable afterwards, without a second read.
 
 `compare` works on what `hash-b2` recorded, not on the live bucket — so after an upload, run
 `hash-b2` again first. When a differing local file is newer than the B2 record, `compare` says so:
@@ -168,7 +171,11 @@ somebody looks at it.
 
 ## Long runs: threads, resume, age, selection
 
-    --threads 8                 files in parallel (default: local 1, B2 4); one B2 connection each
+    --threads 8                 files in parallel (default: local 1, B2 4); one B2 connection each;
+                                hash-local takes it too and finishes the files in their order
+    --hash-threads 5            threads the digests of each file are spread over (default 5): the
+                                CPU, not the disk, limits hashing -- 72 GB took 416 s in one thread,
+                                128 s with 5, 69 s with --threads 2 on top
     --resume                    continue an interrupted run where it stopped
     --older-than 90             only files not successfully checked for 90 days
     --include '\.mp4$'          relative path, regex, repeatable, case-insensitive

@@ -43,6 +43,9 @@ COMMANDS
 
 VERIFICATION RUNS (verify-local, verify-b2 --download, hash-b2 --download-unknown)
     --threads N                 files in parallel (default: local 1, B2 4)
+    --hash-threads N            threads the digests of each file are spread over (default 5; also
+                                for hash-local, which takes --threads too). The CPU, not the disk,
+                                limits hashing: ~200 MB/s for all digests in one thread, ~620 in five
     --resume                    continue an interrupted run
     --older-than DAYS           only files not successfully checked for DAYS
 
@@ -578,6 +581,9 @@ class Context:
     def threads(self, default: int) -> int:
         return getattr(self.args, "threads", None) or default
 
+    def hash_threads(self) -> int:
+        return max(1, getattr(self.args, "hash_threads", None) or fixity.HASH_THREADS)
+
     def is_flat(self, name: str) -> bool:
         return self.args.flat or name in self.flat_buckets
 
@@ -696,8 +702,12 @@ def cmd_hash_local(ctx: Context) -> int:
                     print("  note: no B2 checksums yet - large files without a SHA-1 in B2 become checkable "
                           "after 'hash-b2' and another 'hash-local'.")
             key = fixity.basename if ctx.is_flat(name) and not vault else (lambda p: p)
+            # B2's real layouts first, PyFixity's default (.s3etag) for the rest. Not for a vault:
+            # B2 holds its ciphertext, so an ETag of the cleartext could never be compared.
             r = fixity.update_index(root, index, ctx.excludes, layouts, key, ctx.args.force,
-                                    out=lambda line: print(line, flush=True))
+                                    out=lambda line: print(line, flush=True),
+                                    s3=None if vault else fixity.DEFAULT_S3,
+                                    threads=ctx.threads(1), hash_threads=ctx.hash_threads())
             print(f"  -> {index}  ({r.summary}){'' if r.complete else '  INCOMPLETE'}")
             for manifest, what in r.manifests.items():
                 print(f"  {manifest}: {what}")
@@ -811,7 +821,8 @@ def cmd_verify_local(ctx: Context) -> int:
             state = fixity.read_state(index)
             print(f"\nverifying {label} locally against its index ({saved_info(state)}) ...", flush=True)
             r = fixity.verify_tree(root, index, ctx.excludes, ctx.filter, ctx.args.quick, ctx.args.resume,
-                                   ctx.args.older_than, ctx.threads(1), out=lambda line: print(line, flush=True))
+                                   ctx.args.older_than, ctx.threads(1), out=lambda line: print(line, flush=True),
+                                   hash_threads=ctx.hash_threads())
             info = [f"- **Local index:** {saved_info(state)}"]
             if r.summary:
                 print(f"  read: {r.summary}")
@@ -848,7 +859,8 @@ def verify_b2_content(ctx: Context, name: str, meta: dict[str, str], all_saved: 
     def work(p: FileEntry, stop: threading.Event):
         parts = p.parts if p.etag else None
         return fixity.hash_chunks(b2_chunks(ctx.thread_bucket(name), p.file_id), parts,
-                                  bool(p.etag and fixity.is_multipart_etag(p.etag)), stop, want=("sha1",))
+                                  bool(p.etag and fixity.is_multipart_etag(p.etag)), stop, want=("sha1",),
+                                  threads=fixity.hash_threads_for(p.size, ctx.hash_threads()))
 
     def done(p: FileEntry, result, err: Exception | None) -> None:
         if err:
@@ -1014,7 +1026,8 @@ def vault_content(ctx: Context, cryptomator, name: str, vault, objects: dict, fi
 
     def work(f, stop: threading.Event):
         chunks = b2_chunks(ctx.thread_bucket(name), objects[f.object_name][1])
-        return fixity.hash_chunks(vault.decrypt_chunks(chunks), stop=stop)
+        return fixity.hash_chunks(vault.decrypt_chunks(chunks), stop=stop,
+                                  threads=fixity.hash_threads_for(f.cipher_size, ctx.hash_threads()))
 
     def done(f, result, err: Exception | None) -> None:
         exp = local[f.path]
@@ -1147,6 +1160,8 @@ def build_parser() -> argparse.ArgumentParser:
     verify = argparse.ArgumentParser(add_help=False)
     g = verify.add_argument_group("verification run")
     g.add_argument("--threads", type=int, metavar="N", help="files in parallel (default: local 1, B2 4)")
+    g.add_argument("--hash-threads", type=int, metavar="N",
+                   help=f"threads per file for the digests (default {fixity.HASH_THREADS}; 1 = none)")
     g.add_argument("--resume", action="store_true", help="continue an interrupted run")
     g.add_argument("--older-than", type=float, metavar="DAYS",
                    help="only files not successfully checked for DAYS")
@@ -1157,6 +1172,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--mtime", action="store_true", help="also compare modification times")
     p.add_argument("--mtime-tolerance", type=float, default=2.0, help="tolerance for --mtime in seconds")
     p = sub.add_parser("hash-local", parents=[common], help="update the local index and write the manifests")
+    p.add_argument("--threads", type=int, metavar="N", help="files at once, finished in their order (default 1)")
+    p.add_argument("--hash-threads", type=int, metavar="N",
+                   help=f"threads per file for the digests (default {fixity.HASH_THREADS}; 1 = none)")
     p.add_argument("--force", action="store_true", help="re-read every file, not only changed ones")
     p = sub.add_parser("hash-b2", parents=[common], help="record what B2 states (SHA-1, else S3 ETag)")
     p.add_argument("--download-unknown", action="store_true",
@@ -1175,6 +1193,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--download", action="store_true",
                    help="also decrypt every file and compare its checksums (costs download traffic)")
     p.add_argument("--threads", type=int, metavar="N", help="parallel downloads with --download (default 4)")
+    p.add_argument("--hash-threads", type=int, metavar="N",
+                   help=f"threads per file for the digests (default {fixity.HASH_THREADS}; 1 = none)")
     return ap
 
 

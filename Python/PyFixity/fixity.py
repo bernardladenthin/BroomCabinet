@@ -12,9 +12,16 @@ neither the network nor a third-party package, and `fixity_test.py` covers it.
 ONE READ, FOUR DIGESTS. SHA-256 is the strong one; SHA-1, MD5 and CRC32 exist because somebody
 else speaks them -- Backblaze B2 records a SHA-1, the Internet Archive publishes MD5, RAR and ZIP
 store a CRC32 per member. Reading a file four times would cost four passes over a disk that is the
-bottleneck anyway; computing all four in one pass costs CPU that the disk leaves idle. When the
-part sizes of an S3 multipart upload are known, the same pass also yields its ETag (the MD5 of the
-part MD5s), so a cloud copy without a whole-file checksum can still be compared.
+bottleneck anyway; computing all four in one pass costs CPU that the disk leaves idle.
+
+AND, BY DEFAULT, THE ETAG A CLOUD COPY WILL REPORT. A large file uploaded in parts has no
+whole-file checksum in S3 or Backblaze B2 -- only an ETag, the MD5 of the part MD5s, which depends
+on where the parts were cut and cannot be derived from any whole-file digest afterwards. Learning
+that only after 2.5 TB had been hashed and uploaded meant reading all of it again. So the same
+pass now always computes the ETag for the part layout uploaders actually use (S3Layout: parts of
+100 000 000 bytes above 200 MiB -- B2's recommended part size and Cyberduck's fixed behaviour; every
+one of 3 572 multipart files across fifteen real buckets was cut exactly so). Explicit layouts, from
+a listing of the real cloud copy, still take precedence.
 
 TWO RECORDS, KEPT APART ON PURPOSE.
 
@@ -27,8 +34,11 @@ TWO RECORDS, KEPT APART ON PURPOSE.
                     sha256sum(1), sha1sum(1), md5sum(1) and RHash/QuickSFV write. OpenHashTab
                     and TeraCopy read them without being told anything. They change only when
                     content changes, so uploading them with the tree costs nothing per check.
+                    Beside them .s3etag, the ETags of the files above the cutoff, in md5sum's
+                    layout under a header naming the part size. It travels WITH the tree into
+                    the cloud, so the cloud copy can be checked even where the index is gone.
 
-NO FILE DESCRIBES ITSELF. The four manifests, the index and its state file are never listed in a
+NO FILE DESCRIBES ITSELF. The five manifests, the index and its state file are never listed in a
 manifest; a manifest that contained its own checksum could never be correct. The index, which
 lives elsewhere, may list the manifests -- that is how a cloud copy of them can be checked too.
 """
@@ -39,11 +49,13 @@ import fnmatch
 import hashlib
 import ntpath
 import os
+import queue
 import re
 import threading
 import time
 import unicodedata
 import zlib
+from collections import deque
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
@@ -60,7 +72,35 @@ INCOMPLETE = "no (interrupted, partial)"
 DIGESTS = ("sha256", "sha1", "md5", "crc32")
 # algorithm -> manifest file name. The names are the tools' own, and the same as PyMirror's.
 MANIFEST_FILES = {"sha256": ".sha256sum", "sha1": ".sha1sum", "md5": ".md5sum", "crc32": ".sfv"}
+ETAG_MANIFEST = ".s3etag"
 DEFAULT_INDEX = ".fixity-index.csv"
+# B2's recommendedPartSize, the part size of the b2 command line tool, and Cyberduck's fixed chunk.
+S3_PART_SIZE = 100_000_000
+# Cyberduck uploads a file of up to 200 MiB in one request -- B2 then records its SHA-1, which
+# .sha1sum already covers -- and cuts anything larger: "Files larger than 200MB are split into
+# 100MB chunks". Measured in real buckets: SHA-1s up to exactly 209 715 200 bytes, none above.
+S3_CUTOFF = 200 * 1024 * 1024
+
+
+@dataclass(frozen=True)
+class S3Layout:
+    """Where an uploader cuts a file into the parts of an S3 multipart upload."""
+    part_size: int = S3_PART_SIZE
+    cutoff: int = S3_CUTOFF  # files of up to this size are uploaded in one piece
+
+    def parts(self, size: int) -> list[int] | None:
+        """The part sizes of a file of this size, or None when it is uploaded in one piece."""
+        if self.part_size <= 0 or size <= self.cutoff:
+            return None
+        full, rest = divmod(size, self.part_size)
+        return [self.part_size] * full + ([rest] if rest else [])
+
+    def header(self) -> str:
+        return (f"# S3 multipart ETags (Backblaze B2, AWS S3 and others report them for files uploaded in parts)\n"
+                f"# part size {self.part_size} bytes; files larger than {self.cutoff} bytes\n")
+
+
+DEFAULT_S3 = S3Layout()
 INDEX_COLUMNS = ["path", "size", "mtime_ns", "sha256", "sha1", "md5", "crc32", "etag", "parts", "verified"]
 
 
@@ -278,34 +318,55 @@ class Cancelled(Exception):
     """The run was interrupted (Ctrl+C)."""
 
 
-class StreamHasher:
-    """All digests in one pass and, when part sizes are known, the S3 ETag too.
+# THE DIGESTS OF ONE STREAM ARE SPREAD OVER THREADS, because the CPU is the bottleneck, not the
+# disk. Measured on 2026-10-10, 16 cores, data in memory: SHA-256 1482, SHA-1 1584, MD5 630,
+# CRC32 2106 MB/s each. All five one after the other (MD5 twice: whole file, and per part for the
+# ETag) manage 202 MB/s -- and a real run that day read 72 GB at 178 MB/s, CPU-bound with the disk
+# waiting. One thread per digest: 620 MB/s, the MD5 then being the limit. hashlib and zlib release
+# the GIL on large buffers, so the threads really run at once. The data is still read ONCE: every
+# chunk goes to every thread.
+HASH_THREADS = 5
+# Below this a file is hashed in the calling thread: starting threads would cost more than it saves.
+PARALLEL_MIN_SIZE = 8 * 1024 * 1024
+# How many chunks a thread may lag behind the reader -- bounds the memory to threads x this x chunk.
+LANE_DEPTH = 8
+# Seconds per MB, from the measurement above: how the digests are grouped when threads are fewer.
+_COST = {"sha256": 1 / 1482, "sha1": 1 / 1584, "md5": 1 / 630, "crc32": 1 / 2106, "etag": 1 / 630}
 
-    Chunk boundaries of the incoming data are arbitrary (a file, a network stream). If the amount
-    of data does not fit the part sizes exactly, the ETag is None rather than a wrong value.
-    """
 
-    def __init__(self, parts: list[int] | None = None, multipart: bool = False,
-                 want: Iterable[str] = DIGESTS) -> None:
-        want = tuple(want)
-        self._hashes = {name: hashlib.new(name) for name in want if name != "crc32"}
-        self._crc = 0 if "crc32" in want else None
-        self.size = 0
-        self._parts = parts or []
-        self._multipart = multipart
-        self._index = 0
-        self._left = self._parts[0] if self._parts else 0
+class _Digest:
+    """One whole-stream digest."""
+
+    def __init__(self, name: str) -> None:
+        self.name, self.cost = name, _COST.get(name, 1 / 600)
+        self._h = None if name == "crc32" else hashlib.new(name)
+        self._crc = 0
+
+    def update(self, data) -> None:
+        if self._h is None:
+            self._crc = zlib.crc32(data, self._crc)
+        else:
+            self._h.update(data)
+
+    def value(self) -> str:
+        return crc32_text(self._crc) if self._h is None else self._h.hexdigest()
+
+
+class _PartMD5:
+    """The S3 ETag: an MD5 per part, then the MD5 of those. None if the stream does not fit the
+    part sizes exactly -- rather than a wrong value."""
+
+    name, cost = "etag", _COST["etag"]
+
+    def __init__(self, parts: list[int], multipart: bool) -> None:
+        self._parts, self._multipart = parts, multipart
+        self._index, self._left = 0, parts[0]
         self._md5 = hashlib.md5()
-        self._part_digests: list[bytes] = []
+        self._digests: list[bytes] = []
         self._overflow = False
 
-    def update(self, data: bytes) -> None:
-        for h in self._hashes.values():
-            h.update(data)
-        if self._crc is not None:
-            self._crc = zlib.crc32(data, self._crc)
-        self.size += len(data)
-        if not self._parts or self._overflow:
+    def update(self, data) -> None:
+        if self._overflow:
             return
         view = memoryview(data)
         while view:
@@ -317,40 +378,128 @@ class StreamHasher:
             self._left -= take
             view = view[take:]
             if self._left == 0:
-                self._part_digests.append(self._md5.digest())
+                self._digests.append(self._md5.digest())
                 self._index += 1
                 if self._index < len(self._parts):
                     self._left = self._parts[self._index]
                     self._md5 = hashlib.md5()
 
-    def result(self) -> tuple[dict[str, str], str | None]:
-        digests = {name: h.hexdigest() for name, h in self._hashes.items()}
-        if self._crc is not None:
-            digests["crc32"] = crc32_text(self._crc)
-        if not self._parts or self._overflow or self._index != len(self._parts):
-            return digests, None
+    def value(self) -> str | None:
+        if self._overflow or self._index != len(self._parts):
+            return None
         if self._multipart:
-            etag = f"{hashlib.md5(b''.join(self._part_digests)).hexdigest()}-{len(self._part_digests)}"
+            return f"{hashlib.md5(b''.join(self._digests)).hexdigest()}-{len(self._digests)}"
+        return self._digests[0].hex()
+
+
+def spread(costs: list[float], lanes: int) -> list[list[int]]:
+    """Group items (by index) into at most `lanes` groups of similar total cost: the most
+    expensive first, each to the cheapest group so far. Deterministic."""
+    groups: list[list[int]] = [[] for _ in range(max(1, min(lanes, len(costs))))]
+    load = [0.0] * len(groups)
+    for i in sorted(range(len(costs)), key=lambda k: (-costs[k], k)):
+        g = load.index(min(load))
+        groups[g].append(i)
+        load[g] += costs[i]
+    return [g for g in groups if g]
+
+
+class _Lane(threading.Thread):
+    """A thread feeding every chunk it receives to its share of the digests."""
+
+    def __init__(self, consumers: list) -> None:
+        super().__init__(daemon=True)
+        self.consumers = consumers
+        self.queue: queue.Queue = queue.Queue(maxsize=LANE_DEPTH)
+        self.error: BaseException | None = None
+
+    def run(self) -> None:
+        while True:
+            data = self.queue.get()
+            if data is None:
+                return
+            if self.error is None:  # after an error: keep draining, so the reader never blocks
+                try:
+                    for c in self.consumers:
+                        c.update(data)
+                except BaseException as e:  # noqa: BLE001 - handed to the caller in result()
+                    self.error = e
+
+
+class StreamHasher:
+    """All digests in one pass and, when part sizes are known, the S3 ETag too.
+
+    Chunk boundaries of the incoming data are arbitrary (a file, a network stream). If the amount
+    of data does not fit the part sizes exactly, the ETag is None rather than a wrong value.
+
+    threads > 1 spreads the digests over that many threads (at most one per digest); each gets
+    every chunk, so the data is still read once. Chunks must not be changed after update() --
+    `bytes`, as files and downloads deliver them, never are. close() or result() ends the threads.
+    """
+
+    def __init__(self, parts: list[int] | None = None, multipart: bool = False,
+                 want: Iterable[str] = DIGESTS, threads: int = 1) -> None:
+        self._consumers: list = [_Digest(name) for name in want]
+        self._etag = _PartMD5(parts, multipart) if parts else None
+        if self._etag:
+            self._consumers.append(self._etag)
+        self.size = 0
+        self._lanes: list[_Lane] = []
+        if threads > 1 and len(self._consumers) > 1:
+            groups = spread([c.cost for c in self._consumers], threads)
+            self._lanes = [_Lane([self._consumers[i] for i in g]) for g in groups]
+            for lane in self._lanes:
+                lane.start()
+
+    def update(self, data: bytes) -> None:
+        self.size += len(data)
+        if self._lanes:
+            if not isinstance(data, bytes):
+                data = bytes(data)  # a buffer the caller might reuse
+            for lane in self._lanes:
+                lane.queue.put(data)
         else:
-            etag = self._part_digests[0].hex()
-        return digests, etag
+            for c in self._consumers:
+                c.update(data)
+
+    def close(self) -> None:
+        """End the threads (idempotent). Called by result(); call it on an aborted stream too."""
+        lanes, self._lanes = self._lanes, []
+        for lane in lanes:
+            lane.queue.put(None)
+        for lane in lanes:
+            lane.join()
+        for lane in lanes:
+            if lane.error is not None:
+                raise lane.error
+
+    def result(self) -> tuple[dict[str, str], str | None]:
+        self.close()
+        digests = {c.name: c.value() for c in self._consumers if c is not self._etag}
+        return digests, (self._etag.value() if self._etag else None)
 
 
 def hash_chunks(chunks: Iterable[bytes], parts: list[int] | None = None, multipart: bool = False,
-                stop: threading.Event | None = None,
-                want: Iterable[str] = DIGESTS) -> tuple[dict[str, str], str | None, int]:
+                stop: threading.Event | None = None, want: Iterable[str] = DIGESTS,
+                threads: int = 1) -> tuple[dict[str, str], str | None, int]:
     """Hash a byte stream (file or download) -> (digests, etag, bytes seen). Closes the stream."""
-    h = StreamHasher(parts, multipart, want)
+    h = StreamHasher(parts, multipart, want, threads)
     try:
         for chunk in chunks:
             if stop is not None and stop.is_set():
                 raise Cancelled()
             h.update(chunk)
+    except BaseException:
+        try:
+            h.close()  # end the threads; the stream's own error is the one that matters
+        except BaseException:  # noqa: BLE001
+            pass
+        raise
     finally:
         close = getattr(chunks, "close", None)
         if close:
             close()
-    digests, etag = h.result()
+    digests, etag = h.result()  # raises a digest thread's error, if one had any
     return digests, etag, h.size
 
 
@@ -359,9 +508,16 @@ def read_file_chunks(path: str | os.PathLike, chunk_size: int = READ_CHUNK) -> I
         yield from iter(lambda: f.read(chunk_size), b"")
 
 
+def hash_threads_for(size: int, hash_threads: int) -> int:
+    """Threads for one stream of this size: none extra for a small one."""
+    return hash_threads if size >= PARALLEL_MIN_SIZE else 1
+
+
 def hash_file(path: str | os.PathLike, parts: list[int] | None = None, multipart: bool = False,
-              want: Iterable[str] = DIGESTS) -> tuple[dict[str, str], str | None]:
-    digests, etag, _size = hash_chunks(read_file_chunks(path), parts, multipart, want=want)
+              want: Iterable[str] = DIGESTS, threads: int = 1,
+              stop: threading.Event | None = None) -> tuple[dict[str, str], str | None]:
+    threads = hash_threads_for(os.stat(long_path(path)).st_size, threads)
+    digests, etag, _size = hash_chunks(read_file_chunks(path), parts, multipart, stop, want, threads)
     return digests, etag
 
 
@@ -369,7 +525,8 @@ def hash_file(path: str | os.PathLike, parts: list[int] | None = None, multipart
 
 def own_files(root: Path, index_path: Path | None = None) -> set[str]:
     """Relative paths at the root of the tree that belong to this tool and are never content."""
-    own = set(MANIFEST_FILES.values()) | {DEFAULT_INDEX, DEFAULT_INDEX + ".state"}
+    manifests = set(MANIFEST_FILES.values()) | {ETAG_MANIFEST}
+    own = manifests | {DEFAULT_INDEX, DEFAULT_INDEX + ".state"}
     if index_path is not None:
         try:
             rel = Path(index_path).resolve().relative_to(Path(root).resolve()).as_posix()
@@ -377,7 +534,7 @@ def own_files(root: Path, index_path: Path | None = None) -> set[str]:
             rel = None
         if rel:
             own |= {rel, rel + ".state", rel + ".tmp"}
-    own |= {name + ".tmp" for name in MANIFEST_FILES.values()}
+    own |= {name + ".tmp" for name in manifests}
     return own
 
 
@@ -513,7 +670,38 @@ def manifest_text(entries: list[Entry], algo: str) -> str | None:
     return "".join(line(getattr(e, algo), e.path) for e in sorted(entries, key=lambda x: x.path))
 
 
-def write_manifests(root: Path, entries: list[Entry], want: Iterable[str] = DIGESTS) -> dict[str, str]:
+def etag_manifest_text(entries: list[Entry], s3: S3Layout) -> tuple[str | None, str]:
+    """-> (text of .s3etag, why not) for the files above the cutoff.
+
+    Every line must be an ETag over exactly the layout the header names: an ETag taken over other
+    part sizes (an explicit layout of an older upload) would read as a mismatch on the far side.
+    So, as with the other manifests, an incomplete one is not written at all."""
+    large = sorted((e for e in entries if s3.parts(e.size)), key=lambda x: x.path)
+    if not large:
+        return None, f"not needed (no file larger than {s3.cutoff} bytes)"
+    off = [e for e in large if not e.etag or e.parts != s3.parts(e.size)]
+    if off:
+        return None, (f"not written ({len(off)} of {len(large)} large files lack an ETag over parts of "
+                      f"{s3.part_size} bytes, e.g. {off[0].path})")
+    return s3.header() + "".join(sums_line(e.etag, e.path) for e in large), ""
+
+
+def _write_if_changed(target: Path, text: str) -> str:
+    current = None
+    if os.path.isfile(long_path(target)):
+        with open(long_path(target), encoding="utf-8", newline="") as f:
+            current = f.read()
+    if current == text:
+        return "unchanged"
+    tmp = target.with_name(target.name + ".tmp")
+    with open(long_path(tmp), "w", encoding="utf-8", newline="") as f:
+        f.write(text)
+    os.replace(long_path(tmp), long_path(target))
+    return "written"
+
+
+def write_manifests(root: Path, entries: list[Entry], want: Iterable[str] = DIGESTS,
+                    s3: S3Layout | None = DEFAULT_S3) -> dict[str, str]:
     """Write the manifests at the root of the tree -> {file name: what happened}.
 
     A MANIFEST IS REWRITTEN ONLY WHEN ITS TEXT CHANGES. Re-checking a tree must not produce new
@@ -522,24 +710,41 @@ def write_manifests(root: Path, entries: list[Entry], want: Iterable[str] = DIGE
     result = {}
     for algo in want:
         name = MANIFEST_FILES[algo]
-        target = Path(root) / name
         text = manifest_text(entries, algo)
         if text is None:
             result[name] = "not written (a digest is missing)"
             continue
-        current = None
-        if os.path.isfile(long_path(target)):
-            with open(long_path(target), encoding="utf-8", newline="") as f:
-                current = f.read()
-        if current == text:
-            result[name] = "unchanged"
-            continue
-        tmp = target.with_name(name + ".tmp")
-        with open(long_path(tmp), "w", encoding="utf-8", newline="") as f:
-            f.write(text)
-        os.replace(long_path(tmp), long_path(target))
-        result[name] = "written"
+        result[name] = _write_if_changed(Path(root) / name, text)
+    if s3 is not None and s3.part_size > 0:
+        target = Path(root) / ETAG_MANIFEST
+        text, why = etag_manifest_text(entries, s3)
+        if text is not None:
+            result[ETAG_MANIFEST] = _write_if_changed(target, text)
+        elif not any(s3.parts(e.size) for e in entries) and os.path.isfile(long_path(target)):
+            # The large files are gone; a manifest still naming them would fail on the far side.
+            os.remove(long_path(target))
+            result[ETAG_MANIFEST] = "removed (no file larger than the cutoff any more)"
+        else:
+            result[ETAG_MANIFEST] = why
     return result
+
+
+def read_etags(path: Path) -> tuple[int | None, dict[str, str]]:
+    """-> (part size from the header, {relative path: ETag}) from an .s3etag file."""
+    part_size, etags = None, {}
+    if not os.path.isfile(long_path(path)):
+        return part_size, etags
+    with open(long_path(path), encoding="utf-8", newline="") as f:
+        for line in f.read().splitlines():
+            if line.startswith("#"):
+                m = re.search(r"part size (\d+) bytes", line)
+                if m:
+                    part_size = int(m.group(1))
+                continue
+            etag, sep, rel = line.partition(" *")
+            if sep and not line.startswith("\\"):
+                etags[rel] = etag
+    return part_size, etags
 
 
 def read_sums(path: Path) -> dict[str, str]:
@@ -687,6 +892,58 @@ T = TypeVar("T")
 R = TypeVar("R")
 
 
+def run_ordered(items: Iterable[T], work: Callable[[T, threading.Event], R], threads: int,
+                on_done: Callable[[T, R | None, Exception | None], None]) -> None:
+    """Like run_parallel, but on_done sees the items IN THEIR ORDER, and at most `threads` are in
+    work at once: a file that finishes early waits for the ones before it. That blocks a little;
+    in exchange the output, the progress and an interrupted index read exactly as a run with one
+    thread would have left them. With threads <= 1 everything runs in the calling thread."""
+    stop = threading.Event()
+    if threads <= 1:
+        for item in items:
+            try:
+                result, error = work(item, stop), None
+            except Cancelled:
+                return
+            except Exception as e:  # noqa: BLE001 - an error is part of the result
+                result, error = None, e
+            on_done(item, result, error)
+        return
+    source = iter(items)
+    window: deque = deque()
+    with ThreadPoolExecutor(max_workers=threads) as pool:
+        def refill() -> None:
+            while len(window) < threads:
+                item = next(source, _END)
+                if item is _END:
+                    return
+                window.append((item, pool.submit(work, item, stop)))
+
+        try:
+            refill()
+            while window:
+                item, fut = window[0]
+                while not fut.done():
+                    wait([fut], timeout=1.0)  # with a timeout: an untimed wait misses Ctrl+C on Windows
+                window.popleft()
+                try:
+                    result, error = fut.result(), None
+                except Cancelled:
+                    continue
+                except Exception as e:  # noqa: BLE001
+                    result, error = None, e
+                on_done(item, result, error)
+                refill()
+        except BaseException:
+            stop.set()
+            for _item, fut in window:
+                fut.cancel()
+            raise
+
+
+_END = object()
+
+
 def run_parallel(items: Iterable[T], work: Callable[[T, threading.Event], R], threads: int,
                  on_done: Callable[[T, R | None, Exception | None], None]) -> None:
     """Run work(item, stop) on `threads` threads; on_done(item, result, error) runs in the CALLING
@@ -750,13 +1007,21 @@ class UpdateResult:
 def update_index(root: Path, index_path: Path, excludes: Iterable[str] = (),
                  layouts: Layouts | None = None, layout_key: Callable[[str], str] = lambda p: p,
                  force: bool = False, manifests: bool = True,
-                 out: Callable[[str], None] = print) -> UpdateResult:
+                 out: Callable[[str], None] = print, s3: S3Layout | None = DEFAULT_S3,
+                 threads: int = 1, hash_threads: int = HASH_THREADS) -> UpdateResult:
     """Bring the index of a tree up to date, then its manifests.
 
     A file is read again only when its size or mtime moved, when a digest is missing, or when a
     part layout asks for an ETag the index does not hold. With `force` every file is read -- and a
     file whose size and mtime did NOT move but whose content did keeps its saved digests and is
     reported as damage: a new version would have a new mtime, silent damage does not.
+
+    The part layout of a file is the explicit one from `layouts` if given, else the default `s3`
+    one (None: no ETag at all). So the first run after this default arrived reads every file
+    above the cutoff once more -- and never again.
+
+    threads: files read at once, finished in their order (run_ordered); hash_threads: threads the
+    digests of each file are spread over (StreamHasher). 2 x 5 keeps ten cores busy.
     """
     root, index_path = Path(root), Path(index_path)
     layouts = layouts or {}
@@ -768,6 +1033,8 @@ def update_index(root: Path, index_path: Path, excludes: Iterable[str] = (),
         parts, multipart = layouts.get(layout_key(e.path), (None, False))
         if parts and sum(parts) != e.size:
             parts = None  # the size differs, so the file differs anyway
+        if not parts and s3 is not None:
+            parts, multipart = s3.parts(e.size), True
         p = prev.get(e.path)
         same_file = bool(p and p.size == e.size and p.mtime_ns == e.mtime_ns and p.digests())
         if same_file:
@@ -786,31 +1053,41 @@ def update_index(root: Path, index_path: Path, excludes: Iterable[str] = (),
     progress = Progress(len(todo), sum(e.size for e, _p, _m in todo), out)
     damaged: list[tuple[Entry, dict[str, str]]] = []
     hashed: list[Entry] = []
+
+    def work(item, stop: threading.Event):
+        e, parts, multipart = item
+        return hash_file(e.abs_path, parts, multipart, threads=hash_threads, stop=stop)
+
+    def done(item, result, error: Exception | None) -> None:
+        if error is not None:
+            raise error  # a file that cannot be read stops the run; what is done so far is saved
+        e, parts, _multipart = item
+        digests, etag = result
+        p = prev.get(e.path)
+        if p and p.size == e.size and p.mtime_ns == e.mtime_ns:
+            saved = p.digests()
+            clash = [n for n in saved if n in digests and saved[n].lower() != digests[n].lower()]
+            if clash:
+                # Same size, same mtime, different bytes: keep what was saved, and say so.
+                e.set_digests(saved)
+                e.set_digests({n: v for n, v in digests.items() if n not in saved})
+                e.etag, e.parts, e.verified = p.etag, p.parts, ""
+                damaged.append((e, digests))
+                progress.step("DAMAGE?", e)
+                saver.maybe_save()
+                return
+        e.set_digests(digests)
+        e.etag, e.parts, e.verified = etag, parts, now_ts()
+        hashed.append(e)
+        progress.step("hashed", e)
+        saver.maybe_save()
+
     try:
-        for e, parts, multipart in todo:
-            digests, etag = hash_file(e.abs_path, parts, multipart)
-            p = prev.get(e.path)
-            if p and p.size == e.size and p.mtime_ns == e.mtime_ns:
-                saved = p.digests()
-                clash = [n for n in saved if n in digests and saved[n].lower() != digests[n].lower()]
-                if clash:
-                    # Same size, same mtime, different bytes: keep what was saved, and say so.
-                    e.set_digests(saved)
-                    e.set_digests({n: v for n, v in digests.items() if n not in saved})
-                    e.etag, e.parts, e.verified = p.etag, p.parts, ""
-                    damaged.append((e, digests))
-                    progress.step("DAMAGE?", e)
-                    saver.maybe_save()
-                    continue
-            e.set_digests(digests)
-            e.etag, e.parts, e.verified = etag, parts, now_ts()
-            hashed.append(e)
-            progress.step("hashed", e)
-            saver.maybe_save()
+        run_ordered(todo, work, threads, done)
     finally:
         complete = all(e.has_all_digests() for e in entries)
         saver.save(complete)
-    written = write_manifests(root, entries) if manifests and complete else {}
+    written = write_manifests(root, entries, s3=s3) if manifests and complete else {}
     return UpdateResult(entries, hashed, damaged, complete, written, progress.summary())
 
 
@@ -824,7 +1101,7 @@ class VerifyResult:
 def verify_tree(root: Path, index_path: Path, excludes: Iterable[str] = (),
                 selection: FileFilter | None = None, quick: bool = False, resume: bool = False,
                 older_than: float | None = None, threads: int = 1,
-                out: Callable[[str], None] = print) -> VerifyResult:
+                out: Callable[[str], None] = print, hash_threads: int = HASH_THREADS) -> VerifyResult:
     """Re-read a tree against its index: new, gone, resized, re-dated and damaged files.
 
     Only files of unchanged size are read; new, gone or resized ones are reported anyway. Known
@@ -862,7 +1139,8 @@ def verify_tree(root: Path, index_path: Path, excludes: Iterable[str] = (),
             e, p = pair
             parts = p.parts if p.etag else None
             return hash_chunks(read_file_chunks(e.abs_path), parts,
-                               bool(p.etag and is_multipart_etag(p.etag)), stop)
+                               bool(p.etag and is_multipart_etag(p.etag)), stop,
+                               threads=hash_threads_for(e.size, hash_threads))
 
         def done(pair, result, err):
             e, p = pair

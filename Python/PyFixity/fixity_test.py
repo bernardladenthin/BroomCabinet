@@ -14,6 +14,7 @@ import tempfile
 import threading
 import time
 import unittest
+import unittest.mock
 import zlib
 from datetime import datetime
 from pathlib import Path
@@ -39,6 +40,11 @@ def chunked(data: bytes, sizes: list[int]):
         n = sizes[k % len(sizes)]
         yield data[i:i + n]
         i, k = i + n, k + 1
+
+
+def digest_results(manifests: dict[str, str]) -> list[str]:
+    """What happened to the four digest manifests, leaving out .s3etag."""
+    return [what for name, what in manifests.items() if name != fx.ETAG_MANIFEST]
 
 
 def paths(entries) -> list[str]:
@@ -215,7 +221,8 @@ class ManifestTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             result = fx.write_manifests(root, self.ENTRIES)
-            self.assertEqual(set(result.values()), {"written"})
+            self.assertEqual(set(digest_results(result)), {"written"})
+            self.assertIn("not needed", result[fx.ETAG_MANIFEST])  # no file above the cutoff
             self.assertEqual(fx.read_sums(root / ".sha1sum"), {"a.txt": "h1", "b/two words.bin": "h2"})
             self.assertEqual(fx.read_sfv(root / ".sfv"), {"a.txt": "DEADBEEF", "b/two words.bin": "0000BEEF"})
 
@@ -225,7 +232,7 @@ class ManifestTest(unittest.TestCase):
             fx.write_manifests(root, self.ENTRIES)
             before = (root / ".md5sum").stat().st_mtime_ns
             time.sleep(0.02)
-            self.assertEqual(set(fx.write_manifests(root, self.ENTRIES).values()), {"unchanged"})
+            self.assertEqual(set(digest_results(fx.write_manifests(root, self.ENTRIES))), {"unchanged"})
             self.assertEqual((root / ".md5sum").stat().st_mtime_ns, before)
 
     def test_partial_or_empty_manifests_are_not_written(self):
@@ -299,7 +306,7 @@ class UpdateIndexTest(unittest.TestCase):
             r = fx.update_index(t.root, t.index, out=quiet)
             self.assertTrue(r.complete)
             self.assertEqual(len(r.hashed), 3)
-            self.assertEqual(set(r.manifests.values()), {"written"})
+            self.assertEqual(set(digest_results(r.manifests)), {"written"})
             for rel, data in self.FILES.items():
                 self.assertEqual(fx.read_sums(t.root / ".sha256sum")[rel], hashlib.sha256(data).hexdigest())
                 self.assertEqual(fx.read_sums(t.root / ".md5sum")[rel], hashlib.md5(data).hexdigest())
@@ -311,7 +318,7 @@ class UpdateIndexTest(unittest.TestCase):
             r = fx.update_index(t.root, t.index, out=quiet)  # second run sees the manifests on disk
             listed = set(fx.read_sums(t.root / ".sha1sum"))
             self.assertEqual(listed, set(self.FILES))
-            self.assertEqual(set(r.manifests.values()), {"unchanged"})
+            self.assertEqual(set(digest_results(r.manifests)), {"unchanged"})
             in_tree = Path(t.root) / fx.DEFAULT_INDEX
             fx.update_index(t.root, in_tree, out=quiet)  # an index INSIDE the tree is not content either
             self.assertNotIn(fx.DEFAULT_INDEX, set(fx.read_sums(t.root / ".sha1sum")))
@@ -348,6 +355,189 @@ class UpdateIndexTest(unittest.TestCase):
             r = fx.update_index(t.root, t.index, out=quiet)
             self.assertEqual(len(r.hashed), 3)
             self.assertTrue(all(e.has_all_digests() for e in fx.read_index(t.index)))
+
+
+class S3EtagTest(unittest.TestCase):
+    """The ETag a cloud copy reports, computed by default -- seen on 2026-10-10, when 774 files of
+    2.5 TB were uploaded in parts and their whole-file digests could not be compared with anything."""
+
+    SMALL = fx.S3Layout(part_size=1000, cutoff=2000)  # the real rule, scaled down
+    FILES = {"small.bin": os.urandom(1500), "edge.bin": os.urandom(2000), "big.bin": os.urandom(4500),
+             "sub/exact.bin": os.urandom(3000)}
+
+    def test_the_default_is_the_rule_real_uploads_follow(self):
+        d = fx.DEFAULT_S3
+        self.assertEqual((d.part_size, d.cutoff), (100_000_000, 209_715_200))
+        self.assertIsNone(d.parts(209_715_200))  # up to 200 MiB in one piece, with a SHA-1 in B2
+        self.assertEqual(d.parts(3_557_000_000), [100_000_000] * 35 + [57_000_000])  # a real volume
+
+    def test_layouts(self):
+        s = self.SMALL
+        self.assertIsNone(s.parts(2000))
+        self.assertEqual(s.parts(4500), [1000, 1000, 1000, 1000, 500])
+        self.assertEqual(s.parts(3000), [1000, 1000, 1000])  # no empty last part
+        self.assertIsNone(fx.S3Layout(0).parts(10**12))  # switched off
+
+    def test_index_and_s3etag_without_being_told_anything(self):
+        with Tree(self.FILES) as t:
+            r = fx.update_index(t.root, t.index, out=quiet, s3=self.SMALL)
+            self.assertEqual(r.manifests[fx.ETAG_MANIFEST], "written")
+            got = {e.path: e for e in fx.read_index(t.index)}
+            for rel in ("big.bin", "sub/exact.bin"):
+                self.assertEqual(got[rel].etag, s3_etag(self.FILES[rel], 1000), rel)
+                self.assertEqual(got[rel].parts, self.SMALL.parts(len(self.FILES[rel])))
+            self.assertIsNone(got["edge.bin"].etag)  # at the cutoff: one piece, the SHA-1 covers it
+            part_size, etags = fx.read_etags(t.root / fx.ETAG_MANIFEST)
+            self.assertEqual(part_size, 1000)
+            self.assertEqual(etags, {"big.bin": got["big.bin"].etag, "sub/exact.bin": got["sub/exact.bin"].etag})
+            text = (t.root / fx.ETAG_MANIFEST).read_text(encoding="utf-8")
+            self.assertTrue(text.startswith("# S3 multipart ETags"))
+            self.assertIn("files larger than 2000 bytes", text)
+
+    def test_the_manifest_is_stable_and_never_describes_itself(self):
+        with Tree(self.FILES) as t:
+            fx.update_index(t.root, t.index, out=quiet, s3=self.SMALL)
+            r = fx.update_index(t.root, t.index, out=quiet, s3=self.SMALL)
+            self.assertEqual(r.hashed, [])  # the ETag is in the index: nothing is read again
+            self.assertEqual(r.manifests[fx.ETAG_MANIFEST], "unchanged")
+            self.assertNotIn(fx.ETAG_MANIFEST, fx.read_sums(t.root / ".sha256sum"))
+
+    def test_an_old_index_gets_its_etags_in_one_more_read_of_the_large_files_only(self):
+        with Tree(self.FILES) as t:
+            fx.update_index(t.root, t.index, out=quiet, s3=None)  # before this default existed
+            self.assertFalse((t.root / fx.ETAG_MANIFEST).exists())
+            r = fx.update_index(t.root, t.index, out=quiet, s3=self.SMALL)
+            self.assertEqual(paths(r.hashed), ["big.bin", "sub/exact.bin"])
+            self.assertEqual(set(digest_results(r.manifests)), {"unchanged"})  # the digests did not move
+            self.assertEqual(r.manifests[fx.ETAG_MANIFEST], "written")
+
+    def test_an_explicit_layout_wins_and_then_the_manifest_is_not_written(self):
+        with Tree(self.FILES) as t:
+            layouts = {"big.bin": ([1500, 1500, 1500], True)}  # a cloud copy cut differently
+            r = fx.update_index(t.root, t.index, layouts=layouts, out=quiet, s3=self.SMALL)
+            got = {e.path: e for e in fx.read_index(t.index)}["big.bin"]
+            self.assertEqual(got.etag, s3_etag(self.FILES["big.bin"], 1500))
+            self.assertIn("not written", r.manifests[fx.ETAG_MANIFEST])
+            self.assertIn("big.bin", r.manifests[fx.ETAG_MANIFEST])
+            self.assertFalse((t.root / fx.ETAG_MANIFEST).exists())
+
+    def test_switched_off_and_a_stale_manifest_removed(self):
+        with Tree(self.FILES) as t:
+            r = fx.update_index(t.root, t.index, out=quiet, s3=None)
+            self.assertNotIn(fx.ETAG_MANIFEST, r.manifests)
+            fx.update_index(t.root, t.index, out=quiet, s3=self.SMALL)
+            for rel in ("big.bin", "sub/exact.bin"):
+                (t.root / rel).write_bytes(b"now small")
+            r = fx.update_index(t.root, t.index, out=quiet, s3=self.SMALL)
+            self.assertIn("removed", r.manifests[fx.ETAG_MANIFEST])
+            self.assertFalse((t.root / fx.ETAG_MANIFEST).exists())
+
+
+class ParallelHashingTest(unittest.TestCase):
+    """The digests of one stream spread over threads, and several files at once in their order --
+    the CPU, not the disk, was the bottleneck (202 MB/s for all digests in one thread)."""
+
+    DATA = os.urandom(3 * 1000 + 777)
+
+    def test_every_thread_count_gives_the_same_digests_and_etag(self):
+        expected = fx.hash_chunks(chunked(self.DATA, [4096]), [1000, 1000, 1000, 777], True)
+        self.assertEqual(expected[1], s3_etag(self.DATA, 1000))
+        for threads in (2, 3, 4, 5, 9):
+            for sizes in ([1], [999, 1, 3000], [len(self.DATA)]):
+                got = fx.hash_chunks(chunked(self.DATA, sizes), [1000, 1000, 1000, 777], True, threads=threads)
+                self.assertEqual(got, expected, (threads, sizes))
+
+    def test_the_two_md5s_never_share_a_thread(self):
+        costs = [fx._COST[n] for n in ("sha256", "sha1", "md5", "crc32", "etag")]
+        groups = fx.spread(costs, 4)
+        self.assertEqual(len(groups), 4)
+        md5_groups = [i for i, g in enumerate(groups) if 2 in g or 4 in g]
+        self.assertEqual(len(set(md5_groups)), 2)
+        self.assertEqual(fx.spread(costs, 1), [[2, 4, 0, 1, 3]])
+        self.assertEqual(len(fx.spread(costs, 20)), 5)  # never more threads than digests
+
+    def test_a_reused_buffer_cannot_change_what_was_hashed(self):
+        h = fx.StreamHasher(threads=4)
+        buf = bytearray(b"a" * 5000)
+        h.update(buf)
+        buf[:] = b"b" * 5000  # a caller reusing its buffer
+        h.update(buf)
+        self.assertEqual(h.result()[0]["sha256"], hashlib.sha256(b"a" * 5000 + b"b" * 5000).hexdigest())
+
+    def test_an_error_in_a_digest_thread_reaches_the_caller_and_no_thread_is_left(self):
+        before = threading.active_count()
+
+        class Broken:
+            name, cost = "broken", 1.0
+
+            def update(self, data):
+                raise ValueError("digest failed")
+
+        h = fx.StreamHasher(threads=3)
+        h._lanes[0].consumers.append(Broken())
+        h.update(b"x" * 10_000)
+        h.update(b"y" * 10_000)  # the reader must not block behind the failed thread
+        with self.assertRaisesRegex(ValueError, "digest failed"):
+            h.result()
+        self.assertEqual(threading.active_count(), before)
+
+    def test_an_interrupted_stream_ends_its_threads(self):
+        before = threading.active_count()
+        stop = threading.Event()
+
+        def chunks():
+            yield b"a" * 4096
+            stop.set()
+            yield b"b" * 4096
+
+        with self.assertRaises(fx.Cancelled):
+            fx.hash_chunks(chunks(), stop=stop, threads=4)
+        self.assertEqual(threading.active_count(), before)
+
+    def test_files_finish_in_their_order_with_at_most_n_at_once(self):
+        seen, running, peak, lock = [], [0], [0], threading.Lock()
+
+        def work(i, stop):
+            with lock:
+                running[0] += 1
+                peak[0] = max(peak[0], running[0])
+            time.sleep(0.05 if i % 3 == 0 else 0.005)  # some finish long before the one ahead
+            with lock:
+                running[0] -= 1
+            if i == 4:
+                raise OSError("unreadable")
+            return i * 10
+
+        fx.run_ordered(range(10), work, 3, lambda i, r, e: seen.append((i, r, str(e) if e else None)))
+        self.assertEqual([i for i, _r, _e in seen], list(range(10)))
+        self.assertEqual(seen[4], (4, None, "unreadable"))
+        self.assertEqual(seen[5], (5, 50, None))
+        self.assertLessEqual(peak[0], 3)
+
+    def test_update_index_in_parallel_equals_one_thread(self):
+        files = {f"f{i}.bin": os.urandom(3000 + 400 * i) for i in range(7)}
+        small_rule = fx.S3Layout(part_size=1000, cutoff=2000)
+        with unittest.mock.patch.object(fx, "PARALLEL_MIN_SIZE", 0):  # every file through the threads
+            with Tree(files) as one, Tree(files) as many:
+                lines_one, lines_many = [], []
+                fx.update_index(one.root, one.index, out=lines_one.append, s3=small_rule, threads=1, hash_threads=1)
+                r = fx.update_index(many.root, many.index, out=lines_many.append, s3=small_rule,
+                                    threads=3, hash_threads=5)
+                strip = lambda es: [(e.path, e.digests(), e.etag, e.parts) for e in es]  # noqa: E731
+                self.assertEqual(strip(fx.read_index(many.index)), strip(fx.read_index(one.index)))
+                self.assertEqual([ln.split()[-1] for ln in lines_many[1:8]], sorted(files))  # in order
+                self.assertEqual((many.root / fx.ETAG_MANIFEST).read_text(encoding="utf-8"),
+                                 (one.root / fx.ETAG_MANIFEST).read_text(encoding="utf-8"))
+                self.assertEqual(len(r.hashed), 7)
+
+    def test_verify_with_hash_threads_still_finds_damage(self):
+        files = {"a.bin": os.urandom(50_000), "b.bin": os.urandom(60_000)}
+        with unittest.mock.patch.object(fx, "PARALLEL_MIN_SIZE", 0):
+            with Tree(files) as t:
+                fx.update_index(t.root, t.index, out=quiet)
+                damage(t.root / "b.bin")
+                r = fx.verify_tree(t.root, t.index, threads=2, hash_threads=5, out=quiet)
+                self.assertEqual(paths(a for a, _b in r.diff.checksum), ["b.bin"])
 
 
 class VerifyTreeTest(unittest.TestCase):

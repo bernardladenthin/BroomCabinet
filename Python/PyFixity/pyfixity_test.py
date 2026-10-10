@@ -13,6 +13,7 @@ import io
 import os
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 import fixity
@@ -103,6 +104,38 @@ class CliTest(unittest.TestCase):
         big = {e.path: e for e in fixity.read_index(self.index)}["big.bin"]
         self.assertTrue(big.etag and big.etag.endswith("-3"))
         self.assertEqual(big.parts, [1000, 1000, 500])
+
+    def test_s3etag_by_default_with_the_options_and_switched_off(self):
+        code, out = self.cmd("index")  # real defaults: no test file is above 200 MiB
+        self.assertEqual(code, 0, out)
+        self.assertIn(".s3etag: not needed (no file larger than 209715200 bytes)", out)
+        # The same rule scaled down: parts of 1000 bytes above 2000 -> only big.bin and a.bin.
+        code, out = self.cmd("index", "--s3-part-size", "1000", "--s3-cutoff", "2000")
+        self.assertEqual(code, 0, out)
+        self.assertIn(".s3etag: written", out)
+        part_size, etags = fixity.read_etags(self.tree / fixity.ETAG_MANIFEST)
+        self.assertEqual((part_size, sorted(etags)), (1000, ["a.bin", "big.bin"]))
+        self.assertTrue(etags["big.bin"].endswith("-3"))
+        (self.tree / fixity.ETAG_MANIFEST).unlink()
+        code, out = self.cmd("manifests", "--s3-part-size", "1000", "--s3-cutoff", "2000")
+        self.assertIn(".s3etag: written", out)  # rebuilt from the index, reading nothing
+        code, out = self.cmd("index", "--s3-part-size", "0")
+        self.assertNotIn(".s3etag", out)
+
+    def test_threads_change_the_speed_and_nothing_else(self):
+        code, out = self.cmd("index", "--threads", "1", "--hash-threads", "1")
+        self.assertEqual(code, 0, out)
+        one = {e.path: (e.digests(), e.etag) for e in fixity.read_index(self.index)}
+        manifest = (self.tree / ".sha256sum").read_text(encoding="utf-8")
+        self.index.unlink()
+        with unittest.mock.patch.object(fixity, "PARALLEL_MIN_SIZE", 0):  # tiny files through the threads too
+            code, out = self.cmd("index", "--threads", "3", "--hash-threads", "5")
+        self.assertEqual(code, 0, out)
+        self.assertEqual({e.path: (e.digests(), e.etag) for e in fixity.read_index(self.index)}, one)
+        self.assertIn(".sha256sum: unchanged", out)
+        self.assertEqual((self.tree / ".sha256sum").read_text(encoding="utf-8"), manifest)
+        code, out = self.cmd("verify", "--threads", "2", "--hash-threads", "4")
+        self.assertEqual(code, 0, out)
 
     def test_manifests_from_the_index(self):
         self.cmd("index")

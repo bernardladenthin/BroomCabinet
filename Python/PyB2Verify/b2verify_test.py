@@ -215,6 +215,31 @@ class CommandTest(unittest.TestCase):
         self.assertEqual(code, 1, out)
         self.assertIn("! a.bin", out)
 
+    def test_hash_local_writes_s3etag_where_b2_layouts_and_the_default_agree(self):
+        # PyFixity's default rule, scaled down so the test files are "large": parts of 1000 bytes
+        # above 2000. B2's recorded layout of big.bin (1000, 1000, 500) is exactly that rule.
+        self.write_b2_checksums()
+        with unittest.mock.patch.object(fixity, "DEFAULT_S3", fixity.S3Layout(1000, 2000)):
+            code, out = self.cmd("hash-local", "example-bucket", "--no-report")
+        self.assertEqual(code, 0, out)
+        self.assertIn(".s3etag: written", out)
+        _part, etags = fixity.read_etags(self.bucket / fixity.ETAG_MANIFEST)
+        self.assertEqual(sorted(etags), ["a.bin", "big.bin"])
+        code, out = self.cmd("compare", "example-bucket", "--no-report")
+        self.assertEqual(code, 0, out)  # .s3etag at the bucket root is a manifest, never compared
+        self.assertIn("checksum identical: 3", out)
+
+    def test_hash_local_and_verify_local_with_threads(self):
+        self.write_b2_checksums()
+        with unittest.mock.patch.object(fixity, "PARALLEL_MIN_SIZE", 0):
+            code, out = self.cmd("hash-local", "example-bucket", "--no-report", "--threads", "2", "--hash-threads", "5")
+            self.assertEqual(code, 0, out)
+            code, out = self.cmd("compare", "example-bucket", "--no-report")
+            self.assertEqual(code, 0, out)
+            self.assertIn("checksum identical: 3  (etag 1, sha1 2)", out)
+            code, out = self.cmd("verify-local", "example-bucket", "--no-report", "--threads", "2", "--hash-threads", "3")
+            self.assertEqual(code, 0, out)
+
     def test_selection_narrows_compare(self):
         self.write_b2_checksums(broken="a.bin")
         self.cmd("hash-local", "example-bucket", "--no-report")
@@ -425,6 +450,7 @@ class VaultCommandTest(unittest.TestCase):
     def test_hash_local_indexes_the_cleartext_and_the_vault_matches(self):
         code, out = self.cmd("hash-local", "example-vault-bucket")
         self.assertEqual(code, 0, out)
+        self.assertNotIn(".s3etag", out)  # B2 sees only ciphertext: a cleartext ETag means nothing
         index = self.tmp / "state" / "checksums" / "local" / "example-vault-bucket-films.csv"
         self.assertEqual(sorted(e.path for e in fixity.read_index(index)),
                          ["Film One/film.mkv", "Film One/film.nfo", "Short.mp4"])  # no passphrase file
