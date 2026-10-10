@@ -57,6 +57,9 @@ The configuration is a properties file **outside this repository**; it holds the
     ignoreDirs=scratch                      optional; directories below localRoot that are no bucket
     localIndex=folder                       optional; each bucket directory keeps its own record
                                             (see below); default 'checksums' = <stateDir>/checksums/local
+    bucketDir.example-archive=D:/backup-archive   optional; a bucket kept outside localRoot
+    subfolderRecords=example-archive        optional; buckets whose top-level folders each keep
+                                            their own record (see below)
 
 The checksum and report directories may live inside `localRoot`; they are recognised by their
 configured path and never taken for a bucket. Pass the file with `--config FILE`, or set
@@ -142,6 +145,19 @@ needed to check it. The first `hash-local` in this mode takes an existing `check
 over — last checks and ETags included, reading only what changed — and says that the old file can
 then be deleted. `compare` and `vault` read the bucket directories in this mode, so they need
 `localRoot`; the B2 side stays in `checksums/b2`.
+
+**The record files are checked in B2 too.** They are uploaded with the data, and an upload that
+skips dot files leaves the copy in B2 without them — uncheckable after a restore. So `hash-b2`
+keeps them in its snapshot, and `compare` reports each manifest that is missing or outdated in B2
+(a difference) and a state file that is behind (only a note: every check changes it until the next
+upload). `vault` does the same inside a vault, decrypting the files.
+
+**A bucket kept elsewhere, recorded per folder.** `bucketDir.<bucket>` points a bucket at a
+directory outside `localRoot`. `subfolderRecords` names buckets whose top-level folders each carry
+their own record instead of the bucket directory as a whole — an archive collection packed and
+hashed one folder at a time. `hash-local` and `verify-local` then work folder by folder; `check`,
+`hash-b2` and `compare` see the bucket as one, with every folder's record files left out of the
+data and checked on their own.
 
 A local `<bucket>.tsv` from the first version of this tool is moved onto the index the first time
 it is needed, **without reading any file**: an entry is adopted while the file keeps its recorded
