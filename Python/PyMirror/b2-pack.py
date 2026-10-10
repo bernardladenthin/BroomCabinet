@@ -958,8 +958,8 @@ def rows_for(unit, root, cache=None):
 RAR_CANDIDATES = (r"C:\Program Files\WinRAR\Rar.exe", "rar", "Rar.exe")
 
 
-def fixity_over(folder, work, report=say):
-    r"""Write the four manifests for the PACKED ARTEFACTS in `folder`. -> True when they are there.
+def fixity_over(folder, report=say):
+    r"""Write the manifests for the PACKED ARTEFACTS in `folder`. -> True when they are there.
 
     THE GAP THIS CLOSES. Every check before this one is about what is INSIDE the archive: `rar t`
     decompresses the members, the CRC32 cross-check holds their stored checksums against our own
@@ -973,9 +973,12 @@ def fixity_over(folder, work, report=say):
     read. It is the tool the three ibm-aix tars were given on 2026-10-06, and writing a fifth
     digest pass here would be the drift this project keeps a shared library to avoid.
 
-    THE INDEX GOES TO THE WORK DIRECTORY, not into the tree. PyFixity's own documentation says so
-    -- "It changes on every check, so keep it OUTSIDE a tree that gets uploaded or synced" -- and
-    this tree is the one that gets uploaded.
+    THE FOLDER KEEPS ITS OWN RECORD, as every folder of this collection does since 2026-10-10:
+    PyFixity is called without `--index`, so beside the four manifests it writes `.s3etag` (the
+    ETags B2 will report for the volumes, uploaded in parts) and its state file. All of it travels
+    to B2 with the volumes, and the folder can be checked anywhere without anything else. Until
+    then the index went to the work directory -- which left the folders' state files stale after
+    every run once they existed, and kept the work directory from being scratch.
 
     IT COVERS WHAT GOES TO B2 AND NOTHING ELSE: the volumes, the .rev files and
     `<unit>.index.csv`, all in one flat directory, with `*.log` excluded. One `.sha256sum` beside
@@ -988,15 +991,16 @@ def fixity_over(folder, work, report=say):
     if not exists(tool):
         report("  no PyFixity at %s -- the archive's own checksums were NOT written" % tool)
         return False
-    index = os.path.join(work, os.path.basename(folder.rstrip("\\/")) + ".fixity.csv")
     started = time.time()
     # THE LOGS ARE EXCLUDED, which is the owner's decision of 2026-10-06: he stripped their lines
     # out of the manifests by hand. A manifest describes the UPLOADABLE set -- the volumes, the
     # .rev files and the index CSV -- and `pack.log` is a local record of how they came to be, 82
     # to 95 MB of one line per file. Covering it would also make the manifest go stale the moment
     # a run appended to the log.
-    done = subprocess.run([sys.executable, tool, "index", folder, "--index", index,
-                           "--exclude-glob", "*.log"],
+    # TWO FILES AT ONCE: hashing is CPU-bound, not disk-bound -- measured 2026-10-10, 2.48 TB of
+    # this collection's volumes in 42 minutes this way, against about 178 MB/s in one thread.
+    done = subprocess.run([sys.executable, tool, "index", folder, "--exclude-glob", "*.log",
+                           "--threads", "2"],
                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     text = done.stdout.decode("utf-8", "replace")
     if done.returncode != 0:
@@ -1017,27 +1021,13 @@ def fixity_over(folder, work, report=say):
     return True
 
 
-def fixity_work_for(step):
-    r"""-> the directory PyFixity may use as scratch for this step. Never `dirname(None)`.
-
-    THE BUG THIS REPLACES A TEXT SEARCH FOR. The call site used to read
-    `os.path.dirname(step["index_path"])` directly, which raises TypeError on the index archive's
-    step because that step has no index to place -- and it raised it AFTER vendors had packed
-    399 GB, passed `rar t` and passed the cross-check. A guard was added at the call site and a
-    test asserted the guard by searching b2-pack.py's own source for it, which pinned the shape of
-    the code rather than what it has to do. This function is the thing to ask instead.
-    """
-    if step.get("index_path"):
-        return os.path.dirname(step["index_path"])
-    return step["cwd"]
-
-
 def place_index_beside(step, report=say):
     r"""Copy the unit's own index CSV next to its volumes. -> the destination, or None.
 
-    WHY IT IS COPIED AND NOT MOVED. The work directory's copy is what the NEXT unit's index
-    archive is built from -- `rar a ... *.index.csv` over all ten -- so taking it away would
-    quietly empty that archive. Both copies exist on purpose.
+    WHY IT IS COPIED AND NOT MOVED. The work directory's copy is what this run's index archive is
+    built from -- `rar a ... *.index.csv` over all ten -- so taking it away would quietly empty
+    that archive. Both copies exist on purpose until the run has succeeded; then finish() removes
+    the work directory's one.
 
     AND WHY IT IS NOT LEFT PACKED. The CSV is already inside the archive, as the last argument of
     the pack command, so a unit describes itself. But reading it there costs unpacking a 101 GB
@@ -1812,7 +1802,7 @@ def execute(steps, rar, password):
             # to place, because it IS the index. It still has itself to describe -- it is uploaded
             # like any unit, and without the four manifests a corrupted `index.rar` could only be
             # found by opening it. Corrected 2026-10-09, the first time this step ran at all.
-            fixity_over(os.path.dirname(step["archive"]), fixity_work_for(step))
+            fixity_over(os.path.dirname(step["archive"]))
         elif checked.returncode == 0:
             # THE INDEX ARCHIVE, WHICH CANNOT HAVE THE CROSS-CHECK AND STILL NEEDS THE MANIFESTS.
             # Its members are the units' index CSVs, written by this tool into the work directory;
@@ -1823,12 +1813,49 @@ def execute(steps, rar, password):
                 "collection, so there is no .sfv to hold them against")
             say("   and the -rr10 recovery record are its checks, and the four manifests "
                 "below describe the archive itself")
-            fixity_over(os.path.dirname(step["archive"]), fixity_work_for(step))
+            fixity_over(os.path.dirname(step["archive"]))
         if checked.returncode != 0:
             say("  THE ARCHIVE DOES NOT TEST CLEAN (rar t exited %d) -- stopping before the next "
                 "unit." % checked.returncode)
             return 2
     return 0
+
+
+def finish(code, work, steps, report=say):
+    r"""After a run: on success, remove what it wrote into the work directory. -> code, unchanged.
+
+    THE WORK DIRECTORY IS SCRATCH, and it was not treated as such: after the ten units of
+    2026-10-10 it held 900 MB of lists, unit indexes and the collection index that had all gone
+    into the archives -- every list a subset of its unit's index, every index placed beside its
+    volumes and packed into index.rar -- and the owner emptied it by hand. Nothing in it is read
+    by a later run: the index step rewrites every unit's CSV each time (see main).
+
+    ONLY WHAT THIS RUN WROTE, and only after it succeeded. A file somebody else put there is left
+    alone, and the directory itself is removed only once it is empty. A run that failed keeps
+    everything, because the list RAR read and the index it packed are what a diagnosis needs.
+
+    THE DIRECTORY CANNOT SIMPLY BECOME A TEMPORARY ONE. Its path is stored inside every archive
+    (`tar/<unit>.index.csv`, see WORK_MUST_BE_FLAT), so it has to stay one directory at a drive
+    root with the same name for every unit; a system temp directory would put the account name
+    into all of them.
+    """
+    if code != 0:
+        report("the work directory %s is kept for a look at what failed" % work)
+        return code
+    written = {os.path.join(work, ALL_UNITS_INDEX)}
+    for step in steps:
+        written |= {p for p in (step.get("list_path"), step.get("index_path")) if p}
+    removed = 0
+    for path in sorted(written):
+        if exists(path):
+            os.remove(long_path(path))
+            removed += 1
+    left = os.listdir(long_path(work)) if os.path.isdir(long_path(work)) else []
+    if os.path.isdir(long_path(work)) and not left:
+        os.rmdir(long_path(work))
+    report("work directory: %d file(s) of this run removed%s" % (
+        removed, (", %d other file(s) left in %s" % (len(left), work)) if left else ", directory removed"))
+    return code
 
 
 def main(argv=None):
@@ -1840,8 +1867,9 @@ def main(argv=None):
     # started from, and that path would be written inside all nineteen archives. It has to be
     # chosen, once, deliberately.
     ap.add_argument("--work", required=True,
-                    help="one directory at a drive root, e.g. D:%swork -- holds the list and "
-                         "index files, and its NAME is stored inside every archive" % os.sep)
+                    help="one directory at a drive root, e.g. D:%swork -- scratch for the list and "
+                         "index files, emptied after a successful run; its NAME is stored inside "
+                         "every archive" % os.sep)
     ap.add_argument("--only", action="append", help="one unit, repeatable")
     ap.add_argument("--sizes", action="store_true", help="weigh the units and stop")
     ap.add_argument("--coverage", action="store_true",
@@ -2055,7 +2083,7 @@ def main(argv=None):
             if step["unit"] is not None:
                 write_unit_index(step["index_path"], step["rows"])
         write_collection_index(index_steps, args.work)
-    return execute(steps, rar, password)
+    return finish(execute(steps, rar, password), args.work, list(steps) + list(index_steps))
 
 
 if __name__ == "__main__":
