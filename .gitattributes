@@ -6,11 +6,21 @@
 # read back on Linux runners as well as here. Pin it to LF so a checkout on a
 # machine with core.autocrlf=true cannot put a stray CR in the last column.
 #
-# DELIBERATELY SCOPED TO *.tsv. A repository-wide `* text=auto eol=lf` would be
-# the more complete answer, but it renormalises every tracked text file on the
-# next commit -- a diff touching the whole repository, which is not a thing to
-# hide inside a licensing fix. That stays a separate decision.
+# DELIBERATELY SCOPED TO *.tsv WHEN THIS WAS WRITTEN, and the reason given was that a
+# repository-wide `* text=auto eol=lf` "renormalises every tracked text file on the next commit --
+# a diff touching the whole repository", left as a separate decision. THAT DECISION WAS TAKEN ON
+# 2026-10-10 AND THE WORRY WAS MEASURED AWAY: of 1 090 tracked files, 942 of the 947 text ones
+# were ALREADY pure LF. Two were not, both from patch scripts that re-detected the line ending per
+# write and disagreed with themselves, and three are testdata fixtures the `-text` rule below
+# protects. So the repository-wide rule renormalised exactly those two files -- the same two the
+# commit that added it was fixing -- and the feared whole-repository diff does not exist.
+#
+# SO THE LINE IS HERE FOR WHAT COMES NEXT, not for what is already stored. A file committed with
+# CRLF under `core.autocrlf=true` -- the Windows default -- shows as modified in EVERY working
+# tree forever, because the worktree copy normalises to LF and the blob does not match. No
+# checkout can repair it; only a commit can. This stops the next tool from doing it again.
 *.tsv text eol=lf
+* text=auto eol=lf
 
 # THE FIXTURES ARE QUOTED BYTES AND MUST NEVER BE TRANSFORMED. Everything under testdata/ is a
 # fragment captured from a real server -- the first 512 bytes of a stored file, a server's own

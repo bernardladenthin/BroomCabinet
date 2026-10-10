@@ -32,6 +32,7 @@ import hashlib
 import importlib.util
 import csv
 import io
+import ntpath
 import os
 import shutil
 import sys
@@ -1930,7 +1931,13 @@ class WhereTheIndexCsvLandsInsideTheArchive(unittest.TestCase):
                           os.path.join("X:" + os.sep, "tar"), with_dirs=False)
         argv = steps[0]["argv"]
         index = argv[-1]
-        self.assertTrue(os.path.isabs(index), index)
+        # ntpath AND NOT os.path, BECAUSE THE PATH IS A WINDOWS PATH WHEREVER THIS RUNS. The work
+        # directory is given as a drive letter, so `os.path.isabs` answers False on a Linux runner
+        # and the test failed there while passing here -- reading the platform, not the behaviour.
+        # MEASURED 2026-10-10 that ntpath is the right tool for THIS question, which is not a
+        # given: `ntpath.relpath` reaches a C function Windows alone has and differs between the
+        # two, while `ntpath.isabs` is string logic and answers True on both.
+        self.assertTrue(ntpath.isabs(index), index)
         self.assertTrue(index.lower().endswith(".index.csv"), index)
 
     def test_AND_NO_SWITCH_STRIPS_THE_PATH(self):
