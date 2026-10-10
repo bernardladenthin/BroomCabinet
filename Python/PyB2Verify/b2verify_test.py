@@ -13,6 +13,7 @@ configuration, selection, exit status and report included.
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import io
 import os
 import socket
@@ -409,6 +410,21 @@ class FolderRecordCommandTest(unittest.TestCase):
         code, out = self.cmd("verify-local", "example-bucket", "--no-report")
         self.assertEqual(code, 1, out)
         self.assertIn("! sub/b.bin", out)
+
+    def test_the_uploaded_state_file_is_not_a_difference(self):
+        # Seen 2026-10-10: after the state file was uploaded with its bucket, compare would have
+        # listed it as a file only in B2 -- it is the bucket's record, not its content.
+        self.folder_mode()
+        self.write_b2_checksums()
+        self.cmd("hash-local", "example-bucket", "--no-report")
+        meta, entries = lib.read_snapshot(self.checksums / "b2" / "example-bucket.tsv")
+        state = self.bucket / fixity.STATE_FILE
+        entries.append(lib.FileEntry(fixity.STATE_FILE, state.stat().st_size, 0,
+                                     sha1=hashlib.sha1(state.read_bytes()).hexdigest(), source="b2"))
+        lib.write_snapshot(self.checksums / "b2" / "example-bucket.tsv", meta, entries)
+        code, out = self.cmd("compare", "example-bucket", "--no-report")
+        self.assertEqual(code, 0, out)
+        self.assertNotIn(fixity.STATE_FILE, out)
 
     def test_an_index_in_checksums_local_is_taken_over_with_its_last_checks(self):
         self.write_b2_checksums()

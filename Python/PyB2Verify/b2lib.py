@@ -45,9 +45,11 @@ SNAPSHOT_COLUMNS = ["size", "mtime_ms", "sha1", "etag", "parts", "verified", "so
 LEGACY_META_KEYS = {"seite": "side", "erzeugt": "created", "vollstaendig": "complete",
                     "verify_vollstaendig": "verify_complete"}
 
-# The manifests PyFixity writes at the root of a tree. They are uploaded with the tree, but they
-# describe it rather than belong to it, so neither side's comparison counts them.
-ROOT_MANIFESTS = frozenset(fixity.MANIFEST_FILES.values()) | {fixity.ETAG_MANIFEST}
+# The files PyFixity writes at the root of a tree: the five manifests and its state file. They are
+# uploaded with the tree, but they describe it rather than belong to it, so neither side's
+# comparison counts them. The state file was missing here at first: once uploaded, check and
+# compare reported it as a file only in B2 (seen 2026-10-10, the day it was introduced).
+ROOT_MANIFESTS = frozenset(fixity.MANIFEST_FILES.values()) | {fixity.ETAG_MANIFEST, fixity.STATE_FILE}
 
 
 @dataclass
