@@ -254,9 +254,17 @@ class WhatWindowsCannotExtract(unittest.TestCase):
         self.assertIn("WOULD BE TOO STRONG", TOOL.__doc__)
         self.assertIn("RAR's own path handling is what gives up", TOOL.__doc__)
 
-    def test_a_RELATIVE_reserved_name_really_is_refused_here(self):
-        r"""The half of the folklore that holds. Measured in a temporary directory of this test's
-        own, with the current working directory moved into it so the name is relative."""
+    def test_WHETHER_A_RELATIVE_RESERVED_NAME_IS_REFUSED_IS_THE_HOSTS_ANSWER(self):
+        r"""The half of the folklore that holds -- ON WINDOWS. It asserted all three names were
+        refused, which is true there and false on Linux, where `aux` is an ordinary file. So it
+        passed on the machine the collection lives on and failed on the runner with
+        `[] != ['aux', 'prn', 'com1']`: a test reading the platform instead of the behaviour.
+
+        AND A HOST THAT ACCEPTS THEM IS NOT AN EXCEPTION, IT IS THE ESCAPE ROUTE. The tool's own
+        docstring names a Linux filesystem as one of the two ways this content check could work at
+        all, because there these names extract cleanly. So both answers are recorded as correct
+        and the test says which one it saw -- all refused, or none.
+        """
         folder = tempfile.mkdtemp(prefix="rvc-res-")
         was = os.getcwd()
         try:
@@ -269,7 +277,12 @@ class WhatWindowsCannotExtract(unittest.TestCase):
                     handle.close()
                 except OSError:
                     blocked.append(name)
-            self.assertEqual(blocked, list(self.RESERVED))
+            # ALL OR NOTHING: a host that refuses some but not others would be a third behaviour
+            # neither the tool nor its docstring accounts for, and worth stopping on.
+            self.assertIn(blocked, ([], list(self.RESERVED)), blocked)
+            if not blocked:
+                self.assertIn("Linux filesystem", TOOL.__doc__,
+                              "a host that accepts these is the documented escape route")
         finally:
             os.chdir(was)
             shutil.rmtree(folder, ignore_errors=True)

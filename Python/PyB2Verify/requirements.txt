@@ -4,3 +4,4 @@
 
 b2sdk
 boto3
+cryptography

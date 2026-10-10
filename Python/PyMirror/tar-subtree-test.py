@@ -37,6 +37,13 @@ def write(path, text):
         handle.write(text)
 
 
+# EVERY CASE HERE NEEDS A REAL GNU tar, so the file says so once instead of failing 51 times.
+# A runner without one is not a broken runner: this tool exists for a Windows host where the
+# System32 `tar.exe` is bsdtar, and `check_tar_binary()` is what refuses the wrong binary.
+NEEDS_GNU_TAR = unittest.skipUnless(
+    TOOL.GNU_TAR and os.path.isfile(TOOL.GNU_TAR), "no GNU tar on this host")
+
+
 class Fixture(unittest.TestCase):
     """A source root with one subtree, and a target root beside it. Both temporary."""
 
@@ -223,6 +230,7 @@ class WhatItRefuses(Fixture):
             self.assertEqual(handle.read(), "not really a tar")
 
 
+@NEEDS_GNU_TAR
 class PackingForReal(Fixture):
     r"""--apply end to end, in a temporary directory, with tar.exe actually running."""
 
@@ -273,6 +281,7 @@ class PackingForReal(Fixture):
         self.assertEqual(before, after)
 
 
+@NEEDS_GNU_TAR
 class WhenSomethingIsWrong(Fixture):
     def setUp(self):
         Fixture.setUp(self)
@@ -325,6 +334,7 @@ class WhenSomethingIsWrong(Fixture):
         self.assertIn("mtime only", self.output())
 
 
+@NEEDS_GNU_TAR
 class CheckingWithoutTheMirror(Fixture):
     r"""Check 3 is the one that still works after the subtree is gone, so it is pinned alone."""
 
@@ -377,6 +387,16 @@ class TheDocumentedReasons(unittest.TestCase):
         self.assertIn("4542", TOOL.compare.__doc__)
 
 
+# THE DRIVE-LETTER CASES ARE WINDOWS-ONLY BY NATURE, not by accident. `posix()` turns
+# `X:\tarTarget\v3.tar` into `/x/tarTarget/v3.tar` because this MSYS tar reads `X:\...` as
+# host:path -- and it goes through `os.path.abspath`, which on Linux reads `X:` as an ordinary
+# directory name and answers `/cwd/X:/tarTarget/v3.tar`. There is no drive letter to translate on a
+# POSIX host, so the cases that assert the translation are skipped there rather than asserted
+# wrongly; `check_tar_binary` and the three real checks still run everywhere GNU tar exists.
+ONLY_WITH_DRIVE_LETTERS = unittest.skipUnless(os.name == "nt", "drive letters are Windows-only")
+
+
+@NEEDS_GNU_TAR
 class TheBinaryAndItsPaths(unittest.TestCase):
     r"""The two findings that made check 2 a check which could not fail.
 
@@ -390,14 +410,17 @@ class TheBinaryAndItsPaths(unittest.TestCase):
     is what this build understands, and all three operations behave with it.
     """
 
+    @ONLY_WITH_DRIVE_LETTERS
     def test_a_drive_letter_becomes_a_posix_root(self):
         self.assertEqual(TOOL.posix("X:" + os.sep + "tarTarget" + os.sep + "v3.tar"),
                          "/x/tarTarget/v3.tar")
 
+    @ONLY_WITH_DRIVE_LETTERS
     def test_the_drive_letter_is_lower_cased(self):
         """`/X/...` is not a path this binary resolves; `/x/...` is."""
         self.assertTrue(TOOL.posix("Q:" + os.sep + "mirror").startswith("/q/"))
 
+    @ONLY_WITH_DRIVE_LETTERS
     def test_no_backslash_survives(self):
         self.assertNotIn(os.sep, TOOL.posix("X:" + os.sep + "a" + os.sep + "b"))
 
@@ -427,6 +450,7 @@ class TheBinaryAndItsPaths(unittest.TestCase):
         self.assertIn("no GNU tar", "\n".join(said))
 
 
+@NEEDS_GNU_TAR
 class NothingTarSaysIsIgnored(Fixture):
     r"""The lesson from the silent pass: an unrecognised line must stop the run.
 

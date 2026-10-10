@@ -1959,12 +1959,21 @@ def blocking_parent(path):
     register already knows this shape: 2 416 files across the collection are logged
     "LOST (a file occupies a parent directory of this one)".
     """
-    parts = [p for p in str(path).replace("/", os.sep).split(os.sep) if p]
-    if not parts:
-        return None
-    walk = parts[0] + os.sep if parts[0].endswith(":") else parts[0]
-    for seg in parts[1:-1]:
-        walk = os.path.join(walk, seg)
+    # WALKED WITH dirname AND NOT BY SPLITTING ON os.sep. The split version dropped empty
+    # segments, which on POSIX throws away the leading `/`: `/tmp/a/docs/x.pdf` became
+    # `tmp/a/docs`, a RELATIVE path, so `isfile` asked about the wrong place and this function
+    # answered None for every absolute POSIX path. It could not bite the collection, which lives
+    # on Windows, where the first segment is the drive and survives -- it bit the tests, on Linux
+    # runner, where four cases reported None and the fix is here rather than in them.
+    norm = str(path).replace("/", os.sep)
+    chain = []
+    parent = os.path.dirname(norm)
+    while parent and parent != os.path.dirname(parent):
+        chain.append(parent)
+        parent = os.path.dirname(parent)
+    # OUTERMOST FIRST, because two files in one path is possible after a messy fetch and the one
+    # to act on is the one nearest the root. `chain` was built from the target upwards.
+    for walk in reversed(chain):
         if isfile(walk):
             return walk
     return None

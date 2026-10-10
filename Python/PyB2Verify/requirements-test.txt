@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# What the tests need beyond the standard library (installed by the Python CI if present).
+# Pinned, like ruff: an unpinned package changes a test result under an unchanged tree.
+cryptography==50.0.2

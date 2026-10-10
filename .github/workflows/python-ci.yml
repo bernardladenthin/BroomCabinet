@@ -85,6 +85,20 @@ jobs:
       #
       # So: run them by name, with no arguments, and let a non-zero exit fail
       # the job. A project with no test files says so and passes.
+      #
+      # A project whose tests need a package (PyB2Verify's Cryptomator tests
+      # need `cryptography`) lists it, pinned, in requirements-test.txt. It is
+      # installed only here, AFTER the smoke test, so `--help` above still
+      # proves that argument parsing needs nothing installed.
+      - name: Test dependencies (requirements-test.txt, if present)
+        working-directory: Python/${{ matrix.project }}
+        run: |
+          if [ -f requirements-test.txt ]; then
+            pip install -r requirements-test.txt
+          else
+            echo "no requirements-test.txt - the tests use the standard library only"
+          fi
+
       - name: Tests
         working-directory: Python/${{ matrix.project }}
         run: |
