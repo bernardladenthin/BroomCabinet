@@ -68,6 +68,11 @@ variable B2VERIFY_CONFIG. It holds the credentials, so it must never be committe
     flatBuckets=example-flat-bucket         optional; buckets uploaded without directories
     ignoreDirs=scratch                      optional; directories below localRoot that are no bucket
                                             (stateDir and reportDir are recognised by themselves)
+    localIndex=folder                       optional; every bucket directory keeps its own record --
+                                            five manifests and PyFixity's .fixity-state.csv -- and
+                                            <stateDir>/checksums/local is not used (default: checksums).
+                                            The first hash-local takes an index there over, reading
+                                            only what changed; compare and vault then need localRoot
     vaults=example-vault-bucket/films       optional; <bucket>/<directory> holding a Cryptomator
                                             vault (comma-separated), see below
     vaultKey.example-vault-bucket/films=D:/backup/films.key
@@ -477,7 +482,15 @@ class Context:
         # work on the bucket and the checksum files alone -- which is what lets a download-heavy
         # verify-b2 run on a machine in a data centre that holds nothing but those files.
         root = self.props.get("localRoot")
-        if not root and args.command in LOCAL_COMMANDS:
+        # WHERE THE LOCAL RECORD LIVES. 'checksums': an index per bucket in <stateDir>/checksums/local.
+        # 'folder': each bucket directory carries its own -- five manifests and PyFixity's state
+        # file -- so it can be checked on any machine it is copied to, and nothing is kept twice.
+        mode = (self.props.get("localIndex") or "checksums").strip().lower()
+        if mode not in ("checksums", "folder"):
+            fail(f"localIndex must be 'checksums' or 'folder', not '{mode}'")
+        self.folder_records = mode == "folder"
+        needs_root = LOCAL_COMMANDS | ({"compare", "vault"} if self.folder_records else set())
+        if not root and args.command in needs_root:
             fail(f"'localRoot' is missing in {config_path} ({args.command} reads the local files)")
         self.local_root = Path(root) if root else None
         self.state_dir = Path(self.props.get("stateDir") or config_path.parent)
@@ -533,9 +546,12 @@ class Context:
         """What B2 states about a bucket (written by hash-b2)."""
         return self.checksum_dir / "b2" / f"{bucket}.tsv"
 
-    def local_index(self, bucket: str) -> Path:
-        """PyFixity's index of the local bucket directory. A first-version `<bucket>.tsv` beside it
-        is moved onto it here, once, without reading any file."""
+    def local_index(self, bucket: str) -> Path | None:
+        """PyFixity's index of the local bucket directory; None when the directory keeps its own
+        record (localIndex=folder). A first-version `<bucket>.tsv` beside it is moved onto it here,
+        once, without reading any file."""
+        if self.folder_records:
+            return None
         index = self.checksum_dir / "local" / f"{bucket}.csv"
         legacy = index.with_suffix(".tsv")
         if not index.is_file() and legacy.is_file():
@@ -547,9 +563,21 @@ class Context:
                   f"{dropped} to be read again; the next hash-local adds SHA-256, MD5 and CRC32")
         return index
 
-    def vault_index(self, bucket: str, directory: str) -> Path:
-        """PyFixity's index of a vault's cleartext directory."""
-        return self.checksum_dir / "local" / f"{bucket}-{slug(directory)}.csv"
+    def vault_index(self, bucket: str, directory: str) -> Path | None:
+        """PyFixity's index of a vault's cleartext directory; None with localIndex=folder."""
+        return None if self.folder_records else self.old_index(bucket, directory)
+
+    def old_index(self, bucket: str, directory: str | None = None) -> Path:
+        """Where checksums/local keeps (or kept) an index. With localIndex=folder it is read once,
+        as the seed of a directory's own record, and can then be deleted."""
+        name = f"{bucket}-{slug(directory)}" if directory else bucket
+        return self.checksum_dir / "local" / f"{name}.csv"
+
+    def local_record(self, root: Path, index: Path | None) -> tuple[list[fixity.Entry], dict[str, str]]:
+        """The local record: the index, or the directory's own manifests and state file."""
+        if index is None:
+            return fixity.folder_record(root, self.excludes)
+        return fixity.read_index(index), fixity.read_state(index)
 
     def vault_key(self, bucket: str, directory: str) -> Path:
         explicit = self.props.get(f"vaultKey.{bucket}/{directory}")
@@ -560,18 +588,23 @@ class Context:
                  f"'vaultKey.{bucket}/{directory}' or 'localRoot'")
         return self.local_root / bucket / f"{directory}.key"
 
-    def local_trees(self, name: str) -> list[tuple[str, Path, Path]]:
-        """(label, directory, index) of what is indexed locally for a bucket: the bucket directory,
-        or for a vault bucket each cleartext vault directory."""
+    def local_trees(self, name: str) -> list[tuple[str, Path, Path | None, Path]]:
+        """(label, directory, index or None, old index) of what is recorded locally for a bucket:
+        the bucket directory, or for a vault bucket each cleartext vault directory."""
         if name in self.vaults:
-            return [(f"{name}/{d}", self.local_root / name / d, self.vault_index(name, d))
+            return [(f"{name}/{d}", self.local_root / name / d, self.vault_index(name, d), self.old_index(name, d))
                     for d in self.vaults[name]]
-        return [(name, self.local_root / name, self.local_index(name))]
+        return [(name, self.local_root / name, self.local_index(name), self.old_index(name))]
 
     def b2_names(self) -> list[str]:
         return sorted(p.stem for p in (self.checksum_dir / "b2").glob("*.tsv"))
 
     def local_names(self) -> list[str]:
+        if self.folder_records:
+            def recorded(p: Path) -> bool:
+                return (p / fixity.STATE_FILE).is_file() or (p / ".sha256sum").is_file()
+            return sorted(n for n in self.local_dirs()
+                          if any(recorded(root) for _l, root, _i, _o in self.local_trees(n)))
         d = self.checksum_dir / "local"
         names = {p.stem for p in d.glob("*.csv")} | {p.stem for p in d.glob("*.tsv")}
         vault_indexes = {self.vault_index(b, v).stem for b, vs in self.vaults.items() for v in vs}
@@ -687,11 +720,16 @@ def cmd_hash_local(ctx: Context) -> int:
     any_damage = False
     for name in names:
         vault = name in ctx.vaults
-        for label, root, index in ctx.local_trees(name):
+        for label, root, index, old in ctx.local_trees(name):
             if not root.is_dir():
                 print(f"\n{label}: local directory missing ({root})")
                 continue
             print(flush=True)
+            seed = None
+            if index is None and not (root / fixity.STATE_FILE).is_file() and old.is_file():
+                seed = old  # its last checks and ETags carry over; afterwards it is not needed
+                print(f"{label}: taking over {old} into the directory's own record, reading nothing that "
+                      f"did not change; {old.name} can be deleted after this run")
             if vault:
                 # The B2 part layouts describe the ciphertext: nothing to hash along.
                 print(f"{label}: the cleartext of a Cryptomator vault")
@@ -707,8 +745,8 @@ def cmd_hash_local(ctx: Context) -> int:
             r = fixity.update_index(root, index, ctx.excludes, layouts, key, ctx.args.force,
                                     out=lambda line: print(line, flush=True),
                                     s3=None if vault else fixity.DEFAULT_S3,
-                                    threads=ctx.threads(1), hash_threads=ctx.hash_threads())
-            print(f"  -> {index}  ({r.summary}){'' if r.complete else '  INCOMPLETE'}")
+                                    threads=ctx.threads(1), hash_threads=ctx.hash_threads(), seed=seed)
+            print(f"  -> {index or root / fixity.STATE_FILE}  ({r.summary}){'' if r.complete else '  INCOMPLETE'}")
             for manifest, what in r.manifests.items():
                 print(f"  {manifest}: {what}")
             if r.damaged:
@@ -809,16 +847,16 @@ def cmd_verify_local(ctx: Context) -> int:
         return 2
     any_diff = False
     for name in names:
-        for label, root, index in ctx.local_trees(name):
+        for label, root, index, _old in ctx.local_trees(name):
             if not root.is_dir():
                 print(f"\n{label}: local directory missing")
                 any_diff = True
                 continue
-            if not index.is_file():
-                print(f"\n{label}: no local index - run 'hash-local {name}' first")
+            entries, state = ctx.local_record(root, index)
+            if not entries:
+                print(f"\n{label}: no local record - run 'hash-local {name}' first")
                 any_diff = True
                 continue
-            state = fixity.read_state(index)
             print(f"\nverifying {label} locally against its index ({saved_info(state)}) ...", flush=True)
             r = fixity.verify_tree(root, index, ctx.excludes, ctx.filter, ctx.args.quick, ctx.args.resume,
                                    ctx.args.older_than, ctx.threads(1), out=lambda line: print(line, flush=True),
@@ -891,9 +929,13 @@ def verify_b2_content(ctx: Context, name: str, meta: dict[str, str], all_saved: 
                           check_sum=True, labels=CONTENT_VS_META)
     diff.attach_errors(errors)
     if diff.checksum or diff.size:
-        local_index = ctx.checksum_dir / "local" / f"{name}.csv"
         flat = ctx.is_flat(name)
-        idx = fixity.make_index(fixity.read_index(local_index), flat) if local_index.is_file() else None
+        if ctx.folder_records:
+            known = ctx.local_record(ctx.local_root / name, None)[0] if ctx.local_root else []
+        else:
+            old = ctx.old_index(name)
+            known = fixity.read_index(old) if old.is_file() else []
+        idx = fixity.make_index(known, flat) if known else None
         for got, _exp in diff.checksum + diff.size:
             cands = None if idx is None else idx.get(fixity.basename(got.path) if flat else got.path, [])
             diff.notes[got.path] = f"B2 content does not match the B2 metadata; {local_state(got, cands)}"
@@ -958,18 +1000,23 @@ def cmd_compare(ctx: Context) -> int:
         if name in ctx.vaults:
             print(f"\n{name}: {VAULT_SKIP}")
             continue
-        lp = ctx.checksum_dir / "local" / f"{name}.csv"
-        if not lp.is_file() and lp.with_suffix(".tsv").is_file():
-            lp = ctx.local_index(name)  # moves a first-version file onto the index
+        if ctx.folder_records:
+            lp = None
+            entries, lstate = ctx.local_record(ctx.local_root / name, None)
+        else:
+            lp = ctx.old_index(name)
+            if not lp.is_file() and lp.with_suffix(".tsv").is_file():
+                lp = ctx.local_index(name)  # moves a first-version file onto the index
+            entries, lstate = (fixity.read_index(lp), fixity.read_state(lp)) if lp.is_file() else ([], {})
         rp = ctx.snapshot_path(name)
-        missing = [f"{p} missing ({cmd})" for p, cmd in ((lp, "hash-local"), (rp, "hash-b2")) if not p.is_file()]
+        missing = ([] if entries else [f"no local record for {name} (hash-local)"]) + \
+            ([] if rp.is_file() else [f"{rp} missing (hash-b2)"])
         if missing:
             print(f"\n{name}: " + "; ".join(missing))
             any_diff = True
             continue
-        lstate = fixity.read_state(lp)
         rmeta, remote = read_snapshot(rp)
-        local = ctx.filter.apply([e for e in fixity.read_index(lp) if not fixity.is_excluded(e.path, ctx.excludes)])
+        local = ctx.filter.apply([e for e in entries if not fixity.is_excluded(e.path, ctx.excludes)])
         remote = ctx.filter.apply([e for e in remote
                                    if not fixity.is_excluded(e.path, ctx.excludes) and not is_root_manifest(e.path)])
         flat = ctx.is_flat(name)
@@ -1090,14 +1137,15 @@ def check_vault(ctx: Context, cryptomator, name: str, directory: str, bucket,
         info.append(f"- {line.strip()}")
 
     index = ctx.vault_index(name, directory)
-    if not index.is_file():
-        print(f"  no local index ({index}) - run 'hash-local {name}' to compare names and sizes")
+    clear = (ctx.local_root or Path(".")) / name / directory  # localRoot is required with localIndex=folder
+    known, state = ctx.local_record(clear, index) if index is None or index.is_file() else ([], {})
+    if not known:
+        print(f"  no local record - run 'hash-local {name}' to compare names and sizes")
         return bool(tree.problems or mine)
-    state = fixity.read_state(index)
-    print(f"  local index as of: {saved_info(state)}")
-    info.append(f"- **Local index:** {saved_info(state)}")
+    print(f"  local record as of: {saved_info(state)}")
+    info.append(f"- **Local record:** {saved_info(state)}")
     keep = lambda p: not is_root_manifest(p) and not fixity.is_excluded(p, ctx.excludes)  # noqa: E731
-    local = ctx.filter.apply([e for e in fixity.read_index(index) if keep(e.path)])
+    local = ctx.filter.apply([e for e in known if keep(e.path)])
     # An impossible ciphertext size is already a problem; -1 makes it a size difference as well.
     remote = ctx.filter.apply([fixity.Entry(p, f.size if f.size is not None else -1, 0)
                                for p, f in tree.files.items() if keep(p)])

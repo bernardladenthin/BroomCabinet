@@ -72,12 +72,16 @@ class CliTest(unittest.TestCase):
         for name in (".sha1sum", ".md5sum", ".sfv"):
             self.assertTrue((self.tree / name).is_file(), name)
 
-    def test_default_index_inside_the_tree_is_never_listed(self):
+    def test_by_default_the_folder_keeps_its_own_record_and_never_lists_it(self):
         code, out = run("index", str(self.tree))
         self.assertEqual(code, 0, out)
-        self.assertTrue((self.tree / fixity.DEFAULT_INDEX).is_file())
+        self.assertTrue((self.tree / fixity.STATE_FILE).is_file())
+        self.assertFalse((self.tree / fixity.DEFAULT_INDEX).exists())
         listed = set(fixity.read_sums(self.tree / ".md5sum"))
         self.assertEqual(listed, set(self.files))
+        code, out = run("verify", str(self.tree))
+        self.assertEqual(code, 0, out)
+        self.assertIn("checksum identical: 3", out)
 
     def test_verify_finds_silent_damage(self):
         self.cmd("index")

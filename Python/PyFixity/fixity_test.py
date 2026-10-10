@@ -540,6 +540,131 @@ class ParallelHashingTest(unittest.TestCase):
                 self.assertEqual(paths(a for a, _b in r.diff.checksum), ["b.bin"])
 
 
+class FolderRecordTest(unittest.TestCase):
+    """Each folder carries its own record: five manifests and a state file, nothing elsewhere --
+    so it can move between machines and be checked anywhere."""
+
+    FILES = {"a.bin": os.urandom(3000), "sub/b.bin": os.urandom(500), "#hash first.txt": b"a name starting with #"}
+
+    def state_rows(self, root: Path) -> dict[str, dict[str, str]]:
+        import csv
+        import io
+        body = fx._split_header((root / fx.STATE_FILE).read_text(encoding="utf-8"))[1]
+        return {r["path"]: r for r in csv.DictReader(io.StringIO(body))}
+
+    def test_six_files_and_no_digest_twice(self):
+        with Tree(self.FILES) as t:
+            r = fx.update_index(t.root, None, out=quiet)
+            self.assertTrue(r.complete)
+            own = sorted(p.name for p in t.root.iterdir() if p.name.startswith("."))
+            self.assertEqual(own, sorted([".fixity-state.csv", ".md5sum", ".sfv", ".sha1sum", ".sha256sum"]))
+            rows = self.state_rows(t.root)
+            self.assertEqual(set(rows), set(self.FILES))  # including the name that starts with '#'
+            for row in rows.values():
+                self.assertEqual([row[d] for d in fx.DIGESTS], ["", "", "", ""])  # they are in the manifests
+                self.assertTrue(row["verified"])
+            self.assertEqual(fx.read_state(t.root / fx.STATE_FILE)["complete"], fx.YES)
+            self.assertFalse(fx.state_path(t.root / fx.STATE_FILE).exists())  # run state is inside
+            entries, _state = fx.folder_record(t.root)
+            self.assertTrue(all(e.has_all_digests() for e in entries))
+            self.assertEqual({e.path: e.sha256 for e in entries},
+                             {k: hashlib.sha256(v).hexdigest() for k, v in self.FILES.items()})
+
+    def test_a_run_that_finds_nothing_writes_nothing(self):
+        with Tree(self.FILES) as t:
+            fx.update_index(t.root, None, out=quiet)
+            before = (t.root / fx.STATE_FILE).stat().st_mtime_ns
+            time.sleep(0.02)
+            r = fx.update_index(t.root, None, out=quiet)
+            self.assertEqual(r.hashed, [])
+            self.assertEqual((t.root / fx.STATE_FILE).stat().st_mtime_ns, before)
+
+    def test_another_machine_reads_only_what_changed(self):
+        import shutil
+        with Tree(self.FILES) as t:
+            fx.update_index(t.root, None, out=quiet)
+            other = t.root.parent / "elsewhere"
+            shutil.copytree(t.root, other)  # copy2: times kept, as robocopy and rsync -t keep them
+            self.assertEqual(fx.update_index(other, None, out=quiet).hashed, [])
+            (other / "a.bin").write_bytes(b"changed there")
+            self.assertEqual(paths(fx.update_index(other, None, out=quiet).hashed), ["a.bin"])
+
+    def test_taken_over_from_manifests_alone_without_reading(self):
+        with Tree(self.FILES) as t:
+            fx.update_index(t.root, None, out=quiet)
+            (t.root / fx.STATE_FILE).unlink()  # a folder copied without it, or made before it existed
+            later = t.root / "sub/b.bin"
+            later.write_bytes(b"modified after the manifests")
+            st = later.stat()
+            os.utime(later, ns=(st.st_atime_ns, st.st_mtime_ns + 5_000_000_000))
+            r = fx.update_index(t.root, None, out=quiet)
+            self.assertEqual(paths(r.hashed), ["sub/b.bin"])  # only the file newer than the manifests
+            self.assertEqual(fx.read_sums(t.root / ".sha256sum")["sub/b.bin"],
+                             hashlib.sha256(b"modified after the manifests").hexdigest())
+
+    def test_damage_after_a_takeover_is_still_found(self):
+        with Tree(self.FILES) as t:
+            fx.update_index(t.root, None, out=quiet)
+            (t.root / fx.STATE_FILE).unlink()
+            fx.update_index(t.root, None, out=quiet)  # taken over: nothing read
+            damage(t.root / "a.bin")
+            r = fx.verify_tree(t.root, None, out=quiet)
+            self.assertEqual(paths(a for a, _b in r.diff.checksum), ["a.bin"])
+            self.assertEqual(self.state_rows(t.root)["a.bin"]["verified"], "")  # failed: read again next time
+
+    def test_an_index_kept_elsewhere_is_taken_over_once_with_its_last_checks(self):
+        with Tree(self.FILES) as t:
+            fx.update_index(t.root, t.index, out=quiet)
+            old = fx.read_index(t.index)
+            old = [fx.copy_entry(e, verified="2026-01-02 03:04:05") for e in old]
+            fx.write_index(t.index, old)
+            r = fx.update_index(t.root, None, out=quiet, seed=t.index)
+            self.assertEqual(r.hashed, [])
+            self.assertEqual({row["verified"] for row in self.state_rows(t.root).values()}, {"2026-01-02 03:04:05"})
+
+    def test_the_index_of_earlier_versions_inside_the_tree_is_replaced(self):
+        with Tree(self.FILES) as t:
+            legacy = t.root / fx.DEFAULT_INDEX
+            fx.update_index(t.root, legacy, out=quiet)
+            self.assertTrue(fx.state_path(legacy).exists())
+            r = fx.update_index(t.root, None, out=quiet)
+            self.assertEqual(r.hashed, [])
+            self.assertFalse(legacy.exists())
+            self.assertFalse(fx.state_path(legacy).exists())
+            self.assertIn(fx.STATE_FILE, r.manifests[fx.DEFAULT_INDEX])
+
+    def test_an_interrupted_run_keeps_its_digests_in_the_state_file_until_the_manifests_have_them(self):
+        with Tree(self.FILES) as t:
+            fx.update_index(t.root, None, out=quiet, manifests=False)  # as if stopped before the manifests
+            rows = self.state_rows(t.root)
+            self.assertTrue(all(row["sha256"] for row in rows.values()))
+            r = fx.update_index(t.root, None, out=quiet)
+            self.assertEqual(r.hashed, [])  # nothing lost, nothing read again
+            self.assertTrue(all(row["sha256"] == "" for row in self.state_rows(t.root).values()))
+
+    def test_an_etag_lives_in_s3etag_unless_it_is_over_another_layout(self):
+        files = {"big.bin": os.urandom(4500), "other.bin": os.urandom(4500)}
+        small = fx.S3Layout(1000, 2000)
+        with Tree(files) as t:
+            fx.update_index(t.root, None, out=quiet, s3=small)
+            rows = self.state_rows(t.root)
+            self.assertEqual((rows["big.bin"]["etag"], rows["big.bin"]["parts"]), ("", ""))
+            got = {e.path: e for e in fx.folder_record(t.root)[0]}
+            self.assertEqual(got["big.bin"].etag, s3_etag(files["big.bin"], 1000))
+            self.assertEqual(got["big.bin"].parts, small.parts(4500))
+            fx.update_index(t.root, None, out=quiet, s3=small, layouts={"other.bin": ([1500] * 3, True)})
+            rows = self.state_rows(t.root)
+            self.assertEqual(rows["other.bin"]["etag"], s3_etag(files["other.bin"], 1500))  # not the listed one
+
+    def test_verify_keeps_its_last_checks_in_the_folder(self):
+        with Tree(self.FILES) as t:
+            fx.update_index(t.root, None, out=quiet)
+            r = fx.verify_tree(t.root, None, out=quiet)
+            self.assertEqual(r.diff.identical, 3)
+            r = fx.verify_tree(t.root, None, older_than=1, out=quiet)
+            self.assertEqual(r.diff.skipped, 3)
+
+
 class VerifyTreeTest(unittest.TestCase):
     FILES = {"a.bin": os.urandom(3000), "b.bin": os.urandom(800)}
 
