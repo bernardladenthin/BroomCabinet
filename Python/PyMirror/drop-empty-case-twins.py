@@ -314,7 +314,7 @@ def forget(root, archive, removed, report=say):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--root", default=MIRROR_ROOT)
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT)
     ap.add_argument("--archive", action="append", default=[], help="only this one; repeatable")
     ap.add_argument("--out", metavar="PATH", help="write the full plan here")
     ap.add_argument("--backup", metavar="DIR",

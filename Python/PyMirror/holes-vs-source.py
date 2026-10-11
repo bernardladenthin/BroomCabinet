@@ -163,7 +163,7 @@ def judge(blob):
 def main(argv=None):
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--root", default=MIRROR_ROOT,
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT,
                     help="the collection (default %(default)s)")
     ap.add_argument("--logs", default=LOGS, help="where the --holes run left its logs")
     ap.add_argument("--under", help="only findings in this archive")

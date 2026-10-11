@@ -4,7 +4,7 @@
 
 r"""Run `--holes` over the collection ONE ARCHIVE AT A TIME, so that stopping costs one archive.
 
-WHY THIS EXISTS RATHER THAN `audit.py --holes --root Q:\mirror`. That command is correct and it
+WHY THIS EXISTS RATHER THAN `audit.py --holes --root <root>`. That command is correct and it
 reads 2.39 TB. Measured 2026-09-25 on `develooper-hpux`: 11.55 GB in 145 s, **76 MB/s**, so the
 whole of it is **8.3 hours**. A single process holds everything until the last file has been read
 and prints at the end, so an interruption at hour seven leaves nothing at all -- and this
@@ -109,7 +109,7 @@ def run_one(root, name, min_size):
 def main(argv=None):
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--root", default=DEFAULT_ROOT, help="the collection (default %(default)s)")
+    ap.add_argument("--root", default=DEFAULT_ROOT or None, required=not DEFAULT_ROOT, help="the collection (default %(default)s)")
     ap.add_argument("--logs", default=DEFAULT_LOGS,
                     help="one log per archive lands here (default beside this script)")
     ap.add_argument("--min-size", type=int, default=16,

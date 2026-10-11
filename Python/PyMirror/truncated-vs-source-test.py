@@ -60,7 +60,7 @@ def zip_bytes(comment=b""):
 
 
 class Tree(unittest.TestCase):
-    """A small collection in a temporary directory. Nothing here touches Q:\\mirror."""
+    """A small collection in a temporary directory. Nothing here touches the real collection."""
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="truncated-test-")

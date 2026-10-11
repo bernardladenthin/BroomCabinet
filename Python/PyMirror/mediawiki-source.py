@@ -70,11 +70,11 @@ THE USER-AGENT MUST NOT BEGIN "Mozilla/"
     already explain them.
 
 USAGE
-    python mediawiki-source.py --base https://www.ndwiki.org --root Q:\mirror \
+    python mediawiki-source.py --base https://www.ndwiki.org --root D:\mirror \
         --archive ndwiki --dry-run
-    python mediawiki-source.py --base https://www.ndwiki.org --root Q:\mirror \
+    python mediawiki-source.py --base https://www.ndwiki.org --root D:\mirror \
         --archive ndwiki
-    python mediawiki-source.py --base https://www.ndwiki.org --root Q:\mirror \
+    python mediawiki-source.py --base https://www.ndwiki.org --root D:\mirror \
         --archive ndwiki --images
 """
 import argparse

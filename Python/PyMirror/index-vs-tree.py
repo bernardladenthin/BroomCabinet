@@ -34,7 +34,7 @@ from common import MIRROR_ROOT, OWN_FILES, SUMS_FILE, long_path, relative_to
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--root", default=MIRROR_ROOT)
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT)
     ap.add_argument("--archive", required=True)
     ap.add_argument("--expect-gone", action="append", default=[],
                     help="a path (relative to the archive) that SHOULD be absent now. Repeatable. "

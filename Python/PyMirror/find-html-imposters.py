@@ -144,7 +144,7 @@ def jobs_for(root, archives, markup=False):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--root", default=MIRROR_ROOT)
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT)
     ap.add_argument("--archive", action="append", default=[])
     ap.add_argument("--csv", default=None, help="write the full work-list here")
     ap.add_argument("--workers", type=int, default=12,

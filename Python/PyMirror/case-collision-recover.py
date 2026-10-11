@@ -63,7 +63,7 @@ def fetch(url, out):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--root", default=MIRROR_ROOT)
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT)
     ap.add_argument("--archive", required=True)
     ap.add_argument("--log", default=None, help="default: <root>/logs/<archive>-case-recover.log")
     ap.add_argument("--dry-run", action="store_true")

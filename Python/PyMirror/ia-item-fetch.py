@@ -237,7 +237,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--item", required=True, help="the archive.org identifier")
     ap.add_argument("--archive", required=True, help="directory name under --root")
-    ap.add_argument("--root", default=MIRROR_ROOT)
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--min-free-gb", type=float, default=1.0)
     ap.add_argument("--delay", type=float, default=0.0,

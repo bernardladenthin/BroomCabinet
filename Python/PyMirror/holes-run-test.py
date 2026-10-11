@@ -232,6 +232,8 @@ class ItNeverWritesInsideTheCollection(TempCollection):
     """The promise the whole night rests on."""
 
     def test_the_default_log_directory_is_not_under_the_collection(self):
+        if not TOOL.DEFAULT_ROOT:  # no collection set up here: --root is required, nothing to be under
+            self.skipTest("MIRROR_ROOT is not set up on this machine")
         self.assertNotIn(TOOL.DEFAULT_ROOT.lower(), TOOL.DEFAULT_LOGS.lower())
 
     def test_a_full_run_leaves_the_tree_byte_for_byte_as_it_was(self):

@@ -98,7 +98,7 @@ def write_marker(base_dir, archive, base_url, source, named, gone, failed):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--root", default=MIRROR_ROOT)
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT)
     ap.add_argument("--archive", required=True)
     ap.add_argument("--manifest",
                     help="file inside the archive that lists its contents, in the "

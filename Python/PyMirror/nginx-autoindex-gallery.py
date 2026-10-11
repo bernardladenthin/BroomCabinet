@@ -119,7 +119,7 @@ def compare_with_kev(sums, kev_root):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--root", default=MIRROR_ROOT,
+    parser.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT,
                         metavar="PATH",
                         help="the mirror root; the copy lands in %s under it, and %s under it is "
                              "the archive compared against" % (SUBDIR, KEV_SUBDIR))

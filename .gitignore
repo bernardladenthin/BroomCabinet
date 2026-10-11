@@ -18,3 +18,8 @@ __pycache__/
 # root once created this inside the source tree and five files were committed before the diff
 # was read -- see converge-test.py. Ignored so the next slip is invisible rather than permanent.
 Python/PyMirror/root/
+
+# Where things are on this machine (MIRROR_ROOT, PACK_WORK, PACK_TARGET, VERIFY_SCRATCH) -- read by
+# common.setting(). Private by nature: the sources are public, the paths are one machine's.
+# paths.local.example shows the format.
+Python/PyMirror/paths.local

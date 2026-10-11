@@ -5,7 +5,7 @@
 r"""Tests for tar-subtree.py.
 
 EVERY FIXTURE IS A FRESH tempfile.mkdtemp() AND NOTHING HERE NAMES THE COLLECTION. The tool reads
-a mirror and writes tars; a test that pointed either end at Q: or at X:\tarTarget could pack 92 GB
+a mirror and writes tars; a test that pointed either end at the real collection or the real target could pack 92 GB
 or refuse a real tar, so the roots are always passed explicitly and always point into a temporary
 directory. No test removes a directory it did not create, and none removes a non-empty one.
 
@@ -388,9 +388,9 @@ class TheDocumentedReasons(unittest.TestCase):
 
 
 # THE DRIVE-LETTER CASES ARE WINDOWS-ONLY BY NATURE, not by accident. `posix()` turns
-# `X:\tarTarget\v3.tar` into `/x/tarTarget/v3.tar` because this MSYS tar reads `X:\...` as
-# host:path -- and it goes through `os.path.abspath`, which on Linux reads `X:` as an ordinary
-# directory name and answers `/cwd/X:/tarTarget/v3.tar`. There is no drive letter to translate on a
+# `D:\packed\v3.tar` into `/d/packed/v3.tar` because this MSYS tar reads `D:\...` as
+# host:path -- and it goes through `os.path.abspath`, which on Linux reads `D:` as an ordinary
+# directory name and answers `/cwd/D:/packed/v3.tar`. There is no drive letter to translate on a
 # POSIX host, so the cases that assert the translation are skipped there rather than asserted
 # wrongly; `check_tar_binary` and the three real checks still run everywhere GNU tar exists.
 ONLY_WITH_DRIVE_LETTERS = unittest.skipUnless(os.name == "nt", "drive letters are Windows-only")
@@ -412,17 +412,17 @@ class TheBinaryAndItsPaths(unittest.TestCase):
 
     @ONLY_WITH_DRIVE_LETTERS
     def test_a_drive_letter_becomes_a_posix_root(self):
-        self.assertEqual(TOOL.posix("X:" + os.sep + "tarTarget" + os.sep + "v3.tar"),
-                         "/x/tarTarget/v3.tar")
+        self.assertEqual(TOOL.posix("D:" + os.sep + "packed" + os.sep + "v3.tar"),
+                         "/d/packed/v3.tar")
 
     @ONLY_WITH_DRIVE_LETTERS
     def test_the_drive_letter_is_lower_cased(self):
         """`/X/...` is not a path this binary resolves; `/x/...` is."""
-        self.assertTrue(TOOL.posix("Q:" + os.sep + "mirror").startswith("/q/"))
+        self.assertTrue(TOOL.posix("E:" + os.sep + "mirror").startswith("/e/"))
 
     @ONLY_WITH_DRIVE_LETTERS
     def test_no_backslash_survives(self):
-        self.assertNotIn(os.sep, TOOL.posix("X:" + os.sep + "a" + os.sep + "b"))
+        self.assertNotIn(os.sep, TOOL.posix("D:" + os.sep + "a" + os.sep + "b"))
 
     def test_the_tool_names_gnu_tar_by_its_full_path(self):
         """Not by name, which is exactly what resolved to bsdtar."""
@@ -446,7 +446,7 @@ class TheBinaryAndItsPaths(unittest.TestCase):
 
     def test_a_missing_binary_is_refused(self):
         said = []
-        self.assertFalse(TOOL.check_tar_binary("X:" + os.sep + "nope.exe", report=said.append))
+        self.assertFalse(TOOL.check_tar_binary("D:" + os.sep + "nope.exe", report=said.append))
         self.assertIn("no GNU tar", "\n".join(said))
 
 

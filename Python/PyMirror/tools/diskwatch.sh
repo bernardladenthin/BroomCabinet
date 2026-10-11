@@ -6,7 +6,7 @@
 
 # WATCH THE FREE SPACE WHILE A LONG FETCH RUNS, and say nothing until it matters.
 #
-#     sh Python/PyMirror/tools/diskwatch.sh            # watches Q:/
+#     sh Python/PyMirror/tools/diskwatch.sh            # watches MIRROR_ROOT (environment, then paths.local)
 #     sh Python/PyMirror/tools/diskwatch.sh /mnt/data  # or wherever the collection is
 #
 # IT SPEAKS ONLY ON A CROSSING, never on a schedule, and that is the whole design. A watcher that
@@ -25,7 +25,13 @@
 # last one ends, which is the harmless direction to be wrong in.
 set -u
 
-ROOT="${1:-Q:/}"
+# No default drive: the path is one machine's, so it comes from the argument, else MIRROR_ROOT from
+# the environment, else from paths.local beside the scripts (see common.setting), else a refusal.
+ROOT="${1:-${MIRROR_ROOT:-$(sed -n 's/^[[:space:]]*MIRROR_ROOT[[:space:]]*=[[:space:]]*//p' "$(dirname "$0")/../paths.local" 2>/dev/null | head -n 1)}}"
+if [ -z "$ROOT" ]; then
+  echo "usage: diskwatch.sh <path>   (or set MIRROR_ROOT, or write it into paths.local)" >&2
+  exit 2
+fi
 LAST=999999
 while true; do
   FREE=$(python -c "import shutil,sys; print(int(shutil.disk_usage(sys.argv[1]).free/1e9))" \

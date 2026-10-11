@@ -75,7 +75,7 @@ def retired_urls(log):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--root", default=MIRROR_ROOT,
+    parser.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT,
                         metavar="PATH", help="the mirror root; the copy lands in %s under it"
                                              % SUBDIR)
     parser.add_argument("--list", dest="list_file",

@@ -225,7 +225,7 @@ def install(dest, data, suspect_path):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--root", default=ROOT)
+    ap.add_argument("--root", default=ROOT or None, required=not ROOT)
     ap.add_argument("--archive", help="only this archive")
     ap.add_argument("--apply", action="store_true",
                     help="fetch better captures and install them. Without it nothing is "

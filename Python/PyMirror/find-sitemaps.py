@@ -336,7 +336,7 @@ def look(name, base, archive_dir, mirror, save=False, pacer=None, follow=0):
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--root", default=MIRROR_ROOT)
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT)
     ap.add_argument("--archive", action="append",
                     help="only this archive; repeatable. Default: every HTTP archive")
     ap.add_argument("--delay", type=float, default=2.0,

@@ -90,7 +90,7 @@ def pdf_urls(doc_id):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--root", default=MIRROR_ROOT)
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT)
     ap.add_argument("--archive", default="ibm-redbooks")
     ap.add_argument("--delay", type=float, default=0.5,
                     help="seconds between requests (default 0.5). robots.txt sets no "

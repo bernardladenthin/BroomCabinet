@@ -24,7 +24,7 @@ WHAT IT DOES NOT CLAIM. `completed` keeps the ORIGINAL crawl's timestamp. The ar
 completed then; it was repaired today, and those are different facts. Overwriting the first with
 the second would quietly turn a two-week-old mirror into a fresh one.
 
-    python restate-marker.py --root Q:\mirror --archive gsi-collection \
+    python restate-marker.py --root D:\mirror --archive gsi-collection \
         --reason "33 blocked directory pages removed, 519 files fetched"      # dry run
     python restate-marker.py ... --apply
 """

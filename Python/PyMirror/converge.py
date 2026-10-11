@@ -321,7 +321,7 @@ def write_record(root, archive, history, base):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--root", default=MIRROR_ROOT)
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT)
     ap.add_argument("--archive", required=True)
     ap.add_argument("--base", help="default: the archive's base from mirror.py's register")
     ap.add_argument("--delay", type=float, default=2.0,

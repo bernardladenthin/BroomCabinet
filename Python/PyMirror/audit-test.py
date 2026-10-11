@@ -398,7 +398,7 @@ class TestZeroAtSource(unittest.TestCase):
 
     def test_every_recorded_path_is_still_in_the_collection(self):
         """A record that names files that are gone is a record nobody trusts. Skipped when the
-        collection is not mounted, so this stays a unit test on a machine without Q:."""
+        collection is not mounted, so this stays a unit test on a machine without the collection."""
         root = common.MIRROR_ROOT
         if not os.path.isdir(root):
             self.skipTest("collection not mounted at %s" % root)

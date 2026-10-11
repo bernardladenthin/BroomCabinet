@@ -7,7 +7,7 @@
 r"""The README's `--root` lists, re-derived and compared -- the fourth time is the last.
 
 WHY THIS FILE EXISTS. One paragraph of `README.md` names every tool by how it treats `--root`:
-which default to `Q:\mirror`, which demand it, which take it bare, which have none. It has gone
+which default to the collection (`MIRROR_ROOT`), which demand it, which take it bare, which have none. It has gone
 stale FOUR times, and it says so itself:
 
     three tools, then still "three" at eleven          (and catalogue.py in the wrong group)
@@ -34,20 +34,15 @@ import ast
 import io
 import os
 import re
-import sys
 import unittest
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import common  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 README = os.path.join(HERE, "README.md")
 
-# BUILT FROM THE CONSTANT, not spelled out again. The README names the collection path because
-# it documents a default; taking that text from `common.MIRROR_ROOT` means changing the constant
-# makes this test demand the README change too, instead of leaving a second copy of the path to
-# go stale on its own -- which is the failure this whole file exists to prevent, one level up.
-DEFAULT_PHRASE = "default `--root` to `" + common.MIRROR_ROOT + "`"
+# THE SETTING'S NAME, not a path. The README once named the collection's path here; since
+# 2026-10-12 the path is no longer in the sources at all (it comes from common.setting), so the
+# README names the setting the defaults come from.
+DEFAULT_PHRASE = "default `--root` to `MIRROR_ROOT`"
 DEFAULT_ANCHOR = DEFAULT_PHRASE + " --"
 
 WORDS = {2: "Two", 8: "Eight", 9: "Nine", 10: "Ten", 24: "Twenty-four", 25: "Twenty-five",

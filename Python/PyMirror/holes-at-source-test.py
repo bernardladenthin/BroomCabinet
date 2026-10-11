@@ -114,7 +114,8 @@ class WhenTheCollectionIsHere(unittest.TestCase):
     """The local half of the measurement, re-taken. Skipped where the collection is not mounted."""
 
     def setUp(self):
-        if not os.path.isdir(common.long_path(COLLECTION)):
+        # Not set up (empty) is "not here" too -- never the working directory.
+        if not COLLECTION or not os.path.isdir(common.long_path(COLLECTION)):
             self.skipTest("the collection is not mounted here")
 
     def test_each_file_is_still_there_at_the_recorded_size_and_digest(self):

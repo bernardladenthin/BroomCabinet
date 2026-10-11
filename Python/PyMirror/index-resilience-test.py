@@ -9,7 +9,7 @@ THIS IS NOT A DEFECT REPORT, and saying so matters more than the fix. On 2026-10
 collection-wide four-digest pass died at archive 54 of 113 with
 
     PermissionError: [WinError 5] Zugriff verweigert:
-      Q:\mirror\ibm-redbooks\.mirror-index.csv.tmp -> .mirror-index.csv
+      <root>\ibm-redbooks\.mirror-index.csv.tmp -> .mirror-index.csv
 
 and the cause was A STATUS QUERY OF MY OWN running at that second, which had every archive's
 `.mirror-index.csv` open for reading. Windows will not replace a file another process holds open.

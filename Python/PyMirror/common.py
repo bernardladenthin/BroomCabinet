@@ -175,7 +175,7 @@ __all__ = [
     "COMPLETE_MARKER", "INDEX_FILE", "SUMS_FILE", "PROVENANCE_FILE", "CATALOGUE_FILE",
     "DIGESTS", "digests_of_file", "crc32_text", "MANIFEST_FILES",
     "SHA1_FILE", "MD5_FILE", "SFV_FILE", "write_manifests", "read_manifests", "manifest_coverage", "read_sfv", "read_sums", "sfv_line",
-    "MIRROR_ROOT",
+    "MIRROR_ROOT", "PACK_WORK", "PACK_TARGET", "VERIFY_SCRATCH", "setting", "PATHS_FILE",
     "ROOT_MARKER", "ARCHIVE_MARKERS", "archive_root",
     "COLLECTION_INDEX", "COLLECTION_SUMS",
     "is_extension_only", "looks_like_a_page", "looks_like_a_document", "looks_like_a_copy_of_a_page",
@@ -187,6 +187,56 @@ __all__ = [
     "LONG_PREFIX", "UNSAFE", "HASH_CHUNK", "STATIC_IMAGE",
     "MAX_DEPTH_BELOW_BASE", "MAX_CONSECUTIVE_REPEATS",
 ]
+
+# WHERE THINGS ARE ON THIS MACHINE -- and nowhere in these sources. These sources are public; the
+# collection's drive, the packing directories and the verify scratch are facts about one
+# machine, so they are read here, once, and every tool takes them from these names:
+#
+#     MIRROR_ROOT      the collection                       (--root)
+#     PACK_WORK        b2-pack's flat working directory      (pack-progress.py --work)
+#     PACK_TARGET      where the packed units are written    (tar-subtree.py --target-root)
+#     VERIFY_SCRATCH   where a whole unit is unpacked        (rar-verify-content.py --scratch)
+#
+# FROM WHERE, in this order: the environment, then PATHS_FILE beside these scripts, else empty.
+#
+#   * PATHS_FILE is for a workstation. It is git-ignored, holds `NAME=value` lines (`#` starts a
+#     comment), and makes every run on that machine see the same paths -- whichever terminal
+#     started it. That was the reason the root once came from no environment at all: a run whose
+#     root depended on the window it was started from cannot be reproduced from its own output.
+#     A file next to the scripts keeps that property.
+#   * The environment is for a throwaway machine -- a rented server that checks the collection
+#     where it is stored -- where writing a file first is one step too many. It wins over the
+#     file, so a one-off run can point elsewhere without editing it.
+#   * EMPTY MEANS "NOT SET UP", never "here". A tool whose default would be empty REQUIRES the
+#     option instead (argparse refuses with the option's name), so no tool ever acts on the
+#     working directory because a path was missing.
+#
+# A plain variable still, and still meant to be assignable: a tool builds its defaults from these
+# names when its parser is constructed, so `common.MIRROR_ROOT = r"D:\elsewhere"` before that is
+# obeyed, as before.
+PATHS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "paths.local")
+
+
+def setting(name, paths_file=None, environ=None):
+    """-> the value of NAME from the environment, else from PATHS_FILE, else "" (not set up)."""
+    environ = os.environ if environ is None else environ
+    if environ.get(name):
+        return environ[name]
+    try:
+        with open(PATHS_FILE if paths_file is None else paths_file, encoding="utf-8-sig") as fh:
+            for line in fh:
+                key, sep, value = line.partition("=")
+                if sep and not key.lstrip().startswith("#") and key.strip() == name:
+                    return value.strip()
+    except OSError:
+        pass
+    return ""
+
+
+MIRROR_ROOT = setting("MIRROR_ROOT")
+PACK_WORK = setting("PACK_WORK")
+PACK_TARGET = setting("PACK_TARGET")
+VERIFY_SCRATCH = setting("VERIFY_SCRATCH")
 
 LONG_PREFIX = "\\\\?\\"
 HASH_CHUNK = 1 << 20        # read size while hashing; 1 MB measured no worse than larger
@@ -660,22 +710,13 @@ CATALOGUE_FILE = "CATALOGUE.md"             # generated for the whole tree from 
 # Empty is fine; only its presence is read.
 ROOT_MARKER = ".mirror-root"
 
-# WHERE THE COLLECTION IS, in one place and nowhere else.
+# WHERE THE COLLECTION IS: MIRROR_ROOT, near the top of this file, read once by setting().
 #
-# This was `os.environ.get("MIRROR_ROOT", r"Q:\mirror")` written out in 27 files, plus a dozen
-# more with the path as a bare literal. Forty places naming one drive is the same shape this
-# library was created to end: ".sha256sum" appeared 70 times before it became a constant here.
-#
-# IT IS A PLAIN VARIABLE AND IT IS MEANT TO BE ASSIGNED. A tool builds its `--root` default from
-# it when the parser is constructed, so anything that sets it first is obeyed:
-#
-#     import common
-#     common.MIRROR_ROOT = r"D:\elsewhere"
-#
-# No environment variable, on purpose: a value that comes from outside the process is a value
-# that differs between two terminals on the same machine, and a run whose root depended on which
-# window it was started from is not a run anybody can reproduce from its own output.
-MIRROR_ROOT = r"Q:\mirror"
+# It was the collection's path written out in 27 files, then a dozen more with the path as a bare
+# literal -- forty places naming one drive, the same shape this library was created to end:
+# ".sha256sum" appeared 70 times before it became a constant here. Then it was one literal here;
+# since 2026-10-12 it is no literal at all, because these sources are public and the path is a
+# fact about one machine.
 
 # The pair a NON-mirror tree gets, which is why they are spelled out separately rather than
 # derived: checksums.py indexes a directory that nobody mirrored, and those two files must not be

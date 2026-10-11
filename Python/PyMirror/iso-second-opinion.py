@@ -121,7 +121,7 @@ def main(argv=None):
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--report", required=True,
                     help="an `audit.py --declared` report to take the ISO findings from")
-    ap.add_argument("--root", default=MIRROR_ROOT, help="the collection (default %(default)s)")
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT, help="the collection (default %(default)s)")
     ap.add_argument("--json", help="also write one record per image here")
     ap.add_argument("--quiet", action="store_true", help="no progress while it runs")
     args = ap.parse_args(argv)

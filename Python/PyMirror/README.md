@@ -88,7 +88,35 @@ python wedge_test.py
 Every path is a parameter, and `mirror.py` in particular has **no default root** -- the subject of
 the next section.
 
-The tools added later relax this. **Thirty-eight of them** default `--root` to `Q:\mirror` --
+### Where the defaults come from: `paths.local` and the environment
+
+These sources are public, and where a collection lives is a fact about one machine. So no path is
+written into them. Four names are read once, at the top of `common.py`, by `common.setting()`:
+
+| name | what | option it fills |
+|---|---|---|
+| `MIRROR_ROOT` | the collection | `--root` of the tools listed below |
+| `PACK_WORK` | `b2-pack.py`'s flat working directory | `pack-progress.py --work` |
+| `PACK_TARGET` | where the packed units are written | `tar-subtree.py --target-root` |
+| `VERIFY_SCRATCH` | where a whole unit is unpacked for checking | `rar-verify-content.py --scratch` |
+
+Each comes from **the environment** if set there, else from **`paths.local`** beside the scripts
+(git-ignored; `paths.local.example` shows the format: `NAME=value`, `#` for comments), else it is
+**empty -- and empty means "not set up"**: the tool then requires the option and refuses with its
+name instead of acting on the working directory.
+
+* **On a workstation** write `paths.local` once. Every run on that machine then sees the same
+  paths whichever terminal started it, which is what makes a run reproducible from its own output.
+* **On a rented machine that checks the collection where it is stored** -- a server next to the
+  storage, which reads at datacentre speed and keeps nothing -- set the environment instead, or
+  pass the options. Nothing machine-specific has to be edited into a file first, and the
+  environment wins over a `paths.local` if both exist:
+
+      MIRROR_ROOT=/data/mirror python3 verify-content.py --archive tuhs
+      python3 rar-verify-content.py --archive /data/packed/misc/misc.rar --unit misc \
+          --root /data/mirror --scratch /data/verify --apply
+
+The tools added later relax this. **Thirty-eight of them** default `--root` to `MIRROR_ROOT` --
 `autoindex-tls-broken.py`, `b2-cluster.py`, `b2-pack.py`, `blogger-sitemap.py`, `case-collision-recover.py`,
 `containment.py`,
 `converge.py`, `corpus-coverage.py`, `crawl-gap-audit.py`, `extract-container-tar.py`, `fill-from-local.py`, `find-html-imposters.py`, `find-sitemaps.py`,
@@ -707,16 +735,20 @@ so the measurement it quotes had been unreadable for as long as it had been ther
 lines below the first one, the same drive letter again with **no separator after the colon**.
 
 That fourth one is the whole argument. The sweep that found the other three could not see it,
-because its pattern demanded a `\` or `/` after `X:`. A check that only recognises `X:\` is not a
-check for a drive letter, and no amount of re-reading the file would have said so. Both halves are
-now tests: each of the four findings is fed through the patterns verbatim and must be caught, and
-each repaired sentence must pass — otherwise the ratchet has merely forbidden a form of words.
+because its pattern demanded a `\` or `/` after the colon. A check that only recognises a drive
+letter followed by a separator is not a check for a drive letter, and no amount of re-reading the
+file would have said so. Both halves are now tests: each of the four findings is fed through the
+patterns verbatim and must be caught, and each repaired sentence must pass — otherwise the ratchet
+has merely forbidden a form of words.
 
-What it allows is named, one entry at a time, with a reason: `Q:\mirror` because it is documented in
-`--help` output, `C:\Program Files\7-Zip` because that is where somebody else's installer puts a
-tool, `C:\tmp` and `R:\tree` because they are synthetic and prove path handling, and `move-mirror.py`'s
-bare `X: -> Q:` because that tool exists to move between volumes and naming them *is* the
-explanation. A dead allowance fails the suite, so an exception cannot outlive what it excused.
+**Since 2026-10-12 no real path of the author's machine is allowed at all** — not even the
+collection's, which used to be the one documented exception. The paths come from `paths.local` or
+the environment (above), examples use neutral ones (`D:\mirror`, `D:\work`, `D:\packed`,
+`D:\verify`), and records of past measurements say `<root>`. What it still allows is named, one
+entry at a time, with a reason: those neutral examples, `C:\Program Files\7-Zip` because that is
+where somebody else's installer puts a tool, and `C:\tmp` and `R:\tree` because they are synthetic
+and prove path handling. It reads the Markdown files too, not only the scripts. A dead allowance
+fails the suite, so an exception cannot outlive what it excused.
 
 The one file it does not scan is itself: a detector has to quote what it detects, and scanning it
 reports its own pattern table. That is the same trap a census of `urlopen` calls here fell into when
@@ -841,7 +873,7 @@ prose describing it was removed.**
 | C4 | `--holes` had never run whole | `measurements/holes-run/` — 99 logs + README, `holes-record-test.py` |
 | C5 | 279 unidentified binaries | `testdata/heads/` — InstallShield and the source-damaged PDF as fixtures |
 | C6 | 64 of C4's findings unjudged | `measurements/holes-vs-source-2026-09-25.md` |
-| C8 | is anything worth re-fetching | `measurements/nothing-to-refetch-2026-09-25.md`, and `Q:\DEC` |
+| C8 | is anything worth re-fetching | `measurements/nothing-to-refetch-2026-09-25.md`, and a separate local folder |
 | D1 | `page-extensions.py` not gate-ready | `common.looks_like_a_copy_of_a_page()` |
 | D2 | `--ruins` output not machine-readable | the column width is measured from the reasons present |
 | D3 | two tools walked the archives themselves | both use `iter_archives` |

@@ -105,7 +105,7 @@ def judge(ours, theirs):
 def main(argv=None):
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--root", default=MIRROR_ROOT,
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT,
                     help="the collection (default %(default)s)")
     ap.add_argument("--under", help="only this archive")
     ap.add_argument("--dry-run", action="store_true", help="find them, ask nobody")

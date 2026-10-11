@@ -55,13 +55,15 @@ import sys
 import tarfile
 import time
 
-from common import MD5_FILE, MIRROR_ROOT, SFV_FILE, SHA1_FILE, SUMS_FILE, human, say
+from common import MD5_FILE, MIRROR_ROOT, PACK_TARGET, SFV_FILE, SHA1_FILE, SUMS_FILE, human, say
 
-# THE SUBTREES THAT NEED THIS LIVE UNDER ONE ARCHIVE, and the drive is named in common.py alone.
-# A second spelling of the collection's path is a second thing to change when it moves, and the
+# THE SUBTREES THAT NEED THIS LIVE UNDER ONE ARCHIVE, below the collection common.py names. A
+# second spelling of the collection's path is a second thing to change when it moves, and the
 # library's own test refuses it.
-SOURCE_ROOT = os.path.join(MIRROR_ROOT, "ibm-aix", "fixes")
-TARGET_ROOT = os.path.join("X:" + os.sep, "tarTarget")
+# Both from common.py (MIRROR_ROOT, PACK_TARGET); empty when this machine has not set them up,
+# and then the option is required rather than a path relative to wherever the tool was started.
+SOURCE_ROOT = os.path.join(MIRROR_ROOT, "ibm-aix", "fixes") if MIRROR_ROOT else ""
+TARGET_ROOT = PACK_TARGET
 # The four, through the library's names rather than spelled out: a tool that writes ".sha256sum"
 # by hand is one the next rename leaves behind.
 MANIFESTS = (SUMS_FILE, SHA1_FILE, MD5_FILE, SFV_FILE)
@@ -101,9 +103,9 @@ GNU_TAR = find_gnu_tar()
 
 
 def posix(path):
-    r"""-> the path as GNU tar wants it: /x/tarTarget/v3/v3.tar
+    r"""-> the path as GNU tar wants it: /d/packed/v3/v3.tar
 
-    GNU tar READS `X:\...` AS host:path AND TRIES TO RESOLVE A HOST CALLED "X". Measured, twice:
+    GNU tar READS `D:\...` AS host:path AND TRIES TO RESOLVE A HOST CALLED "D". Measured, twice:
     `tar -cf C:\...\v9.tar` answers "Cannot connect to C: resolve failed" and exits 128, and
     `--force-local` fixes creation but then mangles the same path inside `-d` and exits 2. This
     binary is an MSYS build, so the drive-letter form it understands is the POSIX one -- with
@@ -353,8 +355,10 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--name", action="append", default=[], required=True,
                     help="subtree under the source root; repeatable")
-    ap.add_argument("--source-root", default=SOURCE_ROOT, help="default %s" % SOURCE_ROOT)
-    ap.add_argument("--target-root", default=TARGET_ROOT, help="default %s" % TARGET_ROOT)
+    ap.add_argument("--source-root", default=SOURCE_ROOT or None, required=not SOURCE_ROOT,
+                    help="default %s" % (SOURCE_ROOT or "none: set MIRROR_ROOT"))
+    ap.add_argument("--target-root", default=TARGET_ROOT or None, required=not TARGET_ROOT,
+                    help="default %s" % (TARGET_ROOT or "none: set PACK_TARGET"))
     ap.add_argument("--apply", action="store_true",
                     help="create the tar. Without it, nothing is written")
     ap.add_argument("--check-only", action="store_true", help="check a tar that is already there")

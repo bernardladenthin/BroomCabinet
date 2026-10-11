@@ -259,7 +259,7 @@ class TestRelativeTo(unittest.TestCase):
     def test_and_a_trailing_dot_survives_the_long_form_too(self):
         # The whole reason long_path exists is that normalising strips it. Taking the prefix off
         # must not quietly reintroduce a normalisation.
-        self.assertEqual(common.relative_to("Q:\\a", "\\\\?\\Q:\\a\\TALK."), "TALK.")
+        self.assertEqual(common.relative_to("R:\\a", "\\\\?\\R:\\a\\TALK."), "TALK.")
 
 
 class TestHashing(unittest.TestCase):
@@ -1886,7 +1886,7 @@ class TestFailedUrls(unittest.TestCase):
         """Measured across 680 real lines: the reason comes in at least six shapes, including an
         OSError whose message embeds two Windows long paths with backslashes and colons."""
         text = ("2026-09-26 22:10:00 FAIL PermissionError: [WinError 32] ... "
-                "'\\\\\\\\?\\\\Q:\\\\m\\\\a.pdf.part' -> '\\\\\\\\?\\\\Q:\\\\m\\\\a.pdf' "
+                "'\\\\\\\\?\\\\R:\\\\m\\\\a.pdf.part' -> '\\\\\\\\?\\\\R:\\\\m\\\\a.pdf' "
                 "https://host/a.pdf\n")
         self.assertEqual(common.failed_urls(text), ["https://host/a.pdf"])
 
@@ -3548,42 +3548,41 @@ class TestHttpOpenQuote(unittest.TestCase):
 
 
 class TestTheCollectionPathIsInOnePlace(unittest.TestCase):
-    r"""`Q:\mirror` may appear in exactly one piece of code, and that piece is `MIRROR_ROOT`.
+    r"""Where the collection is lives in ONE place -- common.setting() -- and in no source at all.
 
-    WHERE THIS CAME FROM. The default was `os.environ.get("MIRROR_ROOT", r"Q:\mirror")` written
-    out in 27 files, with a dozen more holding the path as a bare literal -- forty places naming
-    one drive. That is the shape this library was created to end: `".sha256sum"` appeared 70 times
-    and `"PROVENANCE.md"` 122 before they became constants here.
+    WHERE THIS CAME FROM. The default was the collection's path written out in 27 files, with a
+    dozen more holding it as a bare literal -- forty places naming one drive. That is the shape this
+    library was created to end: `".sha256sum"` appeared 70 times and `"PROVENANCE.md"` 122 before
+    they became constants here. It then became one literal in common.py, and on 2026-10-12 not even
+    that: these sources are public, and where the collection is is a fact about one machine. So
+    MIRROR_ROOT, PACK_WORK, PACK_TARGET and VERIFY_SCRATCH come from setting(): the environment,
+    then the git-ignored PATHS_FILE beside the scripts, else empty -- and empty makes every tool
+    REQUIRE the option rather than act on the working directory.
 
-    PROSE IS NOT CODE, and this counts only code. A docstring showing `python containment.py
-    --root Q:\mirror` is documentation of how to invoke the thing, and replacing it with a
-    placeholder would make the example worse, not the collection safer. Comments recording what a
-    past measurement found -- `Q:\mirror\funet-unix\ HELD 64.59 GB` -- are records of a fact and
-    must not be edited at all. So the check walks the AST and looks at string literals that are
-    not docstrings; comments never reach the tree.
+    WHY A FILE AND NOT ONLY THE ENVIRONMENT. A root that came from the environment alone would
+    differ between two terminals on the same machine, and a run whose root depended on which
+    window started it cannot be reproduced from its own output. The file gives a workstation one
+    answer whatever the terminal; the environment is for a throwaway machine, and wins.
 
-    THE ENVIRONMENT VARIABLE IS GONE ON PURPOSE. A value that arrives from outside the process
-    differs between two terminals on the same machine, and a run whose root depended on which
-    window started it cannot be reproduced from its own output. `MIRROR_ROOT` is a plain variable
-    and assigning it is the supported way to point the tools elsewhere.
+    PROSE IS NOT CODE, and the first test counts only code: string literals that are not
+    docstrings. Examples in docstrings use neutral paths (`D:\mirror`), and records of past
+    measurements name `<root>` -- privacy-test.py watches the prose.
     """
 
     HERE = os.path.dirname(os.path.abspath(__file__))
-    NEEDLE = "Q:" + chr(92) + "mirror"
+    # Not after `%` (`"%s://"`) or a backslash (`\d:\d` in a pattern): those are formats, not drives.
+    DRIVE_PATH = re.compile(r"(?<![A-Za-z0-9_%\\])[A-Za-z]:[\\/]")
 
-    # ONE FILE MAY READ THE ENVIRONMENT, and it is not a leftover.
+    # ONE FILE MAY READ THE ENVIRONMENT FOR THE ROOT ITSELF, and it is not a leftover.
     #
     # `mirror.py` resolves its root as --root, then $MIRROR_ROOT, then the working directory if
     # that carries a root marker, and it names the chain in its own refusal: "Pass --root PATH,
-    # or set $MIRROR_ROOT." That is a documented promise to whoever runs the crawler, not a
-    # default scattered across 27 files, and removing it would change what the tool does for
-    # somebody who relies on it. The rule this class enforces is about the DEFAULT VALUE living
-    # in one place; a deliberate precedence chain is a different thing and is spelled out here
-    # rather than silently matched by the pattern.
+    # or set $MIRROR_ROOT." That is a documented promise to whoever runs the crawler. common.py
+    # reads it too, through setting(), by a variable name rather than this literal.
     READS_THE_ENVIRONMENT_ON_PURPOSE = frozenset({"mirror.py"})
 
-    def code_literals(self, name):
-        """-> [line numbers] of non-docstring string literals holding the path."""
+    def code_literals(self, name, needle):
+        """-> [line numbers] of non-docstring string literals matching `needle`."""
         with io.open(os.path.join(self.HERE, name), encoding="utf-8") as fh:
             tree = ast.parse(fh.read(), name)
         docstrings = set()
@@ -3594,27 +3593,70 @@ class TestTheCollectionPathIsInOnePlace(unittest.TestCase):
                     docstrings.add(id(body[0].value))
         return [n.lineno for n in ast.walk(tree)
                 if isinstance(n, ast.Constant) and isinstance(n.value, str)
-                and self.NEEDLE in n.value and id(n) not in docstrings]
+                and needle(n.value) and id(n) not in docstrings]
 
-    def test_only_common_py_names_the_drive_in_code(self):
+    def test_no_tool_and_not_common_py_names_a_machine_path_in_code(self):
+        """A drive letter followed by a separator in a non-test tool's code is a machine's path.
+
+        Tests are left out: they need synthetic drive paths to prove path handling (`R:\\a`,
+        `C:\\tmp`), and privacy-test.py judges those one by one."""
         offenders = {}
         for name in sorted(os.listdir(self.HERE)):
-            if not name.endswith(".py"):
+            if not name.endswith(".py") or "test" in name:
                 continue
-            lines = self.code_literals(name)
-            if lines and name != "common.py":
+            # A bare drive literal counts too: `os.path.join("<letter>:" + os.sep, "tar")` was how the
+            # packing paths were written before 2026-10-12, and it has no separator to match. Not
+            # `"C:"`, where vendors' installers put their tools (`"C:" + os.sep, "Program Files"`),
+            # and not lower case, which is a mode string (`tarfile.open(path, "r:")`).
+            lines = self.code_literals(name, lambda s: (bool(self.DRIVE_PATH.search(s)) or bool(re.fullmatch(r"[ABD-Z]:", s)))
+                                       and "Program Files" not in s and not s.startswith("\\\\?\\"))
+            if lines:
                 offenders[name] = lines
-        self.assertEqual(offenders, {},
-                         "the collection path belongs in common.MIRROR_ROOT; import it")
+        self.assertEqual(offenders, {}, "a machine's path belongs in paths.local; read it via common.setting")
 
-    def test_and_common_py_names_it_exactly_once(self):
-        self.assertEqual(len(self.code_literals("common.py")), 1)
+    def test_the_four_paths_are_what_setting_answers(self):
+        for name in ("MIRROR_ROOT", "PACK_WORK", "PACK_TARGET", "VERIFY_SCRATCH"):
+            self.assertEqual(getattr(common, name), common.setting(name), name)
 
-    def test_the_constant_is_what_that_one_literal_defines(self):
-        self.assertEqual(common.MIRROR_ROOT, self.NEEDLE)
+    def test_setting_reads_the_environment_then_the_file_then_nothing(self):
+        tmp = tempfile.mkdtemp(prefix="setting-")
+        try:
+            path = os.path.join(tmp, "paths.local")
+            with io.open(path, "w", encoding="utf-8") as fh:
+                fh.write("# a comment\n# MIRROR_ROOT=commented out\nMIRROR_ROOT = /from/file \nPACK_WORK=w\n")
+            self.assertEqual(common.setting("MIRROR_ROOT", path, {}), "/from/file")
+            self.assertEqual(common.setting("MIRROR_ROOT", path, {"MIRROR_ROOT": "/from/env"}), "/from/env")
+            self.assertEqual(common.setting("MIRROR_ROOT", path, {"MIRROR_ROOT": ""}), "/from/file")
+            self.assertEqual(common.setting("VERIFY_SCRATCH", path, {}), "")
+            self.assertEqual(common.setting("MIRROR_ROOT", os.path.join(tmp, "absent"), {}), "")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_the_settings_file_is_ignored_by_git(self):
+        """Its whole point is to hold what must not be published."""
+        with io.open(os.path.join(self.HERE, "..", "..", ".gitignore"), encoding="utf-8") as fh:
+            self.assertIn("Python/PyMirror/" + os.path.basename(common.PATHS_FILE), fh.read().split())
+
+    def test_an_unset_path_makes_the_option_required(self):
+        """Empty means "not set up", never "here": the tool refuses and names the option."""
+        import contextlib
+        import importlib.util
+        keep = common.PACK_WORK
+        common.PACK_WORK = ""
+        try:
+            spec = importlib.util.spec_from_file_location("pp_probe", os.path.join(self.HERE, "pack-progress.py"))
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err), self.assertRaises(SystemExit) as stop:
+                module.main(["--unit", "x"])
+            self.assertEqual(stop.exception.code, 2)
+            self.assertIn("--work", err.getvalue())
+        finally:
+            common.PACK_WORK = keep
 
     def test_NOTHING_READS_IT_FROM_THE_ENVIRONMENT(self):
-        """A root that depends on which terminal started the run is not reproducible.
+        """No tool asks the environment for MIRROR_ROOT by that literal; setting() is the one door.
 
         ASKED OF THE SYNTAX TREE, not of the text. The first version of this grepped for the
         string and failed on `common.py` -- whose comment explains that the call used to be there

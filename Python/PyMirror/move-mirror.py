@@ -282,7 +282,7 @@ def main():
                 # ACROSS VOLUMES, os.replace() CANNOT WORK. Windows raises WinError 17, "the
                 # system cannot move the file to a different disk drive". This tool was written
                 # for a same-volume move, where a rename is metadata only and 2.8 TB moves in
-                # minutes; X: -> Q: is not that, and without this branch the FIRST file ends
+                # minutes; one volume to another is not that, and without this branch the FIRST file ends
                 # the run.
                 #
                 # Copy to a .part beside the destination, fsync, compare sizes, then put it in

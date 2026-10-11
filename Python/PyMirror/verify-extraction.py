@@ -5,7 +5,7 @@
 r"""Check an unpacked container tar against every independent record of it that exists.
 
     python verify-extraction.py --archive hp-alphaserver-2008 \
-        --tar "Q:\mirror\bitsavers\mirrors\h18002.www1.hp.com_20080527.tar" --strip-root
+        --tar "D:\mirror\bitsavers\mirrors\h18002.www1.hp.com_20080527.tar" --strip-root
 
 WHY NOT JUST TRUST extract-container-tar.py. It compares the tree with the tar headers the same
 process just read. That catches a truncated write and nothing else: if the tool misreads the
@@ -155,7 +155,7 @@ def walk_tree(base):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--root", default=MIRROR_ROOT)
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT)
     ap.add_argument("--archive", required=True)
     ap.add_argument("--tar", required=True)
     ap.add_argument("--manifest", default=None, help="default: <tar>.txt")

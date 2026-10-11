@@ -6,7 +6,7 @@ r"""Walk a source's own directory listings and write the url list they name.
 
     python listing-to-urllist.py --base https://retro.digitalvintage.ru/ \
         --branch "Hardware%20Info/OEMINFO/" --branch "Hardware%20Info/ROM%20Archive/" \
-        --out Q:\mirror\logs\retro-branches.txt
+        --out D:\mirror\logs\retro-branches.txt
 
 THE SIBLING OF pages-to-urllist.py AND NOT A REPLACEMENT. That one reads pages ALREADY ON DISK and
 costs no requests; this one reads listings from the SOURCE and costs one request per directory. Use

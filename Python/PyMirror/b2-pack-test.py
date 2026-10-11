@@ -22,7 +22,7 @@ WHAT MATTERS MOST HERE, and it is not the command strings:
     contradiction that WinRAR resolves silently, and the two stored units are 844 GB. If the
     builder ever emits it, the mistake is invisible in a 50-line command.
 
-WHY NO SUBPROCESS AND NO `Q:\mirror`. A test that needed WinRAR installed would fail on a machine
+WHY NO SUBPROCESS AND NO REAL COLLECTION. A test that needed WinRAR installed would fail on a machine
 where it is not, for a reason that says nothing about the plan -- and the tool already reports that
 case itself. A test that needed 3.98 TB mounted could only ever run here. The fixture below is four
 small CSV indexes with the shapes that matter: a duplicate pair, a subtree split, a name that
@@ -64,7 +64,7 @@ DIGEST_DUP = "c" * 64
 
 
 def fixture(also=()):
-    """A four-archive collection in a temporary directory. Never Q:\\mirror.
+    """A four-archive collection in a temporary directory. Never the real collection.
 
     `also` adds empty indexes for REAL archive names. `main()` always plans from `TOOL.UNITS`, so a
     test that exercises the command line has to offer the archives one real unit names -- the
@@ -822,7 +822,7 @@ class EveryDecisionOfTheOwnerIsInTheCommand(unittest.TestCase):
         doc = TOOL.__doc__
         self.assertIn("<--out>" + chr(92) + "misc-run.log", doc)
         self.assertIn("<--out>" + chr(92) + "misc-run.err", doc)
-        self.assertNotIn("mirrorPackedWork" + chr(92) + "misc-run", doc)
+        self.assertNotIn("<--work>" + chr(92) + "misc-run", doc)
 
     def test_THE_TWO_LEVELS_OF_CHECKING_ARE_WRITTEN_DOWN(self):
         """Because in twenty years the module docstring is the whole manual.
@@ -1978,7 +1978,7 @@ class WhereTheIndexCsvLandsInsideTheArchive(unittest.TestCase):
     r"""`tar\<unit>.index.csv`, and it is a decision rather than an oversight.
 
     The CSV is passed by ABSOLUTE path, and RAR stores every component below the drive letter --
-    so `X:\tar\misc.index.csv` becomes `tar\misc.index.csv`. Verified on the real misc archive:
+    so `D:\work\misc.index.csv` becomes `work\misc.index.csv`. Verified on the real misc archive:
     the entry sits in part04 of 27, because RAR orders by its own sort and not by argument order,
     which is why looking in the last volume found nothing.
 
@@ -1993,11 +1993,11 @@ class WhereTheIndexCsvLandsInsideTheArchive(unittest.TestCase):
 
     def test_the_index_is_passed_by_absolute_path(self):
         r"""Which is what puts it under `tar\`; a relative name would need the CSV to sit in the
-        collection, and Q: is read-only to this tool."""
+        collection, and the collection is read-only to this tool."""
         unit = [u for u in TOOL.UNITS if u.name == "ibm-aix-opensource"][0]
         steps = TOOL.plan([unit], TOOL.MIRROR_ROOT,
-                          os.path.join("X:" + os.sep, "tarTarget"),
-                          os.path.join("X:" + os.sep, "tar"), with_dirs=False)
+                          os.path.join("D:" + os.sep, "packed"),
+                          os.path.join("D:" + os.sep, "work"), with_dirs=False)
         argv = steps[0]["argv"]
         index = argv[-1]
         # ntpath AND NOT os.path, BECAUSE THE PATH IS A WINDOWS PATH WHEREVER THIS RUNS. The work
@@ -2014,8 +2014,8 @@ class WhereTheIndexCsvLandsInsideTheArchive(unittest.TestCase):
         whole collection was rebuilt to remove."""
         unit = [u for u in TOOL.UNITS if u.name == "ibm-aix-opensource"][0]
         steps = TOOL.plan([unit], TOOL.MIRROR_ROOT,
-                          os.path.join("X:" + os.sep, "tarTarget"),
-                          os.path.join("X:" + os.sep, "tar"), with_dirs=False)
+                          os.path.join("D:" + os.sep, "packed"),
+                          os.path.join("D:" + os.sep, "work"), with_dirs=False)
         argv = steps[0]["argv"]
         self.assertNotIn("-ep", argv)
         self.assertFalse([one for one in argv if one.startswith("-ap")])

@@ -29,7 +29,7 @@ skipped silently -- an unaskable row is exactly the kind that quietly rots.
 
 WHY NOT THE COMPLETION MARKER, which also carries a `source` -- and it does, in 98 of 98 archives.
 Measured 2026-09-25: the marker's `source` is PROSE, not an address. It reads
-`https://github.com/ -- 3 repos + 1 gist`, or `Q:\mirror\bitsavers\...\ftp.agilent.com_...tar`, or
+`https://github.com/ -- 3 repos + 1 gist`, or `D:\mirror\bitsavers\...\ftp.agilent.com_...tar`, or
 `http://aixpdslib.seas.ucla.edu/ (VIA web.archive.org -- origin dead)`. 26 of the 94 archives
 present in both say something the register does not, and in every one of those 26 the extra words
 are provenance a human wrote. That is the right thing for a marker to hold and the wrong thing to
