@@ -20,7 +20,7 @@ So: GENERATED, not duplicated. Everything here is read out of the tree itself --
 markers, the PROVENANCE files, the checksum indexes -- and written back as one readable document.
 Re-run it whenever the tree changes; there is no second copy of any fact to drift.
 
-    python catalogue.py --root Q:\\mirror
+    python catalogue.py --root D:\\mirror
 
 What it deliberately does NOT do: invent, summarise or judge. If an archive has no PROVENANCE.md,
 the catalogue says so rather than filling the space with a guess, because the gap is the useful

@@ -22,7 +22,7 @@ table. That is why writing now needs --apply: the default reports what would cha
 nothing.
 
 NOTHING RUNS ON IMPORT, and the paths are arguments. This file used to hold an absolute path into
-the author's own source tree twice and `Q:\mirror` twice more, at module level with no main(), so
+the author's own source tree twice and the collection's path twice more, at module level with no main(), so
 `python refresh-table.py --help` did not print help -- on this machine it REWROTE mirror.py, and
 on the CI runner it died on the first path.
 
@@ -157,7 +157,7 @@ def main():
                         help="the master record to rewrite (default: beside this file)")
     parser.add_argument("--catalogue", default=os.path.join(HERE, "catalogue.py"), metavar="FILE",
                         help="the tool that emits the fresh rows (default: beside this file)")
-    parser.add_argument("--root", default=MIRROR_ROOT,
+    parser.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT,
                         metavar="PATH", help="the mirror tree to read")
     parser.add_argument("--apply", action="store_true",
                         help="write mirror.py. Without it nothing is changed. DO NOT USE WHILE A "

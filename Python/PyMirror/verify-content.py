@@ -107,7 +107,7 @@ def verify_archive(root, name, log, every):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--root", default=MIRROR_ROOT)
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT)
     ap.add_argument("--archive", action="append", default=[])
     ap.add_argument("--resume", action="store_true",
                     help="skip archives that already have a verdict in the state file")

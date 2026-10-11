@@ -20,9 +20,9 @@ parser does not see -- which is the only shape that finding ever has.
 READ ONLY. It opens files and parses them in memory. Nothing under --root is written, renamed or
 removed, and no network is touched.
 
-    python corpus-coverage.py --root Q:\mirror
-    python corpus-coverage.py --root Q:\mirror --sample 60      # 60 pages per archive, minutes
-    python corpus-coverage.py --root Q:\mirror --archive tuhs
+    python corpus-coverage.py --root D:\mirror
+    python corpus-coverage.py --root D:\mirror --sample 60      # 60 pages per archive, minutes
+    python corpus-coverage.py --root D:\mirror --archive tuhs
 
 EXIT CODE. Non-zero when a page holds links that pass is_child_link and parse_listing still
 returns nothing. That is the one outcome worth acting on; everything else is reported and
@@ -105,7 +105,7 @@ def walk(root, only=None, sample=0):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--root", default=MIRROR_ROOT,
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT,
                     metavar="PATH", help="the mirror root (read only)")
     ap.add_argument("--archive", metavar="NAME", help="one archive instead of all of them")
     ap.add_argument("--sample", type=int, default=0, metavar="N",

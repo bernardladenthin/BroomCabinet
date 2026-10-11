@@ -485,7 +485,7 @@ def main():
     ap.add_argument("--quiet", action="store_true",
                     help="print only entries that no longer match the record")
     ap.add_argument("--pause", type=float, default=1.0, help="seconds between hosts (default 1)")
-    ap.add_argument("--root", default=MIRROR_ROOT,
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT,
                     help="the mirror root. FROZEN is keyed by ARCHIVE NAME, so resolving those "
                          "entries to a host means reading each archive's own marker.")
     args = ap.parse_args()

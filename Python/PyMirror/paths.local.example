@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+# Where things are on this machine. Copy to `paths.local` beside the scripts (git-ignored) and
+# set your own paths; common.setting() reads it. An environment variable of the same name wins
+# over the file -- the way to point a throwaway machine (a rented server) somewhere without
+# writing a file. A name left out stays unset, and every tool then requires the option instead.
+#
+#   MIRROR_ROOT      the collection                     (--root)
+#   PACK_WORK        b2-pack's flat working directory    (pack-progress.py --work)
+#   PACK_TARGET      where the packed units are written  (tar-subtree.py --target-root)
+#   VERIFY_SCRATCH   where a whole unit is unpacked      (rar-verify-content.py --scratch)
+
+MIRROR_ROOT=D:\mirror
+PACK_WORK=D:\work
+PACK_TARGET=D:\packed
+VERIFY_SCRATCH=D:\verify

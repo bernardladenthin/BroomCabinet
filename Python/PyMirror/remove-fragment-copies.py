@@ -184,7 +184,7 @@ def fix_marker(base, removed, freed):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--root", default=MIRROR_ROOT)
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT)
     ap.add_argument("--archive", action="append", default=[], help="limit to this one; repeatable")
     ap.add_argument("--backup", metavar="DIR", help="copy each file here before removing it")
     ap.add_argument("--delete", action="store_true")

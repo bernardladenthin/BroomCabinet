@@ -125,7 +125,7 @@ def base_urls(here):
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--root", default=MIRROR_ROOT)
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT)
     ap.add_argument("--archive", required=True)
     ap.add_argument("--base", help="base URL; taken from mirror.py's ARCHIVES when omitted")
     ap.add_argument("--images", action="store_true",

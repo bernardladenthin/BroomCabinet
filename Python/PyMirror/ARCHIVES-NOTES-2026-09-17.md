@@ -667,7 +667,7 @@ ARCHIVES = [
     #
     # 24 PAIRS OF NAMES DIFFER ONLY IN CASE (`Index`/`index`, `README`/`readme`,
     # `DoorBell.snd`/`Doorbell.snd`), deep in the tree. They survive only because NTFS
-    # case-sensitivity is set on Q:\mirror and cascades to directories created during extraction --
+    # case-sensitivity is set on the collection's root and cascades to directories created during extraction --
     # tested before the run by writing both spellings five levels below the root and looking for
     # both, not by trusting the flag. Without it, 24 files would have been overwritten in silence.
     #
@@ -906,7 +906,7 @@ ARCHIVES = [
     # few hundred kilobytes of a pager. It had to be killed by hand. looks_like_a_loop() was
     # written that night and is now in both crawl loops.
     #
-    # Q:\mirror\funet-unix\ HELD 64.59 GB of which 64.55 GB was the same files
+    # <root>\funet-unix\ HELD 64.59 GB of which 64.55 GB was the same files
     # repeated. It had no marker, no index and no provenance, deliberately: it was not an
     # archive, it was the wreckage of a run.
     #
@@ -919,7 +919,7 @@ ARCHIVES = [
     #
     # ---------------------------------------------------------------------------------------
     # MEASURED PROPERLY ON 2026-09-08 -- 54 branches, two levels deep, with mirror.py's own
-    # parser and 0.7 s between requests. Tables in Q:\mirror\logs\funet-measure.out and
+    # parser and 0.7 s between requests. Tables in <root>\logs\funet-measure.out and
     # funet-live.out. The sizes are FLOORS: level 3 and deeper was not walked.
     #
     #     all 54 branches        6 267 files   8.58 GB

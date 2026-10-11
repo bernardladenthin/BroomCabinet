@@ -10,7 +10,7 @@ r"""Mirror whole archives, one producer thread feeding a pool of downloaders.
 plus the hardware documentation an emulator has to be written against.
 
   THESE THREE NUMBERS ARE GENERATED, NOT TYPED. They are the sum of the .mirror-complete
-  markers; `python catalogue.py --root Q:/mirror --recount` prints them and writes CATALOGUE.md,
+  markers; `python catalogue.py --root D:/mirror --recount` prints them and writes CATALOGUE.md,
   and `refresh-table.py` rebuilds the HELD table below from the same source. A hand-maintained
   headline goes stale silently and did: it read "Thirty archives, 791 631 files, 2 907 GB" while
   the table twenty lines below already summed to 826 162 -- the file disagreeing with itself.
@@ -558,7 +558,7 @@ PERMANENTLY LOST -- 94 files in FOUR archives, counted from the tree rather than
     bullfreeware      59        penguinppc        21
     aixtools          11        rs6000-microcode   3
 
-  The count is whatever `find Q:/mirror -name "*.suspect"` returns; do not maintain it by hand.
+  The count is whatever `find <root> -name "*.suspect"` returns; do not maintain it by hand.
   It read "73 files in three archives" until 2026-09-06 because penguinppc's 21 had never been
   added to the tally -- a fourth archive quietly missing from a list that named itself complete.
   That is the same defect as every other stale number in this file, and the answer is the same:
@@ -930,7 +930,7 @@ SETTLED WORK -- the lessons, and nothing outstanding
   SETTLED 2026-09-11 -- THE AUDITOR HAD THE SAME DISEASE. crawl-gap-audit.py reported 0 absent
   images for sun3arc while a direct call to its own check_refs() said 213. Its containment test
   compared `os.path.normpath(target)` -- which rewrites "/" as "\" -- against a `base` built
-  straight from --root. Invoked as `--root Q:/mirror` the two differ from the third character on,
+  straight from --root. Invoked as `--root D:/mirror` the two differ from the third character on,
   every target was skipped as out-of-archive, and the tool printed a clean bill of health for the
   whole collection having compared nothing. A checker that reads nothing and a checker that finds
   nothing print the identical line. THAT is the thing to keep testing for, in the tools as much as
@@ -2124,7 +2124,7 @@ ARCHIVES = [
     # few hundred kilobytes of a pager. It had to be killed by hand. looks_like_a_loop() was
     # written that night and is now in both crawl loops.
     #
-    # Q:\mirror\funet-unix\ HELD 64.59 GB of which 64.55 GB was the same files
+    # <root>\funet-unix\ HELD 64.59 GB of which 64.55 GB was the same files
     # repeated. It had no marker, no index and no provenance, deliberately: it was not an
     # archive, it was the wreckage of a run.
     #
@@ -2137,7 +2137,7 @@ ARCHIVES = [
     #
     # ---------------------------------------------------------------------------------------
     # MEASURED PROPERLY ON 2026-09-08 -- 54 branches, two levels deep, with mirror.py's own
-    # parser and 0.7 s between requests. Tables in Q:\mirror\logs\funet-measure.out and
+    # parser and 0.7 s between requests. Tables in <root>\logs\funet-measure.out and
     # funet-live.out. The sizes are FLOORS: level 3 and deeper was not walked.
     #
     #     all 54 branches        6 267 files   8.58 GB
@@ -2247,7 +2247,7 @@ ARCHIVES = [
     # FreeBSD and NetBSD mirrors that make walking it expensive.
     # REMOVED FROM THE LIVE LIST ON 2026-09-26, and the reasoning above is kept because it is
     # still the reasoning. The entry read ("funet-unix", "https://ftp.funet.fi/pub/unix/") and
-    # was STILL LIVE: Q:\mirror\funet-unix was deleted on 2026-09-10 after the symlink-loop
+    # was STILL LIVE: <root>\funet-unix was deleted on 2026-09-10 after the symlink-loop
     # incident, so there is no completion marker to stop anything, and a bare `mirror.py` run
     # with no --archive would have re-fetched the whole of /pub/unix/ -- including the BSD trees
     # that a standing decision excludes. `looks_like_a_loop()` would now prevent the 64 GB of

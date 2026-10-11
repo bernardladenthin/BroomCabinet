@@ -72,7 +72,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--archive", required=True)
     ap.add_argument("--list", required=True, dest="list_file")
-    ap.add_argument("--root", default=MIRROR_ROOT)
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT)
     ap.add_argument("--apply", action="store_true",
                     help="actually fetch. Without it nothing leaves this machine.")
     ap.add_argument("--budget", type=int, default=180,

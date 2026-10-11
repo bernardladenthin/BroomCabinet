@@ -6,7 +6,7 @@ r"""Tests for pack-progress.py.
 
 EVERY FIXTURE IS A FRESH tempfile.mkdtemp() AND NOTHING HERE NAMES THE COLLECTION. The tool only
 reads, so there is nothing it could damage -- but `--work` is still always passed explicitly into
-a temporary directory, because a test that found the real `X:\tar` would read the live run's
+a temporary directory, because a test that found the real work directory would read the live run's
 files and report on it instead of on itself.
 """
 import io

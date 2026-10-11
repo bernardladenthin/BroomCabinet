@@ -215,7 +215,7 @@ def units_from_packer():
 def main(argv=None):
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--root", default=MIRROR_ROOT, help="the collection (default %(default)s)")
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT, help="the collection (default %(default)s)")
     ap.add_argument("--pairs", type=int, default=20, help="how many sharing pairs to print")
     ap.add_argument("--extensions", action="store_true", help="bytes per extension, per archive")
     ap.add_argument("--propose", action="store_true",

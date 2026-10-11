@@ -4,8 +4,8 @@
 
 r"""Unpack a packed unit and hash every file against the collection's own SHA-256.
 
-    python rar-verify-content.py --archive X:/tarTarget/misc2/misc/misc.rar --unit misc
-    python rar-verify-content.py --archive ... --unit misc --scratch X:/verify --apply
+    python rar-verify-content.py --archive D:/packed/misc/misc.rar --unit misc
+    python rar-verify-content.py --archive ... --unit misc --scratch D:/verify --apply
     python rar-verify-content.py --archive ... --unit misc --apply --clean
 
 THE THIRD AND STRONGEST CHECK, and the only one that believes nothing RAR says. There are already
@@ -35,7 +35,7 @@ WHY IT IS NOT THE DEFAULT. It costs a full extraction: 144 GB of scratch space a
 decompression pass for misc, about 4 TB for the whole collection. The two header checks run after
 every unit; this one is for a sample, or for a unit there is a reason to doubt.
 
-IT NEVER TOUCHES THE COLLECTION AND IT DELETES NOTHING ANYWHERE. Q: is read for the `.sha256sum`
+IT NEVER TOUCHES THE COLLECTION AND IT DELETES NOTHING ANYWHERE. The collection is read for the `.sha256sum`
 files and nothing else; every byte written goes under --scratch; and `--clean` PRINTS the command
 to remove the extraction rather than running it. The owner's instruction on 2026-10-06 was to run
 no delete operation on the packing drive, which is also the drive holding every packed volume.
@@ -78,7 +78,7 @@ import subprocess
 import sys
 import time
 
-from common import (BOOKKEEPING_FILES, MIRROR_ROOT, OWN_FILES, SUMS_FILE, exists, human,
+from common import (BOOKKEEPING_FILES, MIRROR_ROOT, OWN_FILES, SUMS_FILE, VERIFY_SCRATCH, exists, human,
                     long_path, relative_to, say)
 
 GNU_RAR_NAMES = ("Rar.exe",)
@@ -229,8 +229,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--archive", required=True, help="the unit's first volume, or its base name")
     ap.add_argument("--unit", required=True, help="which unit of b2-pack.py this archive holds")
-    ap.add_argument("--root", default=MIRROR_ROOT, help="the collection, read-only")
-    ap.add_argument("--scratch", default=os.path.join("X:" + os.sep, "verify"),
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT, help="the collection, read-only")
+    ap.add_argument("--scratch", default=VERIFY_SCRATCH or None, required=not VERIFY_SCRATCH,
                     help="where the archive is unpacked. Everything written goes here")
     ap.add_argument("--apply", action="store_true",
                     help="actually extract and hash. Without it only the plan is printed")

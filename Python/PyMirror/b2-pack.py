@@ -47,8 +47,8 @@ HOW TO START A UNIT SO IT SURVIVES THE SESSION. A unit takes hours -- misc is th
 Windows, `Start-Process` hands the process to the operating system instead:
 
     powershell -NoProfile -Command "Start-Process -FilePath 'python' -ArgumentList '-u',
-      'b2-pack.py','--root','Q:/mirror','--out','X:/mirrorPacked',
-      '--work','X:/mirrorPackedWork','--only','misc','--execute'
+      'b2-pack.py','--root','D:/mirror','--out','D:/packed',
+      '--work','D:/work','--only','misc','--execute'
       -WorkingDirectory '<the directory holding b2-pack.py>'
       -RedirectStandardOutput '<--out>\misc-run.log'
       -RedirectStandardError  '<--out>\misc-run.err'
@@ -1244,7 +1244,7 @@ def plan(units, root, out, work, rar="rar", with_dirs=True):
         volumes = volume_count(size, unit.options)
         # THE INDEX CSV LANDS INSIDE THE ARCHIVE AS `tar\<unit>.index.csv` AND THAT IS DELIBERATE.
         # It is passed by ABSOLUTE path, and RAR then stores every component below the drive
-        # letter -- `X:\tar\misc.index.csv` becomes `tar\misc.index.csv`. The same behaviour is
+        # letter -- `D:\work\misc.index.csv` becomes `work\misc.index.csv`. The same behaviour is
         # why WORK_MUST_BE_FLAT: a work directory under a profile would write the account name
         # into every archive.
         #
@@ -1347,7 +1347,7 @@ def write_unit_index(path, rows, unit=None):
     `csv.DictReader` then read `size` as `bin` and `sha256` as `8306`. Silently, on 0.27 % of the
     rows, in the one file whose whole job is to be read later by something that is not this tool.
 
-    THE SOURCE WAS ALWAYS RIGHT. `Q:\mirror\<archive>\.mirror-index.csv` quotes those paths
+    THE SOURCE WAS ALWAYS RIGHT. `<root>\<archive>\.mirror-index.csv` quotes those paths
     (1 229 of them in bitsavers alone), so `common.read_index` read them correctly through the same
     `csv` module and NOTHING WAS MISSING FROM ANY PACKING PLAN. Only the derived file was broken,
     which is why no check caught it: `rar t`, the CRC32 cross-check and the four manifests all
@@ -1861,7 +1861,7 @@ def finish(code, work, steps, report=say):
 def main(argv=None):
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--root", default=MIRROR_ROOT, help="the collection (default %(default)s)")
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT, help="the collection (default %(default)s)")
     ap.add_argument("--out", default="out", help="where the volumes go (default %(default)s)")
     # NO DEFAULT ON PURPOSE. A relative default resolves against whatever directory the tool was
     # started from, and that path would be written inside all nineteen archives. It has to be

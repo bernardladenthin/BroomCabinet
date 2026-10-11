@@ -25,8 +25,10 @@ had survived many readings of the file it was in:
 Four findings, three shapes, one of them invisible to the tool that found the other three. That is
 the argument for a ratchet: a sweep is only as good as the day it was run.
 
-WHAT IS ALLOWED AND WHY EACH IS NAMED. `Q:\mirror` is the collection, documented in
-`common.MIRROR_ROOT` and printed in `--help` output on purpose. Test paths like `C:\tmp` and
+WHAT IS ALLOWED AND WHY EACH IS NAMED. Since 2026-10-12 NO real path of the author's machine,
+not even the collection's: the paths come from `paths.local` or the environment through
+`common.setting()`. Examples use NEUTRAL paths -- `D:\mirror`, `D:\work`, `D:\packed`, `D:\verify`
+-- and records of past measurements say `<root>`. Test paths like `C:\tmp` and
 `R:\tree` are synthetic and prove path handling. `C:\Program Files\7-Zip` is where somebody else's
 installer puts a tool. Everything else is spelled out in `ALLOWED` below, with a reason per entry,
 in the same shape as `audit.ZERO_AT_SOURCE` -- because an exception without a reason is a hole
@@ -50,12 +52,12 @@ LICENCE_MARKER = "SPDX-FileCopyrightText"
 # the others are in the same family -- a byte that survived a shell and looks like nothing.
 FORBIDDEN_BYTES = {0: "NUL", 11: "vertical tab", 12: "form feed", 26: "SUB / DOS end-of-file"}
 
-# The collection's own drive, which is documentation rather than disclosure. MATCHED AGAINST THE
-# REST OF THE LINE, not against the two characters the drive-letter pattern captures: the first
-# version of this file compared `COLLECTION` with `"Q:"` alone, which can never match, so every
-# documented `--root Q:\mirror` example counted as a leak. A separator may be one backslash (a raw
-# string) or two (an escaped one).
-COLLECTION = re.compile(r"(?i)^Q:(?:\\{1,2}|/)mirror")
+# THE NEUTRAL EXAMPLE PATHS, which are documentation rather than disclosure: no machine of ours
+# has them, and every example and README section uses exactly these. MATCHED AGAINST THE REST OF THE
+# LINE, not against the two characters the drive-letter pattern captures: the first version of this
+# file compared its allowance with a bare drive letter alone, which can never match. A separator may
+# be one backslash (a raw string) or two (an escaped one).
+NEUTRAL = re.compile(r"(?i)^D:(?:\\{1,2}|/)(?:mirror|work|packed|verify)\b")
 
 # THIS FILE IS NOT SCANNED, and the reason is not convenience. A detector has to quote what it
 # detects: `PATTERNS` spells out `Privat`, `AppData` and the account name, and `ALLOWED` lists a
@@ -69,7 +71,7 @@ SELF = os.path.basename(__file__)
 PATTERNS = {
     # The apostrophe in the lookbehind is not decoration: without it, "SCOPE IS THE OPERATOR'S:"
     # reads as a drive letter `S:` and the check reports a prose sentence as a leak.
-    "a drive letter other than the collection's":
+    "a drive letter that is not a neutral example":
         re.compile(r"(?<![A-Za-z0-9_/\\.:%'])([A-Z]:)(?![A-Za-z0-9=:])"),
     "a path inside the author's source tree":
         re.compile(r"(Privat|BroomCabinet)"),
@@ -85,37 +87,24 @@ PATTERNS = {
 
 # file -> {matched text -> why it is not a leak}. A reason per entry, deliberately.
 ALLOWED = {
-    "move-mirror.py": {
-        "X:": "two bare drive letters with no path, in the branch that explains WinError 17 -- "
-              "this tool exists to move between volumes, so naming them is the explanation",
-        "Q:": "the other half of the same sentence",
-    },
     "common.py": {
         "D:": "`common.MIRROR_ROOT = r\"D:\\elsewhere\"` -- the documented way to point the tools "
-              "at a different disk, which needs an example that is not the real one",
-        "Q:": "MIRROR_ROOT itself, and the comment recording the 27 files it replaced",
+              "at a different disk in-process, which needs an example that is nobody's real path",
     },
     "common_test.py": {
         "C:": "synthetic paths for long_path() and relative_to(): C:\\tmp\\TALK., C:\\a b\\c",
         "R:": "a synthetic root, chosen as a letter nothing here uses",
-        "Q:": "the needle this file's own class checks for, plus Q:\\a as a synthetic root",
-        "D:": "the reassignment test for MIRROR_ROOT",
+        "D:": "the reassignment test for MIRROR_ROOT, and the drive-path pattern the code check uses",
     },
     "iso-second-opinion.py": {
         "C:": "where 7-Zip's installer puts 7z.exe; a candidate list, not a machine of ours",
     },
     "b2-pack-test.py": {
-        "X:": "the work and out roots passed to plan() so the index-CSV tests read the real unit "
-              "table without inventing one -- the call only builds a command line, it runs "
-              "nothing and writes nothing",
-        "Q:": "the docstring naming Q: as read-only to this tool, which is why the index CSV "
-              "cannot be passed by a path relative to the collection",
+        "D:": "neutral work and out roots passed to plan() so the index-CSV tests read the real unit "
+              "table without inventing one -- the call only builds a command line, it runs nothing "
+              "and writes nothing, and the roots are given as `\"D:\" + os.sep + ...`",
     },
     "b2-pack.py": {
-        "X:": "the comment explaining that the index CSV is passed by absolute path and RAR then "
-              "stores every component below the drive letter, so X:/tar/<unit>.index.csv becomes "
-              "tar/<unit>.index.csv inside the archive -- the example needs the drive to make "
-              "sense, and it is the same behaviour WORK_MUST_BE_FLAT exists for",
         "C:": "where WinRAR's installer puts Rar.exe, in the same candidate list shape as "
               "iso-second-opinion.py -- a vendor's default location, not a path of ours",
         "D:": "the example in --work's help text and in its refusal message. A tool that forbids "
@@ -137,52 +126,45 @@ ALLOWED = {
               "which is the promise that no test of this file writes or deletes on the packing "
               "drive -- the owner's instruction on 2026-10-06",
     },
-    "pack-progress.py": {
-        "X:": "the default --work, 'X:/tar': the flat working directory b2-pack.py writes its "
-              ".list and .index.csv into, and the only place this tool reads",
-    },
-    "pack-progress-test.py": {
-        "X:": "the sentence saying a test must never find the real X:/tar, or it would report on "
-              "the live run instead of on its own fixture",
-    },
     "rar-verify-content.py": {
         "C:": "'C:/Program Files/WinRAR' and its (x86) sibling -- where WinRAR's installer puts "
               "Rar.exe, the same candidate-list shape b2-pack.py and iso-second-opinion.py use. "
               "A vendor's default location, not a path of ours",
-        "X:": "the default --scratch, 'X:/verify': this check unpacks a whole unit somewhere, and "
-              "a default that is not the collection's drive is the point of naming one",
-        "Q:": "the docstring line saying Q: is read for the .sha256sum files and nothing else -- "
-              "the one promise this tool makes about the collection",
     },
     "tar-subtree.py": {
         "C:": "'C:/Program Files/Git/usr/bin/tar.exe' -- GNU tar's location from the Git for "
               "Windows installer, in the same candidate shape as b2-pack.py's Rar.exe. It is "
               "named outright because a bare `tar.exe` resolves through System32 to bsdtar, "
               "which has no -d and made the comparison check unable to fail",
-        "X:": "the tar target drive in TARGET_ROOT -- the packing scratch space, named beside "
-              "the collection root it reads from, which comes from common.MIRROR_ROOT",
+        "D:": "the docstring explaining that GNU tar reads `D:\\...` as host:path and resolves a "
+              "host called D -- the behaviour needs a drive letter to be described at all",
     },
     "tar-subtree-test.py": {
         "C:": "SystemRoot's default, used to find bsdtar and prove the binary check rejects it",
-        "X:": "posix() turns a drive letter into /x/..., which cannot be tested without one; "
-              "also the docstring saying which two drives a test must never be pointed at",
-        "Q:": "the same two: posix() on the collection's letter, and the warning in the "
-              "docstring that no fixture here may name the collection",
+        "D:": "posix() turns a drive letter into /d/..., which cannot be tested without one; the "
+              "letters are synthetic (D:, E:) and name no machine",
+        "E:": "the second synthetic letter for posix(), so a test proves the letter is carried over "
+              "rather than assumed",
     },
-    "ask-the-source.py": {
-        "Q:": "a --help example naming the collection",
+    "README.md": {
+        "C:": "the privacy section naming what this check still allows: `C:\\Program Files\\7-Zip` "
+              "and the synthetic `C:\\tmp` -- the README has to say what the exceptions are",
+        "R:": "the same sentence naming the synthetic `R:\\tree` test root",
     },
-    "audit-test.py": {
-        "Q:": "a skip message: this stays a unit test on a machine without the collection",
+    "ARCHIVES-NOTES-2026-09-17.md": {
+        "B:": "'196 714 496 B:' -- a byte count followed by a colon, not a drive; the pattern cannot "
+              "tell a unit from a letter, and this note records a measurement",
     },
 }
 
-FILES = sorted(n for n in os.listdir(HERE) if n.endswith(".py") and n != SELF)
+# The Markdown files too: a README section or a findings note publishes a path as surely as a
+# comment does, and until 2026-10-12 nothing read them.
+FILES = sorted(n for n in os.listdir(HERE) if n.endswith((".py", ".md")) and n != SELF)
 
 
 def allowed(name, text, rest):
     """`rest` is the line from the match onward, so `Q:` can be judged by what follows it."""
-    if COLLECTION.match(rest):
+    if NEUTRAL.match(rest):
         return True
     return text in ALLOWED.get(name, {})
 
@@ -208,18 +190,19 @@ class NoPrivatePathsInTheSources(unittest.TestCase):
                             found.append("%s:%d  %s  -- %s" % (name, lineno, text, why))
         self.assertEqual(found, [], "\n  " + "\n  ".join(found))
 
-    def test_the_collection_path_is_the_only_bare_drive_it_welcomes(self):
-        """The allowance is narrow on purpose: `Q:\\mirror`, not every Q: path.
+    def test_only_the_neutral_example_paths_are_welcome(self):
+        """The allowance is narrow on purpose: four neutral names on D:, not every D: path.
 
-        `Q:\\somethingelse` would be a second disclosure wearing the first one's clothes.
+        `D:\\somethingelse` would be a disclosure wearing an example's clothes, and the
+        collection's real drive is no longer welcome at all.
         """
         BS = chr(92)
-        self.assertTrue(COLLECTION.match("Q:" + BS + "mirror" + BS + "tuhs"))
-        self.assertTrue(COLLECTION.match("Q:" + BS + BS + "mirror"))    # an escaped separator
-        self.assertTrue(COLLECTION.match("Q:/mirror"))
-        self.assertIsNone(COLLECTION.match("Q:" + BS + "IBM"))
-        self.assertIsNone(COLLECTION.match("X:" + BS + "mirror"))
-        self.assertIsNone(COLLECTION.match("Q:"))                       # the first version's bug
+        for good in ("D:" + BS + "mirror" + BS + "tuhs", "D:" + BS + BS + "mirror", "D:/mirror",
+                     "D:" + BS + "work", "D:/packed/misc/misc.rar", "D:" + BS + "verify"):
+            self.assertTrue(NEUTRAL.match(good), good)
+        for bad in ("E:" + BS + "mirror", "F:" + BS + "work", "D:" + BS + "IBM", "D:" + BS + "mirrors",
+                    "D:"):
+            self.assertIsNone(NEUTRAL.match(bad), bad)
 
 
 class NoControlCharacters(unittest.TestCase):
@@ -239,10 +222,14 @@ class NoControlCharacters(unittest.TestCase):
         self.assertEqual(found, [], "\n  " + "\n  ".join(found))
 
     def test_the_repaired_line_reads_correctly_now(self):
-        """The record this file quotes is a measurement; a mangled path makes it unreadable."""
-        with io.open(os.path.join(HERE, "common_test.py"), encoding="utf-8") as fh:
+        """The record is a measurement; a mangled path makes it unreadable.
+
+        It was quoted in common_test.py, where the form feed was found; that docstring was
+        rewritten on 2026-10-12, and the record itself lives on in mirror.py with `<root>` in place
+        of the drive. The backslash before `funet-unix` must have survived there."""
+        with io.open(os.path.join(HERE, "mirror.py"), encoding="utf-8") as fh:
             text = fh.read()
-        self.assertIn("Q:" + chr(92) + "mirror" + chr(92) + "funet-unix", text)
+        self.assertIn("<root>" + chr(92) + "funet-unix" + chr(92) + " HELD 64.59 GB", text)
 
 
 class ItCatchesTheFourThingsItWasWrittenFor(unittest.TestCase):
@@ -268,19 +255,19 @@ class ItCatchesTheFourThingsItWasWrittenFor(unittest.TestCase):
     def test_1_a_private_volume_and_directory(self):
         line = "# in SEARCH-BRIEF.md in the curated collection -- WHICH IS NO LONGER AT X:" \
                + self.BS + "IBM; that directory"
-        self.assertIn("a drive letter other than the collection's", self.caught(line))
+        self.assertIn("a drive letter that is not a neutral example", self.caught(line))
 
     def test_2_a_bare_drive_letter_with_no_separator(self):
         """THE ONE THE FIRST SWEEP MISSED. `X:` ends the fragment; nothing path-like follows."""
         line = '                              "curated collection -- which has moved off X: and is not "'
-        self.assertIn("a drive letter other than the collection's", self.caught(line))
+        self.assertIn("a drive letter that is not a neutral example", self.caught(line))
 
     def test_3_an_absolute_path_into_the_source_tree(self):
         line = "`X:" + self.BS + "Privat" + self.BS + "OpenSource" + self.BS \
                + "...` twice and `Q:" + self.BS + "mirror` twice more"
         why = self.caught(line, "refresh-table.py")
         self.assertIn("a path inside the author's source tree", why)
-        self.assertIn("a drive letter other than the collection's", why)
+        self.assertIn("a drive letter that is not a neutral example", why)
 
     def test_4_the_form_feed(self):
         """Not a pattern match -- a byte. It is invisible, which is why prose could not hold it."""
@@ -293,8 +280,8 @@ class ItCatchesTheFourThingsItWasWrittenFor(unittest.TestCase):
         for line in (
             "# in SEARCH-BRIEF.md in the curated IBM collection, which moved to another volume",
             '                              "curated IBM collection -- which is not on this volume "',
-            "used to hold an absolute path into the author's own source tree twice and `Q:"
-            + self.BS + "mirror` twice more",
+            "used to hold an absolute path into the author's own source tree twice and the "
+            "collection's path twice more",
         ):
             self.assertEqual(self.caught(line), [], line)
 

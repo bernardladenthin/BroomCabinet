@@ -24,7 +24,7 @@ file that silently became an HTML error page. For that it is perfectly adequate,
 the manifest actually offers.
 
     python sfv-verify.py packages.tar.sfv
-    python sfv-verify.py --root Q:/mirror/ia-bullfreeware packages.sfv
+    python sfv-verify.py --root D:/mirror/ia-bullfreeware packages.sfv
 """
 import argparse
 import io

@@ -5,7 +5,7 @@
 r"""How far through a pack is Rar.exe, and how much longer.
 
     python pack-progress.py --unit oldskool
-    python pack-progress.py --unit bitsavers --work X:/tar
+    python pack-progress.py --unit bitsavers --work D:/work
     python pack-progress.py --unit misc --log somewhere/else.log
 
 RAR PRINTS A PERCENTAGE PER FILE AND NO TOTAL, so a run's own output cannot answer the one
@@ -61,13 +61,14 @@ import re
 import sys
 import time
 
-from common import human, say
+from common import PACK_TARGET, PACK_WORK, human, say
 
 # `Archiviere` is the German build's word and `Adding` the English one; both are followed by the
 # name and then at least two spaces before the percentage column.
 ARCHIVING = re.compile(r"^(?:Archiviere|Adding)\s+(.+?)\s{2,}")
 TESTING = re.compile(r"^(?:Teste|Testing)\s")
-WORK = os.path.join("X:" + os.sep, "tar")
+# From common.py; empty when this machine has not set them up (then --work is required).
+WORK = PACK_WORK
 
 
 def packing_order(list_path):
@@ -201,7 +202,8 @@ def report(unit, work, log_path, report_to=say, now=None):
 
     report_to("  %s" % unit)
     report_to("     file %d of %d  (%.1f %% of the work list)" % (position, total, 100.0 * share))
-    out = written_bytes(os.path.dirname(archive_guess(unit, work)))
+    guess = archive_guess(unit, work)
+    out = written_bytes(os.path.dirname(guess)) if guess else None
     if out:
         report_to("     %s written so far" % human(out))
     report_to("     running %s" % as_hours(elapsed))
@@ -220,10 +222,11 @@ def archive_guess(unit, work):
     """-> where the volumes most likely are, for the written-bytes line only.
 
     A GUESS AND LABELLED AS ONE: the output root is not in the work directory and this tool is not
-    told it. `X:\tarTarget\\<unit>\\` is where every unit so far has been written, and a wrong
-    guess costs one missing line rather than a wrong number.
+    told it. `<PACK_TARGET>\\<unit>\\` is where every unit so far has been written, and a wrong
+    guess costs one missing line rather than a wrong number. None when PACK_TARGET is not set up:
+    then there is no guess, and no line.
     """
-    return os.path.join("X:" + os.sep, "tarTarget", unit, unit + ".rar")
+    return os.path.join(PACK_TARGET, unit, unit + ".rar") if PACK_TARGET else None
 
 
 def as_hours(seconds):
@@ -236,8 +239,8 @@ def as_hours(seconds):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--unit", required=True, help="the unit being packed")
-    ap.add_argument("--work", default=WORK, help="where the .list and .index.csv are (default %s)"
-                                                % WORK)
+    ap.add_argument("--work", default=WORK or None, required=not WORK,
+                    help="where the .list and .index.csv are (default %s)" % (WORK or "none: set PACK_WORK"))
     ap.add_argument("--log", help="the pack log (default <work>/<unit>-pack.log)")
     args = ap.parse_args(argv)
     log_path = args.log or os.path.join(args.work, args.unit + "-pack.log")

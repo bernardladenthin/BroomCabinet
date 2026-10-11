@@ -4,7 +4,7 @@
 
 r"""Unpack a tar that is PACKAGING around a mirrored site, into an archive of its own.
 
-    python extract-container-tar.py --tar "Q:\mirror\bitsavers\mirrors\x.tar" \
+    python extract-container-tar.py --tar "D:\mirror\bitsavers\mirrors\x.tar" \
                                     --archive agilent-ftp-2009 --strip-root --dry-run
     ...and again without --dry-run to do it.
 
@@ -168,7 +168,7 @@ def open_members(path, kind):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--tar", required=True)
-    ap.add_argument("--root", default=MIRROR_ROOT)
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT)
     ap.add_argument("--archive", required=True, help="name of the new top-level archive")
     ap.add_argument("--strip-root", action="store_true",
                     help="drop the tar's own single top directory. Use it when that directory "
@@ -300,7 +300,7 @@ def main():
     # explanations. ftp.digital.com carries 5 124 Apache sort-link names of the form
     # `index.html?C=D;O=A`, which is where this stops being hypothetical.
     #
-    # Case is a SEPARATE question and is only a warning. Q:\mirror has the NTFS per-directory
+    # Case is a SEPARATE question and is only a warning. The collection has the NTFS per-directory
     # case-sensitivity flag set and new subdirectories inherit it, so `Foo` and `foo` coexist. If
     # that flag were ever missing they would not, so a case clash is worth naming even though it
     # is not an error here.

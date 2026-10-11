@@ -15,6 +15,7 @@ import urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import mirror as M
+import common
 
 
 class _Log:
@@ -66,10 +67,11 @@ with tempfile.TemporaryDirectory() as td:
           and any("TRUST-INDEX REFUSED" in ln for ln in log.lines))
 
 # ---------------------------------------------------------------- the real round trip
-ROOT = "Q:/mirror/oldskool"
+# The real archive, where this machine keeps the collection (common.MIRROR_ROOT); skipped without it.
+ROOT = os.path.join(common.MIRROR_ROOT, "oldskool") if common.MIRROR_ROOT else ""
 BASE = "http://ftp.oldskool.org/pub/"
-if not os.path.exists(os.path.join(ROOT, M.SUMS_FILE)):
-    print("  SKIP  round trip: %s not present on this machine" % ROOT)
+if not ROOT or not os.path.exists(os.path.join(ROOT, M.SUMS_FILE)):
+    print("  SKIP  round trip: %s not present on this machine" % (ROOT or "the collection (MIRROR_ROOT)"))
 else:
     root = os.path.normpath(ROOT)
     trusted = M.load_trusted_index(root, _Log())

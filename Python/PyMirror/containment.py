@@ -7,7 +7,7 @@ r"""Which mirror contains which other mirror, and what would a deduplicating pac
 Run it whenever an archive is added, and before packaging the collection.
 
     python containment.py                 # full report
-    python containment.py --root Q:\mirror
+    python containment.py --root D:\mirror
 
 WHY THIS EXISTS. Two archives here hold the same documents under different names --
 `rwth-aachen-ftp` and `ps-2.kev009.com` are both IBM's PC Company BBS, one via the PS/2 Super
@@ -87,7 +87,7 @@ def load(root):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--root", default=MIRROR_ROOT)
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT)
     ap.add_argument("--min-gb", type=float, default=0.2,
                     help="hide pairs below this many GB unless they also exceed --min-pct")
     ap.add_argument("--min-pct", type=float, default=2.0)

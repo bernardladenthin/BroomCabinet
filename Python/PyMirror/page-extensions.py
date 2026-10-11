@@ -44,9 +44,9 @@ decides in mirror.py: resolve against the page's own position, then compare agai
 READ ONLY. It opens files and reads bytes. Nothing under --root is written, renamed or removed,
 and no host is contacted.
 
-    python page-extensions.py --root Q:\mirror
-    python page-extensions.py --root Q:\mirror --sample 400     # per archive, minutes not hours
-    python page-extensions.py --root Q:\mirror --archive sun3arc --raw
+    python page-extensions.py --root D:\mirror
+    python page-extensions.py --root D:\mirror --sample 400     # per archive, minutes not hours
+    python page-extensions.py --root D:\mirror --archive sun3arc --raw
 
 EXIT CODE. Non-zero when at least --min stored files of one unwalked extension hold markup.
 Everything found is printed either way; the floor exists because the first run of this tool went
@@ -335,7 +335,7 @@ def pages_with_links(paths):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--root", default=MIRROR_ROOT,
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT,
                     metavar="PATH", help="the mirror root (read only)")
     ap.add_argument("--archive", metavar="NAME", help="one archive instead of all of them")
     ap.add_argument("--sample", type=int, default=0, metavar="N",

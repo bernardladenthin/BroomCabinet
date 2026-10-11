@@ -180,6 +180,10 @@ class WithoutSevenZipItRefuses(unittest.TestCase):
             fh.write("         2.43 GB missing  82.11 MB of 2.52 GB  ISO 9660  arc/a.iso\n")
 
     def run_tool(self, *argv):
+        # A root of its own: where none is set up, --root is required, and these cases are about
+        # the report and 7-Zip, never about the collection.
+        if "--root" not in argv:
+            argv = ("--root", self.tmp) + argv
         out = io.StringIO()
         keep = sys.stdout
         sys.stdout = out

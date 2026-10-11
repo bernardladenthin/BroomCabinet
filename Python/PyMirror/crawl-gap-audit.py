@@ -98,7 +98,7 @@ def check_refs(base, rx, label):
     """
     # NORMALISE THE BASE BEFORE COMPARING AGAINST NORMALISED TARGETS. `target` below is built
     # with os.path.normpath, which rewrites every "/" as "\" on Windows; `base` arrives however
-    # --root was typed. Given `--root Q:/mirror` the two differ from the third character on, the
+    # --root was typed. Given `--root D:/mirror` the two differ from the third character on, the
     # containment test fails for every single target, and this function returns an empty missing
     # set for every archive -- reporting a clean bill of health because it compared nothing.
     # Found 2026-09-11: the audit said sun3arc had 0 absent images while a direct call to this
@@ -182,7 +182,7 @@ def base_urls():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--root", default=MIRROR_ROOT)
+    ap.add_argument("--root", default=MIRROR_ROOT or None, required=not MIRROR_ROOT)
     ap.add_argument("--archive", action="append", default=[],
                     help="audit only this archive; repeatable")
     ap.add_argument("--links", action="store_true", help="only the link-form check")
