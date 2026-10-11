@@ -16,6 +16,7 @@ import contextlib
 import hashlib
 import io
 import os
+import re
 import shutil
 import socket
 import tempfile
@@ -469,8 +470,83 @@ class FakeListingBucket:
             yield types.SimpleNamespace(file_name=name, size=len(data), id_="id-" + sha1, action="upload",
                                         mod_time_millis=0, get_content_sha1=lambda s=sha1: s), None
 
+    def download_file_by_id(self, file_id):
+        data = next(d for d in self.objects.values() if "id-" + hashlib.sha1(d).hexdigest() == file_id)
+        response = types.SimpleNamespace(
+            iter_content=lambda n: (data[i:i + n] for i in range(0, len(data), n)), close=lambda: None)
+        return types.SimpleNamespace(response=response)
+
     def list_unfinished_large_files(self):
         return []
+
+
+class AllDigestsTest(unittest.TestCase):
+    """verify-b2 --download --all-digests: the content from B2 against every digest of the record
+    -- also on a machine that holds nothing but the record files, like a server next to B2."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+        self.root = self.tmp / "data" / "example-bucket"
+        for rel, size in (("a.bin", 3000), ("sub/b.bin", 500), ("c.bin", 1200)):
+            p = self.root / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(os.urandom(size))
+        self.config = self.tmp / "b2.properties"
+        self.config.write_text(f"keyId=x\napplicationKey=y\nlocalRoot={(self.tmp / 'data').as_posix()}\n"
+                               f"stateDir={(self.tmp / 'state').as_posix()}\nlocalIndex=folder\n", encoding="utf-8")
+        self.bucket = FakeListingBucket({})
+        api = types.SimpleNamespace(get_bucket_by_name=lambda name: self.bucket)
+        self._patches = [unittest.mock.patch.object(b2verify.Context, "api", property(lambda ctx: api)),
+                         unittest.mock.patch.object(b2verify.Context, "thread_bucket", lambda ctx, name: self.bucket)]
+        for p in self._patches:
+            p.start()
+        self.cmd("hash-local", "example-bucket")
+        self.bucket.objects = {p.relative_to(self.root).as_posix(): p.read_bytes()
+                               for p in self.root.rglob("*") if p.is_file()}
+        self.cmd("hash-b2", "example-bucket")
+
+    def tearDown(self):
+        for p in self._patches:
+            p.stop()
+        self._tmp.cleanup()
+
+    def cmd(self, *argv: str) -> tuple[int, str]:
+        return run(*argv, "--config", str(self.config), "--no-report")
+
+    def test_every_digest_of_the_content_matches_the_record(self):
+        code, out = self.cmd("verify-b2", "example-bucket", "--download")
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("sha256", out)  # B2 states a SHA-1; without the option nothing else is computed
+        code, out = self.cmd("verify-b2", "example-bucket", "--download", "--all-digests")
+        self.assertEqual(code, 0, out)
+        self.assertIn("checksum identical: 3  (sha1 3)", out)  # against B2's own checksum, as before
+        self.assertIn("(Content 3 files, Record 3 files)", out)
+        self.assertIn("checksum identical: 3  (sha256+sha1+md5+crc32 3)", out)
+
+    def test_a_broken_line_in_one_manifest_is_found_only_with_all_digests(self):
+        md5sum = self.root / ".md5sum"
+        md5sum.write_text(re.sub(r"^\w+ (\*c\.bin)$", "0" * 32 + r" \1", md5sum.read_text(encoding="utf-8"),
+                                 flags=re.M), encoding="utf-8")
+        code, out = self.cmd("verify-b2", "example-bucket", "--download")
+        self.assertEqual(code, 0, out)  # B2's SHA-1 matches the content: nothing to see
+        code, out = self.cmd("verify-b2", "example-bucket", "--download", "--all-digests")
+        self.assertEqual(code, 1, out)
+        self.assertIn("! c.bin  (md5)", out)
+
+    def test_a_server_with_only_the_record_files(self):
+        for p in [p for p in self.root.rglob("*") if p.is_file() and not p.name.startswith(".")]:
+            p.unlink()
+        code, out = self.cmd("verify-b2", "example-bucket", "--download", "--all-digests")
+        self.assertEqual(code, 0, out)
+        self.assertIn("checksum identical: 3  (sha256+sha1+md5+crc32 3)", out)
+
+    def test_without_a_record_it_says_so_and_checks_what_it_can(self):
+        for p in [p for p in self.root.iterdir() if p.name.startswith(".")]:
+            p.unlink()
+        code, out = self.cmd("verify-b2", "example-bucket", "--download", "--all-digests")
+        self.assertEqual(code, 0, out)
+        self.assertIn("--all-digests: no local record for example-bucket", out)
 
 
 class SubfolderBucketTest(unittest.TestCase):
@@ -663,7 +739,7 @@ class VaultCommandTest(unittest.TestCase):
 
         code, out = self.cmd("vault", "--download", "--threads", "2")
         self.assertEqual(code, 0, out)
-        self.assertIn("checksum identical: 3  (sha256 3)", out)
+        self.assertIn("checksum identical: 3  (sha256+sha1+md5+crc32 3)", out)
 
     def test_a_flipped_bit_in_b2_is_found_only_by_decrypting(self):
         self.cmd("hash-local", "example-vault-bucket")
@@ -781,6 +857,17 @@ class VaultCommandTest(unittest.TestCase):
         code, out = self.cmd("vault", "--download")
         self.assertEqual(code, 1, out)
         self.assertIn("DAMAGED", out)
+
+    def test_decrypted_content_is_compared_by_all_four_digests(self):
+        self.config.write_text(self.config.read_text(encoding="utf-8") + "localIndex=folder\n", encoding="utf-8")
+        self.cmd("hash-local", "example-vault-bucket")
+        self.upload_record()
+        sfv = self.clear / ".sfv"  # a broken line in one manifest; the content and SHA-256 are fine
+        sfv.write_text(re.sub(r"^(Short\.mp4) \w+$", r"\1 00000000", sfv.read_text(encoding="utf-8"), flags=re.M),
+                       encoding="utf-8")
+        code, out = self.cmd("vault", "--download")
+        self.assertEqual(code, 1, out)
+        self.assertIn("! Short.mp4  (crc32)", out)
 
     def test_without_the_cleartext_and_without_a_state_file_in_the_vault_nothing_is_compared(self):
         self.cmd("hash-local", "example-vault-bucket")  # index mode: four manifests, no state file

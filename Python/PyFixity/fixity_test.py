@@ -262,6 +262,28 @@ class CompareTest(unittest.TestCase):
         self.assertEqual(same.ok, {"etag": 1})
         self.assertEqual(len(other.checksum_unknown), 1)
 
+    def test_all_digests_must_agree(self):
+        full = dict(sha256="s", sha1="h", md5="m", crc32="C")
+        same = fx.compare([E("a", 1, 0, **full)], [E("a", 1, 0, **{**full, "crc32": "c"})],
+                          check_sum=True, all_digests=True)
+        self.assertEqual(same.ok, {"sha256+sha1+md5+crc32": 1})  # case does not count
+        # A broken line in one manifest: the strongest digest alone calls it identical.
+        broken = [E("a", 1, 0, **{**full, "md5": "other"})]
+        self.assertEqual(fx.compare([E("a", 1, 0, **full)], broken, check_sum=True).ok, {"sha256": 1})
+        d = fx.compare([E("a", 1, 0, **full)], broken, check_sum=True, all_digests=True)
+        self.assertEqual(paths(x for x, _ in d.checksum), ["a"])
+        self.assertEqual(fx.checksums_match(E("a", 1, 0, **full), broken[0], all_digests=True), (False, "md5"))
+
+    def test_all_digests_takes_the_etag_and_only_what_both_have(self):
+        a = E("x", 10, 0, sha1="h", etag="e-2", parts=[5, 5])
+        self.assertEqual(fx.checksums_match(a, E("x", 10, 0, sha1="h", md5="m", etag="e-2", parts=[5, 5]),
+                                            all_digests=True), (True, "sha1+etag"))
+        self.assertEqual(fx.checksums_match(a, E("x", 10, 0, sha1="h", etag="f-2", parts=[5, 5]),
+                                            all_digests=True), (False, "etag"))
+        self.assertEqual(fx.checksums_match(E("x", 10, 0), E("x", 10, 0, md5="m"), all_digests=True), (None, None))
+        self.assertEqual(fx.checksums_match(E("x", 10, 0, md5="m"), E("x", 11, 0, md5="m"), all_digests=True),
+                         (False, "size"))
+
     def test_categories_and_flat(self):
         d = fx.compare([E("n", 1, 0), E("s", 1, 0)], [E("g", 1, 0), E("s", 2, 0)])
         self.assertEqual((paths(d.only_left), paths(d.only_right), len(d.size)), (["n"], ["g"], 1))

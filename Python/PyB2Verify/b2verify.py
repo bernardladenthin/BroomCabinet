@@ -33,14 +33,19 @@ COMMANDS
     verify-b2 [bucket ...]      compare the current bucket listing with the saved checksums
         --download              also stream every file from B2, hash it and compare it with what
                                 B2's metadata states -- straight from the network, no temp files
-    compare [bucket ...]        local index against saved B2 checksums, 1:1 -- and each folder's own
+        --all-digests           with --download: also compute SHA-256, MD5 and CRC32 and compare
+                                EVERY digest with the local record (on a server: the record files
+                                fetched from the bucket) -- the content against all four manifests
+                                and .s3etag, not only B2's SHA-1 or ETag. Slower: MD5 and SHA-256
+                                cost CPU
+    compare [bucket ...]       local index against saved B2 checksums, 1:1 -- and each folder's own
                                 record files (manifests, state file) against their copies in B2
     vault [bucket ...]          a Cryptomator vault in B2 (see CRYPTOMATOR VAULTS below): open
                                 it, decrypt the directory tree and check that it is consistent,
                                 then compare names and exact sizes with the local index -- all
                                 without downloading any content
         --download              also stream every file, decrypt it (which authenticates every
-                                block) and compare its checksums with the local index
+                                block) and compare all four checksums with the local index
 
 VERIFICATION RUNS (verify-local, verify-b2 --download, hash-b2 --download-unknown)
     --threads N                 files in parallel (default: local 1, B2 4)
@@ -119,7 +124,7 @@ import time
 from pathlib import Path
 from typing import Iterator, NamedTuple
 
-from b2lib import (B2_NOW_VS_SAVED, CONTENT_VS_META, LOCAL_VS_B2, ROOT_MANIFESTS, YES, FileEntry, SnapshotSaver,
+from b2lib import (B2_NOW_VS_SAVED, CONTENT_VS_META, CONTENT_VS_RECORD, LOCAL_VS_B2, ROOT_MANIFESTS, YES, FileEntry, SnapshotSaver,
                    b2_state, classify_unfinished, copy_entry, expected_from_metadata, is_root_manifest, load_previous, local_state, migrate_local_tsv, new_meta,
                    read_snapshot, stale_b2_hint)
 
@@ -328,7 +333,10 @@ def scan_remote(bucket, excludes: list[str], is_record=is_root_manifest,
 
 def checksum_pair(a, b) -> tuple[str, str, str]:
     """The digest a comparison used, with both sides' values, for display."""
-    used = fixity.checksums_match(a, b)[1] or "etag"
+    match, used = fixity.checksums_match(a, b)
+    if match:  # the strongest agrees, yet it is a difference: an all-digests comparison found which
+        used = fixity.checksums_match(a, b, all_digests=True)[1]
+    used = used or "etag"
     if used == "size":
         return "size", str(a.size), str(b.size)
     return used, getattr(a, used, None) or "", getattr(b, used, None) or ""
@@ -978,11 +986,21 @@ def verify_b2_content(ctx: Context, name: str, meta: dict[str, str], all_saved: 
     content: dict[str, FileEntry] = {p.path: copy_entry(p, skipped=True) for p in plan.skipped}
     errors: dict[str, str] = {}
     expected = {p.path: expected_from_metadata(p) for p in plan.todo + plan.skipped}
+    all_digests = ctx.args.all_digests
+    record: list[fixity.Entry] = []
+    if all_digests:
+        known, _state = local_record_of(ctx, name)
+        record = [e for e in known if not fixity.is_excluded(e.path, ctx.excludes)
+                  and not ctx.is_record_file(name, e.path)]
+        if not record:
+            print(f"  --all-digests: no local record for {name} - only B2's own checksums are compared")
+    full: dict[str, fixity.Entry] = {}  # with --all-digests: every digest of what was read
 
     def work(p: FileEntry, stop: threading.Event):
         parts = p.parts if p.etag else None
         return fixity.hash_chunks(b2_chunks(ctx.thread_bucket(name), p.file_id), parts,
-                                  bool(p.etag and fixity.is_multipart_etag(p.etag)), stop, want=("sha1",),
+                                  bool(p.etag and fixity.is_multipart_etag(p.etag)), stop,
+                                  want=fixity.DIGESTS if all_digests else ("sha1",),
                                   threads=fixity.hash_threads_for(p.size, ctx.hash_threads()))
 
     def done(p: FileEntry, result, err: Exception | None) -> None:
@@ -994,6 +1012,10 @@ def verify_b2_content(ctx: Context, name: str, meta: dict[str, str], all_saved: 
             digests, etag, size = result
             content[p.path] = got = FileEntry(p.path, size, p.mtime_ms, digests["sha1"], etag,
                                               p.parts if p.etag else None)
+            if all_digests:
+                full[p.path] = e = fixity.Entry(p.path, size, 0)
+                e.set_digests(digests)
+                e.etag, e.parts = etag, (p.parts if p.etag else None)
             match = fixity.checksums_match(got, expected[p.path])[0]
             if match and not p.sha1:
                 p.sha1 = digests["sha1"]  # a real SHA-1, confirmed by the ETag -> comparable by SHA-1 from now on
@@ -1026,6 +1048,23 @@ def verify_b2_content(ctx: Context, name: str, meta: dict[str, str], all_saved: 
             diff.notes[got.path] = f"B2 content does not match the B2 metadata; {local_state(got, cands)}"
     info = [f"- **B2 checksums:** {saved_info(meta)}", f"- **Threads:** {threads}"] + plan_text(plan, ctx.filter)
     ctx.report(name, diff, ["checksum"], info, suffix=".b2-content", title=f"{name} - B2 content against B2 metadata")
+    bad = diff.has_differences()
+    if record and full:
+        bad |= content_against_record(ctx, name, list(full.values()), record)
+    return bad
+
+
+def content_against_record(ctx: Context, name: str, read: list[fixity.Entry], record: list[fixity.Entry]) -> bool:
+    """--all-digests: what was read from B2 against the home machine's record, by every digest
+    both have (SHA-256, SHA-1, MD5, CRC32, the ETag). Only the files read are compared -- a skipped
+    or unlisted file is no difference here; compare and verify-b2 report those."""
+    flat = ctx.is_flat(name)
+    key = (lambda p: fixity.basename(p)) if flat else (lambda p: p)  # noqa: E731
+    wanted = {key(e.path) for e in read}
+    diff = fixity.compare(read, [e for e in record if key(e.path) in wanted], flat, check_sum=True,
+                          labels=CONTENT_VS_RECORD, all_digests=True)
+    ctx.report(name, diff, ["checksum"], ["- **Digests:** every one both sides have"],
+               suffix=".b2-record", title=f"{name} - B2 content against the local record, all digests")
     return diff.has_differences()
 
 
@@ -1099,6 +1138,17 @@ def record_files_in_b2(ctx: Context, name: str, meta: dict[str, str],
     return problems, notes, ok
 
 
+def local_record_of(ctx: Context, name: str) -> tuple[list[fixity.Entry], dict[str, str]]:
+    """What the home machine recorded for a bucket, with the bucket's paths: the folder record(s),
+    else the external index (moving a first-version file onto it)."""
+    if ctx.folder_records or name in ctx.subfolder_buckets:
+        return ctx.bucket_record(name)
+    lp = ctx.old_index(name)
+    if not lp.is_file() and lp.with_suffix(".tsv").is_file():
+        lp = ctx.local_index(name)  # moves a first-version file onto the index
+    return (fixity.read_index(lp), fixity.read_state(lp)) if lp.is_file() else ([], {})
+
+
 def cmd_compare(ctx: Context) -> int:
     if ctx.args.buckets:
         names = ctx.args.buckets
@@ -1113,14 +1163,7 @@ def cmd_compare(ctx: Context) -> int:
         if name in ctx.vaults:
             print(f"\n{name}: {VAULT_SKIP}")
             continue
-        if ctx.folder_records or name in ctx.subfolder_buckets:
-            lp = None
-            entries, lstate = ctx.bucket_record(name)
-        else:
-            lp = ctx.old_index(name)
-            if not lp.is_file() and lp.with_suffix(".tsv").is_file():
-                lp = ctx.local_index(name)  # moves a first-version file onto the index
-            entries, lstate = (fixity.read_index(lp), fixity.read_state(lp)) if lp.is_file() else ([], {})
+        entries, lstate = local_record_of(ctx, name)
         rp = ctx.snapshot_path(name)
         missing = ([] if entries else [f"no local record for {name} (hash-local)"]) + \
             ([] if rp.is_file() else [f"{rp} missing (hash-b2)"])
@@ -1214,13 +1257,15 @@ def vault_content(ctx: Context, cryptomator, name: str, vault, objects: dict, fi
         digests, _etag, size = result
         content[f.path] = got = fixity.Entry(f.path, size, 0)
         got.set_digests(digests)
-        match = fixity.checksums_match(got, exp)[0]
+        # All four are computed anyway, so all four are compared: free, and it also proves the
+        # manifests agree with each other.
+        match = fixity.checksums_match(got, exp, all_digests=True)[0]
         progress.step({True: "OK", False: "MISMATCH", None: "UNKNOWN"}[match], exp)
 
     fixity.run_parallel(files, work, threads, done)
     print(f"  read: {progress.summary()}")
     diff = fixity.compare(list(content.values()), [local[p] for p in content], check_sum=True,
-                          labels=DECRYPTED_VS_LOCAL)
+                          labels=DECRYPTED_VS_LOCAL, all_digests=True)
     diff.attach_errors(errors)
     return diff
 
@@ -1417,6 +1462,9 @@ def build_parser() -> argparse.ArgumentParser:
                        help="B2 against checksums/b2; with --download also the content")
     p.add_argument("--download", action="store_true",
                    help="stream the content from B2 and check it against the B2 metadata (costs download traffic)")
+    p.add_argument("--all-digests", action="store_true",
+                   help="with --download: also compute SHA-256, MD5 and CRC32 and compare every digest with the "
+                        "local record (slower: more to compute)")
     sub.add_parser("compare", parents=[common, selection], help="local index against saved B2 checksums")
     p = sub.add_parser("vault", parents=[common, selection],
                        help="a Cryptomator vault in B2: structure, names and sizes against the local index")
