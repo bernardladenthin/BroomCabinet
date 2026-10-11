@@ -931,23 +931,35 @@ def make_index(entries: list, flat: bool) -> dict[str, list]:
     return idx
 
 
-def checksums_match(a, b) -> tuple[bool | None, str | None]:
+def checksums_match(a, b, all_digests: bool = False) -> tuple[bool | None, str | None]:
     """-> (match, digest used). By the strongest digest both sides have, else by ETag over the
-    same part sizes; (None, None) when nothing is comparable. A size difference never matches."""
+    same part sizes; (None, None) when nothing is comparable. A size difference never matches.
+
+    all_digests: EVERY digest both sides have must agree, the ETag too (over the same part sizes),
+    and `used` names them all ("sha256+sha1+md5+crc32") -- or, on a mismatch, the first that
+    differs. One strong digest already settles the content; all of them also prove the
+    manifests agree with each other, which a broken line in one of them would not."""
     if a.size != b.size:
         return False, "size"
-    for name in DIGESTS:
-        x, y = getattr(a, name, None), getattr(b, name, None)
-        if x and y:
-            return x.lower() == y.lower(), name
-    if a.etag and b.etag and a.parts == b.parts:
-        return a.etag == b.etag, "etag"
-    return None, None
+    names = [n for n in DIGESTS if getattr(a, n, None) and getattr(b, n, None)]
+    etag = bool(a.etag and b.etag and a.parts == b.parts)
+    if not all_digests:
+        if names:
+            n = names[0]
+            return getattr(a, n).lower() == getattr(b, n).lower(), n
+        return (a.etag == b.etag, "etag") if etag else (None, None)
+    for n in names:
+        if getattr(a, n).lower() != getattr(b, n).lower():
+            return False, n
+    if etag and a.etag != b.etag:
+        return False, "etag"
+    used = names + (["etag"] if etag else [])
+    return (True, "+".join(used)) if used else (None, None)
 
 
 def compare(left: list, right: list, flat: bool = False, check_mtime: bool = False,
             check_sum: bool = False, mtime_tolerance_ns: int = 2_000_000_000,
-            labels: Labels = NOW_VS_SAVED) -> Diff:
+            labels: Labels = NOW_VS_SAVED, all_digests: bool = False) -> Diff:
     d = Diff(flat=flat, labels=labels, left_count=len(left), right_count=len(right))
     li, ri = make_index(left, flat), make_index(right, flat)
     for key in sorted(li.keys() - ri.keys()):
@@ -969,7 +981,7 @@ def compare(left: list, right: list, flat: bool = False, check_mtime: bool = Fal
             if getattr(lf, "skipped", False):
                 d.skipped += 1
                 continue
-            match, used = checksums_match(lf, rf)
+            match, used = checksums_match(lf, rf, all_digests)
             if match is None:
                 d.checksum_unknown.append((lf, rf))
             elif not match:

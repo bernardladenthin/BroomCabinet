@@ -130,6 +130,7 @@ Each side is indexed on its own, so either can be refreshed or re-read without t
     python b2verify.py verify-local               re-read every local file against its index
     python b2verify.py verify-b2                  the bucket listing against its index
     python b2verify.py verify-b2 --download       stream every file from B2 and hash it
+    python b2verify.py verify-b2 --download --all-digests   ... and compare all four digests with the local record
 
     python b2verify.py check                      quick and live: names and sizes only
 
@@ -184,6 +185,17 @@ read produces both the SHA-1 and the ETag, so an 18 GB archive is verified witho
 claims. The download is streamed straight into the hasher; no temporary file is written. A file
 confirmed through its ETag gets its real SHA-1 recorded, so it is comparable by SHA-1 from then on.
 
+**`--all-digests`** goes further: it computes SHA-256, SHA-1, MD5 and CRC32 (and the ETag where B2
+has one) of what comes down and compares **every** one with the local record — the content against
+all four manifests and `.s3etag`, not only against B2's own SHA-1. One strong digest already settles
+the content; all of them also prove the manifests agree with each other, which a broken line in one
+of them would not. It costs CPU (MD5 and SHA-256), so it is an option. It needs the local record —
+on a machine without the data, the bucket's record files fetched from B2 into
+`<localRoot>/<bucket>/` are enough, because the state file carries the sizes. The result is a second
+block, *B2 content against the local record, all digests* (report suffix `.b2-record`).
+
+`vault --download` always compares all four: decrypting computes them anyway.
+
 ## Silent damage is reported, never written over
 
 `hash-local` re-reads only files whose size or modification time moved. With `--force` it reads
@@ -232,7 +244,7 @@ is neither indexed nor uploaded. Then:
 |---|---|
 | `hash-local` | indexes the cleartext directory (`checksums/local/<bucket>-<directory>.csv`, or with `localIndex=folder` its own state file) and writes the manifests into it — so they are encrypted and uploaded with it |
 | `vault` | opens the vault (the passphrase unlocks the keys; the configuration's signature proves it unchanged), decrypts the whole directory tree and checks that it fits together, then compares every name and **exact cleartext size** with the index — without downloading any content |
-| `vault --download` | also streams every file and decrypts it. Every 32 KiB block carries an AES-GCM tag bound to its position, so decrypting *is* the integrity check; the cleartext is hashed on the way and compared with the index |
+| `vault --download` | also streams every file and decrypts it. Every 32 KiB block carries an AES-GCM tag bound to its position, so decrypting *is* the integrity check; the cleartext is hashed on the way and compared with the index by all four digests |
 | `verify-local` | re-reads the cleartext directory against its index |
 | `hash-b2`, `verify-b2` | unchanged: they check the ciphertext, which is what B2 stores |
 | `check`, `compare` | skip the bucket, saying why |

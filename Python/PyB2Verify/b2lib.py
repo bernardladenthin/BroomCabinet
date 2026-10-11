@@ -76,6 +76,7 @@ class FileEntry:
 LOCAL_VS_B2 = fixity.Labels("Local", "B2", "Only local (missing in B2)", "Only in B2 (missing locally)")
 B2_NOW_VS_SAVED = fixity.Labels("Current", "Saved", "New (not in the checksums)", "Gone (only in the checksums)")
 CONTENT_VS_META = fixity.Labels("Content", "Metadata", "Read only", "Not read")
+CONTENT_VS_RECORD = fixity.Labels("Content", "Record", "Read, not in the local record", "In the record, not read")
 
 
 def is_root_manifest(path: str) -> bool:
