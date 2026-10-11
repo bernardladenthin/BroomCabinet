@@ -92,7 +92,8 @@ so they cannot be compared with local ones. For such a bucket:
     hash-local      indexes the cleartext directory (<stateDir>/checksums/local/<bucket>-<directory>.csv)
                     and writes the manifests into it, so they are encrypted and uploaded with it
     verify-local    re-reads the cleartext directory against that index
-    vault           checks the vault in B2 against that index
+    vault           checks the vault in B2 against that index -- on a machine without the cleartext,
+                    against the record files inside the vault (state file + manifests, decrypted)
     hash-b2, verify-b2   work as for any bucket -- on the ciphertext, which is what B2 stores
     check, compare  skip the bucket: a ciphertext listing has nothing to compare with
 The passphrase file holds the passphrase as its only line. Keep it out of every uploaded tree.
@@ -112,6 +113,7 @@ import re
 import socket
 import ssl
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -1223,6 +1225,20 @@ def vault_content(ctx: Context, cryptomator, name: str, vault, objects: dict, fi
     return diff
 
 
+def vault_record(vault, tree, chunks) -> tuple[list[fixity.Entry], dict[str, str]]:
+    """The record the client put into the vault -- its state file and manifests, decrypted into a
+    temporary folder and read like any folder record. ([], {}) without a state file: the manifests
+    alone carry no sizes, and adopting needs the cleartext."""
+    with tempfile.TemporaryDirectory() as tmp:
+        for n in ROOT_MANIFESTS:
+            f = tree.files.get(n)
+            if f is not None:
+                Path(tmp, n).write_bytes(b"".join(vault.decrypt_chunks(chunks(f))))
+        if not Path(tmp, fixity.STATE_FILE).is_file():
+            return [], {}
+        return fixity.folder_record(Path(tmp), adopt=False)
+
+
 def check_vault(ctx: Context, cryptomator, name: str, directory: str, bucket,
                 unfinished: list[str] | None) -> bool:
     """One vault: open, walk, compare with the local index; True if anything is wrong."""
@@ -1264,14 +1280,24 @@ def check_vault(ctx: Context, cryptomator, name: str, directory: str, bucket,
     index = ctx.vault_index(name, directory)
     clear = ctx.bucket_dir(name) / directory  # localRoot (or bucketDir) is required with localIndex=folder
     known, state = ctx.local_record(clear, index) if index is None or index.is_file() else ([], {})
+    from_vault = False
+    if not known:
+        # No cleartext here (another machine): the vault carries the record the client made.
+        try:
+            known, state = vault_record(vault, tree, lambda f: b2_chunks(bucket, objects[f.object_name][1]))
+        except cryptomator.DamagedError as e:
+            print(f"  PROBLEM: the record files inside the vault cannot be read ({e})")
+            return True
+        from_vault = bool(known)
     if not known:
         print(f"  no local record - run 'hash-local {name}' to compare names and sizes")
         return bool(tree.problems or mine)
-    print(f"  local record as of: {saved_info(state)}")
-    info.append(f"- **Local record:** {saved_info(state)}")
+    source = "the record files inside the vault" if from_vault else "local record"
+    print(f"  {source} as of: {saved_info(state)}")
+    info.append(f"- **{'Record (from the vault)' if from_vault else 'Local record'}:** {saved_info(state)}")
     # The cleartext directory's own files went into the vault too: decrypt them and compare.
     record_problems, record_ok = [], 0
-    for n in sorted(ROOT_MANIFESTS):
+    for n in sorted(ROOT_MANIFESTS) if not from_vault else []:
         local_file = clear / n
         if not local_file.is_file():
             continue
@@ -1297,8 +1323,9 @@ def check_vault(ctx: Context, cryptomator, name: str, directory: str, bucket,
             record_problems.append(what)
             print(f"  ! {what}")
             info.append(f"- **Record file:** {what}")
-    print(f"  record files in the vault: {record_ok} identical")
-    info.append(f"- **Record files in the vault:** {record_ok} identical")
+    if not from_vault:
+        print(f"  record files in the vault: {record_ok} identical")
+        info.append(f"- **Record files in the vault:** {record_ok} identical")
     keep = lambda p: not is_root_manifest(p) and not fixity.is_excluded(p, ctx.excludes)  # noqa: E731
     local = ctx.filter.apply([e for e in known if keep(e.path)])
     # An impossible ciphertext size is already a problem; -1 makes it a size difference as well.

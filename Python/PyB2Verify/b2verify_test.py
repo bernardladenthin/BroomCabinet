@@ -16,6 +16,7 @@ import contextlib
 import hashlib
 import io
 import os
+import shutil
 import socket
 import tempfile
 import time
@@ -758,6 +759,37 @@ class VaultCommandTest(unittest.TestCase):
         code, out = self.cmd("vault")
         self.assertEqual(code, 0, out)  # every check changes it: outdated until the next upload, as expected
         self.assertIn("note: .fixity-state.csv: the copy in the vault differs", out)
+
+    def test_without_the_cleartext_the_record_inside_the_vault_is_used(self):
+        # A rented server next to B2 has the passphrase but no cleartext: the vault carries the record.
+        self.config.write_text(self.config.read_text(encoding="utf-8") + "localIndex=folder\n", encoding="utf-8")
+        self.cmd("hash-local", "example-vault-bucket")
+        self.upload_record()
+        shutil.rmtree(self.clear)
+        code, out = self.cmd("vault")
+        self.assertEqual(code, 0, out)
+        self.assertIn("the record files inside the vault as of", out)
+        self.assertIn("in sync  (Local 3 files, B2 3 files)", out)
+        self.assertNotIn("record files in the vault:", out)  # they are the record, not compared with it
+        code, out = self.cmd("vault", "--download")
+        self.assertEqual(code, 0, out)
+        self.assertIn("checksum identical: 3", out)
+        obj = next(n for n in self.bucket.objects if n.endswith(".c9r") and len(self.bucket.objects[n]) > 90_000)
+        data = bytearray(self.bucket.objects[obj])
+        data[50_000] ^= 0x10
+        self.bucket.objects[obj] = bytes(data)
+        code, out = self.cmd("vault", "--download")
+        self.assertEqual(code, 1, out)
+        self.assertIn("DAMAGED", out)
+
+    def test_without_the_cleartext_and_without_a_state_file_in_the_vault_nothing_is_compared(self):
+        self.cmd("hash-local", "example-vault-bucket")  # index mode: four manifests, no state file
+        self.upload_record()
+        shutil.rmtree(self.clear)
+        shutil.rmtree(self.tmp / "state" / "checksums" / "local")  # another machine: no index either
+        code, out = self.cmd("vault")
+        self.assertEqual(code, 0, out)  # the structure is fine; there is just nothing to compare with
+        self.assertIn("no local record", out)
 
     def test_a_malformed_vault_entry_in_the_configuration_is_refused(self):
         self.config.write_text(self.config.read_text(encoding="utf-8").replace(

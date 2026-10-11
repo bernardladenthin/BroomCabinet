@@ -237,6 +237,14 @@ is neither indexed nor uploaded. Then:
 | `hash-b2`, `verify-b2` | unchanged: they check the ciphertext, which is what B2 stores |
 | `check`, `compare` | skip the bucket, saying why |
 
+**On a machine without the cleartext** -- say a rented server next to B2 that holds only the
+configuration and the passphrase file -- `vault` and `vault --download` take the record from the vault
+itself: the state file and manifests that `hash-local` wrote into the cleartext directory were
+encrypted and uploaded with it, so they are decrypted into a temporary folder and read as the
+index. That needs `localIndex=folder` on the machine that made the record (the state file carries
+the sizes; the manifests alone do not). They are then the reference, so they are not compared with
+themselves.
+
 **Why the structure is checked.** B2 has no directories and no transactions. One vault directory
 is several objects — a pointer (`dir.c9r`) in the parent, then the directory itself under `d/` — and
 a client that stops between them leaves a pointer into nothing. That happened during a real
