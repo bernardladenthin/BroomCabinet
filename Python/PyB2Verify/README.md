@@ -185,6 +185,13 @@ read produces both the SHA-1 and the ETag, so an 18 GB archive is verified witho
 claims. The download is streamed straight into the hasher; no temporary file is written. A file
 confirmed through its ETag gets its real SHA-1 recorded, so it is comparable by SHA-1 from then on.
 
+A download that **breaks off** (a dropped connection, `IncompleteRead`) continues where it stopped:
+B2 never changes a file under its id, so the rest is asked for by Range and the hasher goes on —
+nothing is read twice. Up to 5 retries per file, 2 to 30 s apart, each one logged
+(`retry 1/5 at 3.2 GB of 6.4 GB (<file>): ...`); an error that will not pass by itself (a missing
+file, a refused key) fails at once. `vault --download` streams the same way. Over a slow line this
+matters: one stream of a large file runs for many minutes.
+
 **`--all-digests`** goes further: it computes SHA-256, SHA-1, MD5 and CRC32 (and the ETag where B2
 has one) of what comes down and compares **every** one with the local record — the content against
 all four manifests and `.s3etag`, not only against B2's own SHA-1. One strong digest already settles
