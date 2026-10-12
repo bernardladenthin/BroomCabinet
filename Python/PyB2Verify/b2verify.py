@@ -32,8 +32,9 @@ COMMANDS
         --quick                 names, sizes and times only; read nothing
     verify-b2 [bucket ...]      compare the current bucket listing with the saved checksums
         --download              also stream every file from B2, hash it and compare it with what
-                                B2's metadata states -- straight from the network, no temp files
-        --all-digests           with --download: also compute SHA-256, MD5 and CRC32 and compare
+                                B2's metadata states -- straight from the network, no temp files;
+                                a stream that breaks off goes on by Range where it stopped
+        --all-digests          with --download: also compute SHA-256, MD5 and CRC32 and compare
                                 EVERY digest with the local record (on a server: the record files
                                 fetched from the bucket) -- the content against all four manifests
                                 and .s3etag, not only B2's SHA-1 or ETag. Slower: MD5 and SHA-256
@@ -113,6 +114,7 @@ Exit status: 0 everything matches / done, 1 differences found, 2 error.
 from __future__ import annotations
 
 import argparse
+import http.client
 import os
 import re
 import socket
@@ -275,13 +277,66 @@ class S3Info:
         return etag, [self._head(bucket, e, part=n)["ContentLength"] for n in range(1, count + 1)]
 
 
-def b2_chunks(bucket, file_id: str) -> Iterator[bytes]:
-    """A B2 file's content as a stream, from the network straight into the hasher. No temp file."""
-    response = bucket.download_file_by_id(file_id).response
-    try:
-        yield from response.iter_content(fixity.READ_CHUNK)
-    finally:
-        response.close()
+# A DOWNLOAD THAT BREAKS OFF CONTINUES WHERE IT STOPPED. Over a slow line one stream of a large file
+# runs for many minutes, and now and then the connection drops ("IncompleteRead") -- six of 112
+# files on a 100 Mbit/s server. A B2 file never changes under its id, so the rest, asked for by
+# Range, is exactly the missing bytes: the hasher just goes on, nothing is read twice.
+DOWNLOAD_RETRIES = 5
+
+
+def retry_pause(attempt: int) -> None:
+    """Wait before the attempt-th retry: 2, 4, 8, 16, 30 s."""
+    time.sleep(min(2 ** attempt, 30))
+
+
+def transient(e: Exception) -> bool:
+    """Is it worth asking again? b2sdk's errors know it themselves; a broken or timed-out stream
+    is an OSError (requests' exceptions are) or an http.client error. Anything else -- a missing
+    file, a refused key, a bug -- fails at once."""
+    should_retry = getattr(e, "should_retry_http", None)
+    if callable(should_retry):
+        return bool(should_retry())
+    return isinstance(e, (OSError, http.client.HTTPException))
+
+
+def b2_chunks(bucket, file_id: str, retries: int = DOWNLOAD_RETRIES) -> Iterator[bytes]:
+    """A B2 file's content as a stream, from the network straight into the hasher. No temp file.
+    A stream that breaks off is resumed by Range from the byte where it stopped, up to RETRIES times."""
+    downloaded = bucket.download_file_by_id(file_id)
+    got = failures = 0
+    size = None
+    while True:
+        response = downloaded.response
+        if got and getattr(response, "status_code", 206) != 206:
+            response.close()  # the rest must be the rest, not the file from the start again
+            raise OSError(f"B2 ignored the range request (HTTP {response.status_code})")
+        try:
+            for chunk in response.iter_content(fixity.READ_CHUNK):
+                got += len(chunk)
+                yield chunk
+            return
+        except Exception as e:  # noqa: BLE001 - sorted by transient(); the rest is raised
+            if not transient(e) or failures >= retries:
+                raise
+            error = e
+        finally:
+            response.close()
+        if size is None:
+            size = downloaded.download_version.size
+        if got >= size:
+            return
+        while True:
+            failures += 1
+            print(f"  retry {failures}/{retries} at {fixity.fmt_size(got)} of {fixity.fmt_size(size)}"
+                  f" ({getattr(downloaded.download_version, 'file_name', file_id)}): {error}", flush=True)
+            retry_pause(failures)
+            try:
+                downloaded = bucket.download_file_by_id(file_id, range_=(got, size - 1))
+                break
+            except Exception as e:  # noqa: BLE001 - as above
+                if not transient(e) or failures >= retries:
+                    raise
+                error = e
 
 
 def unfinished_uploads(bucket) -> list[str] | None:

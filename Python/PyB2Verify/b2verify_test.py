@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import http.client
 import io
 import os
 import re
@@ -480,6 +481,120 @@ class FakeListingBucket:
         return []
 
 
+class FlakyListingBucket(FakeListingBucket):
+    """A listing bucket whose downloads break off like a dropped connection: the first BREAKS opens
+    of each file deliver CUT bytes and then raise ERROR. Every open honours range_ as B2 does
+    (inclusive end, HTTP 206), unless STATUS says the server ignored it."""
+
+    def __init__(self, objects: dict[str, bytes], breaks=1, cut=100, error=None, status=206):
+        super().__init__(objects)
+        self.breaks, self.cut, self.status = breaks, cut, status
+        self.error = error or ConnectionResetError("Connection broken: IncompleteRead")
+        self.opens: list[tuple[str, tuple[int, int] | None]] = []
+
+    def download_file_by_id(self, file_id, range_=None):
+        name, data = next((n, d) for n, d in self.objects.items() if "id-" + hashlib.sha1(d).hexdigest() == file_id)
+        self.opens.append((file_id, range_))
+        start, end = range_ if range_ else (0, len(data) - 1)
+        part = data[start:end + 1] if self.status == 206 or not range_ else data
+        broken = sum(1 for f, _ in self.opens if f == file_id) <= self.breaks
+
+        def iter_content(n):
+            if broken:
+                yield part[:self.cut]
+                raise self.error
+            yield from (part[i:i + n] for i in range(0, len(part), n))
+        response = types.SimpleNamespace(iter_content=iter_content, close=lambda: None,
+                                         status_code=self.status if range_ else 200)
+        return types.SimpleNamespace(response=response,
+                                     download_version=types.SimpleNamespace(size=len(data), file_name=name))
+
+
+class DownloadRetryTest(unittest.TestCase):
+    """b2_chunks: a stream that breaks off goes on by Range from where it stopped -- the same bytes,
+    each read once -- and gives up after DOWNLOAD_RETRIES or at once on an error that will not pass."""
+
+    DATA = os.urandom(1000)
+
+    def setUp(self):
+        self.pauses: list[int] = []
+        patch = unittest.mock.patch.object(b2verify, "retry_pause", self.pauses.append)
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def read(self, bucket, **kw) -> tuple[bytes, str]:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            data = b"".join(b2verify.b2_chunks(bucket, "id-" + hashlib.sha1(self.DATA).hexdigest(), **kw))
+        return data, out.getvalue()
+
+    def test_a_broken_stream_continues_where_it_stopped(self):
+        bucket = FlakyListingBucket({"big.iso": self.DATA}, breaks=3, cut=100)
+        data, out = self.read(bucket)
+        self.assertEqual(data, self.DATA)  # every byte once, in order
+        self.assertEqual([r for _, r in bucket.opens], [None, (100, 999), (200, 999), (300, 999)])
+        self.assertEqual(self.pauses, [1, 2, 3])
+        self.assertIn("retry 1/5 at 100 B of 1000 B (big.iso): Connection broken: IncompleteRead", out)
+        self.assertIn("retry 3/5", out)
+
+    def test_an_unbroken_stream_is_read_once_and_quietly(self):
+        bucket = FlakyListingBucket({"big.iso": self.DATA}, breaks=0)
+        data, out = self.read(bucket)
+        self.assertEqual(data, self.DATA)
+        self.assertEqual(len(bucket.opens), 1)
+        self.assertEqual((out, self.pauses), ("", []))
+
+    def test_it_gives_up_after_the_last_retry(self):
+        bucket = FlakyListingBucket({"big.iso": self.DATA}, breaks=99, cut=10)
+        with self.assertRaises(ConnectionResetError):
+            self.read(bucket, retries=2)
+        self.assertEqual(len(bucket.opens), 3)  # the first try and two retries
+        self.assertEqual(self.pauses, [1, 2])
+
+    def test_an_error_that_will_not_pass_is_raised_at_once(self):
+        bucket = FlakyListingBucket({"big.iso": self.DATA}, error=ValueError("a bug, not the network"))
+        with self.assertRaises(ValueError):
+            self.read(bucket)
+        self.assertEqual((len(bucket.opens), self.pauses), (1, []))
+
+    def test_a_reopen_refused_for_good_is_not_retried(self):
+        class FileNotPresent(Exception):  # shaped like b2sdk's: it says itself whether to retry
+            def should_retry_http(self):
+                return False
+        bucket = FlakyListingBucket({"big.iso": self.DATA})
+        first = bucket.download_file_by_id
+
+        def refuse_reopen(file_id, range_=None):
+            if range_:
+                raise FileNotPresent("gone")
+            return first(file_id, range_)
+        bucket.download_file_by_id = refuse_reopen
+        with self.assertRaises(FileNotPresent):
+            self.read(bucket)
+        self.assertEqual(self.pauses, [1])
+
+    def test_a_server_that_ignores_the_range_is_an_error_not_a_mismatch(self):
+        # 200 instead of 206 would put the file's start after its first 100 bytes -- a wrong
+        # checksum that is no fault of the data. It must show as a download error instead.
+        bucket = FlakyListingBucket({"big.iso": self.DATA}, status=200)
+        with self.assertRaisesRegex(OSError, "ignored the range request"):
+            self.read(bucket)
+
+    def test_what_counts_as_transient(self):
+        class B2Like(Exception):
+            def __init__(self, retry):
+                self.retry = retry
+
+            def should_retry_http(self):
+                return self.retry
+        self.assertTrue(b2verify.transient(ConnectionResetError()))
+        self.assertTrue(b2verify.transient(TimeoutError()))
+        self.assertTrue(b2verify.transient(http.client.IncompleteRead(b"", 5)))
+        self.assertTrue(b2verify.transient(B2Like(True)))
+        self.assertFalse(b2verify.transient(B2Like(False)))
+        self.assertFalse(b2verify.transient(ValueError()))
+
+
 class AllDigestsTest(unittest.TestCase):
     """verify-b2 --download --all-digests: the content from B2 against every digest of the record
     -- also on a machine that holds nothing but the record files, like a server next to B2."""
@@ -547,6 +662,15 @@ class AllDigestsTest(unittest.TestCase):
         code, out = self.cmd("verify-b2", "example-bucket", "--download", "--all-digests")
         self.assertEqual(code, 0, out)
         self.assertIn("--all-digests: no local record for example-bucket", out)
+
+    def test_broken_downloads_are_resumed_and_still_match_every_digest(self):
+        self.bucket = FlakyListingBucket(self.bucket.objects, breaks=2, cut=200)
+        with unittest.mock.patch.object(b2verify, "retry_pause", lambda attempt: None):
+            code, out = self.cmd("verify-b2", "example-bucket", "--download", "--all-digests")
+        self.assertEqual(code, 0, out)
+        self.assertIn("retry 2/5", out)
+        self.assertIn("checksum identical: 3  (sha256+sha1+md5+crc32 3)", out)
+        self.assertNotIn("download error", out)
 
 
 class SubfolderBucketTest(unittest.TestCase):
