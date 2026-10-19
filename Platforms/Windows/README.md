@@ -18,6 +18,7 @@ Helper scripts, checklists and quick-reference commands for Windows.
 | [`Registry/`](Registry/) | Standalone registry tweaks (hide last user name, spooler despooling, "Open with LibreOffice", …). See [`Registry/README.md`](Registry/README.md). |
 | [`ScheduledTasks/`](ScheduledTasks/) | Task Scheduler recipes (e.g. flush the disk write cache every 15 min with `sync.exe`). See [`ScheduledTasks/README.md`](ScheduledTasks/README.md). |
 | [`DriveIcon/`](DriveIcon/) | Set a custom drive icon/label with `autorun.inf`. See [`DriveIcon/README.md`](DriveIcon/README.md). |
+| [`GitMaintenance/`](GitMaintenance/) | PowerShell script that pulls every git repo in a folder, deletes merged local branches and runs `git gc`. See [`GitMaintenance/README.md`](GitMaintenance/README.md). |
 | [`MatrixRain/`](MatrixRain/) | A console "Matrix rain" effect (PowerShell) with a double-click launcher. Just for fun. See [`MatrixRain/README.md`](MatrixRain/README.md). |
 
 ## Useful commands
