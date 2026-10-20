@@ -51,7 +51,7 @@ SPDX-License-Identifier: Apache-2.0
             class (21.x is an actively maintained LTS line). Use a 19.x/21.x version here; see
             README.md for the boundary.
         -->
-        <ojdbc.version>21.21.0.0</ojdbc.version>
+        <ojdbc.version>21.23.0.0</ojdbc.version>
 
         <!--
             H2 only provides a neutral in-memory source ResultSet for populate(); it has

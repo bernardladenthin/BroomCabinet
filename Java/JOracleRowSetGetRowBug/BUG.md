@@ -38,8 +38,10 @@ implementation must return `0`.
 
 | ojdbc8 version | `getRow()` at `afterLast()` | conforms? |
 |---|---|---|
-| `19.27.0.0` (latest 19.x) | `2` | no |
-| `21.21.0.0` (latest 21.x) | `2` | no |
+| `19.27.0.0` | `2` | no |
+| `19.32.0.0` (latest 19.x, Oct 2026) | `2` | no |
+| `21.21.0.0` | `2` | no |
+| `21.23.0.0` (latest 21.x, Oct 2026) | `2` | no |
 
 The divergence reproduces on every 19.x and 21.x release tested.
 
@@ -48,7 +50,7 @@ The divergence reproduces on every 19.x and 21.x release tested.
 - **Deprecated since 12.2.** Oracle's JDBC Developer's Guide ("Changes in This Release", 12.2)
   deprecated the `oracle.jdbc.rowset` package and recommends the standard JDK rowset instead.
 - **Present and buggy through the 19.x and 21.x lines** — `oracle.jdbc.rowset.OracleCachedRowSet`
-  is in `ojdbc8` `19.27.0.0` and `21.21.0.0` and exhibits the bug.
+  is in `ojdbc8` `19.27.0.0`, `19.32.0.0`, `21.21.0.0` and `21.23.0.0` and exhibits the bug.
 - **Physically absent from the 23.x driver jars** — the entire `oracle/jdbc/rowset/` package is gone
   from `ojdbc8` `23.2.0.0`, `23.9.0.25.07`, and `23.26.2.0.0`, and from `ojdbc11`/`ojdbc17`
   `23.26.2.0.0` (confirmed by listing the jar contents). Oracle's lifecycle docs label the package
@@ -61,7 +63,7 @@ equivalent `ojdbc11`/`ojdbc17` builds carry the same code and are expected to be
 
 ## Environment
 
-- **Driver:** `com.oracle.database.jdbc:ojdbc8` `21.21.0.0` and `19.27.0.0`
+- **Driver:** `com.oracle.database.jdbc:ojdbc8` `21.23.0.0`, `21.21.0.0`, `19.32.0.0` and `19.27.0.0`
 - **JVM:** OpenJDK 21 (behavior is JVM-version independent)
 - **Comparison baseline:** `com.sun.rowset.CachedRowSetImpl`
 - **Data source:** H2 `2.2.224`, used only to provide a neutral source `ResultSet`. **No Oracle
@@ -77,7 +79,7 @@ equivalent `ojdbc11`/`ojdbc17` builds carry the same code and are expected to be
 <dependency>
   <groupId>com.oracle.database.jdbc</groupId>
   <artifactId>ojdbc8</artifactId>
-  <version>21.21.0.0</version>
+  <version>21.23.0.0</version>
 </dependency>
 <dependency>
   <groupId>com.h2database</groupId>
