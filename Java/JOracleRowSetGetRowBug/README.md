@@ -43,7 +43,7 @@ guards the valid `1..N` range and falls through to `0` for any non-row position.
 
 The `oracle.jdbc.rowset` package (including `OracleCachedRowSet`) was **deprecated since ojdbc 12.2**
 but still ships — and still exhibits the bug — in the **19.x and 21.x `ojdbc8` lines** (latest
-checked: `19.27.0.0` and `21.21.0.0`, Dec 2025). Oracle **removed the entire package from the 23.x
+checked: `19.32.0.0` and `21.23.0.0`, Oct 2026; before that `19.27.0.0` and `21.21.0.0`, Dec 2025). Oracle **removed the entire package from the 23.x
 driver jars**, verified on Maven Central: the `oracle/jdbc/rowset/` package is absent from `ojdbc8`
 `23.2.0.0`, `23.9.0.25.07`, and `23.26.2.0.0`, and from `ojdbc11`/`ojdbc17` `23.26.2.0.0`. (Oracle's
 lifecycle docs label the package "desupported in 26ai" and the 23ai/26ai JDBC Developer's Guide still
@@ -52,7 +52,7 @@ lifecycle docs label the package "desupported in 26ai" and the 23ai/26ai JDBC De
 - This project **builds and reproduces the bug against 19.x / 21.x.**
 - It **does not compile against any 23.x version** — `oracle.jdbc.rowset` no longer exists there.
 
-The default `ojdbc.version` is therefore `21.21.0.0`, the newest release that still ships the class.
+The default `ojdbc.version` is therefore `21.23.0.0`, the newest release that still ships the class.
 
 The defect is long-standing: independent public decompiled mirrors of ojdbc6 `11.2.0.2.0` and the
 `10.2.0.2` driver contain a byte-identical `getRow()`, and no public report or Oracle bug ID names the
@@ -63,7 +63,7 @@ exact symptom. See [`BUG.md`](BUG.md) → "Prior art / related reports".
 | Component | Value |
 |---|---|
 | Java | 8 (source/target `1.8`) |
-| Oracle driver | `com.oracle.database.jdbc:ojdbc8:${ojdbc.version}` (default `21.21.0.0`; must be a 19.x/21.x version) |
+| Oracle driver | `com.oracle.database.jdbc:ojdbc8:${ojdbc.version}` (default `21.23.0.0`; must be a 19.x/21.x version) |
 | Source `ResultSet` | H2 `com.h2database:h2:2.2.224` (in-memory; **no Oracle database required**) |
 
 **No live Oracle database is needed.** `CachedRowSet.populate(ResultSet)` accepts *any*
@@ -90,8 +90,8 @@ mvn -Dojdbc.version=19.27.0.0 compile exec:java
 ### Expected output (bug present)
 
 ```
-Oracle JDBC driver under test : ojdbc8 21.21.0.0 (build property)
-Driver self-reported version  : 21.21.0.0.0
+Oracle JDBC driver under test : ojdbc8 21.23.0.0 (build property)
+Driver self-reported version  : 21.23.0.0.0
 Source query: SELECT 'value1' AS COL_A, 123 AS COL_B, CAST(NULL AS VARCHAR) AS COL_C UNION ALL SELECT 'value2', 456, 'not_null'
 
 == com.sun.rowset.CachedRowSetImpl ==
@@ -129,7 +129,9 @@ mvn -Dojdbc.version=<version> compile exec:java     # printed trace
 | ojdbc8 version | ships `OracleCachedRowSet`? | `getRow()` at `afterLast()` | conforms (== 0)? |
 |---|---|---|---|
 | `19.27.0.0` | yes | **2** | no |
-| `21.21.0.0` (default) | yes | **2** | no |
+| `19.32.0.0` | yes | **2** | no |
+| `21.21.0.0` | yes | **2** | no |
+| `21.23.0.0` (default) | yes | **2** | no |
 | `23.2.0.0` … `23.26.2.0.0` | **no — package removed** (verified on Maven Central) | n/a (does not compile) | n/a |
 
 Every 19.x / 21.x release checked reproduces the divergence. The JUnit test
@@ -149,7 +151,7 @@ returning `0` — telling you exactly where the behavior changed.
 
 - If `OracleCachedRowSet` throws an NLS/i18n error at runtime, add
   `com.oracle.database.nls:orai18n` (matching version) — basic `populate`/`getRow` need only
-  `ojdbc8` (verified with `21.21.0.0` and `19.27.0.0`).
+  `ojdbc8` (verified with `21.23.0.0`, `21.21.0.0`, `19.32.0.0` and `19.27.0.0`).
 - `OracleCachedRowSet.populate(ResultSet)` needs a source backed by a live `Statement`. A
   disconnected/hand-built `CachedRowSet` source makes `populate()` throw `NullPointerException`
   (`populateInit` → `getStatement().getMaxFieldSize()`); the JDK reference impl accepts it. This is
