@@ -30,6 +30,7 @@ Each is self-contained and standard-library only unless its own README says othe
 | [`PyB2Verify/`](Python/PyB2Verify/README.md) | Proves that local directories and their Backblaze B2 buckets hold the same bytes, and re-reads either side against its own checksums to catch silent damage. Read-only towards B2; needs `b2sdk` and `boto3`. |
 | [`PyImageResizer/`](Python/PyImageResizer/README.md) | Image-processing toolkit with three subcommands; every one previews by default and needs `--execute` to touch a file. |
 | [`PyWebcamRecorder/`](Python/PyWebcamRecorder/README.md) | Screenshots one element of a webcam page at intervals to build a time-lapse. |
+| [`PyPrimeBitLab/`](Python/PyPrimeBitLab/README.md) | Primes as bit vectors, bit fields and residue vectors, plus a test bench that measures every idea of predicting the next prime against the sieve with the same divisors — with controls, two metrics and one comparison table. |
 | [`PyDDRescueRelais/`](Python/PyDDRescueRelais/) | Runs `ddrescue` against a drive that hangs almost immediately, power-cycling it through a USB relay between short attempts. |
 | [`PyImageSequencer/`](Python/PyImageSequencer/) | Turns a directory tree of images into a sequentially numbered copy, and optionally encodes that sequence to video with ffmpeg. |
 | [`PyJcmdGcRun/`](Python/PyJcmdGcRun/) | Triggers `jcmd GC.run` against every locally running JVM. |
