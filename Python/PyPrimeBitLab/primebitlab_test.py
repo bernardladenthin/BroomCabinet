@@ -145,6 +145,39 @@ class Bench(unittest.TestCase):
         self.assertLess(self.b.train[-1][2], self.b.test[0][2])
 
 
+class FactoringFromBelow(unittest.TestCase):
+    def test_lifting_finds_exactly_the_divisor_pairs(self):
+        """Not only semiprimes: every factorisation a·b = N must come out, and nothing else."""
+        rng = random.Random(3)
+        for base in (2, 10):
+            for _ in range(60):
+                N = rng.randrange(3, 30000) | 1
+                if math.gcd(N, base) != 1:
+                    continue
+                divisors = {(d, N // d) for d in range(1, N + 1) if N % d == 0}
+                self.assertEqual(pbl.lift(N, base)[0], divisors, (N, base))
+
+    def test_without_dropping_the_candidates_are_exactly_the_units(self):
+        """What part A of the experiment shows: N mod B^k excludes no residue of a factor."""
+        rng = random.Random(4)
+        for base, levels in ((2, 12), (10, 4), (3, 7)):
+            for _ in range(5):
+                N = pbl.random_prime(40, rng) * pbl.random_prime(40, rng)
+                counts = pbl.lift(N, base, levels)[1]
+                self.assertEqual(counts, [pbl.unit_count(base, k) for k in range(1, levels + 1)])
+
+    def test_the_primes_ending_in_9_that_primecrash_missed_are_found(self):
+        for p, q in ((19, 23), (331, 999979)):
+            self.assertIn((p, q), pbl.lift(p * q, 10)[0])
+
+    def test_trial_division_and_pollard_rho_find_a_proper_factor(self):
+        rng = random.Random(6)
+        for _ in range(50):
+            p, q = pbl.random_prime(16, rng), pbl.random_prime(20, rng)
+            self.assertEqual(pbl.trial_division(p * q)[0], min(p, q))
+            self.assertIn(pbl.pollard_rho(p * q)[0], (p, q))
+
+
 class Generators(unittest.TestCase):
     def setUp(self):
         self.rng = random.Random(5)

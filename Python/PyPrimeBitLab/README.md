@@ -15,6 +15,7 @@ the same reference, with controls that prove the bench can see a pattern when th
 Standard library only; `mpmath` is used for one cross-check if it happens to be installed.
 
     python primebitlab.py compare          # every experiment quietly, then one comparison table (~2 min)
+    python primebitlab.py factor           # experiment 8 alone: factoring from the lowest digits (~5 s)
     python primebitlab.py all              # the same with every experiment's own output
     python primebitlab.py check 1000003    # a primality test through bit weights alone
     python primebitlab_test.py             # the ground truth the bench stands on
@@ -77,6 +78,7 @@ loses on the test half for that reason alone.
 | 5 learning | `learn` | logistic regression from bits learns nothing (with bit pairs it overfits); from the residue vector 17…31 it learns exactly "sieve to 31" |
 | 6 sieve + Miller–Rabin | `nextprime` | 0 errors up to 10⁶; the next prime after 10¹⁰⁰ in ~7 ms. The binary representation pays off for *testing* (square-and-multiply walks the bits), not for predicting |
 | 7 unexplored ranges | `unexplored` | random windows at 2⁴⁰…2²⁰⁰ and thin binary sets with open questions (weight 3, weight 5, fibbinary, binary palindromes): all within 2 σ of the sieve random model. The negative control n² − 1 = (n−1)(n+1) stands out at −8.1 σ |
+| 8 factoring from below | `factor` | lifting N = a·b digit by digit from the lowest end leaves exactly φ(B^k) candidates after k digits, for every N: the low digits of N carry nothing about those of a factor. The full search costs N^0.502 against N^0.506 for trial division (Pollard rho: N^0.271) |
 
 ## The sieve random model has a range of validity
 
@@ -90,6 +92,20 @@ chance: 30 further windows gave −0.49 σ.
 
 That is the procedure for anything that ever exceeds 4 σ here: new seed, more windows, and a
 look at the model — before believing in a discovery.
+
+## Factoring from the lowest digits
+
+Experiment 8 takes up an old Java attempt (primecrash, 2016) to factor RSA-576 from below: keep
+every pair (a mod 10^k, b mod 10^k) with a·b ≡ N mod 10^k, append a digit, repeat. It looks like
+the last digits of N narrow the search. They do not: for every a with an inverse mod B^k, the
+partner b = N·a⁻¹ is exactly one residue, so the candidates after k digits are φ(B^k) — the same
+count for every N. The search walks through every residue a factor could have, √N of them, which
+is trial division with all candidates held in memory at once. For RSA-576 that is about 2²⁹³ steps.
+
+The old code had a second lesson. Its start filter dropped factors ending in 9, so 19·23 and
+331·999979 could never be found — two of its own commented-out examples. A filter that silently
+excludes the answer looks exactly like a method that does not work; `primebitlab_test.py` therefore
+checks that the lifting finds *every* factorisation of N, not just the expected one.
 
 ## Adding an idea
 
