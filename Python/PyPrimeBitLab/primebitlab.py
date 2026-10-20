@@ -50,6 +50,7 @@ Experiments on the common bench (all take [--limit 1000000] [--k 6]):
     python primebitlab.py learn        5 learning: bits against RNS    [--epochs 2]
     python primebitlab.py nextprime    6 sieve + Miller-Rabin         [--runs 20]
     python primebitlab.py unexplored   7 binary patterns at large heights [--heights 2^40 ... 2^200] [--seed 1]
+    python primebitlab.py factor       8 factoring from the lowest digits [--bits 16 ... 36] [--samples 4]
 
     python primebitlab.py compare      every experiment quietly, then the comparison table
     python primebitlab.py all          everything with output, the comparison table at the end
@@ -1408,11 +1409,163 @@ def cmd_unexplored(args):
 
 
 # ---------------------------------------------------------------------------
+# 8 Factoring from the lowest digits
+# ---------------------------------------------------------------------------
+
+def lift(N, base, levels=None):
+    """Factor N digit by digit from the lowest end: keep every pair (a, b) with a·b ≡ N mod base^k,
+    append one digit to each, keep the pairs that agree with N in one more digit.
+
+    With levels=None it runs to the end: a pair whose product is N is a factorisation, a pair whose
+    product exceeds N is dropped (appending digits only makes it bigger). Otherwise it stops after
+    that many levels and drops nothing. Returns (pairs found, candidates per level, pairs tried).
+    """
+    pairs = [(a, b) for a in range(base) for b in range(base) if a * b % base == N % base]
+    found, counts, tried, t = set(), [], base * base, base
+    while pairs:
+        counts.append(len(pairs))
+        if levels is None:
+            found |= {(a, b) for a, b in pairs if a * b == N}
+            pairs = [(a, b) for a, b in pairs if a * b < N]
+        elif len(counts) == levels:
+            break
+        m = t * base
+        r, steps = N % m, range(0, m, t)
+        tried += len(pairs) * base * base
+        pairs = [(a + i, b + j) for a, b in pairs for i in steps for j in steps if (a + i) * (b + j) % m == r]
+        t = m
+    return found, counts, tried
+
+
+def unit_count(base, k):
+    """φ(base^k): the residues a mod base^k with an inverse -- for each, b = N·a⁻¹ is the one partner."""
+    return euler_phi(base) * base ** (k - 1)
+
+
+def trial_division(N):
+    """Smallest factor of the odd composite N and the number of odd divisors it took."""
+    d = 3
+    while N % d:
+        d += 2
+    return d, (d - 1) // 2
+
+
+def pollard_rho(N):
+    """A factor of the odd composite N (Floyd's cycle finding on x² + c) and the steps it took."""
+    steps, c = 0, 1
+    while True:
+        x = y = 2
+        g = 1
+        while g == 1:
+            x, y = (x * x + c) % N, (y * y + c) % N
+            y = (y * y + c) % N
+            g = math.gcd(x - y, N)
+            steps += 1
+        if g != N:
+            return g, steps
+        c += 1
+
+
+def random_prime(bits, rng):
+    while True:
+        n = rng.getrandbits(bits) | 1 << (bits - 1) | 1
+        if miller_rabin(n):
+            return n
+
+
+def slope(xs, ys):
+    """Least-squares slope of ys over xs."""
+    mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
+    return sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sum((x - mx) ** 2 for x in xs)
+
+
+PRIMECRASH_CASES = [(677, 683), (9967, 9973), (19, 23), (331, 999979)]
+RSA_576_BITS = 576
+
+
+def cmd_factor(args):
+    rng = random.Random(args.seed)
+    print("Factoring N = a·b from the lowest digits: keep every pair (a mod B^k, b mod B^k) with")
+    print("a·b ≡ N mod B^k, append one digit to each, keep the pairs that agree in one more digit.")
+    print("A pair with a·b = N is a factorisation, one with a·b > N is dropped.\n")
+
+    print("A) Candidates after k digits, without dropping any, {} random semiprimes of 64 bits".format(args.samples))
+    print("   against φ(B^k) -- the number of residues a mod B^k that have an inverse.\n")
+    numbers = [random_prime(32, rng) * random_prime(32, rng) for _ in range(args.samples)]
+    print("  {:<6} {:>3} {:>12} {:>12} {:>12}".format("base", "k", "min", "max", "φ(B^k)"))
+    exact = True
+    for base, levels in ((2, 16), (10, 5)):
+        counts = [lift(N, base, levels)[1] for N in numbers]
+        for k in range(1, levels + 1):
+            column = [c[k - 1] for c in counts]
+            exact &= min(column) == max(column) == unit_count(base, k)
+            if base == 10 or k % 4 == 0:
+                print("  {:<6} {:>3} {:>12} {:>12} {:>12}".format(base, k, min(column), max(column), unit_count(base, k)))
+    record("8 Factoring from below", "A: candidates mod 2^16 and 10^5", "= φ(B^k)", "always" if exact else "NOT always",
+           "no information: =", "no information" if exact else "information")
+    print("\n-> Every unit a mod B^k has exactly one partner b = N·a⁻¹ mod B^k, whatever N is. The lowest k")
+    print("   digits of N exclude no candidate for the lowest k digits of a factor: they carry 0 bits about it.")
+
+    print("\nB) The full search in base 2 against trial division and Pollard rho, {} balanced semiprimes per".format(
+        args.samples))
+    print("   size, work as pairs tried / odd divisors tried / rho steps.\n")
+    print("  {:>5} {:>15} {:>15} {:>15} {:>12} {:>8}".format("bits", "Ø peak pairs", "Ø pairs tried",
+                                                             "Ø divisions", "Ø rho steps", "found"))
+    logs, failures = defaultdict(list), 0
+    for bits in args.bits:
+        rows = []
+        for _ in range(args.samples):
+            p, q = random_prime(bits // 2, rng), random_prime(bits - bits // 2, rng)
+            N = p * q
+            found, counts, tried = lift(N, 2)
+            ok = {(p, q), (q, p)} <= found
+            failures += not ok
+            divisions, steps = trial_division(N)[1], pollard_rho(N)[1]
+            for name, work in (("lift", tried), ("trial", divisions), ("rho", steps)):
+                logs[name].append((math.log2(N), math.log2(work)))
+            rows.append((max(counts), tried, divisions, steps, ok))
+        mean = [sum(r[i] for r in rows) / len(rows) for i in range(4)]
+        print("  {:>5} {:>15.0f} {:>15.0f} {:>15.0f} {:>12.0f} {:>8}".format(
+            bits, *mean, "{}/{}".format(sum(r[4] for r in rows), len(rows))))
+    exponents = {name: slope(*zip(*pairs)) for name, pairs in logs.items()}
+    print("\n  work ∝ N^x: lifting x = {lift:.3f}, trial division x = {trial:.3f}, Pollard rho x = {rho:.3f}".format(
+        **exponents))
+    for name, label in (("lift", "lifting"), ("trial", "trial division"), ("rho", "Pollard rho")):
+        xs, ys = zip(*logs[name])
+        level = sum(ys) / len(ys) - exponents[name] * sum(xs) / len(xs)
+        print("  RSA-576 ({} bits) by {:<15} ≈ 2^{:.0f} steps".format(
+            RSA_576_BITS, label, level + exponents[name] * RSA_576_BITS))
+    print("  (RSA-576 was factored in 2003 with the general number field sieve.)")
+    record("8 Factoring from below", "B: base-2 lifting, work ∝ N^x", "x", "{:.3f}".format(exponents["lift"]),
+           "trial division: {:.3f}".format(exponents["trial"]),
+           verdict_lower(exponents["lift"], exponents["trial"], 0.05) if not failures else "FAILED")
+    record("8 Factoring from below", "B: Pollard rho, work ∝ N^x", "x", "{:.3f}".format(exponents["rho"]),
+           "trial division: {:.3f}".format(exponents["trial"]), verdict_lower(exponents["rho"], exponents["trial"], 0.05))
+
+    print("\nC) primecrash's own cases in base 10. Its start filter dropped the final digit 9 -- primes")
+    print("   ending in 9 could never be found, and the last two cases were missed.\n")
+    print("  {:>12} {:>22} {:>12} {:>12}".format("N", "factors found", "peak pairs", "pairs tried"))
+    hits = 0
+    for p, q in PRIMECRASH_CASES:
+        found, counts, tried = lift(p * q, 10)
+        nontrivial = sorted(a for a, b in found if 1 < a <= b)
+        hits += nontrivial == [p]
+        print("  {:>12} {:>22} {:>12} {:>12}".format(
+            p * q, " · ".join(str(a) for a in nontrivial + [p * q // a for a in nontrivial]), max(counts), tried))
+    record("8 Factoring from below", "C: primecrash cases in base 10", "found", "{}/{}".format(
+        hits, len(PRIMECRASH_CASES)), "all {}".format(len(PRIMECRASH_CASES)),
+           "correct" if hits == len(PRIMECRASH_CASES) else "FAILED")
+    print("\n-> Lifting from below is trial division in disguise: it walks through every residue a factor could")
+    print("   have, √N of them, and keeps them all in memory at once. The digits of N tell it nothing.")
+
+
+# ---------------------------------------------------------------------------
 # Full run and comparison
 # ---------------------------------------------------------------------------
 
 DEMO_COMMANDS = [["table"], ["weights"], ["check", "49"], ["check", "1000003"], ["wheel"], ["bits"], ["rns"]]
-BENCH_COMMANDS = ["predict", "ramanujan", "compress", "bias", "zeta", "poly", "learn", "nextprime", "unexplored"]
+BENCH_COMMANDS = ["predict", "ramanujan", "compress", "bias", "zeta", "poly", "learn", "nextprime", "unexplored",
+                  "factor"]
 
 
 def run_sections(args, quiet):
@@ -1518,6 +1671,12 @@ def build_parser():
     p.add_argument("--weight3", type=int, default=400, help="largest exponent a in 2^a + 2^b + 1")
     p.add_argument("--seed", type=int, default=1)
     p.set_defaults(func=cmd_unexplored)
+
+    p = sub.add_parser("factor", help="8 factoring from the lowest digits against trial division")
+    p.add_argument("--bits", type=int, nargs="+", default=[16, 20, 24, 28, 32, 36], help="sizes of N in part B")
+    p.add_argument("--samples", type=int, default=4, help="semiprimes per size")
+    p.add_argument("--seed", type=int, default=1)
+    p.set_defaults(func=cmd_factor)
 
     for name, func, text in (("all", cmd_all, "everything with output, the comparison table at the end"),
                              ("compare", cmd_compare, "every experiment quietly, only the comparison table")):
