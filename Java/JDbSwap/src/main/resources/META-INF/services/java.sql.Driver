@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+# The MonetDB driver jar registers no service of its own, so DriverManager would not find it.
+nl.cwi.monetdb.jdbc.MonetDriver
