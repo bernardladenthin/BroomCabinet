@@ -6,7 +6,7 @@ SPDX-License-Identifier: Apache-2.0
 
 # BroomCabinet
 
-![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/bernardladenthin/BroomCabinet?utm_source=oss&utm_medium=github&utm_campaign=bernardladenthin%2FBroomCabinet&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+[![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/bernardladenthin/BroomCabinet?utm_source=oss&utm_medium=github&utm_campaign=bernardladenthin%2FBroomCabinet&labelColor=171717&color=FF570A&label=CodeRabbit+Reviews)](https://coderabbit.ai)
 
 Some useful stuff and work in progress.
 
