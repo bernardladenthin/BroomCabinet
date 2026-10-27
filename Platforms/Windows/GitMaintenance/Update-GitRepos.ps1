@@ -5,7 +5,8 @@
 # Housekeeping for every git repository directly below a folder:
 #   1. git fetch --all --prune, then git pull --ff-only (if the branch has an upstream)
 #   2. delete local branches already merged into the default branch (git branch -d)
-#   3. git gc
+#   3. list local branches whose upstream is gone (deleted on the remote); never deletes them
+#   4. git gc
 # Usage: Update-GitRepos.ps1 [-Root <folder>] [-WhatIf]
 
 [CmdletBinding(SupportsShouldProcess)]
@@ -18,6 +19,7 @@ param(
 $protected = @('main', 'master', 'develop')
 
 $failed = @()
+$gone   = @()
 $repos  = Get-ChildItem -LiteralPath $Root -Directory | Where-Object { Test-Path (Join-Path $_.FullName '.git') }
 if (-not $repos) { Write-Host "No git repositories found below $Root"; return }
 
@@ -43,7 +45,13 @@ foreach ($repo in $repos) {
             git -C $dir pull --ff-only
             if ($LASTEXITCODE -ne 0) { $ok = $false; Write-Warning 'pull failed (diverged or conflicting local changes?)' }
         } else {
-            Write-Host 'current branch has no upstream - pull skipped' -ForegroundColor DarkGray
+            # @{u} also fails when the upstream is configured but was deleted on the remote.
+            $current = git -C $dir branch --show-current
+            if ($current -and (git -C $dir config "branch.$current.merge")) {
+                Write-Host "upstream of $current is gone - pull skipped" -ForegroundColor Yellow
+            } else {
+                Write-Host 'current branch has no upstream - pull skipped' -ForegroundColor DarkGray
+            }
         }
 
         # The pull only moves the checked-out branch. If a feature branch is checked
@@ -72,7 +80,18 @@ foreach ($repo in $repos) {
         }
     }
 
-    # --- 3. gc -------------------------------------------------------------
+    # --- 3. report branches whose upstream is gone --------------------------
+    # Typically a PR branch the remote deleted after a squash or rebase merge: its commits
+    # are not in the default branch, so step 2 keeps it. Listed only; deciding is manual.
+    $tracks = git -C $dir for-each-ref --format='%(refname:short)|%(upstream:track)' refs/heads/
+    foreach ($line in $tracks) {
+        $name, $track = $line -split '\|', 2
+        if ($track -ne '[gone]') { continue }
+        Write-Host "upstream gone: $name" -ForegroundColor Yellow
+        $gone += "$($repo.Name): $name"
+    }
+
+    # --- 4. gc -------------------------------------------------------------
     if ($PSCmdlet.ShouldProcess($repo.Name, 'git gc')) {
         git -C $dir gc --quiet
         if ($LASTEXITCODE -ne 0) { $ok = $false }
@@ -84,3 +103,7 @@ foreach ($repo in $repos) {
 Write-Host ''
 Write-Host "Done: $($repos.Count) repositories." -ForegroundColor Green
 if ($failed) { Write-Host "With errors: $($failed -join ', ')" -ForegroundColor Yellow }
+if ($gone) {
+    Write-Host 'Upstream gone (not deleted - check the merge, then git branch -D):' -ForegroundColor Yellow
+    $gone | ForEach-Object { Write-Host "  $_" }
+}

@@ -14,4 +14,7 @@ if errorlevel 1 (
 ) else (
     powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Update-GitRepos.ps1" %*
 )
-pause
+REM Explorer starts a double-clicked batch file as  cmd.exe /c ""<full path>" "  and closes
+REM the window when it ends: only then wait for a key. Started from a prompt, a script or an
+REM agent (cmd /c run_UpdateGitRepos.bat ...), the launcher returns at once.
+echo(%cmdcmdline%| findstr /i /l /c:"/c \"\"%~f0\" \"" >nul && pause
