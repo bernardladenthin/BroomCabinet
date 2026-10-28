@@ -25,7 +25,7 @@ jobs:
     outputs:
       projects: ${{ steps.set-matrix.outputs.projects }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - id: set-matrix
         run: |
@@ -49,15 +49,15 @@ jobs:
       matrix:
         project: ${{ fromJson(needs.discover.outputs.projects) }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.x'
 
       - name: Install ruff
         # Pinned: an unpinned ruff changes the lint result under an unchanged tree (see Python/ruff.toml).
-        run: pip install "ruff==0.16.9"
+        run: pip install "ruff==0.17.3"
 
       - name: Lint
         working-directory: Python/${{ matrix.project }}
