@@ -17,10 +17,10 @@ jobs:
     name: REUSE lint (whole repo)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # Official FSFE action: runs `reuse lint` over the repository root and
       # fails the job if any file is missing copyright/licensing information
       # or references a license text not present in LICENSES/.
       - name: REUSE lint
-        uses: fsfe/reuse-action@v6
+        uses: fsfe/reuse-action@676e2d560c9a403aa252096d99fcab3e1132b0f5 # v6

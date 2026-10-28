@@ -1,0 +1,71 @@
+# SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Every Java/<project>/ is its own Maven build and every Python/<project>/ with a requirements file
+# its own pip project, so each is listed. One grouped pull request per ecosystem and week instead of
+# one per dependency and directory.
+#
+# Versions kept on purpose are ignored here, so Dependabot does not propose them every week (the
+# do-not-bump registry in the workspace repository's crossrepostatus.md lists them too):
+# - JOracleRowSetGetRowBug reproduces a driver defect (its BUG.md): h2 and ojdbc8 stay where they
+#   reproduce;
+# - JavaFX stays on the 21 LTS line (JCPUThrottle and JScreenStreamer run on Java 21);
+# - JDbSwap's slf4j-jdk14 stays on 1.7: the Hive 4.2.1 standalone driver logs through slf4j 1.7
+#   (the comment at the dependency in its pom.xml).
+version: 2
+updates:
+  - package-ecosystem: "maven"
+    directories:
+      - "/Java/eject"
+      - "/Java/jackpot"
+      - "/Java/JBinaryNecklaceFinder"
+      - "/Java/JCPUThrottle"
+      - "/Java/JCubeBoxDuplex"
+      - "/Java/JDbSwap"
+      - "/Java/JDiskSpaceFiller"
+      - "/Java/JDtDnsUpdater"
+      - "/Java/JFileInventory"
+      - "/Java/JImageResizer"
+      - "/Java/JMinifloat"
+      - "/Java/JNvidiaD3DLongCommandLineCrash"
+      - "/Java/JPersistentSocket"
+      - "/Java/JScreenStreamer"
+      - "/Java/JWigleExtractor"
+    schedule:
+      interval: "weekly"
+    ignore:
+      - dependency-name: "org.openjfx:*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "org.slf4j:slf4j-jdk14"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+    groups:
+      maven:
+        patterns: ["*"]
+  - package-ecosystem: "maven"
+    directory: "/Java/JOracleRowSetGetRowBug"
+    schedule:
+      interval: "weekly"
+    ignore:
+      - dependency-name: "com.h2database:h2"
+      - dependency-name: "com.oracle.database.jdbc:ojdbc8"
+    groups:
+      maven-oracle-reproducer:
+        patterns: ["*"]
+  - package-ecosystem: "pip"
+    directories:
+      - "/Python/PyB2Verify"
+      - "/Python/PyImageResizer"
+      - "/Python/PyWebcamRecorder"
+    schedule:
+      interval: "weekly"
+    groups:
+      pip:
+        patterns: ["*"]
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns: ["*"]

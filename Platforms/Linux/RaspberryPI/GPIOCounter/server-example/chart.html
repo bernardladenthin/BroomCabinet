@@ -7,8 +7,13 @@ SPDX-License-Identifier: Apache-2.0
 <html>
 <head>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
-    <script type="text/javascript" src="https://code.jquery.com/jquery-2.2.3.min.js"></script>
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/dygraph/1.1.1/dygraph-combined.js"></script>
+    <!-- Pinned versions with Subresource Integrity: the browser refuses a file whose hash differs. -->
+    <script type="text/javascript" src="https://code.jquery.com/jquery-4.0.0.min.js"
+            integrity="sha384-fgGyf7Mo7DURSOMnOy7ed+dkq5Job205Gnzu6QIg0BOHKaqt4D76Dt8VlDCzcMHV" crossorigin="anonymous"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/dygraph/2.2.2/dygraph.min.js"
+            integrity="sha384-M6xnpGYvb+72sCiGRUqtmlh3VShvs+P5nCTDKvt2wVAytYCTGE1bOqDxH1rQkv9q" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/dygraph/2.2.2/dygraph.min.css"
+          integrity="sha384-+Q4+3HadPVChRGn2kirov0CJhbfxQJiB+7MxGhLUOKSKyCwI+EriPGcxs5hbQmUc" crossorigin="anonymous">
     <script type="text/javascript">
     // EXAMPLE ONLY — fetches the JSON history from counter-endpoint.php and
     // draws it with Google Charts (cumulative) and Dygraph (per-minute).
