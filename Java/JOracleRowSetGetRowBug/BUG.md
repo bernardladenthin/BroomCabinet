@@ -68,7 +68,7 @@ equivalent `ojdbc11`/`ojdbc17` builds carry the same code and are expected to be
 - **Driver:** `com.oracle.database.jdbc:ojdbc8` `21.24.0.0`, `21.23.0.0`, `21.21.0.0`, `19.33.0.0`, `19.32.0.0` and `19.27.0.0`
 - **JVM:** OpenJDK 21 (behavior is JVM-version independent)
 - **Comparison baseline:** `com.sun.rowset.CachedRowSetImpl`
-- **Data source:** H2 `2.2.224`, used only to provide a neutral source `ResultSet`. **No Oracle
+- **Data source:** H2 `2.5.252`, used only to provide a neutral source `ResultSet`. **No Oracle
   database is required** — `CachedRowSet.populate(ResultSet)` accepts any `ResultSet`, and the
   divergence is in the disconnected rowset's own cursor logic, not in the data or SQL dialect. Both
   rowsets are populated from the *identical* source, so the only variable is the implementation.
@@ -86,7 +86,7 @@ equivalent `ojdbc11`/`ojdbc17` builds carry the same code and are expected to be
 <dependency>
   <groupId>com.h2database</groupId>
   <artifactId>h2</artifactId>
-  <version>2.2.224</version>
+  <version>2.5.252</version>
 </dependency>
 ```
 

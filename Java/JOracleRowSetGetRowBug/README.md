@@ -62,9 +62,9 @@ exact symptom. See [`BUG.md`](BUG.md) → "Prior art / related reports".
 
 | Component | Value |
 |---|---|
-| Java | 8 (source/target `1.8`) |
+| Java | 11 (`release 11`; H2 2.3+ needs Java 11) |
 | Oracle driver | `com.oracle.database.jdbc:ojdbc8:${ojdbc.version}` (default `21.24.0.0`; must be a 19.x/21.x version) |
-| Source `ResultSet` | H2 `com.h2database:h2:2.2.224` (in-memory; **no Oracle database required**) |
+| Source `ResultSet` | H2 `com.h2database:h2:2.5.252` (in-memory; **no Oracle database required**) |
 
 **No live Oracle database is needed.** `CachedRowSet.populate(ResultSet)` accepts *any*
 `java.sql.ResultSet`, and the divergence is in the disconnected rowset's own cursor logic — not in
@@ -74,7 +74,7 @@ the only variable is the `CachedRowSet` implementation.
 ## Build & run
 
 ```bash
-# Build (compiles for Java 8, runs the JUnit test, builds a runnable fat jar)
+# Build (compiles for Java 11, runs the JUnit test, builds a runnable fat jar)
 mvn clean package
 
 # Run the demonstration
