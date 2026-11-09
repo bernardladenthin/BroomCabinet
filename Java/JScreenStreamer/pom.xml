@@ -115,7 +115,7 @@ SPDX-License-Identifier: Apache-2.0
         <dependency>
             <groupId>at.yawk.lz4</groupId>
             <artifactId>lz4-java</artifactId>
-            <version>1.13.0</version>
+            <version>1.14.0</version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
