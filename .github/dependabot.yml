@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Every Java/<project>/ is its own Maven build and every Python/<project>/ with a requirements file
-# its own pip project, so each is listed. One grouped pull request per ecosystem and week instead of
-# one per dependency and directory.
+# its own pip project, so each is listed. One grouped pull request per ecosystem and week, on
+# Saturday, instead of one per dependency and directory.
 #
 # Versions kept on purpose are ignored here, so Dependabot does not propose them every week (the
 # do-not-bump registry in the workspace repository's crossrepostatus.md lists them too):
@@ -34,6 +34,7 @@ updates:
       - "/Java/JWigleExtractor"
     schedule:
       interval: "weekly"
+      day: "saturday"
     ignore:
       - dependency-name: "org.openjfx:*"
         update-types: ["version-update:semver-major"]
@@ -46,6 +47,7 @@ updates:
     directory: "/Java/JOracleRowSetGetRowBug"
     schedule:
       interval: "weekly"
+      day: "saturday"
     ignore:
       - dependency-name: "com.oracle.database.jdbc:ojdbc8"
     groups:
@@ -58,6 +60,7 @@ updates:
       - "/Python/PyWebcamRecorder"
     schedule:
       interval: "weekly"
+      day: "saturday"
     groups:
       pip:
         patterns: ["*"]
@@ -65,6 +68,7 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "saturday"
     groups:
       github-actions:
         patterns: ["*"]
