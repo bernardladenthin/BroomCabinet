@@ -57,7 +57,7 @@ jobs:
 
       - name: Install ruff
         # Pinned: an unpinned ruff changes the lint result under an unchanged tree (see Python/ruff.toml).
-        run: pip install "ruff==0.17.3"
+        run: pip install "ruff==0.17.4"
 
       - name: Lint
         working-directory: Python/${{ matrix.project }}
