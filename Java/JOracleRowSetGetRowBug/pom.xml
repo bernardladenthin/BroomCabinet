@@ -51,14 +51,15 @@ SPDX-License-Identifier: Apache-2.0
             class (21.x is an actively maintained LTS line). Use a 19.x/21.x version here; see
             README.md for the boundary.
         -->
-        <ojdbc.version>21.23.0.0</ojdbc.version>
+        <ojdbc.version>21.24.0.0</ojdbc.version>
 
         <!--
             H2 only provides a neutral in-memory source ResultSet for populate(); it has
-            nothing to do with the bug. 2.2.224 is the last Java-8-compatible line
-            (H2 2.3.x and newer require Java 11).
+            nothing to do with the bug. H2 2.3.x and newer require Java 11, which is why the
+            project compiles for Java 11: the divergence is in the driver's cursor logic and
+            reproduces the same on Java 11 and 21.
         -->
-        <h2.version>2.2.224</h2.version>
+        <h2.version>2.5.252</h2.version>
 
         <junit.version>4.13.2</junit.version>
     </properties>
@@ -131,7 +132,7 @@ SPDX-License-Identifier: Apache-2.0
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.16.0</version>
                 <configuration>
-                    <release>8</release>
+                    <release>11</release>
                     <encoding>UTF-8</encoding>
                 </configuration>
             </plugin>
