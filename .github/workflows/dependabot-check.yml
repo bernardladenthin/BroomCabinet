@@ -25,4 +25,4 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: bernardladenthin/actions/common/check-dependabot@379fb9448915b8ce7153f6ec5fa65544205196db # v1.2.2
+      - uses: bernardladenthin/actions/common/check-dependabot@e7554f8d2e3f2e59dac55c5f6a7cb5be7b6d8606 # v1.2.3
