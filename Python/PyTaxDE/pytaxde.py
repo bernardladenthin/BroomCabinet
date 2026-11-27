@@ -21,6 +21,11 @@ A folder (its YAML files and those one level below, each with a `jahr:`):
     python pytaxde.py D:\data\Steuer --verweise               links and paths of the notes (*.md) beside the returns
     python pytaxde.py D:\data\Steuer --json [--jahr 2025]     write Steuererklärungen.json (or only those years' blocks)
     python pytaxde.py D:\data\Steuer --anzeigen               the viewer in the browser, data fresh from the YAML files
+    python pytaxde.py D:\data\Steuer --alles [--jahr 2025] [--json] [--mit-tests] [--anzeigen]
+                                                          everything before filing: receipts, notes, self-test (first
+                                                          accepting into the JSON, then this library's tests with
+                                                          the privacy check against the folder, last the viewer);
+                                                          exit status 0 only if all of it is in order
 
 Steuererklärungen.json sits in the folder, or in its PyTaxDEConfig/ subfolder if it has one (for a single
 YAML: in its folder or the one above). The YAML files
@@ -31,6 +36,8 @@ with exit status 0 (all the same, every figure of a `bescheid:` met), 1 (differe
 The output is German, like the forms it fills. Needs PyYAML (requirements.txt); --help does not.
 """
 import argparse
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -163,27 +170,92 @@ def ordner_modus(a) -> int:
     if not yamls:
         print(f"keine Steuererklärung (YAML mit jahr:) in {ordner}" + (f" für {a.jahr}" if a.jahr else ""))
         return 1
+    if a.alles:
+        return alles(a, ordner, yamls)
     if a.anzeigen:
         from taxde.anzeige import anzeigen
         return anzeigen(ordner, a.port, not a.kein_browser)
     if a.belege:
         return max(belege_zeigen(y, None, gesamt.schluessel(y, ordner)) for y in yamls)
     if a.verweise:
-        mds = notizen(ordner, yamls)
-        if not mds:
-            print(f"keine Notiz (*.md) neben den Steuererklärungen in {ordner}")
-            return 0
-        return max(verweise_zeigen(md, gesamt.schluessel(md, ordner)) for md in mds)
+        return alle_verweise(ordner, yamls)
     if a.json:
         return json_schreiben(ordner, yamls if a.jahr else None)
+    code = selbsttest_ordner(ordner, yamls, a.pruefen)
+    return code if a.pruefen else 0
+
+
+def alle_verweise(ordner, yamls) -> int:
+    from taxde import gesamt
+    mds = notizen(ordner, yamls)
+    if not mds:
+        print(f"keine Notiz (*.md) neben den Steuererklärungen in {ordner}")
+        return 0
+    return max(verweise_zeigen(md, gesamt.schluessel(md, ordner)) for md in mds)
+
+
+def selbsttest_ordner(ordner, yamls, details=True) -> int:
+    from taxde import gesamt
     frisch = gesamt.bauen(ordner)
     u = gesamt.vergleichen(ordner, yamls, frisch)
     print(f"# Selbsttest {ordner} ({mehrzahl(len(yamls), 'Steuererklärung', 'Steuererklärungen')})")
-    codes = [selbsttest_zeigen(k, frisch["erklaerungen"][k], None if isinstance(v, str) else v, a.pruefen)
+    codes = [selbsttest_zeigen(k, frisch["erklaerungen"][k], None if isinstance(v, str) else v, details)
              for k, v in u.items()]
-    if not a.pruefen:
-        return 0
     return 1 if 1 in codes else 2 if 2 in codes else 0
+
+
+# ------------------------------------------------------------------ everything at once
+HIER = Path(__file__).resolve().parent
+
+
+def bibliothek_testen(ordner) -> list:
+    """Runs every *_test.py of this library on its own, as CI does, with PYTAXDE_PRIVATE set to the
+    folder, so the privacy test also checks the library against these returns. The names that failed."""
+    env = {**os.environ, "PYTAXDE_PRIVATE": str(Path(ordner).resolve()), "PYTHONDONTWRITEBYTECODE": "1"}
+    fehler = []
+    for t in sorted(HIER.glob("*_test.py")):
+        r = subprocess.run([sys.executable, "-X", "utf8", "-B", str(t)], cwd=HIER, env=env,
+                           capture_output=True, text=True, encoding="utf-8", errors="replace")
+        ausgabe = (r.stdout + r.stderr).splitlines()
+        kurz = ", ".join(z for z in ausgabe if z.startswith(("Ran ", "OK", "FAILED")))
+        print(f"  {t.name:<20} {'OK' if r.returncode == 0 else 'FEHLER'}  ({kurz})")
+        if r.returncode:
+            fehler.append(t.name)
+            print("\n".join("    " + z for z in ausgabe))
+    return fehler
+
+
+def alles(a, ordner, yamls) -> int:
+    """--alles: what the folder's owner runs before filing. Every step runs, whatever an earlier one
+    found; the summary names what is not in order."""
+    fehler = []
+
+    def schritt(titel):
+        print(f"\n== {titel}")
+
+    if a.json:
+        schritt("Übernehmen nach Steuererklärungen.json")
+        json_schreiben(ordner, yamls if a.jahr else None)
+    schritt("Belege")
+    from taxde import gesamt
+    if max(belege_zeigen(y, None, gesamt.schluessel(y, ordner)) for y in yamls):
+        fehler.append("Belege")
+    schritt("Verweise in den Notizen")
+    if alle_verweise(ordner, yamls):
+        fehler.append("Verweise")
+    schritt("Selbsttest")
+    if selbsttest_ordner(ordner, yamls, True):
+        fehler.append("Selbsttest")
+    if a.mit_tests:
+        schritt("Tests der Bibliothek (mit dem Privacy-Abgleich gegen diesen Ordner)")
+        fehler += bibliothek_testen(ordner)
+    print()
+    print(f"Nicht in Ordnung: {', '.join(fehler)}" if fehler else "Alles in Ordnung.")
+    if a.anzeigen:
+        from taxde.anzeige import anzeigen
+        print()
+        anzeigen(ordner, a.port, not a.kein_browser)
+    return 1 if fehler else 0
 
 
 def main(argv=None):
@@ -199,6 +271,11 @@ def main(argv=None):
                     help="Selbsttest: mit Steuererklärungen.json und dem Bescheid vergleichen (Exit 0/1/2)")
     ap.add_argument("--jahr", type=int, nargs="+", help="im Ordner nur diese Jahre (prüfen, übernehmen)")
     ap.add_argument("--anzeigen", action="store_true", help="den Viewer im Browser öffnen (Daten frisch aus den YAML-Dateien)")
+    ap.add_argument("--alles", action="store_true",
+                    help="Ordner: Belege, Verweise und Selbsttest auf einmal (mit --json vorher übernehmen, "
+                         "mit --anzeigen danach der Viewer); Exit 0 nur, wenn alles in Ordnung ist")
+    ap.add_argument("--mit-tests", action="store_true",
+                    help="mit --alles: auch die Tests dieser Bibliothek, der Privacy-Test gegen den Ordner")
     ap.add_argument("--port", type=int, default=0, help="Port des Viewers (Standard: ein freier)")
     ap.add_argument("--kein-browser", action="store_true", help="den Browser nicht selbst öffnen")
     a = ap.parse_args(argv)

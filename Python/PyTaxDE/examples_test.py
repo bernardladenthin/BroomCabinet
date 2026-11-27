@@ -185,6 +185,24 @@ class Kommandozeile(unittest.TestCase):
         code, text = self.run_main(str(BEISPIELE), "--pruefen", "--jahr", "2026")
         self.assertEqual((code, text.count("yaml:")), (0, 1))
 
+    def test_everything_at_once(self):
+        code, text = self.run_main(str(BEISPIELE), "--alles")
+        self.assertEqual(code, 0, text)
+        for teil in ("== Belege", "== Verweise in den Notizen", "== Selbsttest", "Alles in Ordnung."):
+            self.assertIn(teil, text)
+
+    def test_everything_at_once_names_what_is_wrong(self):
+        import shutil
+        with tempfile.TemporaryDirectory() as d:
+            kopie = Path(d) / "beispiele"
+            shutil.copytree(BEISPIELE, kopie)
+            (kopie / "beispiel-2025-jobwechsel.md").write_text("[weg](<gibt es nicht.pdf>)\n", encoding="utf-8")
+            code, text = self.run_main(str(kopie), "--alles")
+            self.assertEqual(code, 1, text)
+            self.assertIn("FEHLT  Zeile 1 (Link): gibt es nicht.pdf", text)
+            self.assertIn("Nicht in Ordnung: Verweise", text)
+            self.assertIn("== Selbsttest", text)                      # every step runs, whatever came first
+
     def test_self_test_shows_what_changed(self):
         quelle = (BEISPIELE / "beispiel-2025-jobwechsel.yaml").read_text(encoding="utf-8")
         with tempfile.TemporaryDirectory() as d:

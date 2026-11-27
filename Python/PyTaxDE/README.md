@@ -53,6 +53,8 @@ imports work without it.
     python pytaxde.py example --json [--jahr 2025]             write Steuererklärungen.json, or only those years' blocks
     python pytaxde.py example --verweise                       the notes (*.md) beside the returns: links and paths
     python pytaxde.py example --anzeigen                       the viewer in the browser
+    python pytaxde.py example --alles [--json] [--mit-tests] [--anzeigen]
+                                                               all checks at once, exit status 0 only if all pass
 
 **German on purpose.** Keys, identifiers and output use the words of the forms (Werbungskosten,
 Anlage N, Zeile 62), because that is what has to be found again in ELSTER. The documentation is
@@ -281,6 +283,21 @@ of its own; words a return shares with the library by nature are accepted in a
 `privacy_allowlist.txt` in your folder (or its `PyTaxDEConfig/`), so that list stays private as well.
 
     PYTAXDE_PRIVATE="<your folder>" python -m unittest privacy_test
+
+All of it in one call, before filing: `--alles` runs the receipts, the notes and the self-test, every
+step whatever the one before found, and names what is not in order. `--json` first accepts the current
+state, `--mit-tests` adds this library's tests with the privacy check against your folder, and
+`--anzeigen` opens the viewer last. A script of your own then only passes parameters, the logic stays
+here -- in PowerShell, say, kept in `PyTaxDEConfig/`:
+
+```powershell
+param([int[]]$Jahr, [switch]$Json, [switch]$Anzeigen, [switch]$MitTests, [string]$PyTaxDE = $env:PYTAXDE)
+$a = @((Split-Path $PSScriptRoot -Parent), '--alles')
+if ($Jahr) { $a += @('--jahr') + ($Jahr | ForEach-Object { "$_" }) }
+if ($Json) { $a += '--json' }; if ($MitTests) { $a += '--mit-tests' }; if ($Anzeigen) { $a += '--anzeigen' }
+& python -X utf8 -B (Join-Path $PyTaxDE 'pytaxde.py') @a
+exit $LASTEXITCODE
+```
 
 ## Two persons
 
