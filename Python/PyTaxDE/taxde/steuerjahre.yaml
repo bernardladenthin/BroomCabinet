@@ -1,0 +1,639 @@
+# SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# General German income tax parameters per assessment year (employees). No personal data; share it.
+#
+# EVERY YEAR IS A COMPLETE, SELF-CONTAINED BLOCK, with no inheritance: what rarely changes is still
+# repeated in every year, because "rarely" is not "never" (VAT changed in 2020). A test checks that
+# all years carry the same keys and that the tariff is continuous at every zone border.
+# Amounts in euros, rates as decimals (0.20 = 20 %). No warranty; the legal sources are in the comments.
+
+2017:
+  # § 32a EStG as amended by the Gesetz zur Umsetzung der Änderungen der EU-Amtshilferichtlinie
+  # (BGBl. 2016 I S. 3000). Old solidarity surcharge. Checked against a real 2017 notice: every figure
+  # matched to the euro.
+  grundfreibetrag: 8820
+  tarif:
+    - {bis: 8820, art: null}
+    - {bis: 13769, art: quadratisch, von: 8820, a: 1007.27, b: 1400, c: 0}
+    - {bis: 54057, art: quadratisch, von: 13769, a: 223.76, b: 2397, c: 939.57}
+    - {bis: 256303, art: linear, satz: 0.42, abzug: 8475.44}
+    - {bis: null, art: linear, satz: 0.45, abzug: 16164.53}
+  soli: {satz: 0.055, freigrenze: 972, milderung: 0.20}
+  umsatzsteuer: {regel: 0.19, ermaessigt: 0.07}
+
+  # Werbungskosten (§ 9 EStG)
+  arbeitnehmer_pauschbetrag: 1000
+  entfernung: [[null, 0.30]]
+  homeoffice_je_tag: 0                     # no home-office allowance before 2020
+  homeoffice_max_tage: 0
+  dienstreise_km_satz: 0.30
+  bewerbung_online_pauschale: 5.00
+  telekom_anteil: 0.20
+  telekom_deckel_monat: 20.00
+  gwg_grenze_netto: 410                    # 800 € only from 2018
+
+  # Other income
+  so_freigrenze_leistungen: 256
+
+  # Sonderausgaben
+  sonderausgaben_pauschbetrag: 36
+  spenden_hoechstsatz: 0.20
+  altersvorsorge_hoechstbetrag: 23362
+  altersvorsorge_quote: 0.84
+  sonstige_vorsorge_hoechstbetrag: 1900
+  kv_kuerzung_krankengeld: 0.04
+
+  # § 35a EStG
+  p35a_dienstleistung_satz: 0.20
+  p35a_dienstleistung_max: 4000
+  p35a_handwerker_satz: 0.20
+  p35a_handwerker_max: 1200
+
+  # § 33 (3)
+  zumutbar_ledig: [[15340, 0.05], [51130, 0.06], [null, 0.07]]
+  zumutbar_verheiratet: [[15340, 0.04], [51130, 0.05], [null, 0.06]]
+
+  # Business trips (§ 9 (4a) EStG)
+  verpflegung_8h: 12
+  verpflegung_24h: 24
+  entfernung_hoechstbetrag_ohne_pkw: 4500
+
+  # Riester and the hardship allowance
+  riester_hoechstbetrag: 2100
+  haerteausgleich_grenze: 410
+  haerteausgleich_obergrenze: 820
+
+  # Line numbers of the ELSTER forms 2017, as far as a filed 2017 return shows them
+  zeilen_geprueft: true
+  zeilen:
+    Anlage N: {entfernung: "31–35", nicht_buero_tage: 31, buero_tage: 35, fortbildung: 44, reisekosten: "49–57",
+               weitere: 47}
+    Haushaltsnahe Aufwendungen: {dienstleistungen: 72}     # still part of the main form (ESt 1 A)
+    Vorsorgeaufwand: {unfall_haftpflicht_risiko: 50}
+
+2018:
+  # § 32a EStG as amended by the Gesetz zur Umsetzung der Änderungen der EU-Amtshilferichtlinie
+  # (BGBl. 2016 I S. 3000). Old solidarity surcharge. Checked against a real 2018 notice: every figure
+  # matched to the euro.
+  grundfreibetrag: 9000
+  tarif:
+    - {bis: 9000, art: null}
+    - {bis: 13996, art: quadratisch, von: 9000, a: 997.80, b: 1400, c: 0}
+    - {bis: 54949, art: quadratisch, von: 13996, a: 220.13, b: 2397, c: 948.49}
+    - {bis: 260532, art: linear, satz: 0.42, abzug: 8621.75}
+    - {bis: null, art: linear, satz: 0.45, abzug: 16437.70}
+  soli: {satz: 0.055, freigrenze: 972, milderung: 0.20}
+  umsatzsteuer: {regel: 0.19, ermaessigt: 0.07}
+
+  # Werbungskosten (§ 9 EStG)
+  arbeitnehmer_pauschbetrag: 1000
+  entfernung: [[null, 0.30]]
+  homeoffice_je_tag: 0                     # no home-office allowance before 2020
+  homeoffice_max_tage: 0
+  dienstreise_km_satz: 0.30
+  bewerbung_online_pauschale: 5.00
+  telekom_anteil: 0.20
+  telekom_deckel_monat: 20.00
+  gwg_grenze_netto: 800                    # raised from 410 € in 2018
+
+  # Other income
+  so_freigrenze_leistungen: 256
+
+  # Sonderausgaben
+  sonderausgaben_pauschbetrag: 36
+  spenden_hoechstsatz: 0.20
+  altersvorsorge_hoechstbetrag: 23712
+  altersvorsorge_quote: 0.86
+  sonstige_vorsorge_hoechstbetrag: 1900
+  kv_kuerzung_krankengeld: 0.04
+
+  # § 35a EStG
+  p35a_dienstleistung_satz: 0.20
+  p35a_dienstleistung_max: 4000
+  p35a_handwerker_satz: 0.20
+  p35a_handwerker_max: 1200
+
+  # § 33 (3)
+  zumutbar_ledig: [[15340, 0.05], [51130, 0.06], [null, 0.07]]
+  zumutbar_verheiratet: [[15340, 0.04], [51130, 0.05], [null, 0.06]]
+
+  # Business trips (§ 9 (4a) EStG)
+  verpflegung_8h: 12
+  verpflegung_24h: 24
+  entfernung_hoechstbetrag_ohne_pkw: 4500
+
+  # Riester and the hardship allowance
+  riester_hoechstbetrag: 2100
+  haerteausgleich_grenze: 410
+  haerteausgleich_obergrenze: 820
+
+  # Line numbers of the ELSTER forms 2018, as far as a filed 2018 return shows them
+  zeilen_geprueft: true
+  zeilen:
+    Anlage N: {entfernung: "31–35", nicht_buero_tage: 31, buero_tage: 35, fortbildung: 44, reisekosten: "50–57",
+               weitere: 47}
+    Haushaltsnahe Aufwendungen: {dienstleistungen: 72}     # 2018 still part of the main form (ESt 1 A)
+    Vorsorgeaufwand: {kv_ueber_basis: 23, unfall_haftpflicht_risiko: 50}
+
+2019:
+  # § 32a EStG as amended by the Familienentlastungsgesetz (BGBl. 2018 I S. 2210). Old solidarity
+  # surcharge. Checked against a real 2019 notice: every figure matched to the euro.
+  grundfreibetrag: 9168
+  tarif:
+    - {bis: 9168, art: null}
+    - {bis: 14254, art: quadratisch, von: 9168, a: 980.14, b: 1400, c: 0}
+    - {bis: 55960, art: quadratisch, von: 14254, a: 216.16, b: 2397, c: 965.58}
+    - {bis: 265326, art: linear, satz: 0.42, abzug: 8780.90}
+    - {bis: null, art: linear, satz: 0.45, abzug: 16740.68}
+  soli: {satz: 0.055, freigrenze: 972, milderung: 0.20}
+  umsatzsteuer: {regel: 0.19, ermaessigt: 0.07}
+
+  # Werbungskosten (§ 9 EStG)
+  arbeitnehmer_pauschbetrag: 1000
+  entfernung: [[null, 0.30]]
+  homeoffice_je_tag: 0                     # no home-office allowance before 2020 (only a home office room)
+  homeoffice_max_tage: 0
+  dienstreise_km_satz: 0.30
+  bewerbung_online_pauschale: 5.00
+  telekom_anteil: 0.20
+  telekom_deckel_monat: 20.00
+  gwg_grenze_netto: 800
+
+  # Other income
+  so_freigrenze_leistungen: 256
+
+  # Sonderausgaben
+  sonderausgaben_pauschbetrag: 36
+  spenden_hoechstsatz: 0.20
+  altersvorsorge_hoechstbetrag: 24305
+  altersvorsorge_quote: 0.88
+  sonstige_vorsorge_hoechstbetrag: 1900
+  kv_kuerzung_krankengeld: 0.04
+
+  # § 35a EStG
+  p35a_dienstleistung_satz: 0.20
+  p35a_dienstleistung_max: 4000
+  p35a_handwerker_satz: 0.20
+  p35a_handwerker_max: 1200
+
+  # § 33 (3)
+  zumutbar_ledig: [[15340, 0.05], [51130, 0.06], [null, 0.07]]
+  zumutbar_verheiratet: [[15340, 0.04], [51130, 0.05], [null, 0.06]]
+
+  # Business trips (§ 9 (4a) EStG): the lower meal allowances until 2019
+  verpflegung_8h: 12
+  verpflegung_24h: 24
+  entfernung_hoechstbetrag_ohne_pkw: 4500
+
+  # Riester and the hardship allowance
+  riester_hoechstbetrag: 2100
+  haerteausgleich_grenze: 410
+  haerteausgleich_obergrenze: 820
+
+  # Line numbers of the ELSTER forms 2019, as far as a filed 2019 return shows them
+  zeilen_geprueft: true
+  zeilen:
+    Anlage N: {entfernung: "31–35", nicht_buero_tage: 31, buero_tage: 35, fortbildung: 45, reisekosten: "49–57",
+               weitere: 47}
+    Haushaltsnahe Aufwendungen: {dienstleistungen: 5}
+    Vorsorgeaufwand: {kv_ueber_basis: 22, unfall_haftpflicht_risiko: 48}
+
+2020:
+  # § 32a EStG as amended by the Familienentlastungsgesetz (BGBl. 2018 I S. 2210). Solidarity surcharge
+  # still the old rules: exemption limit 972 € of income tax, phase-in at 20 %. Checked against a real
+  # 2020 notice: every figure matched to the euro.
+  grundfreibetrag: 9408
+  tarif:
+    - {bis: 9408, art: null}
+    - {bis: 14532, art: quadratisch, von: 9408, a: 972.87, b: 1400, c: 0}
+    - {bis: 57051, art: quadratisch, von: 14532, a: 212.02, b: 2397, c: 972.79}
+    - {bis: 270500, art: linear, satz: 0.42, abzug: 8963.74}
+    - {bis: null, art: linear, satz: 0.45, abzug: 17078.74}
+  soli: {satz: 0.055, freigrenze: 972, milderung: 0.20}
+  umsatzsteuer: {regel: 0.19, ermaessigt: 0.07}   # 16 % / 5 % from 1 July to 31 December 2020
+
+  # Werbungskosten (§ 9 EStG)
+  arbeitnehmer_pauschbetrag: 1000
+  entfernung: [[null, 0.30]]               # 0.30 € for every kilometre until 2020
+  homeoffice_je_tag: 5.00                  # introduced for 2020
+  homeoffice_max_tage: 120
+  dienstreise_km_satz: 0.30
+  bewerbung_online_pauschale: 5.00
+  telekom_anteil: 0.20
+  telekom_deckel_monat: 20.00
+  gwg_grenze_netto: 800
+
+  # Other income
+  so_freigrenze_leistungen: 256
+
+  # Sonderausgaben
+  sonderausgaben_pauschbetrag: 36
+  spenden_hoechstsatz: 0.20
+  altersvorsorge_hoechstbetrag: 25046
+  altersvorsorge_quote: 0.90
+  sonstige_vorsorge_hoechstbetrag: 1900
+  kv_kuerzung_krankengeld: 0.04
+
+  # § 35a EStG
+  p35a_dienstleistung_satz: 0.20
+  p35a_dienstleistung_max: 4000
+  p35a_handwerker_satz: 0.20
+  p35a_handwerker_max: 1200
+
+  # § 33 (3)
+  zumutbar_ledig: [[15340, 0.05], [51130, 0.06], [null, 0.07]]
+  zumutbar_verheiratet: [[15340, 0.04], [51130, 0.05], [null, 0.06]]
+
+  # Business trips (§ 9 (4a) EStG)
+  verpflegung_8h: 14
+  verpflegung_24h: 28
+  entfernung_hoechstbetrag_ohne_pkw: 4500
+
+  # Riester and the hardship allowance
+  riester_hoechstbetrag: 2100
+  haerteausgleich_grenze: 410
+  haerteausgleich_obergrenze: 820
+
+  # Line numbers of the ELSTER forms 2020, as far as a filed 2020 return shows them
+  zeilen_geprueft: true
+  zeilen:
+    Anlage N: {entfernung: "31–35", nicht_buero_tage: 31, buero_tage: 35, fortbildung: 45, weitere: 47}
+    Haushaltsnahe Aufwendungen: {dienstleistungen: 5}
+    Vorsorgeaufwand: {kv_ueber_basis: 22, berufsunfaehigkeit: 47, unfall_haftpflicht_risiko: 48}
+
+2021:
+  # § 32a EStG as amended by the Zweites Familienentlastungsgesetz (BGBl. 2020 I S. 2616). Checked
+  # against a real 2021 notice of a joint assessment: every figure matched to the euro.
+  grundfreibetrag: 9744
+  tarif:
+    - {bis: 9744, art: null}
+    - {bis: 14753, art: quadratisch, von: 9744, a: 995.21, b: 1400, c: 0}
+    - {bis: 57918, art: quadratisch, von: 14753, a: 208.85, b: 2397, c: 950.96}
+    - {bis: 274612, art: linear, satz: 0.42, abzug: 9136.63}
+    - {bis: null, art: linear, satz: 0.45, abzug: 17374.99}
+  soli: {satz: 0.055, freigrenze: 16956, milderung: 0.119}    # the much higher exemption limit since 2021
+  umsatzsteuer: {regel: 0.19, ermaessigt: 0.07}
+
+  # Werbungskosten (§ 9 EStG)
+  arbeitnehmer_pauschbetrag: 1000
+  entfernung: [[20, 0.30], [null, 0.35]]   # 0.35 € from km 21 in 2021 (0.38 € from 2022)
+  homeoffice_je_tag: 5.00
+  homeoffice_max_tage: 120
+  dienstreise_km_satz: 0.30
+  bewerbung_online_pauschale: 5.00
+  telekom_anteil: 0.20
+  telekom_deckel_monat: 20.00
+  gwg_grenze_netto: 800
+
+  # Other income
+  so_freigrenze_leistungen: 256
+
+  # Sonderausgaben
+  sonderausgaben_pauschbetrag: 36
+  spenden_hoechstsatz: 0.20
+  altersvorsorge_hoechstbetrag: 25787
+  altersvorsorge_quote: 0.92
+  sonstige_vorsorge_hoechstbetrag: 1900
+  kv_kuerzung_krankengeld: 0.04
+
+  # § 35a EStG
+  p35a_dienstleistung_satz: 0.20
+  p35a_dienstleistung_max: 4000
+  p35a_handwerker_satz: 0.20
+  p35a_handwerker_max: 1200
+
+  # § 33 (3)
+  zumutbar_ledig: [[15340, 0.05], [51130, 0.06], [null, 0.07]]
+  zumutbar_verheiratet: [[15340, 0.04], [51130, 0.05], [null, 0.06]]
+
+  # Business trips (§ 9 (4a) EStG)
+  verpflegung_8h: 14
+  verpflegung_24h: 28
+  entfernung_hoechstbetrag_ohne_pkw: 4500
+
+  # Riester and the hardship allowance
+  riester_hoechstbetrag: 2100
+  haerteausgleich_grenze: 410
+  haerteausgleich_obergrenze: 820
+
+  # Line numbers of the ELSTER forms 2021, as far as a filed 2021 return shows them
+  zeilen_geprueft: true
+  zeilen:
+    Anlage N: {entfernung: "31–35", nicht_buero_tage: 31, buero_tage: 35, fortbildung: 46, weitere: 49}
+    Haushaltsnahe Aufwendungen: {dienstleistungen: 5}
+    Vorsorgeaufwand: {kv_ueber_basis: 22, wahlleistungen: 27, berufsunfaehigkeit: 47, unfall_haftpflicht_risiko: 48}
+
+2022:
+  # § 32a EStG as amended by the Steuerentlastungsgesetz 2022 (BGBl. 2022 I S. 749), basic allowance
+  # raised retroactively to 10,347 €. Checked against a real 2022 notice of a joint assessment: every
+  # figure matched to the euro.
+  grundfreibetrag: 10347
+  tarif:
+    - {bis: 10347, art: null}
+    - {bis: 14926, art: quadratisch, von: 10347, a: 1088.67, b: 1400, c: 0}
+    - {bis: 58596, art: quadratisch, von: 14926, a: 206.43, b: 2397, c: 869.32}
+    - {bis: 277825, art: linear, satz: 0.42, abzug: 9336.45}
+    - {bis: null, art: linear, satz: 0.45, abzug: 17671.20}
+  soli: {satz: 0.055, freigrenze: 16956, milderung: 0.119}
+  umsatzsteuer: {regel: 0.19, ermaessigt: 0.07}
+
+  # Werbungskosten (§ 9 EStG)
+  arbeitnehmer_pauschbetrag: 1200          # raised retroactively from 1,000 € (Steuerentlastungsgesetz 2022)
+  entfernung: [[20, 0.30], [null, 0.38]]   # 0.38 € from km 21, likewise retroactive
+  homeoffice_je_tag: 5.00                  # 2020 to 2022: 5 € a day ...
+  homeoffice_max_tage: 120                 # ... at most 600 € a year
+  dienstreise_km_satz: 0.30
+  bewerbung_online_pauschale: 5.00
+  telekom_anteil: 0.20
+  telekom_deckel_monat: 20.00
+  gwg_grenze_netto: 800
+
+  # Other income
+  so_freigrenze_leistungen: 256
+
+  # Sonderausgaben
+  sonderausgaben_pauschbetrag: 36
+  spenden_hoechstsatz: 0.20
+  altersvorsorge_hoechstbetrag: 25639
+  altersvorsorge_quote: 0.94               # 94 % in 2022, rising to 100 % in 2023
+  sonstige_vorsorge_hoechstbetrag: 1900
+  kv_kuerzung_krankengeld: 0.04
+
+  # § 35a EStG
+  p35a_dienstleistung_satz: 0.20
+  p35a_dienstleistung_max: 4000
+  p35a_handwerker_satz: 0.20
+  p35a_handwerker_max: 1200
+
+  # § 33 (3)
+  zumutbar_ledig: [[15340, 0.05], [51130, 0.06], [null, 0.07]]
+  zumutbar_verheiratet: [[15340, 0.04], [51130, 0.05], [null, 0.06]]   # joint assessment, no children
+
+  # Business trips (§ 9 (4a) EStG): meal allowances per day
+  verpflegung_8h: 14
+  verpflegung_24h: 28
+  entfernung_hoechstbetrag_ohne_pkw: 4500
+
+  # Riester and the hardship allowance
+  riester_hoechstbetrag: 2100
+  haerteausgleich_grenze: 410
+  haerteausgleich_obergrenze: 820
+
+  # Line numbers of the ELSTER forms 2022: not taken from a filed return yet
+  zeilen_geprueft: false
+  zeilen: {}
+
+2023:
+  # § 32a EStG as amended by the Inflationsausgleichsgesetz (BGBl. 2022 I S. 2230). Checked against a
+  # real 2023 notice of a joint assessment (splitting tariff): every figure matched to the euro.
+  grundfreibetrag: 10908
+  tarif:
+    - {bis: 10908, art: null}
+    - {bis: 15999, art: quadratisch, von: 10908, a: 979.18, b: 1400, c: 0}
+    - {bis: 62809, art: quadratisch, von: 15999, a: 192.59, b: 2397, c: 966.53}
+    - {bis: 277825, art: linear, satz: 0.42, abzug: 9972.98}
+    - {bis: null, art: linear, satz: 0.45, abzug: 18307.73}
+  soli: {satz: 0.055, freigrenze: 17543, milderung: 0.119}    # the exemption limit doubles for a couple
+  umsatzsteuer: {regel: 0.19, ermaessigt: 0.07}
+
+  # Werbungskosten (§ 9 EStG)
+  arbeitnehmer_pauschbetrag: 1230          # raised from 1,200 € in 2023
+  entfernung: [[20, 0.30], [null, 0.38]]
+  homeoffice_je_tag: 6.00                  # the day rate exists since 2023
+  homeoffice_max_tage: 210
+  dienstreise_km_satz: 0.30
+  bewerbung_online_pauschale: 5.00
+  telekom_anteil: 0.20
+  telekom_deckel_monat: 20.00
+  gwg_grenze_netto: 800
+
+  # Other income
+  so_freigrenze_leistungen: 256
+
+  # Sonderausgaben (the flat rate and the caps double for a couple)
+  sonderausgaben_pauschbetrag: 36
+  spenden_hoechstsatz: 0.20
+  altersvorsorge_hoechstbetrag: 26528
+  altersvorsorge_quote: 1.00
+  sonstige_vorsorge_hoechstbetrag: 1900
+  kv_kuerzung_krankengeld: 0.04
+
+  # § 35a EStG
+  p35a_dienstleistung_satz: 0.20
+  p35a_dienstleistung_max: 4000
+  p35a_handwerker_satz: 0.20
+  p35a_handwerker_max: 1200
+
+  # § 33 (3)
+  zumutbar_ledig: [[15340, 0.05], [51130, 0.06], [null, 0.07]]
+  zumutbar_verheiratet: [[15340, 0.04], [51130, 0.05], [null, 0.06]]   # joint assessment, no children
+
+  # Business trips (§ 9 (4a) EStG): meal allowances per day
+  verpflegung_8h: 14                       # more than 8 hours away, and each day of arrival or departure
+  verpflegung_24h: 28                      # a full day away
+  entfernung_hoechstbetrag_ohne_pkw: 4500  # § 9 (2) s. 2: cap of the commuting allowance without a car
+
+  # Riester (§ 10a EStG) and the hardship allowance for other income (§ 46 (3), (5) EStG, § 70 EStDV)
+  riester_hoechstbetrag: 2100              # contributions plus allowance, per entitled person
+  haerteausgleich_grenze: 410              # other income up to this is left untaxed ...
+  haerteausgleich_obergrenze: 820          # ... and the relief tapers off up to this
+
+  # Line numbers of the ELSTER forms 2023, as far as a filed 2023 return shows them
+  zeilen_geprueft: true
+  zeilen:
+    Anlage N: {entfernung: "30–34", nicht_buero_tage: 31, buero_tage: 32, fortbildung: 63, reisekosten: "69–78",
+               weitere: 65}
+    Haushaltsnahe Aufwendungen: {dienstleistungen: 5}
+    Vorsorgeaufwand: {kv_ueber_basis: 22, wahlleistungen: 27, berufsunfaehigkeit: 45, unfall_haftpflicht_risiko: 46}
+
+2024:
+  # § 32a EStG as amended retroactively by the Steuerfortentwicklungsgesetz (BGBl. 2024 I Nr. 449):
+  # basic allowance 11,784 € instead of 11,604 €. Checked against a real 2024 notice; ELSTER's own
+  # calculation at filing in February 2025 still used the earlier tariff (c = 1,025.38 in zone 3,
+  # basic allowance 11,604 €) and came out 34 € higher on the same zvE.
+  grundfreibetrag: 11784
+  tarif:
+    - {bis: 11784, art: null}
+    - {bis: 17005, art: quadratisch, von: 11784, a: 954.80, b: 1400, c: 0}
+    - {bis: 66760, art: quadratisch, von: 17005, a: 181.19, b: 2397, c: 991.21}
+    - {bis: 277825, art: linear, satz: 0.42, abzug: 10636.31}
+    - {bis: null, art: linear, satz: 0.45, abzug: 18971.06}
+  soli: {satz: 0.055, freigrenze: 18130, milderung: 0.119}
+  umsatzsteuer: {regel: 0.19, ermaessigt: 0.07}
+
+  # Werbungskosten (§ 9 EStG)
+  arbeitnehmer_pauschbetrag: 1230
+  entfernung: [[20, 0.30], [null, 0.38]]
+  homeoffice_je_tag: 6.00
+  homeoffice_max_tage: 210
+  dienstreise_km_satz: 0.30
+  bewerbung_online_pauschale: 5.00
+  telekom_anteil: 0.20
+  telekom_deckel_monat: 20.00
+  gwg_grenze_netto: 800
+
+  # Other income
+  so_freigrenze_leistungen: 256
+
+  # Sonderausgaben
+  sonderausgaben_pauschbetrag: 36
+  spenden_hoechstsatz: 0.20
+  altersvorsorge_hoechstbetrag: 27566
+  altersvorsorge_quote: 1.00
+  sonstige_vorsorge_hoechstbetrag: 1900
+  kv_kuerzung_krankengeld: 0.04
+
+  # § 35a EStG
+  p35a_dienstleistung_satz: 0.20
+  p35a_dienstleistung_max: 4000
+  p35a_handwerker_satz: 0.20
+  p35a_handwerker_max: 1200
+
+  # § 33 (3)
+  zumutbar_ledig: [[15340, 0.05], [51130, 0.06], [null, 0.07]]
+  zumutbar_verheiratet: [[15340, 0.04], [51130, 0.05], [null, 0.06]]   # joint assessment, no children
+
+  # Business trips (§ 9 (4a) EStG): meal allowances per day
+  verpflegung_8h: 14                       # more than 8 hours away, and each day of arrival or departure
+  verpflegung_24h: 28                      # a full day away
+  entfernung_hoechstbetrag_ohne_pkw: 4500  # § 9 (2) s. 2: cap of the commuting allowance without a car
+
+  # Riester (§ 10a EStG) and the hardship allowance for other income (§ 46 (3), (5) EStG, § 70 EStDV)
+  riester_hoechstbetrag: 2100              # contributions plus allowance, per entitled person
+  haerteausgleich_grenze: 410              # other income up to this is left untaxed ...
+  haerteausgleich_obergrenze: 820          # ... and the relief tapers off up to this
+
+  # Line numbers of the ELSTER forms 2024, as far as a filed 2024 return shows them
+  # (the home-office day rate and work equipment were not used there, so their lines are not known)
+  zeilen_geprueft: true
+  zeilen:
+    Anlage N: {entfernung: "30–34", nicht_buero_tage: 31, buero_tage: 32, fortbildung: 63, weitere: 65}
+    Haushaltsnahe Aufwendungen: {dienstleistungen: 5}
+    Vorsorgeaufwand: {kv_ueber_basis: 22, wahlleistungen: 27, berufsunfaehigkeit: 45, unfall_haftpflicht_risiko: 46}
+
+2025:
+  # § 32a EStG as amended by the Steuerfortentwicklungsgesetz (BGBl. 2024 I Nr. 449).
+  # Checked against a real 2025 assessment notice: zvE and tariff income tax matched to the euro.
+  grundfreibetrag: 12096
+  tarif:                                   # zones by taxable income x (whole euros)
+    - {bis: 12096, art: null}
+    - {bis: 17443, art: quadratisch, von: 12096, a: 932.30, b: 1400, c: 0}      # (a·y + b)·y + c, y = (x − von) / 10,000
+    - {bis: 68480, art: quadratisch, von: 17443, a: 176.64, b: 2397, c: 1015.13}
+    - {bis: 277825, art: linear, satz: 0.42, abzug: 10911.92}                   # satz·x − abzug
+    - {bis: null, art: linear, satz: 0.45, abzug: 19246.67}
+  soli: {satz: 0.055, freigrenze: 19950, milderung: 0.119}    # §§ 3, 4 SolZG, individual assessment
+  umsatzsteuer: {regel: 0.19, ermaessigt: 0.07}                # § 12 UStG
+
+  # Werbungskosten (§ 9 EStG)
+  arbeitnehmer_pauschbetrag: 1230          # § 9a no. 1a
+  entfernung: [[20, 0.30], [null, 0.38]]   # § 9 (1) no. 4: 0.30 € up to km 20, 0.38 € from km 21
+  homeoffice_je_tag: 6.00                  # § 4 (5) no. 6c: per day ...
+  homeoffice_max_tage: 210                 # ... at most 1,260 €
+  dienstreise_km_satz: 0.30                # BRKG, car, per km driven
+  bewerbung_online_pauschale: 5.00         # accepted in practice, not a statutory flat rate
+  telekom_anteil: 0.20                     # R 9.1 (5) LStR: 20 % without itemising ...
+  telekom_deckel_monat: 20.00              # ... at most 20 € a month
+  gwg_grenze_netto: 800                    # § 6 (2): deductible at once (gross = net × (1 + standard VAT))
+
+  # Other income
+  so_freigrenze_leistungen: 256            # § 22 no. 3: below 256 € tax-free, otherwise in full
+
+  # Sonderausgaben
+  sonderausgaben_pauschbetrag: 36          # § 10c
+  spenden_hoechstsatz: 0.20                # § 10b: up to 20 % of the Gesamtbetrag der Einkünfte
+  altersvorsorge_hoechstbetrag: 29344      # § 10 (3): basic pension provision (Rürup, statutory pension), single
+  altersvorsorge_quote: 1.00               # fully deductible since 2023
+  sonstige_vorsorge_hoechstbetrag: 1900    # § 10 (4): employees (self-payers 2,800 €)
+  kv_kuerzung_krankengeld: 0.04            # § 10 (1) no. 3a s. 4: reduction where sick pay is covered
+
+  # § 35a EStG: tax reduction
+  p35a_dienstleistung_satz: 0.20
+  p35a_dienstleistung_max: 4000            # maximum reduction (= 20,000 € of expenses)
+  p35a_handwerker_satz: 0.20
+  p35a_handwerker_max: 1200                # maximum reduction (= 6,000 € of labour cost)
+
+  # § 33 (3): reasonable burden, single without children, in tiers (BFH VI R 75/14)
+  zumutbar_ledig: [[15340, 0.05], [51130, 0.06], [null, 0.07]]
+  zumutbar_verheiratet: [[15340, 0.04], [51130, 0.05], [null, 0.06]]   # joint assessment, no children
+
+  # Business trips (§ 9 (4a) EStG): meal allowances per day
+  verpflegung_8h: 14                       # more than 8 hours away, and each day of arrival or departure
+  verpflegung_24h: 28                      # a full day away
+  entfernung_hoechstbetrag_ohne_pkw: 4500  # § 9 (2) s. 2: cap of the commuting allowance without a car
+
+  # Riester (§ 10a EStG) and the hardship allowance for other income (§ 46 (3), (5) EStG, § 70 EStDV)
+  riester_hoechstbetrag: 2100              # contributions plus allowance, per entitled person
+  haerteausgleich_grenze: 410              # other income up to this is left untaxed ...
+  haerteausgleich_obergrenze: 820          # ... and the relief tapers off up to this
+
+  # Line numbers of the ELSTER forms 2025, checked against a filed 2025 return
+  zeilen_geprueft: true
+  zeilen:
+    Anlage N: {entfernung: "27–31", nicht_buero_tage: 28, buero_tage: 29, arbeitsmittel: 54,
+               homeoffice: 58, fortbildung: 60, weitere: 62}
+    Haushaltsnahe Aufwendungen: {dienstleistungen: 5, handwerker: 6}
+    Vorsorgeaufwand: {kv_ueber_basis: 22, wahlleistungen: 27, berufsunfaehigkeit: 45, unfall_haftpflicht_risiko: 46}
+
+2026:
+  # § 32a EStG from 2026 (Steuerfortentwicklungsgesetz). Not checked against a notice yet.
+  grundfreibetrag: 12348
+  tarif:
+    - {bis: 12348, art: null}
+    - {bis: 17799, art: quadratisch, von: 12348, a: 914.51, b: 1400, c: 0}
+    - {bis: 69878, art: quadratisch, von: 17799, a: 173.10, b: 2397, c: 1034.87}
+    - {bis: 277825, art: linear, satz: 0.42, abzug: 11135.63}
+    - {bis: null, art: linear, satz: 0.45, abzug: 19470.38}
+  soli: {satz: 0.055, freigrenze: 20350, milderung: 0.119}
+  umsatzsteuer: {regel: 0.19, ermaessigt: 0.07}
+
+  # Werbungskosten (§ 9 EStG)
+  arbeitnehmer_pauschbetrag: 1230
+  entfernung: [[null, 0.38]]               # from 2026: 0.38 € from the first kilometre
+  homeoffice_je_tag: 6.00
+  homeoffice_max_tage: 210
+  dienstreise_km_satz: 0.30
+  bewerbung_online_pauschale: 5.00
+  telekom_anteil: 0.20
+  telekom_deckel_monat: 20.00
+  gwg_grenze_netto: 800
+
+  # Other income
+  so_freigrenze_leistungen: 256
+
+  # Sonderausgaben
+  sonderausgaben_pauschbetrag: 36
+  spenden_hoechstsatz: 0.20
+  altersvorsorge_hoechstbetrag: 30826      # § 10 (3): 24.7 % of 124,800 € (ceiling, miners' pension insurance) = 30,825.60, rounded up
+  altersvorsorge_quote: 1.00
+  sonstige_vorsorge_hoechstbetrag: 1900
+  kv_kuerzung_krankengeld: 0.04
+
+  # § 35a EStG
+  p35a_dienstleistung_satz: 0.20
+  p35a_dienstleistung_max: 4000
+  p35a_handwerker_satz: 0.20
+  p35a_handwerker_max: 1200
+
+  # § 33 (3)
+  zumutbar_ledig: [[15340, 0.05], [51130, 0.06], [null, 0.07]]
+  zumutbar_verheiratet: [[15340, 0.04], [51130, 0.05], [null, 0.06]]   # joint assessment, no children
+
+  # Business trips (§ 9 (4a) EStG): meal allowances per day
+  verpflegung_8h: 14                       # more than 8 hours away, and each day of arrival or departure
+  verpflegung_24h: 28                      # a full day away
+  entfernung_hoechstbetrag_ohne_pkw: 4500  # § 9 (2) s. 2: cap of the commuting allowance without a car
+
+  # Riester (§ 10a EStG) and the hardship allowance for other income (§ 46 (3), (5) EStG, § 70 EStDV)
+  riester_hoechstbetrag: 2100              # contributions plus allowance, per entitled person
+  haerteausgleich_grenze: 410              # other income up to this is left untaxed ...
+  haerteausgleich_obergrenze: 820          # ... and the relief tapers off up to this
+
+  # Line numbers: forms 2026 not compared yet, the 2025 lines for now
+  zeilen_geprueft: false
+  zeilen:
+    Anlage N: {entfernung: "27–31", nicht_buero_tage: 28, buero_tage: 29, arbeitsmittel: 54,
+               homeoffice: 58, fortbildung: 60, weitere: 62}
+    Haushaltsnahe Aufwendungen: {dienstleistungen: 5, handwerker: 6}
+    Vorsorgeaufwand: {kv_ueber_basis: 22, wahlleistungen: 27, berufsunfaehigkeit: 45, unfall_haftpflicht_risiko: 46}

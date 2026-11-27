@@ -1,0 +1,2396 @@
+{
+  "format": 2,
+  "erzeugt_von": "PyTaxDE",
+  "erklaerungen": {
+    "beispiel-2025-hohes-einkommen.yaml": {
+      "geprueft": {
+        "jahr": 2025,
+        "elster": {
+          "Anlage N": {
+            "Beispiel AG: Arbeitstage an der Tätigkeitsstätte": {
+              "zeile": 29,
+              "wert": 52,
+              "einheit": "Tage"
+            },
+            "Beispiel AG: Tage ohne Fahrt (Homeoffice, Urlaub, krank)": {
+              "zeile": 28,
+              "wert": 176,
+              "einheit": "Tage"
+            },
+            "Beispiel AG: einfache Entfernung": {
+              "zeile": "27–31",
+              "wert": 6,
+              "einheit": "km"
+            },
+            "Homeoffice-Pauschale: Anzahl Tage": {
+              "zeile": 58,
+              "wert": 143,
+              "einheit": "Tage"
+            },
+            "Arbeitsmittel": {
+              "zeile": 54,
+              "wert": 0,
+              "einheit": "€"
+            },
+            "Fortbildungskosten": {
+              "zeile": 60,
+              "wert": 0,
+              "einheit": "€"
+            },
+            "Weitere Werbungskosten": {
+              "zeile": 62,
+              "wert": 16,
+              "einheit": "€"
+            }
+          },
+          "Anlage SO": {
+            "Umfrageteilnahmen: Einnahmen": {
+              "zeile": null,
+              "wert": 76,
+              "einheit": "€"
+            },
+            "Umfrageteilnahmen: Werbungskosten": {
+              "zeile": null,
+              "wert": 0,
+              "einheit": "€"
+            }
+          },
+          "Sonderausgaben": {
+            "Zuwendungen an steuerbegünstigte Organisationen": {
+              "zeile": null,
+              "wert": 231,
+              "einheit": "€"
+            }
+          },
+          "Haushaltsnahe Aufwendungen": {
+            "Haushaltsnahe Dienstleistungen": {
+              "zeile": 5,
+              "wert": 1855,
+              "einheit": "€"
+            },
+            "Handwerkerleistungen (Lohnanteil)": {
+              "zeile": 6,
+              "wert": 0,
+              "einheit": "€"
+            }
+          },
+          "Vorsorgeaufwand": {
+            "Kranken-/Pflegeversicherung über die Basisabsicherung hinaus": {
+              "zeile": 22,
+              "wert": 0,
+              "einheit": "€"
+            },
+            "Wahlleistungen und Zusatzversicherungen": {
+              "zeile": 27,
+              "wert": 0,
+              "einheit": "€"
+            },
+            "Berufsunfähigkeitsversicherung": {
+              "zeile": 45,
+              "wert": 0,
+              "einheit": "€"
+            },
+            "Unfall-, Haftpflicht- und Risikoversicherungen": {
+              "zeile": 46,
+              "wert": 65,
+              "einheit": "€"
+            },
+            "LStB Rentenversicherung Arbeitnehmer (Nr. 23a)": {
+              "zeile": null,
+              "wert": 8983.8,
+              "einheit": "€"
+            },
+            "LStB Rentenversicherung Arbeitgeber (Nr. 22a)": {
+              "zeile": null,
+              "wert": 8983.8,
+              "einheit": "€"
+            },
+            "LStB Krankenversicherung Arbeitnehmer (Nr. 25)": {
+              "zeile": null,
+              "wert": 5655.83,
+              "einheit": "€"
+            },
+            "LStB Pflegeversicherung Arbeitnehmer (Nr. 26)": {
+              "zeile": null,
+              "wert": 1587.6,
+              "einheit": "€"
+            },
+            "LStB Arbeitslosenversicherung Arbeitnehmer (Nr. 27)": {
+              "zeile": null,
+              "wert": 1255.8,
+              "einheit": "€"
+            }
+          },
+          "Außergewöhnliche Belastungen": {
+            "Krankheitskosten": {
+              "zeile": null,
+              "wert": 7174,
+              "einheit": "€"
+            }
+          }
+        },
+        "werte": {
+          "moegliche_tage_Beispiel AG": 251,
+          "nicht_buero_tage_Beispiel AG": 176,
+          "entfernungspauschale_brutto": 94,
+          "entfernungspauschale": 94,
+          "homeoffice": 858,
+          "arbeitsmittel": 0,
+          "fortbildung": 0,
+          "reisekosten": 0,
+          "weitere": 16,
+          "werbungskosten": 968,
+          "ueber_pauschbetrag": 0,
+          "sonstige_einkuenfte": 76,
+          "spenden": 231,
+          "35a_dienstleistungen": 1855,
+          "35a_dienstleistungen_ermaessigung": 371,
+          "35a_handwerker": 0,
+          "35a_handwerker_ermaessigung": 0,
+          "kv_ueber_basis": 0,
+          "wahlleistungen": 0,
+          "berufsunfaehigkeit": 0,
+          "unfall_haftpflicht_risiko": 65,
+          "zumutbare_belastung": 6104.3,
+          "krankheitskosten_wirksam": 1069.7
+        },
+        "simulation": {
+          "fehlt": [],
+          "schritte": {
+            "Bruttoarbeitslohn": 97930,
+            "ab Werbungskosten (Pauschbetrag)": -1230,
+            "Einkünfte nichtselbständige Arbeit": 96700,
+            "Sonstige Einkünfte": 0,
+            "Gesamtbetrag der Einkünfte": 96700,
+            "Altersvorsorge (RV AN + AG − AG-Anteil)": 8984,
+            "Kranken-/Pflegeversicherung Basis (Kürzung Krankengeld 226,00 €)": 7018,
+            "weitere sonstige Vorsorge (wirksam)": 0,
+            "Summe beschränkt abziehbare Sonderausgaben": -16002,
+            "Spenden": -231,
+            "außergewöhnliche Belastungen": -1069.7,
+            "zu versteuerndes Einkommen": 79397,
+            "tarifliche Einkommensteuer": 22434,
+            "ab § 35a-Ermäßigungen": -371,
+            "festzusetzende Einkommensteuer": 22063,
+            "Solidaritätszuschlag": 251.44,
+            "Lohnsteuer und Soli bereits abgezogen": 25173.69,
+            "Erstattung (+) / Nachzahlung (−)": 2859.25
+          },
+          "werte": {
+            "bruttoarbeitslohn": 97930,
+            "werbungskosten_abzug": 1230,
+            "einkuenfte_n": 96700,
+            "sonstige": 0,
+            "gde": 96700,
+            "altersvorsorge_summe": 17967,
+            "altersvorsorge": 8984,
+            "kv_kuerzung": 226,
+            "kv_pv_basis": 7018,
+            "beschraenkt": 16002,
+            "unbeschraenkt": 231,
+            "einkommen": 79397,
+            "zve": 79397,
+            "tarif": 22434,
+            "erm_dienstleistungen": 371,
+            "erm_handwerker": 0,
+            "ermaessigung_35a": 371,
+            "festgesetzt": 22063,
+            "soli": 251.44,
+            "lohnsteuer": 24835,
+            "soli_abzug": 338.69,
+            "erstattung": 2859.25,
+            "grenzsteuersatz": 0.42,
+            "sonstige_unwirksam": 1321
+          },
+          "abgleich": {
+            "werbungskosten": {
+              "bescheid": 1230,
+              "simuliert": 1230
+            },
+            "sonstige einkuenfte": {
+              "bescheid": 0,
+              "simuliert": 0
+            },
+            "gesamtbetrag der einkuenfte": {
+              "bescheid": 96700,
+              "simuliert": 96700
+            },
+            "kuerzung krankengeld": {
+              "bescheid": 226,
+              "simuliert": 226
+            },
+            "kranken pflege basis": {
+              "bescheid": 7018,
+              "simuliert": 7018
+            },
+            "zu versteuerndes einkommen": {
+              "bescheid": 79397,
+              "simuliert": 79397
+            },
+            "tarifliche einkommensteuer": {
+              "bescheid": 22434,
+              "simuliert": 22434
+            },
+            "festgesetzte einkommensteuer": {
+              "bescheid": 22063,
+              "simuliert": 22063
+            },
+            "solidaritaetszuschlag": {
+              "bescheid": 251.44,
+              "simuliert": 251.44
+            },
+            "abzug vom lohn": {
+              "bescheid": 24835,
+              "simuliert": 24835
+            },
+            "erstattung": {
+              "bescheid": 2859.25,
+              "simuliert": 2859.25
+            }
+          }
+        },
+        "offen": [],
+        "hinweise": [
+          "Anlage SO: Einkünfte 76,00 € unter der Freigrenze von 256,00 € – steuerfrei"
+        ],
+        "posten": {
+          "Anlage N: Weitere Werbungskosten": {
+            "summe": 16,
+            "posten": {
+              "Kontoführungsgebühren (Pauschale)": {
+                "exakt": 16,
+                "eintrag": 16,
+                "status": ""
+              }
+            }
+          },
+          "Sonderausgaben: Spenden und Mitgliedsbeiträge": {
+            "summe": 231,
+            "posten": {
+              "Spende Kinderhilfe": {
+                "exakt": 231,
+                "eintrag": 231,
+                "status": ""
+              }
+            }
+          },
+          "§ 35a: Haushaltsnahe Dienstleistungen": {
+            "summe": 1855,
+            "posten": {
+              "Gartenpflege": {
+                "exakt": 1854.19,
+                "eintrag": 1855,
+                "status": ""
+              }
+            }
+          },
+          "Vorsorgeaufwand: Unfall-, Haftpflicht- und Risikoversicherungen": {
+            "summe": 65,
+            "posten": {
+              "Privathaftpflicht": {
+                "exakt": 64.9,
+                "eintrag": 65,
+                "status": ""
+              }
+            }
+          },
+          "Außergewöhnliche Belastungen: Krankheitskosten": {
+            "summe": 7174,
+            "posten": {
+              "Zahnimplantat, Eigenanteil": {
+                "exakt": 7173.81,
+                "eintrag": 7174,
+                "status": ""
+              }
+            }
+          }
+        }
+      },
+      "anzeige": {
+        "jahr": 2025,
+        "veranlagung": "einzeln",
+        "personen": [
+          {
+            "person": "A",
+            "name": "Max Mustermann"
+          }
+        ],
+        "zeilen_geprueft": true,
+        "hebel": [
+          "Sonstige Vorsorge wirkt nicht: 1.321,00 € (Arbeitslosenversicherung, Zeilen 22, 27, 45, 46) bleiben ohne Wirkung, weil Kranken-/Pflegeversicherung (7.018,00 €) den Höchstbetrag von 1.900,00 € schon ausschöpft. Eintragen schadet nicht.",
+          "Altersvorsorge: bis 11.377,00 € zusätzliche Beiträge zur Basisrente (Rürup) wären abziehbar; Wirkung je 1.000 € etwa 420,00 € (Grenzsteuersatz 42,0 %).",
+          "Grenzsteuersatz 42,0 % (ohne Soli): jeder weitere Euro Werbungskosten oder Spende spart etwa 42 Cent.",
+          "Werbungskosten 968,00 € liegen unter dem Arbeitnehmer-Pauschbetrag 1.230,00 €: erst ab 262,00 € mehr wirkt jeder weitere Euro.",
+          "Homeoffice: 143 von 210 Tagen eingetragen, noch 67 möglich. Jeder gearbeitete Tag zählt genau einmal: ein Bürotag bringt 1,80 € Entfernungspauschale (6 km), ein Homeoffice-Tag 6,00 €. Wichtig ist, dass alle Tage erfasst sind.",
+          "§ 35a haushaltsnahe Dienstleistungen: noch 18.145,00 € Aufwand mit 20 % Steuerermäßigung möglich (direkt von der Steuer, unabhängig vom Grenzsteuersatz).",
+          "§ 35a Handwerker-Lohnkosten: noch 6.000,00 € Aufwand mit 20 % Steuerermäßigung möglich (direkt von der Steuer, unabhängig vom Grenzsteuersatz)."
+        ],
+        "regeln": {
+          "grundfreibetrag": 12096,
+          "arbeitnehmer_pauschbetrag": 1230,
+          "entfernung": [
+            [
+              20,
+              0.3
+            ],
+            [
+              null,
+              0.38
+            ]
+          ],
+          "homeoffice_je_tag": 6,
+          "homeoffice_max_tage": 210,
+          "altersvorsorge_hoechstbetrag": 29344,
+          "altersvorsorge_quote": 1,
+          "sonstige_vorsorge_hoechstbetrag": 1900,
+          "sonderausgaben_pauschbetrag": 36,
+          "soli": {
+            "satz": 0.055,
+            "freigrenze": 19950,
+            "milderung": 0.119
+          },
+          "verpflegung_8h": 14,
+          "verpflegung_24h": 28,
+          "gwg_grenze_netto": 800
+        },
+        "abschnitte": [
+          {
+            "titel": "Anlage N: Wege zur ersten Tätigkeitsstätte",
+            "summe": 94,
+            "zeilen": [
+              "Beispiel AG (01.01.–31.12.2025): 251 mögliche Arbeitstage, 52 Büro, 143 Homeoffice, 30 Urlaub, 3 krank; 52 Tage × 6 km = 93,60 €",
+              "Entfernungspauschale 94,00 € − steuerfreie Arbeitgeberleistungen 0,00 € = 94,00 € (ELSTER rechnet das selbst)"
+            ],
+            "posten": []
+          },
+          {
+            "titel": "Anlage N: Homeoffice-Pauschale",
+            "summe": 858,
+            "zeilen": [
+              "143 Tage × 6,00 € = 858,00 €"
+            ],
+            "posten": []
+          },
+          {
+            "titel": "Anlage N: Arbeitsmittel",
+            "summe": 0,
+            "zeilen": [],
+            "posten": []
+          },
+          {
+            "titel": "Anlage N: Fortbildung",
+            "summe": 0,
+            "zeilen": [],
+            "posten": []
+          },
+          {
+            "titel": "Anlage N: Reisekosten",
+            "summe": 0,
+            "zeilen": [],
+            "posten": []
+          },
+          {
+            "titel": "Anlage N: Weitere Werbungskosten",
+            "summe": 16,
+            "zeilen": [],
+            "posten": [
+              {
+                "bezeichnung": "Kontoführungsgebühren (Pauschale)",
+                "rechnung": "Betrag",
+                "exakt": 16,
+                "eintrag": 16,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              }
+            ]
+          },
+          {
+            "titel": "Anlage SO: Werbungskosten Umfrageteilnahmen",
+            "summe": 0,
+            "zeilen": [
+              "Einnahmen 76,00 € − Werbungskosten 0,00 € = Einkünfte 76,00 €"
+            ],
+            "posten": []
+          },
+          {
+            "titel": "Sonderausgaben: Spenden und Mitgliedsbeiträge",
+            "summe": 231,
+            "zeilen": [],
+            "posten": [
+              {
+                "bezeichnung": "Spende Kinderhilfe",
+                "rechnung": "Betrag",
+                "exakt": 231,
+                "eintrag": 231,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              }
+            ]
+          },
+          {
+            "titel": "§ 35a: Haushaltsnahe Dienstleistungen",
+            "summe": 1855,
+            "zeilen": [
+              "Steuerermäßigung 20 % von 1.855,00 € = 371,00 €"
+            ],
+            "posten": [
+              {
+                "bezeichnung": "Gartenpflege",
+                "rechnung": "Betrag",
+                "exakt": 1854.19,
+                "eintrag": 1855,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              }
+            ]
+          },
+          {
+            "titel": "§ 35a: Handwerkerleistungen (Lohnanteil)",
+            "summe": 0,
+            "zeilen": [
+              "Steuerermäßigung 20 % von 0,00 € = 0,00 €"
+            ],
+            "posten": []
+          },
+          {
+            "titel": "Vorsorgeaufwand: Kranken-/Pflegeversicherung über die Basisabsicherung hinaus",
+            "summe": 0,
+            "zeilen": [],
+            "posten": []
+          },
+          {
+            "titel": "Vorsorgeaufwand: Wahlleistungen und Zusatzversicherungen",
+            "summe": 0,
+            "zeilen": [],
+            "posten": []
+          },
+          {
+            "titel": "Vorsorgeaufwand: Berufsunfähigkeitsversicherung",
+            "summe": 0,
+            "zeilen": [],
+            "posten": []
+          },
+          {
+            "titel": "Vorsorgeaufwand: Unfall-, Haftpflicht- und Risikoversicherungen",
+            "summe": 65,
+            "zeilen": [],
+            "posten": [
+              {
+                "bezeichnung": "Privathaftpflicht",
+                "rechnung": "Betrag",
+                "exakt": 64.9,
+                "eintrag": 65,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              }
+            ]
+          },
+          {
+            "titel": "Außergewöhnliche Belastungen: Krankheitskosten",
+            "summe": 7174,
+            "zeilen": [
+              "Gesamtbetrag der Einkünfte ≈ 96.700,00 €, zumutbare Belastung 6.104,30 €, wirkt sich aus: 1.069,70 €"
+            ],
+            "posten": [
+              {
+                "bezeichnung": "Zahnimplantat, Eigenanteil",
+                "rechnung": "Betrag",
+                "exakt": 7173.81,
+                "eintrag": 7174,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              }
+            ]
+          }
+        ],
+        "belege": [],
+        "cluster": [
+          {
+            "cluster": "werbungskosten",
+            "person": "A",
+            "wert": 968,
+            "grenze": 1230,
+            "teile": {
+              "fahrt": 94,
+              "homeoffice": 858,
+              "arbeitsmittel": 0,
+              "fortbildung": 0,
+              "reisekosten": 0,
+              "weitere": 16
+            }
+          },
+          {
+            "cluster": "homeoffice",
+            "person": "A",
+            "wert": 858,
+            "grenze": 1260
+          },
+          {
+            "cluster": "fahrt",
+            "person": "A",
+            "wert": 94,
+            "grenze": 4500,
+            "gilt": false
+          },
+          {
+            "cluster": "sonstige",
+            "person": "",
+            "wert": 76,
+            "grenze": 256,
+            "teile": {
+              "fahrten": 0,
+              "parken": 0,
+              "kleinausgaben": 0,
+              "weitere": 0
+            },
+            "einnahmen": 76
+          },
+          {
+            "cluster": "altersvorsorge",
+            "person": "",
+            "wert": 17967,
+            "grenze": 29344
+          },
+          {
+            "cluster": "sonstige_vorsorge",
+            "person": "",
+            "wert": 8339,
+            "grenze": 1900
+          },
+          {
+            "cluster": "spenden",
+            "person": "",
+            "wert": 231,
+            "grenze": 19340
+          },
+          {
+            "cluster": "soli",
+            "person": "",
+            "wert": 22063,
+            "grenze": 19950
+          },
+          {
+            "cluster": "haushaltsnahe",
+            "person": "",
+            "wert": 1855,
+            "grenze": 20000
+          },
+          {
+            "cluster": "handwerker",
+            "person": "",
+            "wert": 0,
+            "grenze": 6000
+          },
+          {
+            "cluster": "krankheitskosten",
+            "person": "",
+            "wert": 7174,
+            "grenze": 6104.3
+          }
+        ]
+      }
+    },
+    "beispiel-2025-jobwechsel.yaml": {
+      "geprueft": {
+        "jahr": 2025,
+        "elster": {
+          "Anlage N": {
+            "Beispiel GmbH: Arbeitstage an der Tätigkeitsstätte": {
+              "zeile": 29,
+              "wert": 60,
+              "einheit": "Tage"
+            },
+            "Beispiel GmbH: Tage ohne Fahrt (Homeoffice, Urlaub, krank)": {
+              "zeile": 28,
+              "wert": 107,
+              "einheit": "Tage"
+            },
+            "Beispiel GmbH: einfache Entfernung": {
+              "zeile": "27–31",
+              "wert": 33,
+              "einheit": "km"
+            },
+            "Muster AG: Arbeitstage an der Tätigkeitsstätte": {
+              "zeile": 29,
+              "wert": 30,
+              "einheit": "Tage"
+            },
+            "Muster AG: Tage ohne Fahrt (Homeoffice, Urlaub, krank)": {
+              "zeile": 28,
+              "wert": 25,
+              "einheit": "Tage"
+            },
+            "Muster AG: einfache Entfernung": {
+              "zeile": "27–31",
+              "wert": 9,
+              "einheit": "km"
+            },
+            "Homeoffice-Pauschale: Anzahl Tage": {
+              "zeile": 58,
+              "wert": 99,
+              "einheit": "Tage"
+            },
+            "Arbeitsmittel": {
+              "zeile": 54,
+              "wert": 352,
+              "einheit": "€"
+            },
+            "Fortbildungskosten": {
+              "zeile": 60,
+              "wert": 268,
+              "einheit": "€"
+            },
+            "Weitere Werbungskosten": {
+              "zeile": 62,
+              "wert": 295,
+              "einheit": "€"
+            }
+          },
+          "Anlage SO": {
+            "Studienteilnahme Musterklinik: Einnahmen": {
+              "zeile": null,
+              "wert": 1459,
+              "einheit": "€"
+            },
+            "Studienteilnahme Musterklinik: Werbungskosten": {
+              "zeile": null,
+              "wert": 268,
+              "einheit": "€"
+            }
+          },
+          "Sonderausgaben": {
+            "Zuwendungen an steuerbegünstigte Organisationen": {
+              "zeile": null,
+              "wert": 426,
+              "einheit": "€"
+            }
+          },
+          "Haushaltsnahe Aufwendungen": {
+            "Haushaltsnahe Dienstleistungen": {
+              "zeile": 5,
+              "wert": 271,
+              "einheit": "€"
+            },
+            "Handwerkerleistungen (Lohnanteil)": {
+              "zeile": 6,
+              "wert": 546,
+              "einheit": "€"
+            }
+          },
+          "Vorsorgeaufwand": {
+            "Kranken-/Pflegeversicherung über die Basisabsicherung hinaus": {
+              "zeile": 22,
+              "wert": 0,
+              "einheit": "€"
+            },
+            "Wahlleistungen und Zusatzversicherungen": {
+              "zeile": 27,
+              "wert": 0,
+              "einheit": "€"
+            },
+            "Berufsunfähigkeitsversicherung": {
+              "zeile": 45,
+              "wert": 519,
+              "einheit": "€"
+            },
+            "Unfall-, Haftpflicht- und Risikoversicherungen": {
+              "zeile": 46,
+              "wert": 51,
+              "einheit": "€"
+            },
+            "LStB Rentenversicherung Arbeitnehmer (Nr. 23a)": {
+              "zeile": null,
+              "wert": 5310.05,
+              "einheit": "€"
+            },
+            "LStB Rentenversicherung Arbeitgeber (Nr. 22a)": {
+              "zeile": null,
+              "wert": 5310.05,
+              "einheit": "€"
+            },
+            "LStB Krankenversicherung Arbeitnehmer (Nr. 25)": {
+              "zeile": null,
+              "wert": 4881.82,
+              "einheit": "€"
+            },
+            "LStB Pflegeversicherung Arbeitnehmer (Nr. 26)": {
+              "zeile": null,
+              "wert": 1370.33,
+              "einheit": "€"
+            },
+            "LStB Arbeitslosenversicherung Arbeitnehmer (Nr. 27)": {
+              "zeile": null,
+              "wert": 742.26,
+              "einheit": "€"
+            },
+            "Erstattete Beiträge (z. B. Bonus der Krankenkasse)": {
+              "zeile": null,
+              "wert": 50,
+              "einheit": "€"
+            }
+          },
+          "Außergewöhnliche Belastungen": {
+            "Krankheitskosten": {
+              "zeile": null,
+              "wert": 222,
+              "einheit": "€"
+            }
+          }
+        },
+        "werte": {
+          "moegliche_tage_Beispiel GmbH": 188,
+          "nicht_buero_tage_Beispiel GmbH": 107,
+          "moegliche_tage_Muster AG": 63,
+          "nicht_buero_tage_Muster AG": 25,
+          "entfernungspauschale_brutto": 738,
+          "entfernungspauschale": 726,
+          "homeoffice": 594,
+          "arbeitsmittel": 352,
+          "fortbildung": 268,
+          "reisekosten": 0,
+          "weitere": 295,
+          "werbungskosten": 2235,
+          "ueber_pauschbetrag": 1005,
+          "sonstige_einkuenfte": 1191,
+          "spenden": 426,
+          "35a_dienstleistungen": 271,
+          "35a_dienstleistungen_ermaessigung": 54.2,
+          "35a_handwerker": 546,
+          "35a_handwerker_ermaessigung": 109.2,
+          "kv_ueber_basis": 0,
+          "wahlleistungen": 0,
+          "berufsunfaehigkeit": 519,
+          "unfall_haftpflicht_risiko": 51,
+          "zumutbare_belastung": 3259.01,
+          "krankheitskosten_wirksam": 0
+        },
+        "simulation": {
+          "fehlt": [],
+          "schritte": {
+            "Bruttoarbeitslohn": 57097,
+            "ab Werbungskosten": -2235,
+            "Einkünfte nichtselbständige Arbeit": 54862,
+            "Sonstige Einkünfte": 1191,
+            "Gesamtbetrag der Einkünfte": 56053,
+            "Altersvorsorge (RV AN + AG − AG-Anteil)": 5311,
+            "Kranken-/Pflegeversicherung Basis (Kürzung Krankengeld 193,00 €)": 6010,
+            "weitere sonstige Vorsorge (wirksam)": 0,
+            "Summe beschränkt abziehbare Sonderausgaben": -11321,
+            "Spenden": -426,
+            "zu versteuerndes Einkommen": 44306,
+            "tarifliche Einkommensteuer": 8728,
+            "ab § 35a-Ermäßigungen": -165,
+            "festzusetzende Einkommensteuer": 8563,
+            "Solidaritätszuschlag": 0,
+            "Lohnsteuer und Soli bereits abgezogen": 7245,
+            "Erstattung (+) / Nachzahlung (−)": -1318
+          },
+          "werte": {
+            "bruttoarbeitslohn": 57097,
+            "werbungskosten_abzug": 2235,
+            "einkuenfte_n": 54862,
+            "sonstige": 1191,
+            "gde": 56053,
+            "altersvorsorge_summe": 10621,
+            "altersvorsorge": 5311,
+            "kv_kuerzung": 193,
+            "kv_pv_basis": 6010,
+            "beschraenkt": 11321,
+            "unbeschraenkt": 426,
+            "einkommen": 44306,
+            "zve": 44306,
+            "tarif": 8728,
+            "erm_dienstleistungen": 55,
+            "erm_handwerker": 110,
+            "ermaessigung_35a": 165,
+            "festgesetzt": 8563,
+            "soli": 0,
+            "lohnsteuer": 7245,
+            "soli_abzug": 0,
+            "erstattung": -1318,
+            "grenzsteuersatz": 0.337,
+            "sonstige_unwirksam": 1313
+          },
+          "abgleich": {
+            "bruttoarbeitslohn": {
+              "bescheid": 57097,
+              "simuliert": 57097
+            },
+            "werbungskosten": {
+              "bescheid": 2235,
+              "simuliert": 2235
+            },
+            "einkuenfte nichtselbstaendige arbeit": {
+              "bescheid": 54862,
+              "simuliert": 54862
+            },
+            "sonstige einkuenfte": {
+              "bescheid": 1191,
+              "simuliert": 1191
+            },
+            "gesamtbetrag der einkuenfte": {
+              "bescheid": 56053,
+              "simuliert": 56053
+            },
+            "kuerzung krankengeld": {
+              "bescheid": 193,
+              "simuliert": 193
+            },
+            "kranken pflege basis": {
+              "bescheid": 6010,
+              "simuliert": 6010
+            },
+            "beschraenkt abziehbare sonderausgaben": {
+              "bescheid": 11321,
+              "simuliert": 11321
+            },
+            "unbeschraenkt abziehbare sonderausgaben": {
+              "bescheid": 426,
+              "simuliert": 426
+            },
+            "zu versteuerndes einkommen": {
+              "bescheid": 44306,
+              "simuliert": 44306
+            },
+            "tarifliche einkommensteuer": {
+              "bescheid": 8728,
+              "simuliert": 8728
+            },
+            "ermaessigung haushaltsnahe dienstleistungen": {
+              "bescheid": 55,
+              "simuliert": 55
+            },
+            "ermaessigung handwerker": {
+              "bescheid": 110,
+              "simuliert": 110
+            },
+            "festgesetzte einkommensteuer": {
+              "bescheid": 8563,
+              "simuliert": 8563
+            },
+            "solidaritaetszuschlag": {
+              "bescheid": 0,
+              "simuliert": 0
+            },
+            "abzug vom lohn": {
+              "bescheid": 7245,
+              "simuliert": 7245
+            },
+            "erstattung": {
+              "bescheid": -1318,
+              "simuliert": -1318
+            }
+          }
+        },
+        "offen": [],
+        "hinweise": [],
+        "posten": {
+          "Anlage N: Arbeitsmittel": {
+            "summe": 352,
+            "posten": {
+              "Bürostuhl": {
+                "exakt": 286.87,
+                "eintrag": 287,
+                "status": ""
+              },
+              "Drucker, beruflicher Anteil": {
+                "exakt": 64.95,
+                "eintrag": 65,
+                "status": ""
+              }
+            }
+          },
+          "Anlage N: Fortbildung": {
+            "summe": 268,
+            "posten": {
+              "Online-Kurs Projektmanagement": {
+                "exakt": 220.35,
+                "eintrag": 221,
+                "status": ""
+              },
+              "Fachbuch": {
+                "exakt": 46.6,
+                "eintrag": 47,
+                "status": ""
+              }
+            }
+          },
+          "Anlage N: Weitere Werbungskosten": {
+            "summe": 295,
+            "posten": {
+              "Internet Festnetz": {
+                "exakt": 94.73,
+                "eintrag": 95,
+                "status": ""
+              },
+              "Mobilfunk (Tarifwechsel im Juli)": {
+                "exakt": 42.55,
+                "eintrag": 43,
+                "status": ""
+              },
+              "Kontoführungsgebühren (Pauschale)": {
+                "exakt": 16,
+                "eintrag": 16,
+                "status": ""
+              },
+              "Online-Bewerbungen": {
+                "exakt": 105,
+                "eintrag": 105,
+                "status": ""
+              },
+              "Fahrt zur Schulung, eigener Pkw": {
+                "exakt": 35.4,
+                "eintrag": 36,
+                "status": ""
+              }
+            }
+          },
+          "Anlage SO: Werbungskosten Studienteilnahme Musterklinik": {
+            "summe": 268,
+            "posten": {
+              "Fahrten zur Klinik (12 Termine, hin und zurück)": {
+                "exakt": 207.84,
+                "eintrag": 208,
+                "status": ""
+              },
+              "Parken": {
+                "exakt": 60,
+                "eintrag": 60,
+                "status": ""
+              }
+            }
+          },
+          "Sonderausgaben: Spenden und Mitgliedsbeiträge": {
+            "summe": 426,
+            "posten": {
+              "Tierschutzverein Musterstadt": {
+                "exakt": 324,
+                "eintrag": 324,
+                "status": ""
+              },
+              "Einzelspende Katastrophenhilfe": {
+                "exakt": 101.57,
+                "eintrag": 102,
+                "status": ""
+              }
+            }
+          },
+          "§ 35a: Haushaltsnahe Dienstleistungen": {
+            "summe": 271,
+            "posten": {
+              "Wartung Heizung": {
+                "exakt": 270.24,
+                "eintrag": 271,
+                "status": ""
+              }
+            }
+          },
+          "§ 35a: Handwerkerleistungen (Lohnanteil)": {
+            "summe": 546,
+            "posten": {
+              "Malerarbeiten, Lohnanteil": {
+                "exakt": 545.61,
+                "eintrag": 546,
+                "status": ""
+              }
+            }
+          },
+          "Vorsorgeaufwand: Berufsunfähigkeitsversicherung": {
+            "summe": 519,
+            "posten": {
+              "Berufsunfähigkeitsversicherung": {
+                "exakt": 518.52,
+                "eintrag": 519,
+                "status": ""
+              }
+            }
+          },
+          "Vorsorgeaufwand: Unfall-, Haftpflicht- und Risikoversicherungen": {
+            "summe": 51,
+            "posten": {
+              "Privathaftpflicht": {
+                "exakt": 50.28,
+                "eintrag": 51,
+                "status": ""
+              }
+            }
+          },
+          "Außergewöhnliche Belastungen: Krankheitskosten": {
+            "summe": 222,
+            "posten": {
+              "Zahnarzt, Eigenanteil": {
+                "exakt": 221.38,
+                "eintrag": 222,
+                "status": ""
+              }
+            }
+          }
+        }
+      },
+      "anzeige": {
+        "jahr": 2025,
+        "veranlagung": "einzeln",
+        "personen": [
+          {
+            "person": "A",
+            "name": "Erika Musterfrau"
+          }
+        ],
+        "zeilen_geprueft": true,
+        "hebel": [
+          "Sonstige Vorsorge wirkt nicht: 1.313,00 € (Arbeitslosenversicherung, Zeilen 22, 27, 45, 46) bleiben ohne Wirkung, weil Kranken-/Pflegeversicherung (6.010,00 €) den Höchstbetrag von 1.900,00 € schon ausschöpft. Eintragen schadet nicht.",
+          "Altersvorsorge: bis 18.723,00 € zusätzliche Beiträge zur Basisrente (Rürup) wären abziehbar; Wirkung je 1.000 € etwa 337,00 € (Grenzsteuersatz 33,7 %).",
+          "Grenzsteuersatz 33,7 % (ohne Soli): jeder weitere Euro Werbungskosten oder Spende spart etwa 34 Cent.",
+          "Soli: festzusetzende ESt 8.563,00 € liegt unter der Freigrenze 19.950,00 €.",
+          "Homeoffice: 99 von 210 Tagen eingetragen, noch 111 möglich. Jeder gearbeitete Tag zählt genau einmal: ein Bürotag bringt 2,70 € Entfernungspauschale (9 km), ein Homeoffice-Tag 6,00 €. Wichtig ist, dass alle Tage erfasst sind.",
+          "§ 35a haushaltsnahe Dienstleistungen: noch 19.729,00 € Aufwand mit 20 % Steuerermäßigung möglich (direkt von der Steuer, unabhängig vom Grenzsteuersatz).",
+          "§ 35a Handwerker-Lohnkosten: noch 5.454,00 € Aufwand mit 20 % Steuerermäßigung möglich (direkt von der Steuer, unabhängig vom Grenzsteuersatz).",
+          "Krankheitskosten 222,00 € liegen unter der zumutbaren Belastung 3.259,01 €: sie wirken erst ab 3.037,01 € mehr (Brille, Zahnarzt, Medikamente mit Rezept, Fahrten zum Arzt)."
+        ],
+        "regeln": {
+          "grundfreibetrag": 12096,
+          "arbeitnehmer_pauschbetrag": 1230,
+          "entfernung": [
+            [
+              20,
+              0.3
+            ],
+            [
+              null,
+              0.38
+            ]
+          ],
+          "homeoffice_je_tag": 6,
+          "homeoffice_max_tage": 210,
+          "altersvorsorge_hoechstbetrag": 29344,
+          "altersvorsorge_quote": 1,
+          "sonstige_vorsorge_hoechstbetrag": 1900,
+          "sonderausgaben_pauschbetrag": 36,
+          "soli": {
+            "satz": 0.055,
+            "freigrenze": 19950,
+            "milderung": 0.119
+          },
+          "verpflegung_8h": 14,
+          "verpflegung_24h": 28,
+          "gwg_grenze_netto": 800
+        },
+        "abschnitte": [
+          {
+            "titel": "Anlage N: Wege zur ersten Tätigkeitsstätte",
+            "summe": 726,
+            "zeilen": [
+              "Beispiel GmbH (01.01.–30.09.2025): 188 mögliche Arbeitstage, 60 Büro, 80 Homeoffice, 22 Urlaub, 5 krank; 60 Tage × 33 km = 656,40 €",
+              "Muster AG (01.10.–31.12.2025): 63 mögliche Arbeitstage, 30 Büro, 19 Homeoffice, 6 Urlaub, 0 krank; 30 Tage × 9 km = 81,00 €",
+              "Entfernungspauschale 738,00 € − steuerfreie Arbeitgeberleistungen 12,00 € = 726,00 € (ELSTER rechnet das selbst)"
+            ],
+            "posten": []
+          },
+          {
+            "titel": "Anlage N: Homeoffice-Pauschale",
+            "summe": 594,
+            "zeilen": [
+              "99 Tage × 6,00 € = 594,00 €"
+            ],
+            "posten": []
+          },
+          {
+            "titel": "Anlage N: Arbeitsmittel",
+            "summe": 352,
+            "zeilen": [],
+            "posten": [
+              {
+                "bezeichnung": "Bürostuhl",
+                "rechnung": "Betrag",
+                "exakt": 286.87,
+                "eintrag": 287,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              },
+              {
+                "bezeichnung": "Drucker, beruflicher Anteil",
+                "rechnung": "Betrag × 50 % Anteil",
+                "exakt": 64.95,
+                "eintrag": 65,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              }
+            ]
+          },
+          {
+            "titel": "Anlage N: Fortbildung",
+            "summe": 268,
+            "zeilen": [],
+            "posten": [
+              {
+                "bezeichnung": "Online-Kurs Projektmanagement",
+                "rechnung": "Betrag",
+                "exakt": 220.35,
+                "eintrag": 221,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              },
+              {
+                "bezeichnung": "Fachbuch",
+                "rechnung": "Betrag",
+                "exakt": 46.6,
+                "eintrag": 47,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              }
+            ]
+          },
+          {
+            "titel": "Anlage N: Reisekosten",
+            "summe": 0,
+            "zeilen": [],
+            "posten": []
+          },
+          {
+            "titel": "Anlage N: Weitere Werbungskosten",
+            "summe": 295,
+            "zeilen": [],
+            "posten": [
+              {
+                "bezeichnung": "Internet Festnetz",
+                "rechnung": "12 Monate × 39,47 € × 20 %, je Monat höchstens 20,00 €",
+                "exakt": 94.73,
+                "eintrag": 95,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              },
+              {
+                "bezeichnung": "Mobilfunk (Tarifwechsel im Juli)",
+                "rechnung": "Σ 12 Monatsbeträge (212,76 €) × 20 %, je Monat höchstens 20,00 €",
+                "exakt": 42.55,
+                "eintrag": 43,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              },
+              {
+                "bezeichnung": "Kontoführungsgebühren (Pauschale)",
+                "rechnung": "Betrag",
+                "exakt": 16,
+                "eintrag": 16,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              },
+              {
+                "bezeichnung": "Online-Bewerbungen",
+                "rechnung": "21 × 5,00 €",
+                "exakt": 105,
+                "eintrag": 105,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              },
+              {
+                "bezeichnung": "Fahrt zur Schulung, eigener Pkw",
+                "rechnung": "118 km × 0,30 €",
+                "exakt": 35.4,
+                "eintrag": 36,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              }
+            ]
+          },
+          {
+            "titel": "Anlage SO: Werbungskosten Studienteilnahme Musterklinik",
+            "summe": 268,
+            "zeilen": [
+              "Einnahmen 1.459,00 € − Werbungskosten 268,00 € = Einkünfte 1.191,00 €"
+            ],
+            "posten": [
+              {
+                "bezeichnung": "Fahrten zur Klinik (12 Termine, hin und zurück)",
+                "rechnung": "12 Tage × 27 km × 2 Wege nach Entfernungspauschale",
+                "exakt": 207.84,
+                "eintrag": 208,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              },
+              {
+                "bezeichnung": "Parken",
+                "rechnung": "12 × 5,00 €",
+                "exakt": 60,
+                "eintrag": 60,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              }
+            ]
+          },
+          {
+            "titel": "Sonderausgaben: Spenden und Mitgliedsbeiträge",
+            "summe": 426,
+            "zeilen": [],
+            "posten": [
+              {
+                "bezeichnung": "Tierschutzverein Musterstadt",
+                "rechnung": "12 × 27,00 €",
+                "exakt": 324,
+                "eintrag": 324,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              },
+              {
+                "bezeichnung": "Einzelspende Katastrophenhilfe",
+                "rechnung": "Betrag",
+                "exakt": 101.57,
+                "eintrag": 102,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              }
+            ]
+          },
+          {
+            "titel": "§ 35a: Haushaltsnahe Dienstleistungen",
+            "summe": 271,
+            "zeilen": [
+              "Steuerermäßigung 20 % von 271,00 € = 54,20 €"
+            ],
+            "posten": [
+              {
+                "bezeichnung": "Wartung Heizung",
+                "rechnung": "Betrag",
+                "exakt": 270.24,
+                "eintrag": 271,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              }
+            ]
+          },
+          {
+            "titel": "§ 35a: Handwerkerleistungen (Lohnanteil)",
+            "summe": 546,
+            "zeilen": [
+              "Steuerermäßigung 20 % von 546,00 € = 109,20 €"
+            ],
+            "posten": [
+              {
+                "bezeichnung": "Malerarbeiten, Lohnanteil",
+                "rechnung": "Betrag",
+                "exakt": 545.61,
+                "eintrag": 546,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              }
+            ]
+          },
+          {
+            "titel": "Vorsorgeaufwand: Kranken-/Pflegeversicherung über die Basisabsicherung hinaus",
+            "summe": 0,
+            "zeilen": [],
+            "posten": []
+          },
+          {
+            "titel": "Vorsorgeaufwand: Wahlleistungen und Zusatzversicherungen",
+            "summe": 0,
+            "zeilen": [],
+            "posten": []
+          },
+          {
+            "titel": "Vorsorgeaufwand: Berufsunfähigkeitsversicherung",
+            "summe": 519,
+            "zeilen": [],
+            "posten": [
+              {
+                "bezeichnung": "Berufsunfähigkeitsversicherung",
+                "rechnung": "12 × 43,21 €",
+                "exakt": 518.52,
+                "eintrag": 519,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              }
+            ]
+          },
+          {
+            "titel": "Vorsorgeaufwand: Unfall-, Haftpflicht- und Risikoversicherungen",
+            "summe": 51,
+            "zeilen": [],
+            "posten": [
+              {
+                "bezeichnung": "Privathaftpflicht",
+                "rechnung": "Betrag",
+                "exakt": 50.28,
+                "eintrag": 51,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              }
+            ]
+          },
+          {
+            "titel": "Außergewöhnliche Belastungen: Krankheitskosten",
+            "summe": 222,
+            "zeilen": [
+              "Gesamtbetrag der Einkünfte ≈ 56.053,00 €, zumutbare Belastung 3.259,01 €, wirkt sich aus: 0,00 €"
+            ],
+            "posten": [
+              {
+                "bezeichnung": "Zahnarzt, Eigenanteil",
+                "rechnung": "Betrag",
+                "exakt": 221.38,
+                "eintrag": 222,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              }
+            ]
+          }
+        ],
+        "belege": [],
+        "cluster": [
+          {
+            "cluster": "werbungskosten",
+            "person": "A",
+            "wert": 2235,
+            "grenze": 1230,
+            "teile": {
+              "fahrt": 726,
+              "homeoffice": 594,
+              "arbeitsmittel": 352,
+              "fortbildung": 268,
+              "reisekosten": 0,
+              "weitere": 295
+            }
+          },
+          {
+            "cluster": "homeoffice",
+            "person": "A",
+            "wert": 594,
+            "grenze": 1260
+          },
+          {
+            "cluster": "fahrt",
+            "person": "A",
+            "wert": 738,
+            "grenze": 4500,
+            "gilt": false
+          },
+          {
+            "cluster": "sonstige",
+            "person": "",
+            "wert": 1191,
+            "grenze": 256,
+            "teile": {
+              "fahrten": 0,
+              "parken": 0,
+              "kleinausgaben": 0,
+              "weitere": 268
+            },
+            "einnahmen": 1459
+          },
+          {
+            "cluster": "altersvorsorge",
+            "person": "",
+            "wert": 10621,
+            "grenze": 29344
+          },
+          {
+            "cluster": "sonstige_vorsorge",
+            "person": "",
+            "wert": 7323,
+            "grenze": 1900
+          },
+          {
+            "cluster": "spenden",
+            "person": "",
+            "wert": 426,
+            "grenze": 11210
+          },
+          {
+            "cluster": "soli",
+            "person": "",
+            "wert": 8563,
+            "grenze": 19950
+          },
+          {
+            "cluster": "haushaltsnahe",
+            "person": "",
+            "wert": 271,
+            "grenze": 20000
+          },
+          {
+            "cluster": "handwerker",
+            "person": "",
+            "wert": 546,
+            "grenze": 6000
+          },
+          {
+            "cluster": "krankheitskosten",
+            "person": "",
+            "wert": 222,
+            "grenze": 3259.01
+          }
+        ]
+      }
+    },
+    "beispiel-2026-laufendes-jahr.yaml": {
+      "geprueft": {
+        "jahr": 2026,
+        "elster": {
+          "Anlage N": {
+            "Beispiel KG: Arbeitstage an der Tätigkeitsstätte": {
+              "zeile": 29,
+              "wert": 68,
+              "einheit": "Tage"
+            },
+            "Beispiel KG: Tage ohne Fahrt (Homeoffice, Urlaub, krank)": {
+              "zeile": 28,
+              "wert": 96,
+              "einheit": "Tage"
+            },
+            "Beispiel KG: einfache Entfernung": {
+              "zeile": "27–31",
+              "wert": 40,
+              "einheit": "km"
+            },
+            "Homeoffice-Pauschale: Anzahl Tage": {
+              "zeile": 58,
+              "wert": 64,
+              "einheit": "Tage"
+            },
+            "Arbeitsmittel": {
+              "zeile": 54,
+              "wert": 36,
+              "einheit": "€"
+            },
+            "Fortbildungskosten": {
+              "zeile": 60,
+              "wert": 0,
+              "einheit": "€"
+            },
+            "Weitere Werbungskosten": {
+              "zeile": 62,
+              "wert": 96,
+              "einheit": "€"
+            }
+          },
+          "Sonderausgaben": {
+            "Zuwendungen an steuerbegünstigte Organisationen": {
+              "zeile": null,
+              "wert": 180,
+              "einheit": "€"
+            }
+          },
+          "Haushaltsnahe Aufwendungen": {
+            "Haushaltsnahe Dienstleistungen": {
+              "zeile": 5,
+              "wert": 0,
+              "einheit": "€"
+            },
+            "Handwerkerleistungen (Lohnanteil)": {
+              "zeile": 6,
+              "wert": 0,
+              "einheit": "€"
+            }
+          },
+          "Vorsorgeaufwand": {
+            "Kranken-/Pflegeversicherung über die Basisabsicherung hinaus": {
+              "zeile": 22,
+              "wert": 0,
+              "einheit": "€"
+            },
+            "Wahlleistungen und Zusatzversicherungen": {
+              "zeile": 27,
+              "wert": 0,
+              "einheit": "€"
+            },
+            "Berufsunfähigkeitsversicherung": {
+              "zeile": 45,
+              "wert": 0,
+              "einheit": "€"
+            },
+            "Unfall-, Haftpflicht- und Risikoversicherungen": {
+              "zeile": 46,
+              "wert": 0,
+              "einheit": "€"
+            },
+            "LStB Rentenversicherung Arbeitnehmer (Nr. 23a)": {
+              "zeile": null,
+              "wert": 5535.43,
+              "einheit": "€"
+            },
+            "LStB Rentenversicherung Arbeitgeber (Nr. 22a)": {
+              "zeile": null,
+              "wert": 5535.43,
+              "einheit": "€"
+            },
+            "LStB Krankenversicherung Arbeitnehmer (Nr. 25)": {
+              "zeile": null,
+              "wert": 5089.03,
+              "einheit": "€"
+            },
+            "LStB Pflegeversicherung Arbeitnehmer (Nr. 26)": {
+              "zeile": null,
+              "wert": 1428.5,
+              "einheit": "€"
+            },
+            "LStB Arbeitslosenversicherung Arbeitnehmer (Nr. 27)": {
+              "zeile": null,
+              "wert": 773.77,
+              "einheit": "€"
+            }
+          }
+        },
+        "werte": {
+          "moegliche_tage_Beispiel KG": 254,
+          "nicht_buero_tage_Beispiel KG": 96,
+          "entfernungspauschale_brutto": 1034,
+          "entfernungspauschale": 1034,
+          "homeoffice": 384,
+          "arbeitsmittel": 36,
+          "fortbildung": 0,
+          "reisekosten": 0,
+          "weitere": 96,
+          "werbungskosten": 1550,
+          "ueber_pauschbetrag": 320,
+          "sonstige_einkuenfte": 0,
+          "spenden": 180,
+          "35a_dienstleistungen": 0,
+          "35a_dienstleistungen_ermaessigung": 0,
+          "35a_handwerker": 0,
+          "35a_handwerker_ermaessigung": 0,
+          "kv_ueber_basis": 0,
+          "wahlleistungen": 0,
+          "berufsunfaehigkeit": 0,
+          "unfall_haftpflicht_risiko": 0
+        },
+        "simulation": {
+          "fehlt": [],
+          "schritte": {
+            "Bruttoarbeitslohn": 59520,
+            "ab Werbungskosten": -1550,
+            "Einkünfte nichtselbständige Arbeit": 57970,
+            "Sonstige Einkünfte": 0,
+            "Gesamtbetrag der Einkünfte": 57970,
+            "Altersvorsorge (RV AN + AG − AG-Anteil)": 5536,
+            "Kranken-/Pflegeversicherung Basis (Kürzung Krankengeld 203,00 €)": 6316,
+            "weitere sonstige Vorsorge (wirksam)": 0,
+            "Summe beschränkt abziehbare Sonderausgaben": -11852,
+            "Spenden": -180,
+            "zu versteuerndes Einkommen": 45938,
+            "tarifliche Einkommensteuer": 9150,
+            "ab § 35a-Ermäßigungen": 0,
+            "festzusetzende Einkommensteuer": 9150,
+            "Solidaritätszuschlag": 0,
+            "Lohnsteuer und Soli bereits abgezogen": 10722,
+            "Erstattung (+) / Nachzahlung (−)": 1572
+          },
+          "werte": {
+            "bruttoarbeitslohn": 59520,
+            "werbungskosten_abzug": 1550,
+            "einkuenfte_n": 57970,
+            "sonstige": 0,
+            "gde": 57970,
+            "altersvorsorge_summe": 11071,
+            "altersvorsorge": 5536,
+            "kv_kuerzung": 203,
+            "kv_pv_basis": 6316,
+            "beschraenkt": 11852,
+            "unbeschraenkt": 180,
+            "einkommen": 45938,
+            "zve": 45938,
+            "tarif": 9150,
+            "erm_dienstleistungen": 0,
+            "erm_handwerker": 0,
+            "ermaessigung_35a": 0,
+            "festgesetzt": 9150,
+            "soli": 0,
+            "lohnsteuer": 10722,
+            "soli_abzug": 0,
+            "erstattung": 1572,
+            "grenzsteuersatz": 0.339,
+            "sonstige_unwirksam": 774
+          },
+          "abgleich": {}
+        },
+        "offen": [
+          "Arbeitstage Beispiel KG: Dezember noch nicht erfasst",
+          "Anlage N: Arbeitsmittel: Schreibtisch – 1.288,65 € über 952,00 € brutto, nur die AfA des Jahres ist absetzbar: Betrag eintragen und `afa: true` setzen (Computer-Hardware und Software: Nutzungsdauer 1 Jahr, BMF 22.02.2022)",
+          "Anlage N: Arbeitsmittel: Monitor – Rechnung fehlt",
+          "Sonderausgaben: Spenden und Mitgliedsbeiträge: Spende Hochwasserhilfe – Zuwendungsbestätigung fehlt",
+          "§ 35a: Handwerkerleistungen (Lohnanteil): Badsanierung, Lohnanteil – Rechnung kommt im Dezember"
+        ],
+        "hinweise": [
+          "Bruttolohn, Lohnsteuer und Sozialversicherung sind aus der Abrechnung Oktober hochgerechnet"
+        ],
+        "posten": {
+          "Anlage N: Arbeitsmittel": {
+            "summe": 36,
+            "posten": {
+              "Schreibtisch": {
+                "exakt": 0,
+                "eintrag": 0,
+                "status": "offen"
+              },
+              "Maus": {
+                "exakt": 35.74,
+                "eintrag": 36,
+                "status": ""
+              },
+              "Monitor": {
+                "exakt": 0,
+                "eintrag": 0,
+                "status": "offen"
+              }
+            }
+          },
+          "Anlage N: Weitere Werbungskosten": {
+            "summe": 96,
+            "posten": {
+              "Internet Festnetz": {
+                "exakt": 95.98,
+                "eintrag": 96,
+                "status": ""
+              }
+            }
+          },
+          "Sonderausgaben: Spenden und Mitgliedsbeiträge": {
+            "summe": 180,
+            "posten": {
+              "Tierschutzverein Musterstadt": {
+                "exakt": 180,
+                "eintrag": 180,
+                "status": ""
+              },
+              "Spende Hochwasserhilfe": {
+                "exakt": 0,
+                "eintrag": 0,
+                "status": "offen"
+              }
+            }
+          },
+          "§ 35a: Handwerkerleistungen (Lohnanteil)": {
+            "summe": 0,
+            "posten": {
+              "Badsanierung, Lohnanteil": {
+                "exakt": 0,
+                "eintrag": 0,
+                "status": "offen"
+              }
+            }
+          }
+        }
+      },
+      "anzeige": {
+        "jahr": 2026,
+        "veranlagung": "einzeln",
+        "personen": [
+          {
+            "person": "A",
+            "name": "Erika Musterfrau"
+          }
+        ],
+        "zeilen_geprueft": false,
+        "hebel": [
+          "Sonstige Vorsorge wirkt nicht: 774,00 € (Arbeitslosenversicherung, Zeilen 22, 27, 45, 46) bleiben ohne Wirkung, weil Kranken-/Pflegeversicherung (6.316,00 €) den Höchstbetrag von 1.900,00 € schon ausschöpft. Eintragen schadet nicht.",
+          "Altersvorsorge: bis 19.755,00 € zusätzliche Beiträge zur Basisrente (Rürup) wären abziehbar; Wirkung je 1.000 € etwa 339,00 € (Grenzsteuersatz 33,9 %).",
+          "Grenzsteuersatz 33,9 % (ohne Soli): jeder weitere Euro Werbungskosten oder Spende spart etwa 34 Cent.",
+          "Soli: festzusetzende ESt 9.150,00 € liegt unter der Freigrenze 20.350,00 €.",
+          "Homeoffice: 64 von 210 Tagen eingetragen, noch 146 möglich. Jeder gearbeitete Tag zählt genau einmal: ein Bürotag bringt 15,20 € Entfernungspauschale (40 km), ein Homeoffice-Tag 6,00 €. Wichtig ist, dass alle Tage erfasst sind.",
+          "§ 35a haushaltsnahe Dienstleistungen: noch 20.000,00 € Aufwand mit 20 % Steuerermäßigung möglich (direkt von der Steuer, unabhängig vom Grenzsteuersatz).",
+          "§ 35a Handwerker-Lohnkosten: noch 6.000,00 € Aufwand mit 20 % Steuerermäßigung möglich (direkt von der Steuer, unabhängig vom Grenzsteuersatz)."
+        ],
+        "regeln": {
+          "grundfreibetrag": 12348,
+          "arbeitnehmer_pauschbetrag": 1230,
+          "entfernung": [
+            [
+              null,
+              0.38
+            ]
+          ],
+          "homeoffice_je_tag": 6,
+          "homeoffice_max_tage": 210,
+          "altersvorsorge_hoechstbetrag": 30826,
+          "altersvorsorge_quote": 1,
+          "sonstige_vorsorge_hoechstbetrag": 1900,
+          "sonderausgaben_pauschbetrag": 36,
+          "soli": {
+            "satz": 0.055,
+            "freigrenze": 20350,
+            "milderung": 0.119
+          },
+          "verpflegung_8h": 14,
+          "verpflegung_24h": 28,
+          "gwg_grenze_netto": 800
+        },
+        "abschnitte": [
+          {
+            "titel": "Anlage N: Wege zur ersten Tätigkeitsstätte",
+            "summe": 1034,
+            "zeilen": [
+              "Beispiel KG (01.01.–31.12.2026): 254 mögliche Arbeitstage, 68 Büro, 64 Homeoffice, 28 Urlaub, 4 krank; 68 Tage × 40 km = 1.033,60 €",
+              "Entfernungspauschale 1.034,00 € − steuerfreie Arbeitgeberleistungen 0,00 € = 1.034,00 € (ELSTER rechnet das selbst)"
+            ],
+            "posten": []
+          },
+          {
+            "titel": "Anlage N: Homeoffice-Pauschale",
+            "summe": 384,
+            "zeilen": [
+              "64 Tage × 6,00 € = 384,00 €"
+            ],
+            "posten": []
+          },
+          {
+            "titel": "Anlage N: Arbeitsmittel",
+            "summe": 36,
+            "zeilen": [],
+            "posten": [
+              {
+                "bezeichnung": "Schreibtisch",
+                "rechnung": "offen",
+                "exakt": 0,
+                "eintrag": 0,
+                "status": "offen",
+                "notiz": "1.288,65 € über 952,00 € brutto, nur die AfA des Jahres ist absetzbar: Betrag eintragen und `afa: true` setzen (Computer-Hardware und Software: Nutzungsdauer 1 Jahr, BMF 22.02.2022)",
+                "kategorie": "",
+                "belege": []
+              },
+              {
+                "bezeichnung": "Maus",
+                "rechnung": "Betrag",
+                "exakt": 35.74,
+                "eintrag": 36,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              },
+              {
+                "bezeichnung": "Monitor",
+                "rechnung": "offen",
+                "exakt": 0,
+                "eintrag": 0,
+                "status": "offen",
+                "notiz": "Rechnung fehlt",
+                "kategorie": "",
+                "belege": []
+              }
+            ]
+          },
+          {
+            "titel": "Anlage N: Fortbildung",
+            "summe": 0,
+            "zeilen": [],
+            "posten": []
+          },
+          {
+            "titel": "Anlage N: Reisekosten",
+            "summe": 0,
+            "zeilen": [],
+            "posten": []
+          },
+          {
+            "titel": "Anlage N: Weitere Werbungskosten",
+            "summe": 96,
+            "zeilen": [],
+            "posten": [
+              {
+                "bezeichnung": "Internet Festnetz",
+                "rechnung": "12 Monate × 39,99 € × 20 %, je Monat höchstens 20,00 €",
+                "exakt": 95.98,
+                "eintrag": 96,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              }
+            ]
+          },
+          {
+            "titel": "Sonderausgaben: Spenden und Mitgliedsbeiträge",
+            "summe": 180,
+            "zeilen": [],
+            "posten": [
+              {
+                "bezeichnung": "Tierschutzverein Musterstadt",
+                "rechnung": "12 × 15,00 €",
+                "exakt": 180,
+                "eintrag": 180,
+                "status": "",
+                "notiz": "",
+                "kategorie": "",
+                "belege": []
+              },
+              {
+                "bezeichnung": "Spende Hochwasserhilfe",
+                "rechnung": "offen",
+                "exakt": 0,
+                "eintrag": 0,
+                "status": "offen",
+                "notiz": "Zuwendungsbestätigung fehlt",
+                "kategorie": "",
+                "belege": []
+              }
+            ]
+          },
+          {
+            "titel": "§ 35a: Haushaltsnahe Dienstleistungen",
+            "summe": 0,
+            "zeilen": [
+              "Steuerermäßigung 20 % von 0,00 € = 0,00 €"
+            ],
+            "posten": []
+          },
+          {
+            "titel": "§ 35a: Handwerkerleistungen (Lohnanteil)",
+            "summe": 0,
+            "zeilen": [
+              "Steuerermäßigung 20 % von 0,00 € = 0,00 €"
+            ],
+            "posten": [
+              {
+                "bezeichnung": "Badsanierung, Lohnanteil",
+                "rechnung": "offen",
+                "exakt": 0,
+                "eintrag": 0,
+                "status": "offen",
+                "notiz": "Rechnung kommt im Dezember",
+                "kategorie": "",
+                "belege": []
+              }
+            ]
+          },
+          {
+            "titel": "Vorsorgeaufwand: Kranken-/Pflegeversicherung über die Basisabsicherung hinaus",
+            "summe": 0,
+            "zeilen": [],
+            "posten": []
+          },
+          {
+            "titel": "Vorsorgeaufwand: Wahlleistungen und Zusatzversicherungen",
+            "summe": 0,
+            "zeilen": [],
+            "posten": []
+          },
+          {
+            "titel": "Vorsorgeaufwand: Berufsunfähigkeitsversicherung",
+            "summe": 0,
+            "zeilen": [],
+            "posten": []
+          },
+          {
+            "titel": "Vorsorgeaufwand: Unfall-, Haftpflicht- und Risikoversicherungen",
+            "summe": 0,
+            "zeilen": [],
+            "posten": []
+          }
+        ],
+        "belege": [],
+        "cluster": [
+          {
+            "cluster": "werbungskosten",
+            "person": "A",
+            "wert": 1550,
+            "grenze": 1230,
+            "teile": {
+              "fahrt": 1034,
+              "homeoffice": 384,
+              "arbeitsmittel": 36,
+              "fortbildung": 0,
+              "reisekosten": 0,
+              "weitere": 96
+            }
+          },
+          {
+            "cluster": "homeoffice",
+            "person": "A",
+            "wert": 384,
+            "grenze": 1260
+          },
+          {
+            "cluster": "fahrt",
+            "person": "A",
+            "wert": 1034,
+            "grenze": 4500,
+            "gilt": false
+          },
+          {
+            "cluster": "altersvorsorge",
+            "person": "",
+            "wert": 11071,
+            "grenze": 30826
+          },
+          {
+            "cluster": "sonstige_vorsorge",
+            "person": "",
+            "wert": 7090,
+            "grenze": 1900
+          },
+          {
+            "cluster": "spenden",
+            "person": "",
+            "wert": 180,
+            "grenze": 11594
+          },
+          {
+            "cluster": "soli",
+            "person": "",
+            "wert": 9150,
+            "grenze": 20350
+          },
+          {
+            "cluster": "haushaltsnahe",
+            "person": "",
+            "wert": 0,
+            "grenze": 20000
+          },
+          {
+            "cluster": "handwerker",
+            "person": "",
+            "wert": 0,
+            "grenze": 6000
+          }
+        ]
+      }
+    }
+  },
+  "uebergreifend": {
+    "zeitreihe": [
+      {
+        "quelle": "beispiel-2025-hohes-einkommen.yaml",
+        "jahr": 2025,
+        "veranlagung": "einzeln",
+        "brutto": 97930,
+        "gesamtbetrag": 96700,
+        "zve": 79397,
+        "tarif": 22434,
+        "festgesetzt": 22063,
+        "soli": 251.44,
+        "lohnsteuer": 24835,
+        "erstattung": 2859.25,
+        "grenzsteuersatz": 0.42,
+        "durchschnittssteuersatz": 0.2779
+      },
+      {
+        "quelle": "beispiel-2025-jobwechsel.yaml",
+        "jahr": 2025,
+        "veranlagung": "einzeln",
+        "brutto": 57097,
+        "gesamtbetrag": 56053,
+        "zve": 44306,
+        "tarif": 8728,
+        "festgesetzt": 8563,
+        "soli": 0,
+        "lohnsteuer": 7245,
+        "erstattung": -1318,
+        "grenzsteuersatz": 0.337,
+        "durchschnittssteuersatz": 0.1933
+      },
+      {
+        "quelle": "beispiel-2026-laufendes-jahr.yaml",
+        "jahr": 2026,
+        "veranlagung": "einzeln",
+        "brutto": 59520,
+        "gesamtbetrag": 57970,
+        "zve": 45938,
+        "tarif": 9150,
+        "festgesetzt": 9150,
+        "soli": 0,
+        "lohnsteuer": 10722,
+        "erstattung": 1572,
+        "grenzsteuersatz": 0.339,
+        "durchschnittssteuersatz": 0.1992
+      }
+    ],
+    "summen": {
+      "jahre": 3,
+      "festgesetzt": 39776,
+      "erstattung": 3113.25
+    },
+    "cluster": [
+      {
+        "id": "werbungskosten",
+        "titel": "Werbungskosten",
+        "art": "schwelle",
+        "erklaerung": "Werbungskosten je Person; erst über dem Arbeitnehmer-Pauschbetrag wirkt jeder weitere Euro",
+        "punkte": [
+          {
+            "quelle": "beispiel-2025-hohes-einkommen.yaml",
+            "jahr": 2025,
+            "person": "A",
+            "wert": 968,
+            "grenze": 1230,
+            "teile": {
+              "fahrt": 94,
+              "homeoffice": 858,
+              "arbeitsmittel": 0,
+              "fortbildung": 0,
+              "reisekosten": 0,
+              "weitere": 16
+            }
+          },
+          {
+            "quelle": "beispiel-2025-jobwechsel.yaml",
+            "jahr": 2025,
+            "person": "A",
+            "wert": 2235,
+            "grenze": 1230,
+            "teile": {
+              "fahrt": 726,
+              "homeoffice": 594,
+              "arbeitsmittel": 352,
+              "fortbildung": 268,
+              "reisekosten": 0,
+              "weitere": 295
+            }
+          },
+          {
+            "quelle": "beispiel-2026-laufendes-jahr.yaml",
+            "jahr": 2026,
+            "person": "A",
+            "wert": 1550,
+            "grenze": 1230,
+            "teile": {
+              "fahrt": 1034,
+              "homeoffice": 384,
+              "arbeitsmittel": 36,
+              "fortbildung": 0,
+              "reisekosten": 0,
+              "weitere": 96
+            }
+          }
+        ]
+      },
+      {
+        "id": "fahrt",
+        "titel": "Fahrten zur Arbeit",
+        "art": "obergrenze",
+        "erklaerung": "Entfernungspauschale gegen den Höchstbetrag; der gilt nur für Wege ohne eigenen Pkw, mit dem Pkw gibt es keine Grenze",
+        "punkte": [
+          {
+            "quelle": "beispiel-2025-hohes-einkommen.yaml",
+            "jahr": 2025,
+            "person": "A",
+            "wert": 94,
+            "grenze": 4500,
+            "gilt": false
+          },
+          {
+            "quelle": "beispiel-2025-jobwechsel.yaml",
+            "jahr": 2025,
+            "person": "A",
+            "wert": 738,
+            "grenze": 4500,
+            "gilt": false
+          },
+          {
+            "quelle": "beispiel-2026-laufendes-jahr.yaml",
+            "jahr": 2026,
+            "person": "A",
+            "wert": 1034,
+            "grenze": 4500,
+            "gilt": false
+          }
+        ]
+      },
+      {
+        "id": "homeoffice",
+        "titel": "Homeoffice",
+        "art": "obergrenze",
+        "erklaerung": "Homeoffice-Pauschale (auch wo sie unter den weiteren Werbungskosten erklärt wurde); vor 2020 gab es sie nicht",
+        "punkte": [
+          {
+            "quelle": "beispiel-2025-hohes-einkommen.yaml",
+            "jahr": 2025,
+            "person": "A",
+            "wert": 858,
+            "grenze": 1260
+          },
+          {
+            "quelle": "beispiel-2025-jobwechsel.yaml",
+            "jahr": 2025,
+            "person": "A",
+            "wert": 594,
+            "grenze": 1260
+          },
+          {
+            "quelle": "beispiel-2026-laufendes-jahr.yaml",
+            "jahr": 2026,
+            "person": "A",
+            "wert": 384,
+            "grenze": 1260
+          }
+        ]
+      },
+      {
+        "id": "altersvorsorge",
+        "titel": "Altersvorsorge",
+        "art": "obergrenze",
+        "erklaerung": "Rentenbeiträge (Arbeitnehmer + Arbeitgeber) gegen den Höchstbetrag; darunter wäre Platz für Rürup",
+        "punkte": [
+          {
+            "quelle": "beispiel-2025-hohes-einkommen.yaml",
+            "jahr": 2025,
+            "person": "",
+            "wert": 17967,
+            "grenze": 29344
+          },
+          {
+            "quelle": "beispiel-2025-jobwechsel.yaml",
+            "jahr": 2025,
+            "person": "",
+            "wert": 10621,
+            "grenze": 29344
+          },
+          {
+            "quelle": "beispiel-2026-laufendes-jahr.yaml",
+            "jahr": 2026,
+            "person": "",
+            "wert": 11071,
+            "grenze": 30826
+          }
+        ]
+      },
+      {
+        "id": "sonstige_vorsorge",
+        "titel": "Sonstige Vorsorge",
+        "art": "obergrenze",
+        "erklaerung": "Kranken-, Pflege-, Arbeitslosen- und weitere Versicherungen gegen den Höchstbetrag; die Basis-Kranken- und Pflegeversicherung zählt auch darüber",
+        "punkte": [
+          {
+            "quelle": "beispiel-2025-hohes-einkommen.yaml",
+            "jahr": 2025,
+            "person": "",
+            "wert": 8339,
+            "grenze": 1900
+          },
+          {
+            "quelle": "beispiel-2025-jobwechsel.yaml",
+            "jahr": 2025,
+            "person": "",
+            "wert": 7323,
+            "grenze": 1900
+          },
+          {
+            "quelle": "beispiel-2026-laufendes-jahr.yaml",
+            "jahr": 2026,
+            "person": "",
+            "wert": 7090,
+            "grenze": 1900
+          }
+        ]
+      },
+      {
+        "id": "spenden",
+        "titel": "Spenden",
+        "art": "obergrenze",
+        "erklaerung": "Spenden gegen 20 % des Gesamtbetrags der Einkünfte",
+        "punkte": [
+          {
+            "quelle": "beispiel-2025-hohes-einkommen.yaml",
+            "jahr": 2025,
+            "person": "",
+            "wert": 231,
+            "grenze": 19340
+          },
+          {
+            "quelle": "beispiel-2025-jobwechsel.yaml",
+            "jahr": 2025,
+            "person": "",
+            "wert": 426,
+            "grenze": 11210
+          },
+          {
+            "quelle": "beispiel-2026-laufendes-jahr.yaml",
+            "jahr": 2026,
+            "person": "",
+            "wert": 180,
+            "grenze": 11594
+          }
+        ]
+      },
+      {
+        "id": "haushaltsnahe",
+        "titel": "Haushaltsnahe Dienstleistungen",
+        "art": "obergrenze",
+        "erklaerung": "Aufwand gegen den Höchstbetrag (20 % davon, höchstens 4.000 €)",
+        "punkte": [
+          {
+            "quelle": "beispiel-2025-hohes-einkommen.yaml",
+            "jahr": 2025,
+            "person": "",
+            "wert": 1855,
+            "grenze": 20000
+          },
+          {
+            "quelle": "beispiel-2025-jobwechsel.yaml",
+            "jahr": 2025,
+            "person": "",
+            "wert": 271,
+            "grenze": 20000
+          },
+          {
+            "quelle": "beispiel-2026-laufendes-jahr.yaml",
+            "jahr": 2026,
+            "person": "",
+            "wert": 0,
+            "grenze": 20000
+          }
+        ]
+      },
+      {
+        "id": "handwerker",
+        "titel": "Handwerkerleistungen",
+        "art": "obergrenze",
+        "erklaerung": "Lohnanteil gegen den Höchstbetrag (20 % davon, höchstens 1.200 €)",
+        "punkte": [
+          {
+            "quelle": "beispiel-2025-hohes-einkommen.yaml",
+            "jahr": 2025,
+            "person": "",
+            "wert": 0,
+            "grenze": 6000
+          },
+          {
+            "quelle": "beispiel-2025-jobwechsel.yaml",
+            "jahr": 2025,
+            "person": "",
+            "wert": 546,
+            "grenze": 6000
+          },
+          {
+            "quelle": "beispiel-2026-laufendes-jahr.yaml",
+            "jahr": 2026,
+            "person": "",
+            "wert": 0,
+            "grenze": 6000
+          }
+        ]
+      },
+      {
+        "id": "krankheitskosten",
+        "titel": "Krankheitskosten",
+        "art": "schwelle",
+        "erklaerung": "wirken erst über der zumutbaren Belastung",
+        "punkte": [
+          {
+            "quelle": "beispiel-2025-hohes-einkommen.yaml",
+            "jahr": 2025,
+            "person": "",
+            "wert": 7174,
+            "grenze": 6104.3
+          },
+          {
+            "quelle": "beispiel-2025-jobwechsel.yaml",
+            "jahr": 2025,
+            "person": "",
+            "wert": 222,
+            "grenze": 3259.01
+          }
+        ]
+      },
+      {
+        "id": "sonstige",
+        "titel": "Sonstige Einkünfte (Studien, Umfragen)",
+        "art": "freigrenze",
+        "erklaerung": "Einnahmen abzüglich Fahrten, Parken und Kleinausgaben gegen die Freigrenze; darunter steuerfrei, ab der Grenze ist alles steuerpflichtig",
+        "punkte": [
+          {
+            "quelle": "beispiel-2025-hohes-einkommen.yaml",
+            "jahr": 2025,
+            "person": "",
+            "wert": 76,
+            "grenze": 256,
+            "teile": {
+              "fahrten": 0,
+              "parken": 0,
+              "kleinausgaben": 0,
+              "weitere": 0
+            },
+            "einnahmen": 76
+          },
+          {
+            "quelle": "beispiel-2025-jobwechsel.yaml",
+            "jahr": 2025,
+            "person": "",
+            "wert": 1191,
+            "grenze": 256,
+            "teile": {
+              "fahrten": 0,
+              "parken": 0,
+              "kleinausgaben": 0,
+              "weitere": 268
+            },
+            "einnahmen": 1459
+          }
+        ]
+      },
+      {
+        "id": "soli",
+        "titel": "Solidaritätszuschlag",
+        "art": "schwelle",
+        "erklaerung": "festgesetzte Einkommensteuer gegen die Freigrenze; darüber wird Soli fällig",
+        "punkte": [
+          {
+            "quelle": "beispiel-2025-hohes-einkommen.yaml",
+            "jahr": 2025,
+            "person": "",
+            "wert": 22063,
+            "grenze": 19950
+          },
+          {
+            "quelle": "beispiel-2025-jobwechsel.yaml",
+            "jahr": 2025,
+            "person": "",
+            "wert": 8563,
+            "grenze": 19950
+          },
+          {
+            "quelle": "beispiel-2026-laufendes-jahr.yaml",
+            "jahr": 2026,
+            "person": "",
+            "wert": 9150,
+            "grenze": 20350
+          }
+        ]
+      }
+    ]
+  }
+}

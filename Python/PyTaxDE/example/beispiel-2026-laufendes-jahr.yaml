@@ -1,0 +1,63 @@
+# SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# FICTITIOUS EXAMPLE. Person, employer and every amount are invented; the amounts were drawn at
+# random within plausible ranges.
+#
+# What it shows: a return during the year it belongs to. Income and insurance are an estimate
+# (projected from a payslip), several items are still open (`offen: true`: reported, not counted),
+# a desk above the limit for immediate deduction, and the 2026 commuting allowance of 0.38 € from
+# the first kilometre. The 2026 pension cap is not in steuerjahre.yaml yet, which the simulation says.
+
+jahr: 2026
+
+steuerpflichtig:
+  name: Erika Musterfrau
+  steuerklasse: 1
+
+lohnsteuerbescheinigungen:
+  - arbeitgeber: Beispiel KG
+    von: 2026-01-01
+    bis: 2026-12-31
+    brutto: 59520.78          # estimate: October payslip projected to the year
+    lohnsteuer: 10721.27      # estimate, likewise
+    soli: 0
+
+arbeit:
+  - arbeitgeber: Beispiel KG
+    von: 2026-01-01
+    bis: 2026-12-31
+    km: 40
+    buero_tage: 68
+    homeoffice_tage: 64
+    urlaub: 28
+    krank: 4
+    offen: "Dezember noch nicht erfasst"
+
+werbungskosten:
+  arbeitsmittel:
+    - {bezeichnung: "Schreibtisch", betrag: 1288.65}   # above 952 € gross: open until its depreciation (AfA) is entered
+    - {bezeichnung: "Maus", betrag: 35.74}
+    - {bezeichnung: "Monitor", offen: true, notiz: "Rechnung fehlt"}
+  weitere:
+    - {bezeichnung: "Internet Festnetz", art: telekom, monatlich: 39.99, monate: 12}
+
+spenden:
+  - {bezeichnung: "Tierschutzverein Musterstadt", monatlich: 15, monate: 12}
+  - {bezeichnung: "Spende Hochwasserhilfe", offen: true, notiz: "Zuwendungsbestätigung fehlt"}
+
+haushaltsnahe:
+  handwerker:
+    - {bezeichnung: "Badsanierung, Lohnanteil", offen: true, notiz: "Rechnung kommt im Dezember"}
+
+vorsorge:
+  lohnsteuerbescheinigung:    # estimate, projected like the wage
+    rv_an: 5535.43
+    rv_ag: 5535.43
+    kv_an: 5089.03
+    pv_an: 1428.50
+    av_an: 773.77
+
+hinweise:
+  - "Bruttolohn, Lohnsteuer und Sozialversicherung sind aus der Abrechnung Oktober hochgerechnet"

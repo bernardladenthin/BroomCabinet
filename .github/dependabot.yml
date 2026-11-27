@@ -56,6 +56,7 @@ updates:
     directories:
       - "/Python/PyB2Verify"
       - "/Python/PyImageResizer"
+      - "/Python/PyTaxDE"
       - "/Python/PyWebcamRecorder"
     schedule:
       interval: "weekly"
