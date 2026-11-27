@@ -37,4 +37,5 @@ Each is self-contained and standard-library only unless its own README says othe
 | [`PyDDRescueRelais/`](Python/PyDDRescueRelais/) | Runs `ddrescue` against a drive that hangs almost immediately, power-cycling it through a USB relay between short attempts. |
 | [`PyImageSequencer/`](Python/PyImageSequencer/) | Turns a directory tree of images into a sequentially numbered copy, and optionally encodes that sequence to video with ffmpeg. |
 | [`PyJcmdGcRun/`](Python/PyJcmdGcRun/) | Triggers `jcmd GC.run` against every locally running JVM. |
+| [`PyTaxDE/`](Python/PyTaxDE/README.md) | A German income tax return as one YAML file per year, single or joint: works out what goes into which ELSTER line, replays the tax office's calculation step by step (checked against real notices to the euro), keeps all results in one file as a self-test, and shows every year against its caps in a viewer. Needs PyYAML. |
 | [`PyShellyGpuPowerManager/`](Python/PyShellyGpuPowerManager/) | Throttles an NVIDIA GPU's power limit from a Shelly plug's live meter reading, so the circuit keeps a set headroom and is never overdrawn. |

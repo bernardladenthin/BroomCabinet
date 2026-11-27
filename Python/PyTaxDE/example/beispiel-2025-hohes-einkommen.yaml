@@ -1,0 +1,77 @@
+# SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# FICTITIOUS EXAMPLE. Person, employer and every amount are invented; the amounts were drawn at
+# random within plausible ranges. The `bescheid` block is no real notice: its figures were worked out
+# by hand from the rules, independently of this library (see examples_test.py).
+#
+# What it shows: a short commute and much home office, so the expenses stay below the employee
+# allowance of 1,230 €; pension and health insurance at the contribution ceilings; other income below
+# the 256 € exemption limit; medical costs above the reasonable burden; and an income tax inside the
+# phase-in zone of the solidarity surcharge (above the exemption limit, below the full 5.5 %).
+
+jahr: 2025
+
+steuerpflichtig:
+  name: Max Mustermann
+  steuerklasse: 1
+
+bescheid:                     # fictitious, see above
+  werbungskosten: 1230                         # the employee allowance: the 968 € of expenses are less
+  sonstige_einkuenfte: 0                       # 76 € are below the exemption limit
+  gesamtbetrag_der_einkuenfte: 96700
+  kuerzung_krankengeld: 226
+  kranken_pflege_basis: 7018
+  zu_versteuerndes_einkommen: 79397
+  tarifliche_einkommensteuer: 22434
+  festgesetzte_einkommensteuer: 22063
+  solidaritaetszuschlag: 251.44
+  abzug_vom_lohn: 24835
+  erstattung: 2859.25
+
+lohnsteuerbescheinigungen:
+  - arbeitgeber: Beispiel AG
+    von: 2025-01-01
+    bis: 2025-12-31
+    brutto: 97930.26
+    lohnsteuer: 24834.33
+    soli: 338.69
+
+arbeit:
+  - arbeitgeber: Beispiel AG
+    von: 2025-01-01
+    bis: 2025-12-31
+    km: 6
+    buero_tage: 52
+    homeoffice_tage: 143
+    urlaub: 30
+    krank: 3
+
+werbungskosten:
+  weitere:
+    - {bezeichnung: "Kontoführungsgebühren (Pauschale)", betrag: 16}
+
+sonstige_einkuenfte:
+  - bezeichnung: "Umfrageteilnahmen"
+    einnahmen: 76.23            # below 256 €: tax-free, the simulation counts 0
+
+spenden:
+  - {bezeichnung: "Spende Kinderhilfe", betrag: 231}
+
+haushaltsnahe:
+  dienstleistungen:
+    - {bezeichnung: "Gartenpflege", betrag: 1854.19}
+
+vorsorge:
+  lohnsteuerbescheinigung:    # pension and unemployment insurance at the 2025 ceiling of 96,600 €,
+    rv_an: 8983.80            # health and care insurance at 66,150 €
+    rv_ag: 8983.80
+    kv_an: 5655.83
+    pv_an: 1587.60
+    av_an: 1255.80
+  unfall_haftpflicht_risiko:
+    - {bezeichnung: "Privathaftpflicht", betrag: 64.90}
+
+krankheitskosten:
+  - {bezeichnung: "Zahnimplantat, Eigenanteil", betrag: 7173.81}

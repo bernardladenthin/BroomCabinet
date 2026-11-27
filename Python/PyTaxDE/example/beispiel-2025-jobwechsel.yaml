@@ -1,0 +1,121 @@
+# SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# FICTITIOUS EXAMPLE. Person, employers, places and every amount are invented; the amounts were drawn
+# at random within plausible ranges. The `bescheid` block is no real notice either: its figures were
+# worked out by hand from the rules, independently of this library, and examples_test.py checks that
+# the simulation arrives at the same numbers.
+#
+# What it shows: a job change in the year (two wage tax certificates, two commutes, one of them
+# beyond 20 km and so in both tiers of 2025), home office, the 20 % telecom rule with a monthly
+# amount that changes, a work share, other income with its own costs (Anlage SO), donations, § 35a,
+# insurance, and medical costs below the reasonable burden.
+
+jahr: 2025
+
+steuerpflichtig:
+  name: Erika Musterfrau
+  steuerklasse: 1
+
+bescheid:                     # fictitious, see above
+  bruttoarbeitslohn: 57097
+  werbungskosten: 2235
+  einkuenfte_nichtselbstaendige_arbeit: 54862
+  sonstige_einkuenfte: 1191
+  gesamtbetrag_der_einkuenfte: 56053
+  kuerzung_krankengeld: 193                    # 4 % of (4,882 − 50); own contributions rounded up
+  kranken_pflege_basis: 6010
+  beschraenkt_abziehbare_sonderausgaben: 11321
+  unbeschraenkt_abziehbare_sonderausgaben: 426
+  zu_versteuerndes_einkommen: 44306
+  tarifliche_einkommensteuer: 8728
+  ermaessigung_haushaltsnahe_dienstleistungen: 55
+  ermaessigung_handwerker: 110
+  festgesetzte_einkommensteuer: 8563
+  solidaritaetszuschlag: 0
+  abzug_vom_lohn: 7244                         # the sum rounded up: 5,294.36 + 1,949.03 = 7,243.39
+  erstattung: -1319             # negative: a back payment
+
+lohnsteuerbescheinigungen:
+  - arbeitgeber: Beispiel GmbH
+    von: 2025-01-01
+    bis: 2025-09-30
+    brutto: 41110.15
+    lohnsteuer: 5294.36
+    soli: 0
+  - arbeitgeber: Muster AG
+    von: 2025-10-01
+    bis: 2025-12-31
+    brutto: 15987.13
+    lohnsteuer: 1949.03
+    soli: 0
+
+arbeit:
+  - arbeitgeber: Beispiel GmbH
+    von: 2025-01-01
+    bis: 2025-09-30
+    km: 33                     # 20 km × 0,30 € + 13 km × 0,38 € per day
+    buero_tage: 60
+    homeoffice_tage: 80
+    urlaub: 22
+    krank: 5
+  - arbeitgeber: Muster AG
+    von: 2025-10-01
+    bis: 2025-12-31
+    km: 9
+    buero_tage: 30
+    homeoffice_tage: 19
+    urlaub: 6
+    krank: 0
+
+arbeitgeber_fahrtkosten_steuerfrei: 12   # tax-free employer travel allowance, no. 17 of the certificate
+
+werbungskosten:
+  arbeitsmittel:
+    - {bezeichnung: "Bürostuhl", betrag: 286.87}
+    - {bezeichnung: "Drucker, beruflicher Anteil", betrag: 129.90, anteil: 0.5}
+  fortbildung:
+    - {bezeichnung: "Online-Kurs Projektmanagement", betrag: 220.35}
+    - {bezeichnung: "Fachbuch", betrag: 46.60}
+  weitere:
+    - {bezeichnung: "Internet Festnetz", art: telekom, monatlich: 39.47, monate: 12}
+    - bezeichnung: "Mobilfunk (Tarifwechsel im Juli)"
+      art: telekom
+      betraege: [16.23, 16.23, 16.23, 16.23, 16.23, 16.23, 19.23, 19.23, 19.23, 19.23, 19.23, 19.23]
+    - {bezeichnung: "Kontoführungsgebühren (Pauschale)", betrag: 16}
+    - {bezeichnung: "Online-Bewerbungen", art: bewerbung_online, anzahl: 21}
+    - {bezeichnung: "Fahrt zur Schulung, eigener Pkw", art: dienstreise, km: 118}
+
+sonstige_einkuenfte:          # Anlage SO
+  - bezeichnung: "Studienteilnahme Musterklinik"
+    einnahmen: 1459.11
+    werbungskosten:
+      - {bezeichnung: "Fahrten zur Klinik (12 Termine, hin und zurück)", art: entfernung, tage: 12, km: 27, wege: 2}
+      - {bezeichnung: "Parken", anzahl: 12, je: 5}
+
+spenden:
+  - {bezeichnung: "Tierschutzverein Musterstadt", monatlich: 27, monate: 12}
+  - {bezeichnung: "Einzelspende Katastrophenhilfe", betrag: 101.57}
+
+haushaltsnahe:                # § 35a
+  dienstleistungen:
+    - {bezeichnung: "Wartung Heizung", betrag: 270.24}
+  handwerker:
+    - {bezeichnung: "Malerarbeiten, Lohnanteil", betrag: 545.61}
+
+vorsorge:
+  lohnsteuerbescheinigung:    # both certificates added up
+    rv_an: 5310.05
+    rv_ag: 5310.05
+    kv_an: 4881.82
+    pv_an: 1370.33
+    av_an: 742.26
+  erstattete_beitraege: 50    # bonus of the health insurer
+  berufsunfaehigkeit:
+    - {bezeichnung: "Berufsunfähigkeitsversicherung", monatlich: 43.21, monate: 12}
+  unfall_haftpflicht_risiko:
+    - {bezeichnung: "Privathaftpflicht", betrag: 50.28}
+
+krankheitskosten:
+  - {bezeichnung: "Zahnarzt, Eigenanteil", betrag: 221.38}

@@ -1,0 +1,383 @@
+<!doctype html>
+<!--
+SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Steuererklärungen</title>
+<style>
+:root { --bg: #f7f6f2; --surface: #ffffff; --ink: #1d211f; --muted: #5d665f; --line: #dcdcd4; --accent: #b4532a;
+  --ok: #2f7d4f; --warn: #b8860b; --cap: #c62828; --mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --text: system-ui, -apple-system, "Segoe UI", sans-serif; color-scheme: light;
+  --s1: #2f6f9f; --s2: #2f7d4f; --s3: #b4532a; --s4: #7a5ba6; --s5: #b8860b; --s6: #5d665f; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #131715; --surface: #1b201d; --ink: #e8ece8;
+  --muted: #9aa59e; --line: #2d3530; --accent: #f08a4b; --ok: #6fcf97; --warn: #e6b34a; --cap: #ff6b6b; color-scheme: dark;
+  --s1: #6fa8dc; --s2: #6fcf97; --s3: #f08a4b; --s4: #b59ae0; --s5: #e6b34a; --s6: #9aa59e; } }
+:root[data-theme="dark"] { --bg: #131715; --surface: #1b201d; --ink: #e8ece8; --muted: #9aa59e; --line: #2d3530;
+  --accent: #f08a4b; --ok: #6fcf97; --warn: #e6b34a; --cap: #ff6b6b; color-scheme: dark;
+  --s1: #6fa8dc; --s2: #6fcf97; --s3: #f08a4b; --s4: #b59ae0; --s5: #e6b34a; --s6: #9aa59e; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--text);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 40px; }
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+h1 { font: 600 clamp(22px, 3.5vw, 30px)/1.15 var(--text); margin: 0; }
+.lede { margin: 0; max-width: 80ch; color: var(--muted); }
+nav { display: flex; flex-wrap: wrap; gap: 8px; }
+nav button, .knopf { font: 500 14px/1 var(--text); color: var(--ink); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 6px; padding: 10px 14px; min-height: 44px; cursor: pointer; }
+nav button[aria-selected="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+.panel[hidden] { display: none; }
+section h2 { font: 600 13px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+h3 { font: 600 15px/1.3 var(--text); margin: 0 0 6px; }
+input[type="search"] { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; width: min(100%, 420px); }
+.sub { color: var(--muted); font-size: 13px; }
+.tsum { display: flex; flex-wrap: wrap; gap: 10px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; min-width: 150px; }
+.kpi b { display: block; font: 600 20px/1.2 var(--mono); }
+.kpi span { font: 600 11px/1.2 var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 540px), 1fr)); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px; min-width: 0; }
+.twrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 600 11px/1.2 var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+td.num, th.num { text-align: right; font-family: var(--mono); white-space: nowrap; }
+.badge { display: inline-block; font: 600 11px/1.3 var(--mono); padding: 1px 6px; border-radius: 4px; border: 1px solid currentColor; white-space: nowrap; }
+.badge.ok { color: var(--ok); } .badge.warn { color: var(--warn); } .badge.cap { color: var(--cap); } .badge.muted { color: var(--muted); }
+details { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); margin: 8px 0; }
+details > summary { cursor: pointer; padding: 10px 12px; font-weight: 600; list-style-position: outside; }
+details > .inhalt { padding: 0 12px 12px; }
+details details { background: var(--bg); }
+details details > summary { font-weight: 500; }
+.zeile { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
+.zeile .rechts { margin-left: auto; font-family: var(--mono); }
+.dateien { margin: 2px 0 0; padding-left: 16px; font-size: 12px; }
+a { color: var(--accent); }
+.leer { border: 2px dashed var(--line); border-radius: 10px; padding: 28px; text-align: center; color: var(--muted); }
+.leer.ueber { border-color: var(--accent); color: var(--ink); }
+svg.chart { width: 100%; height: auto; display: block; }
+svg.chart text { font: 11px var(--mono); fill: var(--muted); }
+svg.chart .achse { stroke: var(--line); }
+.legende { display: flex; flex-wrap: wrap; gap: 4px 14px; font: 12px var(--mono); color: var(--muted); margin-top: 4px; }
+.legende i { display: inline-block; width: 12px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+ul.knapp { margin: 4px 0; padding-left: 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Steuererklärungen</h1>
+    <p class="lede">Alle Steuererklärungen eines Ordners aus <code>Steuererklärungen.json</code>, wie PyTaxDE sie aus den YAML-Dateien rechnet:
+      je Jahr die Simulation des Bescheids, jeder Posten mit Rechnung und Belegen, und über alle Jahre, was von jeder Grenze genutzt ist.
+      Die YAML-Dateien sind die Wahrheit; diese Seite zeigt nur an.</p>
+    <p class="sub" id="quelle"></p>
+  </header>
+  <div class="leer" id="laden" hidden>
+    <p><b>Steuererklärungen.json hierher ziehen</b> oder <label class="knopf">auswählen<input type="file" id="datei" accept=".json,application/json" hidden></label></p>
+    <p class="sub">Mit <code>python pytaxde.py &lt;Ordner&gt; --anzeigen</code> lädt die Seite die Daten selbst, frisch aus den YAML-Dateien, und die Belege sind verlinkt.</p>
+  </div>
+  <nav role="tablist" hidden>
+    <button role="tab" data-tab="ueberblick" aria-selected="true">Überblick</button>
+    <button role="tab" data-tab="grenzen" aria-selected="false">Grenzen</button>
+    <button role="tab" data-tab="erklaerungen" aria-selected="false">Erklärungen</button>
+    <button role="tab" data-tab="posten" aria-selected="false">Posten</button>
+    <button role="tab" data-tab="belege" aria-selected="false">Belege</button>
+  </nav>
+  <div class="panel" id="p-ueberblick" hidden></div>
+  <div class="panel" id="p-grenzen" hidden></div>
+  <div class="panel" id="p-erklaerungen" hidden></div>
+  <div class="panel" id="p-posten" hidden></div>
+  <div class="panel" id="p-belege" hidden></div>
+</div>
+<script>
+"use strict";
+let D = null;
+const $ = id => document.getElementById(id);
+const esc = t => String(t ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const zahl = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const euro = v => v === null || v === undefined ? "–" : zahl.format(v) + " €";
+const prozent = v => v === null || v === undefined ? "–" : (v * 100).toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " %";
+const FARBEN = ["--s1", "--s2", "--s3", "--s4", "--s5", "--s6"];
+const farbe = i => `var(${FARBEN[i % FARBEN.length]})`;
+
+/* ------------------------------------------------------------ loading */
+function zeigen(daten, herkunft) {
+  D = daten;
+  $("laden").hidden = !!daten && location.protocol.startsWith("http");
+  document.querySelector("nav").hidden = false;
+  $("quelle").textContent = herkunft;
+  render();
+  oeffnen(location.hash.slice(1) || "ueberblick");
+}
+function datei_lesen(f) {
+  const r = new FileReader();
+  r.onload = () => { try { zeigen(JSON.parse(r.result), `geladen: ${f.name}`); } catch (e) { alert(`keine lesbare JSON: ${e}`); } };
+  r.readAsText(f, "utf-8");
+}
+$("datei").addEventListener("change", e => e.target.files[0] && datei_lesen(e.target.files[0]));
+document.addEventListener("dragover", e => { e.preventDefault(); $("laden").classList.add("ueber"); });
+document.addEventListener("dragleave", () => $("laden").classList.remove("ueber"));
+document.addEventListener("drop", e => { e.preventDefault(); $("laden").classList.remove("ueber"); e.dataTransfer.files[0] && datei_lesen(e.dataTransfer.files[0]); });
+if (location.protocol.startsWith("http")) {
+  fetch("daten.json", { cache: "no-store" }).then(r => r.json())
+    .then(d => zeigen(d, "frisch aus den YAML-Dateien (pytaxde --anzeigen)"))
+    .catch(e => { $("laden").hidden = false; $("quelle").textContent = `daten.json nicht ladbar: ${e}`; });
+} else {
+  $("laden").hidden = false;
+}
+
+/* ------------------------------------------------------------ tabs */
+const tabs = [...document.querySelectorAll('[role="tab"]')];
+function oeffnen(name) {
+  if (!tabs.some(t => t.dataset.tab === name)) name = "ueberblick";
+  for (const t of tabs) {
+    const an = t.dataset.tab === name;
+    t.setAttribute("aria-selected", an);
+    $("p-" + t.dataset.tab).hidden = !an;
+  }
+}
+tabs.forEach(t => t.addEventListener("click", () => { oeffnen(t.dataset.tab); history.replaceState(null, "", "#" + t.dataset.tab); }));
+
+/* ------------------------------------------------------------ helpers */
+function erklaerungen() {
+  return Object.entries(D.erklaerungen || {}).sort((a, b) =>
+    ((a[1].geprueft || {}).jahr || 0) - ((b[1].geprueft || {}).jahr || 0) || a[0].localeCompare(b[0]));
+}
+function kurz(quelle) { return quelle.split("/").pop().replace(/\.yaml$/, ""); }
+function link(rel) {
+  const name = esc(rel.split("/").pop());
+  const href = D.links && D.links[rel];
+  return href ? `<a href="${esc(href)}" target="_blank" rel="noopener" title="${esc(rel)}">${name}</a>` : `<span title="${esc(rel)}">${name}</span>`;
+}
+function beleg(b, max = 6) {
+  const st = b.gefunden ? "" : ` <span class="badge cap">fehlt</span>`;
+  const n = b.dateien.length, mehr = (b.weitere || 0) + Math.max(0, n - max);
+  const liste = b.dateien.slice(0, max).map(f => `<li>${link(f)}</li>`).join("") + (mehr ? `<li class="sub">… ${mehr} weitere</li>` : "");
+  return `<div><code>${esc(b.angabe)}</code>${st}${n > 1 || (n === 1 && b.dateien[0].split("/").pop() !== b.angabe.split("/").pop()) ? `<ul class="dateien">${liste}</ul>` : n === 1 ? ` ${link(b.dateien[0])}` : ""}</div>`;
+}
+function status(s) {
+  return s === "offen" ? `<span class="badge warn">offen</span>` : s === "nicht anerkannt" ? `<span class="badge cap">nicht anerkannt</span>` : "";
+}
+function falt(titel, inhalt, auf = false) {
+  return `<details${auf ? " open" : ""}><summary>${titel}</summary><div class="inhalt">${inhalt}</div></details>`;
+}
+function tabelle(kopf, zeilen) {
+  return `<div class="twrap"><table><thead><tr>${kopf.map(([t, k]) => `<th${k ? ` class="${k}"` : ""}>${t}</th>`).join("")}</tr></thead><tbody>${zeilen.join("")}</tbody></table></div>`;
+}
+
+/* ------------------------------------------------------------ charts (SVG, no library) */
+function skala(maxWert) {
+  if (maxWert <= 0) return { max: 1, schritt: 1 };
+  const roh = maxWert / 4, p = Math.pow(10, Math.floor(Math.log10(roh)));
+  const schritt = [1, 2, 2.5, 5, 10].map(f => f * p).find(s => s >= roh);
+  return { max: Math.ceil(maxWert / schritt) * schritt, schritt };
+}
+function kurzzahl(v) { return Math.abs(v) >= 1000 ? zahl.format(Math.round(v / 100) / 10) + " T" : zahl.format(v); }
+/* bars per category (stacked if several series), optional line for a cap or threshold per category */
+function balken({ kategorien, reihen, linie, linienArt, linienName, hoehe = 230 }) {
+  const B = 640, L = 52, R = 10, O = 10, U = 34, n = kategorien.length;
+  const summen = kategorien.map((_, i) => reihen.reduce((s, r) => s + Math.max(0, r.werte[i] || 0), 0));
+  const minWert = Math.min(0, ...kategorien.map((_, i) => reihen.reduce((s, r) => s + Math.min(0, r.werte[i] || 0), 0)));
+  const { max, schritt } = skala(Math.max(...summen, ...(linie || []).filter(v => v !== null), 1));
+  const unten = minWert < 0 ? -skala(-minWert).max : 0;
+  const y = v => O + (hoehe - O - U) * (1 - (v - unten) / (max - unten));
+  const breite = (B - L - R) / Math.max(n, 1), bw = Math.min(46, breite * 0.62);
+  let s = `<svg class="chart" viewBox="0 0 ${B} ${hoehe}" role="img">`;
+  for (let v = unten; v <= max + 1e-9; v += schritt)
+    s += `<line class="achse" x1="${L}" x2="${B - R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${kurzzahl(v)}</text>`;
+  kategorien.forEach((k, i) => {
+    const x = L + breite * i + (breite - bw) / 2;
+    let pos = 0, neg = 0;
+    reihen.forEach((r, j) => {
+      const v = r.werte[i] || 0; if (!v) return;
+      const von = v >= 0 ? pos : neg, bis = von + v;
+      if (v >= 0) pos = bis; else neg = bis;
+      const f = r.farben ? r.farben[i] : farbe(j);
+      s += `<rect x="${x}" y="${Math.min(y(von), y(bis))}" width="${bw}" height="${Math.max(1, Math.abs(y(von) - y(bis)))}" fill="${f}" rx="2"><title>${esc(k)} · ${esc(r.name)}: ${euro(v)}</title></rect>`;
+    });
+    s += `<text x="${L + breite * i + breite / 2}" y="${hoehe - 14}" text-anchor="middle">${esc(k)}</text>`;
+  });
+  if (linie) {   /* a step per category: the cap of that year */
+    linie.forEach((v, i) => {
+      if (v === null || v === undefined) return;
+      const x1 = L + breite * i + 4, x2 = L + breite * (i + 1) - 4;
+      s += `<line x1="${x1}" x2="${x2}" y1="${y(v)}" y2="${y(v)}" stroke="var(--cap)" stroke-width="2.5"${linienArt === "schwelle" ? ' stroke-dasharray="6 4"' : ""}><title>${esc(kategorien[i])} · ${esc(linienName)}: ${euro(v)}</title></line>`;
+    });
+  }
+  return s + `</svg>`;
+}
+function linien({ kategorien, reihen, hoehe = 250 }) {
+  const B = 640, L = 52, R = 10, O = 10, U = 34, n = kategorien.length;
+  const alle = reihen.flatMap(r => r.werte.filter(v => v !== null && v !== undefined));
+  const { max, schritt } = skala(Math.max(...alle, 1));
+  const unten = Math.min(0, ...alle) < 0 ? -skala(-Math.min(...alle)).max : 0;
+  const y = v => O + (hoehe - O - U) * (1 - (v - unten) / (max - unten));
+  const x = i => n === 1 ? (L + B - R) / 2 : L + 12 + (B - L - R - 24) * i / (n - 1);
+  let s = `<svg class="chart" viewBox="0 0 ${B} ${hoehe}" role="img">`;
+  for (let v = unten; v <= max + 1e-9; v += schritt)
+    s += `<line class="achse" x1="${L}" x2="${B - R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${kurzzahl(v)}</text>`;
+  kategorien.forEach((k, i) => { s += `<text x="${x(i)}" y="${hoehe - 14}" text-anchor="middle">${esc(k)}</text>`; });
+  reihen.forEach((r, j) => {
+    const pkt = r.werte.map((v, i) => v === null || v === undefined ? null : [x(i), y(v), v, i]).filter(Boolean);
+    s += `<polyline fill="none" stroke="${farbe(j)}" stroke-width="2.2" points="${pkt.map(p => p[0] + "," + p[1]).join(" ")}"/>`;
+    s += pkt.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="${farbe(j)}"><title>${esc(kategorien[p[3]])} · ${esc(r.name)}: ${euro(p[2])}</title></circle>`).join("");
+  });
+  return s + `</svg>`;
+}
+function legende(eintraege) {
+  return `<div class="legende">${eintraege.map(([n, f, strich]) => strich
+    ? `<span><svg width="18" height="10"><line x1="0" x2="18" y1="5" y2="5" stroke="var(--cap)" stroke-width="2.5"${strich === "schwelle" ? ' stroke-dasharray="5 3"' : ""}/></svg> ${esc(n)}</span>`
+    : `<span><i style="background:${f}"></i>${esc(n)}</span>`).join("")}</div>`;
+}
+/* category labels: the year, the person where there are two, the file where a year comes twice */
+function kategorien(punkte) {
+  const basis = punkte.map(p => `${p.jahr}${p.person && punkte.some(q => q.jahr === p.jahr && q.quelle === p.quelle && q.person !== p.person) ? " " + p.person : ""}`);
+  return basis.map((b, i) => basis.filter(x => x === b).length > 1 ? `${b} ${kurz(punkte[i].quelle).slice(-14)}` : b);
+}
+
+/* ------------------------------------------------------------ the tabs' contents */
+function render() {
+  const U = D.uebergreifend || {}, reihe = U.zeitreihe || [];
+  const mit = reihe.filter(z => z.erstattung !== undefined);
+  const kat = kategorien(mit.map(z => ({ jahr: z.jahr, quelle: z.quelle, person: "" })));
+
+  /* overview */
+  const su = U.summen || {};
+  let h = `<section><h2>Überblick</h2><div class="tsum">
+      <div class="kpi"><span>Erklärungen</span><b>${su.jahre ?? 0}</b></div>
+      <div class="kpi"><span>Einkommensteuer festgesetzt</span><b>${euro(su.festgesetzt)}</b></div>
+      <div class="kpi"><span>Erstattungen gesamt</span><b>${euro(su.erstattung)}</b></div></div></section>`;
+  if (mit.length) {
+    h += `<div class="cards"><div class="card"><h3>Einkommen und Steuer</h3>` +
+      linien({ kategorien: kat, reihen: [["Bruttolohn", "brutto"], ["Gesamtbetrag der Einkünfte", "gesamtbetrag"], ["zu versteuerndes Einkommen", "zve"], ["festgesetzte Einkommensteuer", "festgesetzt"]]
+        .map(([name, k]) => ({ name, werte: mit.map(z => z[k]) })) }) +
+      legende([["Bruttolohn", farbe(0)], ["Gesamtbetrag der Einkünfte", farbe(1)], ["zu versteuerndes Einkommen", farbe(2)], ["festgesetzte ESt", farbe(3)]]) + `</div>` +
+      `<div class="card"><h3>Erstattung (+) / Nachzahlung (−)</h3>` +
+      balken({ kategorien: kat, reihen: [{ name: "Erstattung", werte: mit.map(z => z.erstattung), farben: mit.map(z => z.erstattung >= 0 ? "var(--ok)" : "var(--cap)") }] }) +
+      `</div></div>`;
+  }
+  h += `<section><h2>Je Erklärung</h2>` + tabelle(
+    [["Jahr"], ["Datei"], ["Veranlagung"], ["Brutto", "num"], ["zvE", "num"], ["ESt", "num"], ["Ø Steuersatz", "num"], ["Grenzsteuersatz", "num"], ["Erstattung", "num"]],
+    reihe.map(z => `<tr><td>${z.jahr}</td><td><code>${esc(kurz(z.quelle))}</code></td><td>${esc(z.veranlagung)}</td>` +
+      ["brutto", "zve", "festgesetzt"].map(k => `<td class="num">${euro(z[k])}</td>`).join("") +
+      `<td class="num">${prozent(z.durchschnittssteuersatz)}</td><td class="num">${prozent(z.grenzsteuersatz)}</td><td class="num">${euro(z.erstattung)}</td></tr>`)) + `</section>`;
+  $("p-ueberblick").innerHTML = h;
+
+  /* caps: every cluster across the years */
+  h = `<section><h2>Grenzen je Jahr</h2><p class="lede">Je Art von Kosten oder Abzügen der Wert je Jahr gegen die Grenze dieses Jahres.
+    <b style="color:var(--cap)">Rote Linie</b>: Obergrenze – darüber zählt nichts mehr. <b style="color:var(--cap)">Gestrichelt</b>: Schwelle – erst darüber wirkt es.
+    Balken in Rot: Obergrenze erreicht oder überschritten.</p></section><div class="cards">`;
+  const TEILE = [["fahrt", "Fahrten"], ["homeoffice", "Homeoffice"], ["arbeitsmittel", "Arbeitsmittel"], ["fortbildung", "Fortbildung"], ["reisekosten", "Reisekosten"], ["weitere", "Weitere"]];
+  const SO_TEILE = [["fahrten", "Fahrten"], ["parken", "Parken"], ["kleinausgaben", "Kleinausgaben"], ["weitere", "Weitere Werbungskosten"]];
+  for (const c of U.cluster || []) {
+    const p = c.punkte, k = kategorien(p);
+    if (c.art === "freigrenze") {   /* Anlage SO: a bar is the income; bottom the taxable result, above it the expenses */
+      const frei = x => x.wert < x.grenze;
+      const reihen = [{ name: "Einkünfte", werte: p.map(x => x.wert), farben: p.map(x => frei(x) ? "var(--ok)" : "var(--cap)") },
+        ...SO_TEILE.map(([t, name], i) => ({ name, werte: p.map(x => (x.teile || {})[t] || 0), farben: p.map(() => farbe(i + 1)) }))];
+      h += `<div class="card"><h3>${esc(c.titel)}</h3><p class="sub">${esc(c.erklaerung)}</p>` +
+        balken({ kategorien: k, reihen, linie: p.map(x => x.grenze), linienArt: "schwelle", linienName: "Freigrenze" }) +
+        legende([["Einkünfte (grün: steuerfrei, rot: steuerpflichtig)", "var(--ok)"],
+                 ...SO_TEILE.map(([, name], i) => [name, farbe(i + 1)]), ["Freigrenze (gegen die Einkünfte)", null, "schwelle"]]) +
+        falt("Zahlen", tabelle([["Jahr"], ["Einnahmen", "num"], ...SO_TEILE.map(([, name]) => [name, "num"]), ["Einkünfte", "num"], ["Freigrenze", "num"], [""]],
+          p.map((x, i) => `<tr><td>${esc(k[i])}</td><td class="num">${euro(x.einnahmen)}</td>` +
+            SO_TEILE.map(([t]) => `<td class="num">${euro((x.teile || {})[t] || 0)}</td>`).join("") +
+            `<td class="num">${euro(x.wert)}</td><td class="num">${euro(x.grenze)}</td><td>` +
+            (x.wert < 0 ? `<span class="badge muted">Verlust, nicht verrechenbar</span>`
+              : frei(x) ? `<span class="badge ok">steuerfrei</span>` : `<span class="badge cap">voll steuerpflichtig</span>`) + `</td></tr>`))) + `</div>`;
+      continue;
+    }
+    const grenze = p.map(x => x.grenze);
+    let reihen;
+    if (c.id === "werbungskosten") {
+      reihen = TEILE.map(([t, name]) => ({ name, werte: p.map(x => (x.teile || {})[t] || 0) }));
+    } else {
+      reihen = [{ name: c.titel, werte: p.map(x => x.wert),
+        farben: p.map(x => c.art === "obergrenze" && x.grenze !== null && x.gilt !== false && x.wert >= x.grenze ? "var(--cap)" : c.art === "schwelle" && x.grenze !== null && x.wert < x.grenze ? "var(--muted)" : "var(--ok)") }];
+    }
+    const linienName = c.art === "obergrenze" ? "Obergrenze" : c.id === "werbungskosten" ? "Arbeitnehmer-Pauschbetrag" : "Schwelle";
+    h += `<div class="card"><h3>${esc(c.titel)}</h3><p class="sub">${esc(c.erklaerung)}</p>` +
+      balken({ kategorien: k, reihen, linie: grenze.some(v => v !== null) ? grenze : null, linienArt: c.art, linienName }) +
+      legende([...(c.id === "werbungskosten" ? reihen.map((r, i) => [r.name, farbe(i)]) : [[c.art === "schwelle" ? "Wert (grau: unter der Schwelle)" : "Wert (rot: Grenze erreicht)", "var(--ok)"]]),
+               ...(grenze.some(v => v !== null) ? [[linienName, null, c.art]] : [])]) +
+      falt("Zahlen", tabelle([["Jahr"], ["Wert", "num"], [c.art === "obergrenze" ? "Obergrenze" : "Schwelle", "num"], ["genutzt", "num"], [""]],
+        p.map((x, i) => {
+          const anteil = x.grenze ? x.wert / x.grenze : null;
+          const st = x.grenze === null ? `<span class="badge muted">keine Grenze</span>`
+            : x.gilt === false ? `<span class="badge muted">gilt nicht (mit Pkw)</span>`
+            : c.art === "obergrenze" ? (x.wert >= x.grenze ? `<span class="badge cap">ausgeschöpft</span>` : `<span class="badge ok">frei: ${euro(x.grenze - x.wert)}</span>`)
+            : (x.wert > x.grenze ? `<span class="badge ok">wirkt: ${euro(x.wert - x.grenze)}</span>` : `<span class="badge muted">fehlt: ${euro(x.grenze - x.wert)}</span>`);
+          return `<tr><td>${esc(k[i])}</td><td class="num">${euro(x.wert)}</td><td class="num">${euro(x.grenze)}</td><td class="num">${prozent(anteil)}</td><td>${st}</td></tr>`;
+        }))) + `</div>`;
+  }
+  $("p-grenzen").innerHTML = h + `</div>`;
+
+  /* every return, unfolding down to the items */
+  const liste = erklaerungen();
+  h = `<section><h2>Erklärungen</h2><p class="lede">Jede Erklärung ausklappbar: Rechenweg, Abgleich mit dem Bescheid, ELSTER-Einträge, jeder Posten mit Rechnung und Belegen.</p></section>`;
+  liste.slice().reverse().forEach(([q, b], idx) => {
+    if (b.fehler) { h += falt(`<span class="badge cap">Fehler</span> ${esc(q)}`, `<p>${esc(b.fehler)}</p>`); return; }
+    const g = b.geprueft, a = b.anzeige, s = g.simulation, sw = s.werte || {};
+    const abgl = Object.entries(s.abgleich || {}), getroffen = abgl.filter(([, v]) => v.bescheid === v.simuliert).length;
+    const kopf = `<span class="zeile"><span>${g.jahr}</span><code>${esc(kurz(q))}</code><span class="sub">${esc(a.veranlagung)}</span>` +
+      (abgl.length ? `<span class="badge ${getroffen === abgl.length ? "ok" : "cap"}">Bescheid ${getroffen}/${abgl.length}</span>` : `<span class="badge muted">kein Bescheid</span>`) +
+      (g.offen.length ? `<span class="badge warn">${g.offen.length} offen</span>` : "") +
+      `<span class="rechts">${sw.erstattung !== undefined ? (sw.erstattung >= 0 ? "Erstattung " : "Nachzahlung ") + euro(Math.abs(sw.erstattung)) : "Simulation: Angaben fehlen"}</span></span>`;
+    let inhalt = "";
+    inhalt += falt("Rechenweg", s.fehlt.length ? `<p class="sub">Simulation nicht möglich, es fehlt: ${esc(s.fehlt.join("; "))}</p>` :
+      tabelle([["Schritt"], ["Betrag", "num"]], Object.entries(s.schritte).map(([t, v]) => `<tr><td>${esc(t)}</td><td class="num">${euro(v)}</td></tr>`)), true);
+    if (abgl.length) inhalt += falt(`Abgleich mit dem Bescheid (${getroffen} von ${abgl.length})`,
+      tabelle([["Wert"], ["Bescheid", "num"], ["simuliert", "num"], [""]], abgl.map(([n, v]) =>
+        `<tr><td>${esc(n)}</td><td class="num">${euro(v.bescheid)}</td><td class="num">${euro(v.simuliert)}</td><td>${v.bescheid === v.simuliert ? `<span class="badge ok">✓</span>` : `<span class="badge cap">${euro(v.simuliert - v.bescheid)}</span>`}</td></tr>`)));
+    inhalt += falt("ELSTER-Einträge", Object.entries(g.elster).map(([f, felder]) => `<h3>${esc(f)}</h3>` +
+      tabelle([["Zeile"], ["Feld"], ["Wert", "num"]], Object.entries(felder).map(([n, v]) =>
+        `<tr><td>${esc(v.zeile ?? "?")}</td><td>${esc(n)}</td><td class="num">${v.einheit === "€" ? euro(v.wert) : esc(zahl.format(v.wert) + " " + v.einheit)}</td></tr>`))).join(""));
+    inhalt += falt("Posten", a.abschnitte.map(ab => falt(
+      `<span class="zeile"><span>${esc(ab.titel)}</span><span class="rechts">${euro(ab.summe)}</span></span>`,
+      (ab.zeilen.length ? `<ul class="knapp sub">${ab.zeilen.map(z => `<li>${esc(z)}</li>`).join("")}</ul>` : "") +
+      (ab.posten.length ? tabelle([["Posten"], ["Rechnung"], ["genau", "num"], ["Eintrag", "num"], ["Belege"]], ab.posten.map(p =>
+        `<tr><td>${esc(p.bezeichnung)} ${status(p.status)}${p.notiz ? `<div class="sub">${esc(p.notiz)}</div>` : ""}</td><td class="sub">${esc(p.rechnung)}</td>` +
+        `<td class="num">${euro(p.exakt)}</td><td class="num">${euro(p.eintrag)}</td><td>${p.belege.map(x => beleg(x, 3)).join("")}</td></tr>`)) : ""))).join(""));
+    if (a.hebel.length) inhalt += falt("Hebel", `<ul class="knapp">${a.hebel.map(x => `<li>${esc(x)}</li>`).join("")}</ul>`);
+    if (g.offen.length || g.hinweise.length) inhalt += falt("Offen und Hinweise",
+      (g.offen.length ? `<h3>Offen (zählt noch nicht mit)</h3><ul class="knapp">${g.offen.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : "") +
+      (g.hinweise.length ? `<h3>Hinweise</h3><ul class="knapp">${g.hinweise.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""));
+    inhalt += falt(`Belege (${a.belege.length})`, a.belege.map(x => `<p><span class="sub">${esc(x.stelle)}</span> ${beleg(x)}</p>`).join("") + (D.links ? "" : `<p class="sub">Links zu den Dateien gibt es mit <code>pytaxde.py &lt;Ordner&gt; --anzeigen</code>.</p>`));
+    inhalt += falt("Regeln des Jahres", tabelle([["Regel"], ["Wert", "num"]], Object.entries(a.regeln).map(([k, v]) =>
+      `<tr><td>${esc(k)}</td><td class="num">${esc(typeof v === "object" && v !== null ? JSON.stringify(v) : v ?? "–")}</td></tr>`)));
+    inhalt += `<p class="sub">Datei: ${link(q)}</p>`;
+    h += falt(kopf, inhalt, idx === 0);
+  });
+  $("p-erklaerungen").innerHTML = h;
+
+  /* every item of every return, searchable */
+  const posten = [];
+  for (const [q, b] of liste) if (b.anzeige) for (const ab of b.anzeige.abschnitte) for (const p of ab.posten)
+    posten.push({ jahr: b.anzeige.jahr, q, ab: ab.titel, p });
+  $("p-posten").innerHTML = `<section><h2>Alle Posten (${posten.length})</h2><input type="search" id="suche" placeholder="suchen: Bezeichnung, Abschnitt, Jahr …"></section><div id="postenliste"></div>`;
+  const zeichnen = filter => {
+    const f = filter.toLowerCase();
+    const treffer = posten.filter(x => !f || `${x.jahr} ${x.ab} ${x.p.bezeichnung} ${x.p.status} ${x.p.kategorie}`.toLowerCase().includes(f));
+    $("postenliste").innerHTML = tabelle([["Jahr"], ["Abschnitt"], ["Posten"], ["Eintrag", "num"], ["Belege"]], treffer.map(x =>
+      `<tr><td>${x.jahr}</td><td class="sub">${esc(x.ab)}</td><td>${esc(x.p.bezeichnung)} ${status(x.p.status)}</td><td class="num">${euro(x.p.eintrag)}</td><td>${x.p.belege.map(y => beleg(y, 2)).join("")}</td></tr>`)) +
+      `<p class="sub">${treffer.length} Treffer, Summe der Einträge ${euro(treffer.filter(x => !x.p.status).reduce((s, x) => s + x.p.eintrag, 0))} (ohne offene und nicht anerkannte)</p>`;
+  };
+  $("suche").addEventListener("input", e => zeichnen(e.target.value));
+  zeichnen("");
+
+  /* receipts of every return */
+  h = `<section><h2>Belege</h2></section>`;
+  for (const [q, b] of liste.slice().reverse()) {
+    if (!b.anzeige) continue;
+    const fehlen = b.anzeige.belege.filter(x => !x.gefunden).length;
+    h += falt(`<span class="zeile"><span>${b.anzeige.jahr}</span><code>${esc(kurz(q))}</code><span class="badge ${fehlen ? "cap" : "ok"}">${b.anzeige.belege.length} Belege${fehlen ? `, ${fehlen} fehlen` : ""}</span></span>`,
+      b.anzeige.belege.map(x => `<p><span class="sub">${esc(x.stelle)}</span> ${beleg(x, 20)}</p>`).join(""));
+  }
+  $("p-belege").innerHTML = h;
+}
+</script>
+</body>
+</html>
