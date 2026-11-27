@@ -151,8 +151,8 @@
           "wahlleistungen": 0,
           "berufsunfaehigkeit": 0,
           "unfall_haftpflicht_risiko": 65,
-          "zumutbare_belastung": 6104.3,
-          "krankheitskosten_wirksam": 1069.7
+          "zumutbare_belastung": 6104,
+          "krankheitskosten_wirksam": 1070
         },
         "simulation": {
           "fehlt": [],
@@ -167,7 +167,7 @@
             "weitere sonstige Vorsorge (wirksam)": 0,
             "Summe beschränkt abziehbare Sonderausgaben": -16002,
             "Spenden": -231,
-            "außergewöhnliche Belastungen": -1069.7,
+            "außergewöhnliche Belastungen": -1070,
             "zu versteuerndes Einkommen": 79397,
             "tarifliche Einkommensteuer": 22434,
             "ab § 35a-Ermäßigungen": -371,
@@ -497,7 +497,7 @@
             "titel": "Außergewöhnliche Belastungen: Krankheitskosten",
             "summe": 7174,
             "zeilen": [
-              "Gesamtbetrag der Einkünfte ≈ 96.700,00 €, zumutbare Belastung 6.104,30 €, wirkt sich aus: 1.069,70 €"
+              "Gesamtbetrag der Einkünfte ≈ 96.700,00 €, zumutbare Belastung 6.104,00 €, wirkt sich aus: 1.070,00 €"
             ],
             "posten": [
               {
@@ -595,7 +595,7 @@
             "cluster": "krankheitskosten",
             "person": "",
             "wert": 7174,
-            "grenze": 6104.3
+            "grenze": 6104
           }
         ]
       }
@@ -771,7 +771,7 @@
           "wahlleistungen": 0,
           "berufsunfaehigkeit": 519,
           "unfall_haftpflicht_risiko": 51,
-          "zumutbare_belastung": 3259.01,
+          "zumutbare_belastung": 3259,
           "krankheitskosten_wirksam": 0
         },
         "simulation": {
@@ -792,8 +792,8 @@
             "ab § 35a-Ermäßigungen": -165,
             "festzusetzende Einkommensteuer": 8563,
             "Solidaritätszuschlag": 0,
-            "Lohnsteuer und Soli bereits abgezogen": 7245,
-            "Erstattung (+) / Nachzahlung (−)": -1318
+            "Lohnsteuer und Soli bereits abgezogen": 7244,
+            "Erstattung (+) / Nachzahlung (−)": -1319
           },
           "werte": {
             "bruttoarbeitslohn": 57097,
@@ -815,9 +815,9 @@
             "ermaessigung_35a": 165,
             "festgesetzt": 8563,
             "soli": 0,
-            "lohnsteuer": 7245,
+            "lohnsteuer": 7244,
             "soli_abzug": 0,
-            "erstattung": -1318,
+            "erstattung": -1319,
             "grenzsteuersatz": 0.337,
             "sonstige_unwirksam": 1313
           },
@@ -883,12 +883,12 @@
               "simuliert": 0
             },
             "abzug vom lohn": {
-              "bescheid": 7245,
-              "simuliert": 7245
+              "bescheid": 7244,
+              "simuliert": 7244
             },
             "erstattung": {
-              "bescheid": -1318,
-              "simuliert": -1318
+              "bescheid": -1319,
+              "simuliert": -1319
             }
           }
         },
@@ -1055,7 +1055,7 @@
           "Homeoffice: 99 von 210 Tagen eingetragen, noch 111 möglich. Jeder gearbeitete Tag zählt genau einmal: ein Bürotag bringt 2,70 € Entfernungspauschale (9 km), ein Homeoffice-Tag 6,00 €. Wichtig ist, dass alle Tage erfasst sind.",
           "§ 35a haushaltsnahe Dienstleistungen: noch 19.729,00 € Aufwand mit 20 % Steuerermäßigung möglich (direkt von der Steuer, unabhängig vom Grenzsteuersatz).",
           "§ 35a Handwerker-Lohnkosten: noch 5.454,00 € Aufwand mit 20 % Steuerermäßigung möglich (direkt von der Steuer, unabhängig vom Grenzsteuersatz).",
-          "Krankheitskosten 222,00 € liegen unter der zumutbaren Belastung 3.259,01 €: sie wirken erst ab 3.037,01 € mehr (Brille, Zahnarzt, Medikamente mit Rezept, Fahrten zum Arzt)."
+          "Krankheitskosten 222,00 € liegen unter der zumutbaren Belastung 3.259,00 €: sie wirken erst ab 3.037,00 € mehr (Brille, Zahnarzt, Medikamente mit Rezept, Fahrten zum Arzt)."
         ],
         "regeln": {
           "grundfreibetrag": 12096,
@@ -1365,7 +1365,7 @@
             "titel": "Außergewöhnliche Belastungen: Krankheitskosten",
             "summe": 222,
             "zeilen": [
-              "Gesamtbetrag der Einkünfte ≈ 56.053,00 €, zumutbare Belastung 3.259,01 €, wirkt sich aus: 0,00 €"
+              "Gesamtbetrag der Einkünfte ≈ 56.053,00 €, zumutbare Belastung 3.259,00 €, wirkt sich aus: 0,00 €"
             ],
             "posten": [
               {
@@ -1463,7 +1463,7 @@
             "cluster": "krankheitskosten",
             "person": "",
             "wert": 222,
-            "grenze": 3259.01
+            "grenze": 3259
           }
         ]
       }
@@ -2018,8 +2018,8 @@
         "tarif": 8728,
         "festgesetzt": 8563,
         "soli": 0,
-        "lohnsteuer": 7245,
-        "erstattung": -1318,
+        "lohnsteuer": 7244,
+        "erstattung": -1319,
         "grenzsteuersatz": 0.337,
         "durchschnittssteuersatz": 0.1933
       },
@@ -2042,7 +2042,7 @@
     "summen": {
       "jahre": 3,
       "festgesetzt": 39776,
-      "erstattung": 3113.25
+      "erstattung": 3112.25
     },
     "cluster": [
       {
@@ -2315,14 +2315,14 @@
             "jahr": 2025,
             "person": "",
             "wert": 7174,
-            "grenze": 6104.3
+            "grenze": 6104
           },
           {
             "quelle": "beispiel-2025-jobwechsel.yaml",
             "jahr": 2025,
             "person": "",
             "wert": 222,
-            "grenze": 3259.01
+            "grenze": 3259
           }
         ]
       },

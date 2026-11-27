@@ -268,11 +268,12 @@ class Kalender(unittest.TestCase):
 class Belastung(unittest.TestCase):
     def test_reasonable_burden_in_tiers(self):
         r = regeln(2025)
-        # 15,340 × 5 % + (40,000 − 15,340) × 6 % = 767 + 1,479.60
-        self.assertEqual(zumutbare_belastung(D("40000"), r), D("2246.60"))
-        self.assertEqual(zumutbare_belastung(D("10000"), r), D("500.00"))
-        # 767 + 35,790 × 6 % + 8,870 × 7 % = 767 + 2,147.40 + 620.90
-        self.assertEqual(zumutbare_belastung(D("60000"), r), D("3535.30"))
+        # 15,340 × 5 % + (40,000 − 15,340) × 6 % = 767 + 1,479.60 = 2,246.60, in whole euros rounded down as the
+        # notices of 2018 to 2024 show it
+        self.assertEqual(zumutbare_belastung(D("40000"), r), D("2246"))
+        self.assertEqual(zumutbare_belastung(D("10000"), r), D("500"))
+        # 767 + 35,790 × 6 % + 8,870 × 7 % = 767 + 2,147.40 + 620.90 = 3,535.30
+        self.assertEqual(zumutbare_belastung(D("60000"), r), D("3535"))
 
 
 class Rechnen(unittest.TestCase):
@@ -405,7 +406,7 @@ class Tarif(unittest.TestCase):
         self.assertEqual(soli(D("1500"), r), D("82.50"))                    # min(5.5 % = 82.50, 20 % of 528 = 105.60)
         self.assertEqual(soli(D("1000"), r), D("5.60"))                     # min(55, 20 % of 28 = 5.60)
 
-    def test_2021_points_and_wage_tax_per_certificate(self):
+    def test_2021_points_and_wage_tax_summed_then_rounded_up(self):
         r = regeln(2021)
         # y = (40,000 − 14,753) / 10,000 = 2.5247; (208.85 y + 2,397) y + 950.96 = 8,333.89
         self.assertEqual(tarif(40000, r), D("8333"))
@@ -413,8 +414,9 @@ class Tarif(unittest.TestCase):
         d = minimal(jahr=2021, lohnsteuerbescheinigungen=[{"brutto": 20000, "lohnsteuer": 1000.10},
                                                           {"brutto": 10000, "lohnsteuer": 500.10}],
                     vorsorge={"lohnsteuerbescheinigung": {"rv_an": 0, "rv_ag": 0, "kv_an": 0, "pv_an": 0}})
-        # each certificate rounded up: 1,001 + 501, not 1,500.20 -> 1,500
-        self.assertEqual(Rechner(d).rechnen().simulation.werte["lohnsteuer"], 1502)
+        # the sum rounded up: 1,500.20 -> 1,501. Not each certificate (1,001 + 501): a 2021 notice credits 18,585 for
+        # 8,209.83 + 10,374.27, and a 2020 notice of another couple one euro less than each certificate rounded up
+        self.assertEqual(Rechner(d).rechnen().simulation.werte["lohnsteuer"], 1501)
 
     def test_2022_points_and_the_94_percent_share(self):
         r = regeln(2022)
@@ -510,7 +512,7 @@ class Zusammenveranlagung(unittest.TestCase):
         self.assertEqual(soli(D("35086"), r, True), 0)              # 2 × 17,543
         self.assertEqual(soli(D("35086"), r), D("1929.73"))         # single: min(5.5 % = 1,929.73, 11.9 % of 17,543 = 2,087.62)
         # 15,340 × 4 % + 24,660 × 5 % = 613.60 + 1,233
-        self.assertEqual(zumutbare_belastung(D("40000"), r, True), D("1846.60"))
+        self.assertEqual(zumutbare_belastung(D("40000"), r, True), D("1846"))
 
 
 class Arbeitswege(unittest.TestCase):

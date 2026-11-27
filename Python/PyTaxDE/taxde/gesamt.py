@@ -254,7 +254,7 @@ def block(yaml, ordner) -> dict:
     yaml, ordner = Path(yaml), Path(ordner)
     try:
         daten = laden(yaml)
-        rechner = Rechner(daten)
+        rechner = Rechner(daten, yaml)
         e = rechner.rechnen()
     except Exception as fehler:                              # one broken return must not hide the others
         return {"fehler": f"{type(fehler).__name__}: {fehler}"}

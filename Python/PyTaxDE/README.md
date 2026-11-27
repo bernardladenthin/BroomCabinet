@@ -12,7 +12,9 @@ item with its calculation, its receipts and a comment on where it came from — 
 out what goes into which line of ELSTER. It then replays the tax office's calculation step by step,
 the way an assessment notice (Bescheid) shows it, down to the refund or back payment. Checked
 against nine real notices — 2017 to 2020, 2021 to 2023 (joint assessments), 2024 and 2025 — it met
-every one of their 21, 21, 21, 20, 29, 31, 32, 20 and 24 figures to the euro.
+every one of their 21, 21, 21, 20, 29, 31, 32, 20 and 24 figures to the euro. A second household's notices
+2018 to 2024 -- a couple with two children, Elterngeld, church tax, joint and separate assessments -- are met
+in every one of their 29 to 39 figures, to the cent where the notice has cents.
 
 During the year the same file answers the more useful question: **where is something left?** —
 allowances not used yet, a cap already reached, what one more euro of expenses is worth.
@@ -33,6 +35,7 @@ allowances not used yet, a cap already reached, what one more euro of expenses i
 | `example/` | three **fictitious** returns with randomly drawn amounts, and their accepted result `Steuererklärungen.json` |
 | `taxde_test.py` | the rules one by one, every expected figure worked out in a comment |
 | `examples_test.py` | the three examples end to end, against a calculation by hand made without this library |
+| `familie_test.py` | children, Progressionsvorbehalt, church tax, spouses assessed separately, capital income: fictitious figures, worked out by hand |
 | `privacy_test.py` | refuses drive letters, home directories, e-mail addresses, tax numbers, tax IDs and IBANs in this project; given the folder of your real returns, also every word and number of them |
 
 Needs PyYAML (`requirements.txt`); everything else is the standard library. `--help` and the tests'
@@ -129,14 +132,38 @@ The limit is counted for the return as a whole, not per spouse.
 return filed by hand would be. The insurance figures of a wage tax certificate keep their cents in
 the YAML; the simulation rounds them the way the notice does: own contributions up, the employer's
 share, tax-free subsidies, refunds and the reduction for sick pay (per person) down, the deductible
-share of pension contributions (84 % in 2017, 86 % in 2018, 88 % in 2019, 90 % in 2020, 92 % in 2021, 94 % in 2022) up, and the wage tax withheld up per
-certificate. An item marked `offen: true` does not count; it is listed under
+share of pension contributions (84 % in 2017, 86 % in 2018, 88 % in 2019, 90 % in 2020, 92 % in 2021, 94 % in 2022) up, and the wage tax withheld
+summed and then rounded up (two notices: per certificate would be a euro too much). The reasonable burden is
+whole euros, rounded down. An item marked `offen: true` does not count; it is listed under
 "Offen" with its note, so a return in progress shows what is missing. An item the tax office did not
 recognise stays in the file as filed, marked `nicht_anerkannt: "reason"`: it does not count either, is
 reported with its reason, and the simulation meets the notice. Work equipment above the limit
 for immediate deduction (952 € gross) is open until its depreciation for the year is entered with
 `afa: true`. Office days, home-office days, holidays and sick days are checked against the working
 days of the period.
+
+**Children, benefits, church tax.** For a family the return says, besides:
+
+```yaml
+kinder:                        # §§ 31, 32 (6): allowances per child against the Kindergeld, checked child by child
+  - name: Kind A
+    geburt: 2019-05-01         # counts from the month of birth; `monate:` where a notice counted differently
+    freibetrag: halb           # voll (default for a joint assessment) or halb
+    betreuungskosten:          # § 10 (1) no. 5: 2/3, from 2025 80 %, capped per child
+      - {bezeichnung: Kita, monatlich: 120, monate: 12}
+lohnersatz:                    # § 32b: Elterngeld, Krankengeld ... raise the rate on the rest (also in person_b)
+  - {bezeichnung: Elterngeld, betrag: 9000}
+kirchensteuer:                 # assessed on the tax with all children's allowances; a Sonderausgabe when paid
+  satz: 0.09
+  person: B                    # A, B or beide: in a joint assessment the member's share only
+  erstattet: 120               # refunded in the year: off the Sonderausgabe, above it added to the income
+kapitalertraege: {ertraege: 600, kapitalertragsteuer: 150, soli: 8.25}   # within the saver's allowance it comes back
+sonstige_belastungen:          # § 33 besides medical costs (a stay at a spa, care), against the same reasonable burden
+  - {bezeichnung: Kur, betrag: 220}
+```
+
+The church tax withheld goes into a wage tax certificate as `kirchensteuer:`. Older notices show the health
+insurance already reduced for sick pay; `kv_kuerzung: 0` in `vorsorge.lohnsteuerbescheinigung` says so.
 
 ## The tax office's calculation, and the levers
 
@@ -262,9 +289,18 @@ wage tax certificates, commute, expenses and insurance figures — the same keys
 Each person keeps their own employee allowance; caps, the solidarity-surcharge exemption and the
 Sonderausgaben flat rate double; the tariff is split. Rental income (`vermietung:`) names its person.
 
+Spouses who choose the separate assessment (§ 26a) file one return each, `veranlagung: einzeln`. Halved on
+request, each names the other's file, and both get half of both spouses' Sonderausgaben, extraordinary burdens
+and § 35a reductions:
+
+```yaml
+ehegatte: {aufteilung: haelftig, datei: "Steuererklärung 2023 Ehegatte.yaml"}
+```
+
 ## Not covered
 
-Church tax, Progressionsvorbehalt (e.g. sick pay), children, self-employment, capital income, the
-costs side of rental income beyond plain items. Working days know Berlin's holidays only.
+Self-employment, capital income beyond tax withheld at source, the costs side of rental income beyond plain
+items, the relief for single parents (§ 24b), maintenance payments, the Kindergeld of a third child (give it
+with `kindergeld:`), church tax capping and Kirchgeld. Working days know Berlin's holidays only.
 
 No warranty, no tax advice.

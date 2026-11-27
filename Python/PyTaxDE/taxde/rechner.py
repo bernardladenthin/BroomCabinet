@@ -7,8 +7,10 @@
 Forms covered: Anlage N (commuting, home office, work equipment, business trips, further
 income-related expenses), Anlage SO (other income), Anlage V (rental income), donations, § 35a
 (household services and craftsmen), Vorsorgeaufwand (insurance), medical costs with the reasonable
-burden (zumutbare Belastung). Individual or joint assessment (`veranlagung: zusammen` with a
-`person_b` block holding the second person's wage, commute, expenses and insurance).
+burden (zumutbare Belastung), children (Anlage Kind: allowances, Kindergeld, childcare costs), wage replacement
+benefits (§ 32b), church tax as Sonderausgabe. Individual or joint assessment (`veranlagung: zusammen` with a
+`person_b` block holding the second person's wage, commute, expenses and insurance), or spouses assessed
+separately with their Sonderausgaben halved (`ehegatte:`).
 """
 import os
 import re
@@ -49,6 +51,7 @@ class Ergebnis:
     hinweise: list = field(default_factory=list)
     zeilen_geprueft: bool = True
     simulation: object = None                         # simulation.Simulation
+    kinder: list = field(default_factory=list)        # per child: name, monate, freibetrag, kindergeld
 
 
 LSTB_FELDER = {
@@ -59,6 +62,9 @@ LSTB_FELDER = {
     "av_an": "Arbeitslosenversicherung Arbeitnehmer (Nr. 27)",
     "zuschuss_kv": "steuerfreier Zuschuss Krankenversicherung (Nr. 24a)",
     "zuschuss_pv": "steuerfreier Zuschuss Pflegeversicherung (Nr. 24c)",
+    # where a notice states the reduction for sick pay itself (older notices show the contributions already
+    # reduced, and no reduction): that amount instead of 4 %
+    "kv_kuerzung": "Kürzung Krankengeld laut Bescheid",
 }
 
 
@@ -70,8 +76,12 @@ def laden(pfad) -> dict:
 
 
 class Rechner:
-    def __init__(self, daten: dict):
+    def __init__(self, daten: dict, pfad=None, aufteilen: bool = True):
+        """`pfad`: the YAML file, needed only to find a spouse's return named relative to it (`ehegatte.datei`);
+        `aufteilen=False` computes that spouse's own figures without halving them again."""
         self.d = daten
+        self.pfad = None if pfad is None else Path(pfad)
+        self.aufteilen = aufteilen
         self.jahr = int(daten["jahr"])
         self.r = regeln_fuer(self.jahr)
         self.e = Ergebnis(self.jahr, zeilen_geprueft=self.r.zeilen_geprueft)
@@ -319,11 +329,19 @@ class Rechner:
 
     # ---------------------------------------------------------------- außergewöhnliche Belastungen
     def krankheitskosten(self):
-        posten = self.d.get("krankheitskosten")
-        if not posten:
+        """Medical costs and other extraordinary burdens under § 33 (a stay at a spa, care, ...), both against
+        the reasonable burden; `sonstige_belastungen` is the notice's line "sonstige außergewöhnliche Belastungen"."""
+        posten, sonstige = self.d.get("krankheitskosten"), self.d.get("sonstige_belastungen")
+        if not posten and not sonstige:
             return
         ab = self.liste("Außergewöhnliche Belastungen: Krankheitskosten", posten)
         self.eintrag("Außergewöhnliche Belastungen", None, "Krankheitskosten", ab.summe)
+        summe = ab.summe
+        if sonstige:
+            so = self.liste("Außergewöhnliche Belastungen: sonstige", sonstige)
+            self.eintrag("Außergewöhnliche Belastungen", None, "sonstige außergewöhnliche Belastungen", so.summe)
+            summe += so.summe
+            self.e.werte["aussergewoehnliche_belastungen"] = summe
         from .simulation import einkuenfte
         ek = einkuenfte(self.d, self.e.werte, self.r)
         if ek.fehlt:
@@ -331,44 +349,165 @@ class Rechner:
             return
         # the Gesamtbetrag der Einkünfte the way the simulation and the notice form it
         gde = ek.gde
-        zb = zumutbare_belastung(gde, self.r, self.zusammen)
-        abziehbar = max(ab.summe - zb, D("0"))
-        ab.zeilen.append(f"Gesamtbetrag der Einkünfte ≈ {fmt(gde)} €, zumutbare Belastung {fmt(zb)} €, "
-                         f"wirkt sich aus: {fmt(abziehbar)} €")
+        kinder = sum(1 for k in self.e.kinder if k["monate"])
+        zb = zumutbare_belastung(gde, self.r, self.zusammen, kinder)
+        abziehbar = max(summe - zb, D("0"))
+        ab.zeilen.append(f"Gesamtbetrag der Einkünfte ≈ {fmt(gde)} €, zumutbare Belastung {fmt(zb)} €"
+                         + (f" ({kinder} Kinder)" if kinder else "") + f", wirkt sich aus: {fmt(abziehbar)} €")
         self.e.werte["zumutbare_belastung"] = zb
         self.e.werte["krankheitskosten_wirksam"] = abziehbar
 
+    # ---------------------------------------------------------------- Kinder
+    @staticmethod
+    def _monate(kind, jahr) -> list:
+        """The months of the year in which the child counts: from the month of birth on, all twelve if born
+        before; `monate: n` states the number (the last n months) where the notice counted differently."""
+        if "monate" in kind:
+            n = int(kind["monate"])
+            if not 0 <= n <= 12:
+                raise ValueError(f"Kind {kind.get('name')}: monate {n}, erlaubt 0 bis 12")
+            return list(range(13 - n, 13)) if n else []
+        geburt = kind.get("geburt")
+        if geburt is None or geburt.year < jahr:
+            return list(range(1, 13))
+        return [] if geburt.year > jahr else list(range(geburt.month, 13))
+
+    def kinder(self):
+        """Children (§ 31, § 32 (6) EStG): for every child the allowances for its months of the year and the
+        Kindergeld they are weighed against (the simulation does the Günstigerprüfung); childcare costs
+        (§ 10 (1) no. 5) as Sonderausgaben, their share capped per child.
+
+            kinder:
+              - name: Kind A
+                geburt: 2017-03-01
+                freibetrag: voll        # voll (default for a joint assessment) or halb (default otherwise)
+                betreuungskosten:       # Kita, after-school care: items, receipts as usual
+                  - {bezeichnung: Hort, monatlich: 120, monate: 12}
+
+        `kindergeld:` gives the year's claim where it differs from the rules (a third child, a claim for part of
+        the year), `monate:` the months counted where the notice counted differently."""
+        r = self.r
+        kgm = r.kindergeld_monat
+        kgm = list(kgm) if isinstance(kgm, list) else [kgm] * 12
+        kbk_summe = D("0")
+        for k in self.d.get("kinder") or []:
+            name = str(k.get("name") or f"Kind {len(self.e.kinder) + 1}")
+            art = k.get("freibetrag", "voll" if self.zusammen else "halb")
+            if art not in ("voll", "halb"):
+                raise ValueError(f"Kind {name}: freibetrag {art!r}, erlaubt: voll, halb")
+            faktor = D("1") if art == "voll" else D("0.5")
+            monate = self._monate(k, self.jahr)
+            freibetrag = euro_ab((r.kinderfreibetrag + r.bea_freibetrag) * len(monate) / 12 * faktor)
+            if "kindergeld" in k:
+                kindergeld = dec(k["kindergeld"])
+            else:
+                kindergeld = (sum((kgm[m - 1] for m in monate), D("0")) + (r.kinderbonus if monate else 0)) * faktor
+            self.e.kinder.append({"name": name, "monate": len(monate), "freibetrag": freibetrag, "kindergeld": cent(kindergeld)})
+            self.e.werte[f"freibetraege_kind_{name}"] = freibetrag
+            self.e.werte[f"kindergeld_{name}"] = cent(kindergeld)
+            self.eintrag("Anlage Kind", None, f"{name}: Monate", D(len(monate)), "Monate",
+                         f"Freibeträge {fmt(freibetrag)} € ({art}), Kindergeld {fmt(kindergeld)} €")
+            if k.get("betreuungskosten"):
+                ab = self.liste(f"Sonderausgaben: Kinderbetreuungskosten {name}", k["betreuungskosten"])
+                # the share of the exact costs, rounded up (1,000.50 × 2 / 3 = 667, not 1,001 × 2 / 3 -> 668)
+                exakt = sum((b.exakt for b in ab.posten if not b.offen and not b.nicht_anerkannt), D("0"))
+                z, n = r.kinderbetreuung["anteil"]
+                abziehbar = min(euro_auf(exakt * z / n), r.kinderbetreuung["hoechstbetrag"])
+                ab.zeilen.append(f"{fmt(ab.summe)} € × {r.kinderbetreuung['anteil'][0]}/{r.kinderbetreuung['anteil'][1]}, "
+                                 f"höchstens {fmt(r.kinderbetreuung['hoechstbetrag'])} € = {fmt(abziehbar)} € abziehbar")
+                self.eintrag("Anlage Kind", None, f"{name}: Kinderbetreuungskosten", ab.summe, hinweis=f"abziehbar {fmt(abziehbar)} €")
+                kbk_summe += abziehbar
+        if kbk_summe:
+            self.e.werte["kinderbetreuung"] = kbk_summe
+
+    # ---------------------------------------------------------------- Progressionsvorbehalt, Kirchensteuer
+    def lohnersatz(self):
+        """Wage replacement benefits (Elterngeld, Krankengeld, Arbeitslosengeld, ...): tax-free, but they raise
+        the rate on the rest (§ 32b EStG). Per person, as `lohnersatz:` items (the benefit office reports them)."""
+        personen = [("", "", self.d)] + ([(" (Person B)", "_b", self.d["person_b"])] if self.zusammen else [])
+        for wer, sfx, d in personen:
+            posten = d.get("lohnersatz")
+            if posten:
+                summe = sum((berechne(p, self.r, rundung=euro_ab).exakt for p in posten), D("0"))
+                self.eintrag("Progressionsvorbehalt", None, "Lohn- und Einkommensersatzleistungen" + wer, euro_ab(summe),
+                             hinweis="meldet der Leistungsträger, nur Kontrolle")
+                self.e.werte["lohnersatz" + sfx] = euro_ab(summe)
+
+    def kirchensteuer(self):
+        """Church tax paid in the year is a Sonderausgabe, less what was refunded in it (§ 10 (1) no. 4); a
+        refund above the payments is added to the income (§ 10 (4b) s. 3). `gezahlt` defaults to the church tax
+        on the wage tax certificates."""
+        ki = self.d.get("kirchensteuer")
+        if not ki:
+            return
+        if "gezahlt" in ki:
+            gezahlt = dec(ki["gezahlt"])
+        else:
+            personen = [self.d] + ([self.d["person_b"]] if self.zusammen else [])
+            gezahlt = sum((dec(x.get("kirchensteuer", 0)) for p in personen for x in p.get("lohnsteuerbescheinigungen") or []), D("0"))
+        erstattet = dec(ki.get("erstattet", 0))
+        self.e.werte["kirchensteuer_gezahlt"] = euro_auf(gezahlt)
+        self.e.werte["kirchensteuer_erstattet"] = euro_ab(erstattet)
+        self.eintrag("Sonderausgaben", None, "gezahlte Kirchensteuer", euro_auf(gezahlt))
+        if erstattet:
+            self.eintrag("Sonderausgaben", None, "erstattete Kirchensteuer", euro_ab(erstattet))
+
+    def ehegatte(self):
+        """Einzelveranlagung von Ehegatten with the request to halve (§ 26a (2) s. 2 EStG): Sonderausgaben,
+        extraordinary burdens and the § 35a reductions of both are added and halved. The spouse's own figures come
+        from the spouse's return, named relative to this one:
+
+            ehegatte: {aufteilung: haelftig, datei: "Steuererklärung 2023 Ehegatte.yaml"}"""
+        eg = self.d.get("ehegatte") or {}
+        if eg.get("aufteilung") in (None, "keine") or not self.aufteilen:
+            return None
+        if eg["aufteilung"] != "haelftig" or self.zusammen:
+            raise ValueError("ehegatte.aufteilung: haelftig (nur bei Einzelveranlagung) oder keine")
+        if self.pfad is None:
+            raise ValueError("ehegatte.datei: der Pfad dieser Steuererklärung ist nicht bekannt")
+        pfad = self.pfad.parent / eg["datei"]
+        anderer = Rechner(laden(pfad), pfad, aufteilen=False).rechnen()
+        if anderer.simulation.fehlt or int(anderer.jahr) != self.jahr:
+            raise ValueError(f"ehegatte.datei {eg['datei']}: nicht berechenbar oder anderes Jahr")
+        return dict(anderer.simulation.eigen)       # its own figures, before halving
+
     def rechnen(self) -> Ergebnis:
+        self.kinder()
         self.anlage_n()
         if self.zusammen:
             self.anlage_n(self.d["person_b"], "Anlage N (Person B)", "_b")
+        self.lohnersatz()
         self.anlage_so()
         self.anlage_v()
         self.spenden()
+        self.kirchensteuer()
         self.haushaltsnah()
         self.vorsorge()
         self.krankheitskosten()
         from .simulation import simuliere
-        self.e.simulation = simuliere(self.d, self.e, self.r)
+        self.e.simulation = simuliere(self.d, self.e, self.r, self.ehegatte())
         return self.e
 
 
-def zumutbare_belastung(gde: D, regeln, zusammen: bool = False) -> D:
-    """Reasonable burden under § 33 (3) EStG, computed in tiers (BFH VI R 75/14); no children,
-    single or jointly assessed."""
+def zumutbare_belastung(gde: D, regeln, zusammen: bool = False, kinder: int = 0) -> D:
+    """Reasonable burden under § 33 (3) EStG, computed in tiers (BFH VI R 75/14), in whole euros rounded
+    down as the notices of 2018 to 2024 show it (the cents dropped): single or jointly assessed without children,
+    or with one or two children, or with three or more (then the marital status does not matter)."""
+    stufen = (regeln.zumutbar_kinder_3 if kinder >= 3 else regeln.zumutbar_kinder_1_2 if kinder
+              else regeln.zumutbar_verheiratet if zusammen else regeln.zumutbar_ledig)
     summe, unten = D("0"), D("0")
-    for bis, satz in (regeln.zumutbar_verheiratet if zusammen else regeln.zumutbar_ledig):
+    for bis, satz in stufen:
         oben = gde if bis is None else min(gde, bis)
         if oben > unten:
             summe += (oben - unten) * satz
         if bis is None or gde <= bis:
             break
         unten = bis
-    return cent(summe)
+    return euro_ab(summe)
 
 
 def rechne(pfad) -> Ergebnis:
-    return Rechner(laden(Path(pfad))).rechnen()
+    return Rechner(laden(Path(pfad)), pfad).rechnen()
 
 
 def belege(daten) -> list:

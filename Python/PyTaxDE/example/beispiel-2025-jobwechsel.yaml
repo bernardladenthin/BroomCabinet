@@ -34,8 +34,8 @@ bescheid:                     # fictitious, see above
   ermaessigung_handwerker: 110
   festgesetzte_einkommensteuer: 8563
   solidaritaetszuschlag: 0
-  abzug_vom_lohn: 7245                         # each certificate rounded up: 5,295 + 1,950
-  erstattung: -1318             # negative: a back payment
+  abzug_vom_lohn: 7244                         # the sum rounded up: 5,294.36 + 1,949.03 = 7,243.39
+  erstattung: -1319             # negative: a back payment
 
 lohnsteuerbescheinigungen:
   - arbeitgeber: Beispiel GmbH

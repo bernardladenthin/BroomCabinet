@@ -52,7 +52,7 @@ class Jobwechsel2025(unittest.TestCase):
             ("35a_dienstleistungen_ermaessigung", "54.20"),
             ("35a_handwerker_ermaessigung", "109.20"),
             ("berufsunfaehigkeit", "519"),               # 12 × 43.21 = 518.52
-            ("zumutbare_belastung", "3259.01"),          # 767 + 2,147.40 + 4,923 × 7 %
+            ("zumutbare_belastung", "3259"),             # 767 + 2,147.40 + 4,923 × 7 % = 3,259.01, whole euros down
             ("krankheitskosten_wirksam", "0"),
         ]:
             with self.subTest(schluessel):
@@ -75,7 +75,7 @@ class Jobwechsel2025(unittest.TestCase):
         for name, bescheid, simuliert in s.abgleich:
             with self.subTest(name):
                 self.assertEqual(simuliert, bescheid)
-        self.assertEqual(s.werte["erstattung"], D("-1318.00"))       # a back payment
+        self.assertEqual(s.werte["erstattung"], D("-1319.00"))       # a back payment
         self.assertEqual(s.werte["kv_pv_basis"], D("6010"))          # 4,882 − 193 + 1,371 − 50: own contributions up
 
     def test_levers(self):
@@ -108,8 +108,8 @@ class HohesEinkommen2025(unittest.TestCase):
         self.assertEqual(self.e.simulation.werte["gde"], D("96700"))
 
     def test_medical_costs_above_the_reasonable_burden(self):
-        self.assertEqual(self.e.werte["zumutbare_belastung"], D("6104.30"))        # on 96,700, not on 96,776
-        self.assertEqual(self.e.werte["krankheitskosten_wirksam"], D("1069.70"))   # 7,174 − 6,104.30
+        self.assertEqual(self.e.werte["zumutbare_belastung"], D("6104"))           # on 96,700, not on 96,776; 6,104.30 down
+        self.assertEqual(self.e.werte["krankheitskosten_wirksam"], D("1070"))      # 7,174 − 6,104
 
     def test_solidarity_surcharge_in_the_phase_in_zone(self):
         # min(22,063 × 5.5 % = 1,213.46, (22,063 − 19,950) × 11.9 % = 251.447) -> 251.44
@@ -277,7 +277,7 @@ class Gesamt(unittest.TestCase):
     def test_time_series_and_sums(self):
         u = self.d["uebergreifend"]
         self.assertEqual([z["jahr"] for z in u["zeitreihe"]], [2025, 2025, 2026])
-        self.assertEqual(u["summen"]["erstattung"], D("-1318") + D("2859.25") + D("1572"))
+        self.assertEqual(u["summen"]["erstattung"], D("-1319") + D("2859.25") + D("1572"))
 
     def test_the_stored_file_is_current(self):
         self.assertEqual(lesen(als_json(self.d)), gesamt.lesen_datei(BEISPIELE))
@@ -328,7 +328,7 @@ class ErgebnisJson(unittest.TestCase):
         e = rechne(BEISPIELE / "beispiel-2025-jobwechsel.yaml")
         d = lesen(als_json(als_dict(e, "x.yaml")))
         self.assertEqual(d["werte"]["entfernungspauschale"], D("726"))
-        self.assertEqual(d["simulation"]["abgleich"]["erstattung"], {"bescheid": D("-1318"), "simuliert": D("-1318")})
+        self.assertEqual(d["simulation"]["abgleich"]["erstattung"], {"bescheid": D("-1319"), "simuliert": D("-1319")})
         self.assertEqual(d["elster"]["Anlage N"]["Weitere Werbungskosten"]["zeile"], 62)
         self.assertNotIn("hebel", d["simulation"])                           # prose, not compared
 

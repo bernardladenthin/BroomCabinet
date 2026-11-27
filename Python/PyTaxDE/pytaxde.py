@@ -39,6 +39,11 @@ from taxde.posten import fmt
 from taxde.rechner import belege, belege_pruefen, dateinamen_in_kommentaren, laden, rechne
 
 
+def bescheid_betrag(name: str, x) -> str:
+    """An amount of a notice in euros; the Progressionsvorbehalt rate in per cent with its four decimals."""
+    return f"{x:.4f} %".replace(".", ",") if "satz" in name else f"{fmt(x)} €"
+
+
 def wert_text(e):
     return f"{fmt(e.wert)} €" if e.einheit == "€" else f"{int(e.wert)} {e.einheit}"
 
@@ -67,7 +72,7 @@ def selbsttest_zeigen(name: str, frisch: dict, unterschied, details=True) -> int
     treffer, abw = bescheid_text(frisch["geprueft"])
     if treffer:
         teile.append(f"Bescheid {treffer} getroffen")
-        unten += [f"{n}: Bescheid {fmt(fa)} €, simuliert {fmt(sim)} €" for n, fa, sim in abw]
+        unten += [f"{n}: Bescheid {bescheid_betrag(n, fa)}, simuliert {bescheid_betrag(n, sim)}" for n, fa, sim in abw]
         status = 1 if abw else 0
     if unterschied is None:
         teile.append("noch nicht in Steuererklärungen.json (mit --json übernehmen)")
@@ -257,8 +262,8 @@ def main(argv=None):
     if s.abgleich:
         print("\n## Abgleich mit dem Bescheid")
         for name, fa, sim in s.abgleich:
-            print(f"  {name:<40} Bescheid {fmt(fa):>12} €   simuliert {fmt(sim):>12} €   "
-                  + ("✓" if fa == sim else f"Abweichung {fmt(sim - fa)} €"))
+            print(f"  {name:<40} Bescheid {bescheid_betrag(name, fa):>14}   simuliert {bescheid_betrag(name, sim):>14}   "
+                  + ("✓" if fa == sim else f"Abweichung {bescheid_betrag(name, sim - fa)}"))
     if s.hebel:
         print("\n# Hebel")
         for h in s.hebel:

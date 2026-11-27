@@ -10,10 +10,13 @@ Order as in a notice: income -> Gesamtbetrag der Einkünfte -> Sonderausgaben wi
 hardship allowance (§ 46 (3)) -> zvE (taxable income) -> tariff, split for a joint assessment ->
 § 35a -> Riester allowance added back -> assessed income tax -> solidarity surcharge -> compared
 with the wage tax withheld. Checked against real notices for 2017 to 2020, 2021 to 2023 (joint), 2024 and 2025, every
-figure to the euro. Not modelled: church tax, Progressionsvorbehalt, children.
+figure to the euro. Modelled since, and checked against a family's notices 2018 to 2024: children (allowances
+against Kindergeld, § 31; childcare costs), wage replacement benefits (Progressionsvorbehalt, § 32b), church tax
+(as Sonderausgabe and assessed, also for one spouse of a joint assessment), the separate assessment of spouses
+halved on request (§ 26a (2)), and capital income taxed at source within the saver's allowance.
 """
 from dataclasses import dataclass, field
-from decimal import ROUND_HALF_UP
+from decimal import ROUND_DOWN, ROUND_HALF_UP
 from decimal import Decimal as D
 
 from .posten import dec, entfernungspauschale, euro_ab, euro_auf, fmt
@@ -30,6 +33,7 @@ class Simulation:
     hebel: list = field(default_factory=list)        # texts
     fehlt: list = field(default_factory=list)
     abgleich: list = field(default_factory=list)     # (figure, per notice, simulated)
+    eigen: dict = field(default_factory=dict)        # own Sonderausgaben etc. before halving with a spouse (§ 26a)
 
 
 # The figures of the tax office's calculation ("Berechnung des Finanzamts", as ELSTER shows it with the
@@ -55,6 +59,7 @@ BESCHEID_FELDER = {
     "weitere_werbungskosten_b": ("e", "weitere_b"),
     "werbungskosten_b": ("s", "werbungskosten_abzug_b"),
     "einkuenfte_nichtselbstaendige_arbeit_b": ("s", "einkuenfte_n_b"),
+    "lohnersatz": ("s", "progressionsvorbehalt"),                       # § 32b, both persons, after § 32b (2)
     "sonstige_einkuenfte": ("s", "sonstige"),
     "einkuenfte_vermietung": ("s", "vermietung"),                      # both persons together
     "gesamtbetrag_der_einkuenfte": ("s", "gde"),
@@ -63,19 +68,43 @@ BESCHEID_FELDER = {
     "kuerzung_krankengeld": ("s", "kv_kuerzung"),
     "kranken_pflege_basis": ("s", "kv_pv_basis"),
     "beschraenkt_abziehbare_sonderausgaben": ("s", "beschraenkt"),
+    "vorsorge_eigen": ("s", "vorsorge_eigen"),                          # § 26a halved: own before halving ...
+    "vorsorge_haelfte": ("s", "vorsorge_haelfte"),                      # ... its half ...
+    "vorsorge_ehegatte": ("s", "vorsorge_ehegatte"),                    # ... and half of the spouse's
+    "spenden": ("e", "spenden"),
+    "gezahlte_kirchensteuer": ("e", "kirchensteuer_gezahlt"),
+    "erstattete_kirchensteuer": ("e", "kirchensteuer_erstattet"),
+    "kinderbetreuungskosten": ("s", "kinderbetreuung"),                 # the deductible share
     "unbeschraenkt_abziehbare_sonderausgaben": ("s", "unbeschraenkt"),
+    "aussergewoehnliche_belastungen": ("e", "aussergewoehnliche_belastungen"),
+    "zumutbare_belastung": ("e", "zumutbare_belastung"),
+    "abziehbar_nach_33": ("s", "agb"),
+    "erstattungsueberhang_kirchensteuer": ("s", "erstattungsueberhang_kirchensteuer"),
     "altersvorsorgebeitraege": ("s", "riester"),                       # § 10a: contributions plus allowance
     "einkommen": ("s", "einkommen"),
     "haerteausgleich": ("s", "haerteausgleich"),                       # § 46 (3) and (5)
+    "freibetraege_kinder": ("s", "freibetraege_kinder"),               # deducted, where better than Kindergeld
     "zu_versteuerndes_einkommen": ("s", "zve"),
+    "progressionssatz": ("s", "progressionssatz"),                     # in per cent, four decimals
     "tarifliche_einkommensteuer": ("s", "tarif"),
     "ermaessigung_haushaltsnahe_dienstleistungen": ("s", "erm_dienstleistungen"),
     "ermaessigung_handwerker": ("s", "erm_handwerker"),
+    "ermaessigung_35a": ("s", "ermaessigung_35a"),                     # both together (after halving)
     "altersvorsorgezulage": ("s", "zulage_hinzurechnung"),
+    "kindergeld": ("s", "kindergeld_hinzurechnung"),                   # added where the allowances were deducted
     "festgesetzte_einkommensteuer": ("s", "festgesetzt"),
+    "freibetraege_kinder_soli": ("s", "freibetraege_kinder_alle"),     # the base of Soli and church tax ...
+    "zve_soli": ("s", "zve_kinderfreibetraege"),
+    "bemessungsgrundlage_soli": ("s", "bemessungsgrundlage_soli"),     # ... the tax on it
     "solidaritaetszuschlag": ("s", "soli"),
+    "kirchensteuer_bemessungsgrundlage": ("s", "kirchensteuer_bemessung"),
+    "kirchensteuer": ("s", "kirchensteuer"),
     "abzug_vom_lohn": ("s", "lohnsteuer"),
-    "erstattung": ("s", "erstattung"),
+    "soli_abzug": ("s", "soli_abzug"),
+    "kirchensteuer_abzug": ("s", "kirchensteuer_abzug"),
+    "kapitalertragsteuer_abzug": ("s", "kapitalertragsteuer"),
+    "erstattung_einkommensteuer": ("s", "erstattung_einkommensteuer"),  # the income tax column alone
+    "erstattung": ("s", "erstattung"),                                 # all columns: income tax, Soli, church tax
 }
 
 
@@ -113,6 +142,23 @@ def soli(est, r, zusammen=False) -> D:
     if est <= frei:
         return D("0.00")
     return min(est * s["satz"], (est - frei) * s["milderung"]).quantize(D("0.01"), rounding="ROUND_DOWN")
+
+
+def steuer(zve, pv, r, zusammen=False):
+    """The tax on the taxable income; with wage replacement benefits `pv` at the special rate of § 32b EStG:
+    the tariff on zvE + benefits over that sum, cut after four decimals of the per cent (as the notices print it,
+    e.g. "mit 12,3456 %"), times the zvE, rounded down. Returns (tax, rate or None)."""
+    if not pv:
+        return tarif_veranlagung(zve, r, zusammen), None
+    basis = euro_ab(dec(zve) + pv)
+    if basis <= 0 or zve <= 0:
+        return D("0"), D("0")
+    satz = (tarif_veranlagung(basis, r, zusammen) / basis).quantize(D("0.000001"), rounding=ROUND_DOWN)
+    return euro_ab(dec(zve) * satz), satz
+
+
+def prozent4(x) -> str:
+    return f"{x * 100:.4f}".replace(".", ",") + " %"
 
 
 def grenzsteuersatz(zve, r, zusammen=False) -> D:
@@ -160,7 +206,8 @@ def haerteausgleich(neben, r) -> D:
     return max(r.haerteausgleich_obergrenze - neben, D("0"))
 
 
-def simuliere(daten: dict, e, r) -> Simulation:
+def simuliere(daten: dict, e, r, ehegatte=None) -> Simulation:
+    """`ehegatte`: the spouse's own figures (Rechner.ehegatte) for a separate assessment halved on request."""
     s = Simulation()
     w = e.werte
     zusammen = daten.get("veranlagung") == "zusammen"
@@ -213,8 +260,10 @@ def simuliere(daten: dict, e, r) -> Simulation:
         erst = euro_ab(v.get("erstattete_beitraege", 0))
         # the reduction for sick pay per person, each rounded down: a 2022 notice has 186 + 150 = 336,
         # where 4 % of the couple's 8,442 would be 337 (2023: 195 + 161 = 356)
-        kuerzung = sum((euro_ab((euro_auf(sv.get("kv_an", 0)) - (erst if i == 0 else 0) - euro_ab(sv.get("zuschuss_kv", 0)))
-                               * r.kv_kuerzung_krankengeld) for i, sv in enumerate(svs)), D("0"))
+        # a notice that states the reduction itself (`kv_kuerzung`, older notices show none) is taken as it is
+        kuerzung = sum((sv["kv_kuerzung"] if "kv_kuerzung" in sv else
+                        euro_ab((euro_auf(sv.get("kv_an", 0)) - (erst if i == 0 else 0) - euro_ab(sv.get("zuschuss_kv", 0)))
+                                * r.kv_kuerzung_krankengeld) for i, sv in enumerate(svs)), D("0"))
         basis = kv_an - kuerzung + pv_an - erst - zkv - zpv
         weitere = summe("av_an", euro_auf) + sum(w.get(k, D("0")) for k in
                                                 ("kv_ueber_basis", "wahlleistungen", "berufsunfaehigkeit", "unfall_haftpflicht_risiko"))
@@ -226,14 +275,50 @@ def simuliere(daten: dict, e, r) -> Simulation:
                        ("weitere sonstige Vorsorge (wirksam)", sonstige - basis),
                        ("Summe beschränkt abziehbare Sonderausgaben", -beschraenkt)]
 
-        # --- Spenden (unbeschränkt) und außergewöhnliche Belastungen
+        # --- unbeschränkt abziehbare Sonderausgaben: donations, church tax paid less refunded (§ 10 (1) no. 4),
+        # childcare (§ 10 (1) no. 5) -- together at least the Sonderausgaben-Pauschbetrag; a church-tax refund above
+        # the payments is added to the income instead (§ 10 (4b) s. 3). Then the extraordinary burdens.
         spenden = min(w.get("spenden", D("0")), euro_ab(gde * r.spenden_hoechstsatz))
-        sa = max(spenden, r.sonderausgaben_pauschbetrag * f)
+        kist_gez = w.get("kirchensteuer_gezahlt")
+        kist_erst = w.get("kirchensteuer_erstattet", D("0"))
+        kist_sa = max(kist_gez - kist_erst, D("0")) if kist_gez is not None else D("0")
+        ueberhang = max(kist_erst - kist_gez, D("0")) if kist_gez is not None else D("0")
+        kbk = w.get("kinderbetreuung", D("0"))
+        unbeschraenkt_summe = spenden + kist_sa + kbk
         agb = w.get("krankheitskosten_wirksam", D("0"))
-        s.schritte += [("Spenden" + (" (Sonderausgaben-Pauschbetrag)" if sa > spenden else ""), -sa)]
+        erm = euro_auf(w.get("35a_dienstleistungen_ermaessigung", 0)) + euro_auf(w.get("35a_handwerker_ermaessigung", 0))
+        s.eigen = {"beschraenkt": beschraenkt, "unbeschraenkt_summe": unbeschraenkt_summe, "agb": agb,
+                   "ermaessigung_35a": erm}
+        if ehegatte is not None:
+            # Einzelveranlagung von Ehegatten, halved on request (§ 26a (2) s. 2): each spouse gets half of both
+            # spouses' Sonderausgaben, extraordinary burdens and § 35a reductions (as a pair of 2023 notices shows:
+            # "abziehbare Vorsorgeaufwendungen aufgrund der hälftigen Aufteilung" plus "... von Ihrem Ehegatten")
+            def haelfte(x):
+                return euro_ab(dec(x) / 2)
+            s.werte.update(vorsorge_eigen=beschraenkt, vorsorge_haelfte=haelfte(beschraenkt),
+                           vorsorge_ehegatte=haelfte(ehegatte["beschraenkt"]))
+            beschraenkt = haelfte(beschraenkt) + haelfte(ehegatte["beschraenkt"])
+            # the own half at least the flat rate, plus half of the spouse's: a 2023 notice gives a spouse without
+            # Sonderausgaben of his own the flat rate of 36 € AND half of the other's childcare costs
+            sa = max(haelfte(unbeschraenkt_summe), r.sonderausgaben_pauschbetrag) + haelfte(ehegatte["unbeschraenkt_summe"])
+            unbeschraenkt_summe = haelfte(unbeschraenkt_summe) + haelfte(ehegatte["unbeschraenkt_summe"])
+            agb = haelfte(agb) + haelfte(ehegatte["agb"])
+            erm = haelfte(erm) + haelfte(ehegatte["ermaessigung_35a"])
+            s.schritte.append(("Vorsorgeaufwendungen nach hälftiger Aufteilung (eigene und Ehegatte je zur Hälfte)", -beschraenkt))
+        else:
+            sa = max(unbeschraenkt_summe, r.sonderausgaben_pauschbetrag * f)
+        neu = kist_gez is not None or kbk or ehegatte is not None
+        if not neu:
+            s.schritte += [("Spenden" + (" (Sonderausgaben-Pauschbetrag)" if sa > spenden else ""), -sa)]
+        else:
+            teile = [n for n, x in (("Spenden", spenden), ("Kirchensteuer", kist_sa), ("Kinderbetreuung", kbk)) if x]
+            s.schritte += [("unbeschränkt abziehbare Sonderausgaben" + (f" ({', '.join(teile)})" if teile else "")
+                            + (" (Sonderausgaben-Pauschbetrag)" if sa > unbeschraenkt_summe else ""), -sa)]
         if agb:
             s.schritte.append(("außergewöhnliche Belastungen", -agb))
-        vor_riester = gde - beschraenkt - sa - agb
+        if ueberhang:
+            s.schritte.append(("hinzu Erstattungsüberhang aus Kirchensteuern", ueberhang))
+        vor_riester = gde - beschraenkt - sa - agb + ueberhang
 
         # --- Riester (§ 10a): deducted only where the tax saving beats the allowance, which is then
         # added back to the tax (Günstigerprüfung). Contributions plus allowance, capped per person.
@@ -253,31 +338,106 @@ def simuliere(daten: dict, e, r) -> Simulation:
                 zulage = D("0")
                 s.hebel.append(f"Riester: Sonderausgabenabzug ({fmt(ersparnis)} € Ersparnis) lohnt nicht gegen die Zulage")
         einkommen = euro_ab(vor_riester - riester)
-        zve = einkommen - ha
-        if riester or ha:
+
+        # --- § 32b: wage replacement benefits, less what is left of the employee allowance (§ 32b (2) no. 1 a)
+        pv = D("0")
+        for label, sfx, bl, abzug, n in ek.personen:
+            leistung = w.get("lohnersatz" + sfx)
+            if leistung:
+                rest = max(pausch - bl, D("0")) if euro_auf(w.get("werbungskosten" + sfx, 0)) <= pausch else D("0")
+                pv += leistung - min(rest, leistung)
+
+        # --- children (§ 31): a child's allowances are deducted only where they save more tax than its Kindergeld,
+        # which is then added to the tax; checked child by child
+        basis_zve = einkommen - ha
+        fb_abzug, kg_hinzu, fb_alle = D("0"), D("0"), D("0")
+        for k in e.kinder:
+            fb_alle += k["freibetrag"]
+            if not k["freibetrag"]:
+                continue
+            ohne, _ = steuer(basis_zve - fb_abzug, pv, r, zusammen)
+            mit, _ = steuer(basis_zve - fb_abzug - k["freibetrag"], pv, r, zusammen)
+            if ohne - mit > k["kindergeld"]:
+                fb_abzug += k["freibetrag"]
+                kg_hinzu += k["kindergeld"]
+                s.hebel.append(f"Kind {k['name']}: Freibeträge {fmt(k['freibetrag'])} € sparen {fmt(ohne - mit)} € Steuer, "
+                               f"mehr als das Kindergeld {fmt(k['kindergeld'])} € – Freibeträge abgezogen, Kindergeld hinzugerechnet")
+            else:
+                s.hebel.append(f"Kind {k['name']}: Kindergeld {fmt(k['kindergeld'])} € ist günstiger als die Freibeträge "
+                               f"(Ersparnis {fmt(ohne - mit)} €)")
+        zve = basis_zve - fb_abzug
+        if riester or ha or e.kinder:
             s.schritte.append(("Einkommen", einkommen))
         if ha:
             s.schritte.append(("ab Härteausgleich § 46 Abs. 3 EStG", -ha))
+        if fb_abzug:
+            s.schritte.append(("ab Freibeträge für Kinder", -fb_abzug))
         s.schritte.append(("zu versteuerndes Einkommen", zve))
 
         # --- Steuer
-        t = tarif_veranlagung(zve, r, zusammen)
-        erm = euro_auf(w.get("35a_dienstleistungen_ermaessigung", 0)) + euro_auf(w.get("35a_handwerker_ermaessigung", 0))
-        fest = max(t - min(erm, t), D("0")) + zulage
-        sz = soli(fest, r, zusammen)
-        # wage tax withheld, each certificate rounded up: a 2021 notice credits 8,210 + 10,375 = 18,585
-        # for 8,209.83 and 10,374.27, where the rounded sum would be 18,584
-        lst = sum((euro_auf(x.get("lohnsteuer", 0)) for x in lstb), D("0"))
+        t, satz = steuer(zve, pv, r, zusammen)
+        fest = max(t - min(erm, t), D("0")) + zulage + kg_hinzu
+        # the solidarity surcharge and church tax are assessed on the tax as if all children's allowances were
+        # deducted, without Kindergeld (§ 3 (2) SolZG, § 51a (2) EStG)
+        if e.kinder:
+            zve_kfb = basis_zve - fb_alle
+            t_kfb, _ = steuer(zve_kfb, pv, r, zusammen)
+            bemessung = max(t_kfb - min(erm, t_kfb), D("0")) + zulage
+        else:
+            bemessung = fest
+        sz = soli(bemessung, r, zusammen)
+        # wage tax withheld: the sum of the certificates rounded up -- a 2021 notice credits 18,585 for 8,209.83 +
+        # 10,374.27; a 2020 notice (another couple) credits one euro less than the certificates each rounded up
+        lst = euro_auf(sum((dec(x.get("lohnsteuer", 0)) for x in lstb), D("0")))
         soli_lst = sum((dec(x.get("soli", 0)) for x in lstb), D("0"))
         erstattung = lst + soli_lst - fest - sz
+
+        # --- church tax: a rate of the assessment base; where only one spouse of a joint assessment belongs to a
+        # church, of that spouse's share of it, split in the ratio of the basic tariff on each one's Summe der
+        # Einkünfte, cut to the cent (met to the cent by a 2021 notice: "auf die Ehefrau entfallen")
+        ki = daten.get("kirchensteuer") or {}
+        if ki:
+            person = str(ki.get("person", "beide")).upper()
+            if person not in ("A", "B", "BEIDE"):
+                raise ValueError(f"kirchensteuer.person {person!r}, erlaubt: A, B, beide")
+            kist_basis = bemessung
+            if zusammen and person != "BEIDE":
+                eink = {"A": w.get("vermietung", D("0")) + so, "B": w.get("vermietung_b", D("0"))}
+                for label, sfx, bl, abzug, n in ek.personen:
+                    eink["B" if sfx else "A"] += n
+                ta, tb = tarif(eink["A"], r), tarif(eink["B"], r)
+                kist_basis = (bemessung * (ta if person == "A" else tb) / (ta + tb)).quantize(D("0.01"), rounding=ROUND_DOWN) \
+                    if ta + tb else D("0")
+            kist = (kist_basis * dec(ki.get("satz", "0.09"))).quantize(D("0.01"), rounding=ROUND_DOWN)
+            kist_abzug = sum((dec(x.get("kirchensteuer", 0)) for x in lstb), D("0"))
+            erstattung += kist_abzug - kist
+
+        # --- capital income taxed at source (§ 32d): within the saver's allowance the withheld tax comes back
+        kap = daten.get("kapitalertraege") or {}
+        if kap:
+            pflichtig = max(euro_ab(dec(kap.get("ertraege", 0))) - r.sparer_pauschbetrag * f, D("0"))
+            kapest = (pflichtig * D("0.25")).quantize(D("0.01"), rounding=ROUND_DOWN)
+            kapsoli = (kapest * r.soli["satz"]).quantize(D("0.01"), rounding=ROUND_DOWN)
+            kap_einb, kap_soli = dec(kap.get("kapitalertragsteuer", 0)), dec(kap.get("soli", 0))
+            erstattung += kap_einb - kapest + kap_soli - kapsoli
+
         grenz = grenzsteuersatz(zve, r, zusammen)
-        s.schritte += [("tarifliche Einkommensteuer" + (" (Splittingtarif)" if zusammen else ""), t),
+        s.schritte += [("tarifliche Einkommensteuer" + (" (Splittingtarif)" if zusammen else "")
+                        + (f" mit Progressionsvorbehalt {prozent4(satz)}" if satz is not None else ""), t),
                        ("ab § 35a-Ermäßigungen", -min(erm, t))]
         if zulage:
             s.schritte.append(("dazu Altersvorsorgezulage", zulage))
-        s.schritte += [("festzusetzende Einkommensteuer", fest), ("Solidaritätszuschlag", sz),
-                       ("Lohnsteuer und Soli bereits abgezogen", lst + soli_lst),
-                       ("Erstattung (+) / Nachzahlung (−)", erstattung)]
+        if kg_hinzu:
+            s.schritte.append(("dazu Kindergeld", kg_hinzu))
+        s.schritte += [("festzusetzende Einkommensteuer", fest), ("Solidaritätszuschlag", sz)]
+        if ki:
+            s.schritte.append((f"Kirchensteuer {dec(ki.get('satz', '0.09')) * 100:.0f} % von {fmt(kist_basis)} €", kist))
+        s.schritte.append(("Lohnsteuer und Soli bereits abgezogen", lst + soli_lst))
+        if ki:
+            s.schritte.append(("Kirchensteuer bereits abgezogen", kist_abzug))
+        if kap:
+            s.schritte.append(("Kapitalertragsteuer und Soli darauf, bereits abgezogen", kap_einb + kap_soli))
+        s.schritte.append(("Erstattung (+) / Nachzahlung (−)", erstattung))
         s.werte.update(sonstige=so,
                        gde=gde, altersvorsorge_summe=av_summe, altersvorsorge=av, kv_kuerzung=kuerzung,
                        kv_pv_basis=basis, beschraenkt=beschraenkt, unbeschraenkt=sa, einkommen=einkommen, zve=zve, tarif=t,
@@ -289,6 +449,23 @@ def simuliere(daten: dict, e, r) -> Simulation:
             s.werte.update(riester=riester, zulage_hinzurechnung=zulage)
         if ha:
             s.werte["haerteausgleich"] = ha
+        if neu:
+            s.werte.update(unbeschraenkt_summe=unbeschraenkt_summe, kinderbetreuung=kbk, spenden=spenden)
+        if kist_gez is not None:
+            s.werte.update(kirchensteuer_sonderausgaben=kist_sa, erstattungsueberhang_kirchensteuer=ueberhang)
+        if pv:
+            s.werte.update(progressionsvorbehalt=pv, progressionssatz=satz * 100)
+        if e.kinder:
+            s.werte.update(freibetraege_kinder=fb_abzug, kindergeld_hinzurechnung=kg_hinzu, freibetraege_kinder_alle=fb_alle,
+                           zve_kinderfreibetraege=zve_kfb, bemessungsgrundlage_soli=bemessung, agb=agb)
+        elif ehegatte is not None:
+            s.werte["agb"] = agb
+        if ki:
+            s.werte.update(kirchensteuer_bemessung=kist_basis, kirchensteuer=kist, kirchensteuer_abzug=kist_abzug,
+                           erstattung_einkommensteuer=lst - fest)
+        if kap:
+            s.werte.update(kapitalertragsteuer=kap_einb, kapitalertragsteuer_festgesetzt=kapest,
+                           erstattung_einkommensteuer=lst - fest + kap_einb - kapest)
 
         # --- Hebel, die das Einkommen brauchen
         if basis >= sonst_hb and weitere:
@@ -335,6 +512,9 @@ def simuliere(daten: dict, e, r) -> Simulation:
         if schl in b and wert in werte:
             # expenses of the return appear in the notice in whole euros, rounded up (1,267.64 -> 1,268)
             s.abgleich.append((schl.replace("_", " "), dec(b[schl]), werte[wert] if quelle == "s" else euro_auf(werte[wert])))
+        elif schl in b and not s.fehlt:
+            # stated but not computed for this return (no children, no church tax, ...): said, not silently skipped
+            e.hinweise.append(f"bescheid: {schl} wird für diese Erklärung nicht berechnet und nicht verglichen")
 
     if "zumutbare_belastung" in w:
         zb = w["zumutbare_belastung"]

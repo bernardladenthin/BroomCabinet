@@ -65,6 +65,17 @@
   haerteausgleich_grenze: 410
   haerteausgleich_obergrenze: 820
 
+  # Children (§§ 31, 32 (6) EStG): allowances per child for both parents together, half each when
+  # assessed separately; Kindergeld for the first and second child per month. § 32 (6): 2 × 2,358 and 2 × 1,320; Kindergeld 192 € a month
+  kinderfreibetrag: 4716
+  bea_freibetrag: 2640
+  kindergeld_monat: 192
+  kinderbonus: 0
+  kinderbetreuung: {anteil: [2, 3], hoechstbetrag: 4000}      # § 10 (1) no. 5: share of the costs, cap per child
+  zumutbar_kinder_1_2: [[15340, 0.02], [51130, 0.03], [null, 0.04]]   # § 33 (3): one or two children
+  zumutbar_kinder_3: [[15340, 0.01], [51130, 0.01], [null, 0.02]]     # three or more
+  sparer_pauschbetrag: 801                 # § 20 (9), doubled for a couple
+
   # Line numbers of the ELSTER forms 2017, as far as a filed 2017 return shows them
   zeilen_geprueft: true
   zeilen:
@@ -129,6 +140,17 @@
   haerteausgleich_grenze: 410
   haerteausgleich_obergrenze: 820
 
+  # Children (§§ 31, 32 (6) EStG): allowances per child for both parents together, half each when
+  # assessed separately; Kindergeld for the first and second child per month. § 32 (6): 2 × 2,394 and 2 × 1,320; Kindergeld 194 € a month
+  kinderfreibetrag: 4788
+  bea_freibetrag: 2640
+  kindergeld_monat: 194
+  kinderbonus: 0
+  kinderbetreuung: {anteil: [2, 3], hoechstbetrag: 4000}      # § 10 (1) no. 5: share of the costs, cap per child
+  zumutbar_kinder_1_2: [[15340, 0.02], [51130, 0.03], [null, 0.04]]   # § 33 (3): one or two children
+  zumutbar_kinder_3: [[15340, 0.01], [51130, 0.01], [null, 0.02]]     # three or more
+  sparer_pauschbetrag: 801                 # § 20 (9), doubled for a couple
+
   # Line numbers of the ELSTER forms 2018, as far as a filed 2018 return shows them
   zeilen_geprueft: true
   zeilen:
@@ -191,6 +213,17 @@
   riester_hoechstbetrag: 2100
   haerteausgleich_grenze: 410
   haerteausgleich_obergrenze: 820
+
+  # Children (§§ 31, 32 (6) EStG): allowances per child for both parents together, half each when
+  # assessed separately; Kindergeld for the first and second child per month. Familienentlastungsgesetz: 2 × 2,490 and 2 × 1,320; Kindergeld 204 € from July
+  kinderfreibetrag: 4980
+  bea_freibetrag: 2640
+  kindergeld_monat: [194, 194, 194, 194, 194, 194, 204, 204, 204, 204, 204, 204]
+  kinderbonus: 0
+  kinderbetreuung: {anteil: [2, 3], hoechstbetrag: 4000}      # § 10 (1) no. 5: share of the costs, cap per child
+  zumutbar_kinder_1_2: [[15340, 0.02], [51130, 0.03], [null, 0.04]]   # § 33 (3): one or two children
+  zumutbar_kinder_3: [[15340, 0.01], [51130, 0.01], [null, 0.02]]     # three or more
+  sparer_pauschbetrag: 801                 # § 20 (9), doubled for a couple
 
   # Line numbers of the ELSTER forms 2019, as far as a filed 2019 return shows them
   zeilen_geprueft: true
@@ -256,6 +289,17 @@
   haerteausgleich_grenze: 410
   haerteausgleich_obergrenze: 820
 
+  # Children (§§ 31, 32 (6) EStG): allowances per child for both parents together, half each when
+  # assessed separately; Kindergeld for the first and second child per month. 2 × 2,586 and 2 × 1,320; Kindergeld 204 € plus the Kinderbonus of 300 €
+  kinderfreibetrag: 5172
+  bea_freibetrag: 2640
+  kindergeld_monat: 204
+  kinderbonus: 300
+  kinderbetreuung: {anteil: [2, 3], hoechstbetrag: 4000}      # § 10 (1) no. 5: share of the costs, cap per child
+  zumutbar_kinder_1_2: [[15340, 0.02], [51130, 0.03], [null, 0.04]]   # § 33 (3): one or two children
+  zumutbar_kinder_3: [[15340, 0.01], [51130, 0.01], [null, 0.02]]     # three or more
+  sparer_pauschbetrag: 801                 # § 20 (9), doubled for a couple
+
   # Line numbers of the ELSTER forms 2020, as far as a filed 2020 return shows them
   zeilen_geprueft: true
   zeilen:
@@ -317,6 +361,17 @@
   riester_hoechstbetrag: 2100
   haerteausgleich_grenze: 410
   haerteausgleich_obergrenze: 820
+
+  # Children (§§ 31, 32 (6) EStG): allowances per child for both parents together, half each when
+  # assessed separately; Kindergeld for the first and second child per month. 2 × 2,730 and 2 × 1,464; Kindergeld 219 € plus the Kinderbonus of 150 €
+  kinderfreibetrag: 5460
+  bea_freibetrag: 2928
+  kindergeld_monat: 219
+  kinderbonus: 150
+  kinderbetreuung: {anteil: [2, 3], hoechstbetrag: 4000}      # § 10 (1) no. 5: share of the costs, cap per child
+  zumutbar_kinder_1_2: [[15340, 0.02], [51130, 0.03], [null, 0.04]]   # § 33 (3): one or two children
+  zumutbar_kinder_3: [[15340, 0.01], [51130, 0.01], [null, 0.02]]     # three or more
+  sparer_pauschbetrag: 801                 # § 20 (9), doubled for a couple
 
   # Line numbers of the ELSTER forms 2021, as far as a filed 2021 return shows them
   zeilen_geprueft: true
@@ -381,6 +436,17 @@
   haerteausgleich_grenze: 410
   haerteausgleich_obergrenze: 820
 
+  # Children (§§ 31, 32 (6) EStG): allowances per child for both parents together, half each when
+  # assessed separately; Kindergeld for the first and second child per month. 2 × 2,810 (raised retroactively) and 2 × 1,464; Kindergeld 219 € plus the Kinderbonus of 100 €
+  kinderfreibetrag: 5620
+  bea_freibetrag: 2928
+  kindergeld_monat: 219
+  kinderbonus: 100
+  kinderbetreuung: {anteil: [2, 3], hoechstbetrag: 4000}      # § 10 (1) no. 5: share of the costs, cap per child
+  zumutbar_kinder_1_2: [[15340, 0.02], [51130, 0.03], [null, 0.04]]   # § 33 (3): one or two children
+  zumutbar_kinder_3: [[15340, 0.01], [51130, 0.01], [null, 0.02]]     # three or more
+  sparer_pauschbetrag: 801                 # § 20 (9), doubled for a couple
+
   # Line numbers of the ELSTER forms 2022: not taken from a filed return yet
   zeilen_geprueft: false
   zeilen: {}
@@ -439,6 +505,17 @@
   riester_hoechstbetrag: 2100              # contributions plus allowance, per entitled person
   haerteausgleich_grenze: 410              # other income up to this is left untaxed ...
   haerteausgleich_obergrenze: 820          # ... and the relief tapers off up to this
+
+  # Children (§§ 31, 32 (6) EStG): allowances per child for both parents together, half each when
+  # assessed separately; Kindergeld for the first and second child per month. 2 × 3,012 and 2 × 1,464; Kindergeld 250 € for every child
+  kinderfreibetrag: 6024
+  bea_freibetrag: 2928
+  kindergeld_monat: 250
+  kinderbonus: 0
+  kinderbetreuung: {anteil: [2, 3], hoechstbetrag: 4000}      # § 10 (1) no. 5: share of the costs, cap per child
+  zumutbar_kinder_1_2: [[15340, 0.02], [51130, 0.03], [null, 0.04]]   # § 33 (3): one or two children
+  zumutbar_kinder_3: [[15340, 0.01], [51130, 0.01], [null, 0.02]]     # three or more
+  sparer_pauschbetrag: 1000                 # § 20 (9), doubled for a couple
 
   # Line numbers of the ELSTER forms 2023, as far as a filed 2023 return shows them
   zeilen_geprueft: true
@@ -505,6 +582,17 @@
   haerteausgleich_grenze: 410              # other income up to this is left untaxed ...
   haerteausgleich_obergrenze: 820          # ... and the relief tapers off up to this
 
+  # Children (§§ 31, 32 (6) EStG): allowances per child for both parents together, half each when
+  # assessed separately; Kindergeld for the first and second child per month. 2 × 3,306 (raised retroactively) and 2 × 1,464; Kindergeld 250 €
+  kinderfreibetrag: 6612
+  bea_freibetrag: 2928
+  kindergeld_monat: 250
+  kinderbonus: 0
+  kinderbetreuung: {anteil: [2, 3], hoechstbetrag: 4000}      # § 10 (1) no. 5: share of the costs, cap per child
+  zumutbar_kinder_1_2: [[15340, 0.02], [51130, 0.03], [null, 0.04]]   # § 33 (3): one or two children
+  zumutbar_kinder_3: [[15340, 0.01], [51130, 0.01], [null, 0.02]]     # three or more
+  sparer_pauschbetrag: 1000                 # § 20 (9), doubled for a couple
+
   # Line numbers of the ELSTER forms 2024, as far as a filed 2024 return shows them
   # (the home-office day rate and work equipment were not used there, so their lines are not known)
   zeilen_geprueft: true
@@ -568,6 +656,17 @@
   haerteausgleich_grenze: 410              # other income up to this is left untaxed ...
   haerteausgleich_obergrenze: 820          # ... and the relief tapers off up to this
 
+  # Children (§§ 31, 32 (6) EStG): allowances per child for both parents together, half each when
+  # assessed separately; Kindergeld for the first and second child per month. 2 × 3,336 and 2 × 1,464; Kindergeld 255 €; childcare 80 %, at most 4,800 €
+  kinderfreibetrag: 6672
+  bea_freibetrag: 2928
+  kindergeld_monat: 255
+  kinderbonus: 0
+  kinderbetreuung: {anteil: [4, 5], hoechstbetrag: 4800}      # § 10 (1) no. 5: share of the costs, cap per child
+  zumutbar_kinder_1_2: [[15340, 0.02], [51130, 0.03], [null, 0.04]]   # § 33 (3): one or two children
+  zumutbar_kinder_3: [[15340, 0.01], [51130, 0.01], [null, 0.02]]     # three or more
+  sparer_pauschbetrag: 1000                 # § 20 (9), doubled for a couple
+
   # Line numbers of the ELSTER forms 2025, checked against a filed 2025 return
   zeilen_geprueft: true
   zeilen:
@@ -629,6 +728,17 @@
   riester_hoechstbetrag: 2100              # contributions plus allowance, per entitled person
   haerteausgleich_grenze: 410              # other income up to this is left untaxed ...
   haerteausgleich_obergrenze: 820          # ... and the relief tapers off up to this
+
+  # Children (§§ 31, 32 (6) EStG): allowances per child for both parents together, half each when
+  # assessed separately; Kindergeld for the first and second child per month. 2 × 3,414 and 2 × 1,464; Kindergeld 259 €
+  kinderfreibetrag: 6828
+  bea_freibetrag: 2928
+  kindergeld_monat: 259
+  kinderbonus: 0
+  kinderbetreuung: {anteil: [4, 5], hoechstbetrag: 4800}      # § 10 (1) no. 5: share of the costs, cap per child
+  zumutbar_kinder_1_2: [[15340, 0.02], [51130, 0.03], [null, 0.04]]   # § 33 (3): one or two children
+  zumutbar_kinder_3: [[15340, 0.01], [51130, 0.01], [null, 0.02]]     # three or more
+  sparer_pauschbetrag: 1000                 # § 20 (9), doubled for a couple
 
   # Line numbers: forms 2026 not compared yet, the 2025 lines for now
   zeilen_geprueft: false
