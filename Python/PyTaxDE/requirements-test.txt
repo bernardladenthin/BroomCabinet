@@ -4,4 +4,4 @@
 
 # What the tests need beyond the standard library (installed by the Python CI if present).
 # Pinned, like ruff: an unpinned package changes a test result under an unchanged tree.
-PyYAML==6.0.3
+PyYAML==6.0.4
