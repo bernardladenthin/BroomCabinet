@@ -11,12 +11,14 @@ One return:
     python pytaxde.py "Steuererklärung 2025.yaml" --details   with the calculation of every item
     python pytaxde.py "Steuererklärung 2025.yaml" --belege    every receipt exists, no file named only in a comment
     python pytaxde.py "Steuererklärung 2025.yaml" --pruefen   self-test: same as its block in Steuererklärungen.json?
+    python pytaxde.py "Steuererklärung 2025.md" --verweise    every link and path of the note exists (taxde/verweise.py)
     python pytaxde.py "Steuererklärung 2025.yaml" --json      accept its result into Steuererklärungen.json
 
 A folder (its YAML files and those one level below, each with a `jahr:`):
     python pytaxde.py D:\data\Steuer                          one line per return
     python pytaxde.py D:\data\Steuer --pruefen [--jahr 2025]  self-test of all returns (or of some years)
     python pytaxde.py D:\data\Steuer --belege                 receipts of all returns
+    python pytaxde.py D:\data\Steuer --verweise               links and paths of the notes (*.md) beside the returns
     python pytaxde.py D:\data\Steuer --json [--jahr 2025]     write Steuererklärungen.json (or only those years' blocks)
     python pytaxde.py D:\data\Steuer --anzeigen               the viewer in the browser, data fresh from the YAML files
 
@@ -106,6 +108,23 @@ def belege_zeigen(yaml, basis=None, name=None) -> int:
     return 1 if fehlt or nur_kommentar else 0
 
 
+# ------------------------------------------------------------------ links and paths in the notes
+def verweise_zeigen(md, name=None) -> int:
+    from taxde.verweise import verweise, verweise_pruefen
+    md = Path(md)
+    alle = verweise(md.read_text(encoding="utf-8"))
+    fehlt = verweise_pruefen(md)
+    print(f"{name or md.name}: {mehrzahl(len(alle), 'Verweis', 'Verweise')}, {len(fehlt)} nicht gefunden")
+    for nr, art, ziel in fehlt:
+        print(f"  FEHLT  Zeile {nr} ({'Link' if art == 'link' else 'Pfad'}): {ziel}")
+    return 1 if fehlt else 0
+
+
+def notizen(ordner, yamls) -> list:
+    """The Markdown notes beside the returns: every *.md in a folder that holds a return."""
+    return sorted({md for y in yamls for md in Path(y).parent.glob("*.md")})
+
+
 # ------------------------------------------------------------------ writing the file
 def json_schreiben(ordner, nur=None) -> int:
     from taxde import gesamt
@@ -144,6 +163,12 @@ def ordner_modus(a) -> int:
         return anzeigen(ordner, a.port, not a.kein_browser)
     if a.belege:
         return max(belege_zeigen(y, None, gesamt.schluessel(y, ordner)) for y in yamls)
+    if a.verweise:
+        mds = notizen(ordner, yamls)
+        if not mds:
+            print(f"keine Notiz (*.md) neben den Steuererklärungen in {ordner}")
+            return 0
+        return max(verweise_zeigen(md, gesamt.schluessel(md, ordner)) for md in mds)
     if a.json:
         return json_schreiben(ordner, yamls if a.jahr else None)
     frisch = gesamt.bauen(ordner)
@@ -161,6 +186,8 @@ def main(argv=None):
     ap.add_argument("pfad", help="eine Steuererklärung (YAML) oder ein Ordner mit Steuererklärungen")
     ap.add_argument("--details", action="store_true", help="auch jeden Posten mit Rechnung zeigen")
     ap.add_argument("--belege", action="store_true", help="nur prüfen, ob alle Belege existieren")
+    ap.add_argument("--verweise", action="store_true",
+                    help="prüfen, ob jeder Link und Pfad der Notizen (*.md) existiert; bei einer YAML: ihre .md")
     ap.add_argument("--basis", help="Ordner, gegen den Belege aufgelöst werden (Standard: Ordner der YAML-Datei)")
     ap.add_argument("--json", action="store_true", help="Ergebnis in Steuererklärungen.json übernehmen")
     ap.add_argument("--pruefen", action="store_true",
@@ -178,6 +205,12 @@ def main(argv=None):
         return ordner_modus(a)
     if a.belege:
         return belege_zeigen(a.pfad, a.basis)
+    if a.verweise:
+        md = Path(a.pfad).with_suffix(".md")
+        if not md.exists():
+            print(f"keine Notiz {md.name} neben {Path(a.pfad).name}")
+            return 0
+        return verweise_zeigen(md)
     if a.anzeigen:
         from taxde.anzeige import anzeigen
         from taxde.gesamt import finde_gesamt

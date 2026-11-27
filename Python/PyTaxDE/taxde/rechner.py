@@ -10,6 +10,7 @@ income-related expenses), Anlage SO (other income), Anlage V (rental income), do
 burden (zumutbare Belastung). Individual or joint assessment (`veranlagung: zusammen` with a
 `person_b` block holding the second person's wage, commute, expenses and insurance).
 """
+import os
 import re
 from dataclasses import dataclass, field
 from decimal import Decimal as D
@@ -419,13 +420,22 @@ def dateinamen_in_kommentaren(pfad) -> list:
     return out
 
 
+def belege_basis(pfad, daten=None) -> Path:
+    """The folder the receipts of a return are relative to: the YAML's own folder, or the one its
+    `belege_ordner:` names (relative to the YAML) -- for YAML files kept apart from their receipts."""
+    pfad = Path(pfad)
+    daten = laden(pfad) if daten is None else daten
+    return Path(os.path.normpath(pfad.parent / str((daten or {}).get("belege_ordner") or ".")))
+
+
 def belege_pruefen(pfad, basis=None) -> list:
-    """Checks every receipt relative to the folder of the YAML file (or `basis`); * and ? are allowed.
+    """Checks every receipt relative to belege_basis() (or `basis`); * and ? are allowed.
     Returns (where, receipt) for every receipt that was not found."""
     pfad = Path(pfad)
-    basis = Path(basis) if basis else pfad.parent
+    daten = laden(pfad)
+    basis = Path(basis) if basis else belege_basis(pfad, daten)
     fehlt = []
-    for stelle, b in belege(laden(pfad)):
+    for stelle, b in belege(daten):
         if "*" in b or "?" in b:
             ok = any(basis.glob(b))
         else:

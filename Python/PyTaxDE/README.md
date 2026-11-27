@@ -29,6 +29,7 @@ allowances not used yet, a cap already reached, what one more euro of expenses i
 | `taxde/anzeige.py` | `--anzeigen`: serves the viewer on 127.0.0.1 with the data fresh from the YAML files and the receipts linked |
 | `taxde/posten.py` | the forms an item can take (fixed, monthly, count × price, telecom 20 %, commute, ...) |
 | `taxde/arbeitstage.py` | working days in Berlin, to check office and home-office days |
+| `taxde/verweise.py` | `--verweise`: every link and every path of the Markdown note beside a return exists |
 | `example/` | three **fictitious** returns with randomly drawn amounts, and their accepted result `Steuererklärungen.json` |
 | `taxde_test.py` | the rules one by one, every expected figure worked out in a comment |
 | `examples_test.py` | the three examples end to end, against a calculation by hand made without this library |
@@ -42,10 +43,12 @@ imports work without it.
     python pytaxde.py "Steuererklärung 2025.yaml" --belege     every receipt exists, and no file is named only in a comment
     python pytaxde.py "Steuererklärung 2025.yaml" --pruefen    self-test: exit status 0 same, 1 different, 2 not stored yet
     python pytaxde.py "Steuererklärung 2025.yaml" --json       accept its result into Steuererklärungen.json
+    python pytaxde.py "Steuererklärung 2025.yaml" --verweise   its note (Steuererklärung 2025.md): every link and path exists
 
     python pytaxde.py example                                  a folder: one line per return
     python pytaxde.py example --pruefen [--jahr 2025]          the self-test of all returns, or of some years
     python pytaxde.py example --json [--jahr 2025]             write Steuererklärungen.json, or only those years' blocks
+    python pytaxde.py example --verweise                       the notes (*.md) beside the returns: links and paths
     python pytaxde.py example --anzeigen                       the viewer in the browser
 
 **German on purpose.** Keys, identifiers and output use the words of the forms (Werbungskosten,
@@ -68,7 +71,7 @@ werbungskosten:
     - {bezeichnung: "Internet Festnetz", art: telekom, monatlich: 39.47, monate: 12}
     - bezeichnung: "Fachzeitschrift, Jahresabo"
       betrag: 89.40
-      belege: ["Belege/Rechnung Fachzeitschrift.pdf"]   # relative to the YAML file, * allowed
+      belege: ["Belege/Rechnung Fachzeitschrift.pdf"]   # relative to the YAML file (or belege_ordner:), * allowed
 spenden:
   - {bezeichnung: "Tierschutzverein", monatlich: 27, monate: 12}
   - {bezeichnung: "Spende", offen: true, notiz: "Zuwendungsbestätigung fehlt"}
@@ -230,6 +233,20 @@ Keep the returns next to their receipts, outside this repository, with the folde
 `Steuererklärungen.json` beside them -- or, if the folder has a subfolder `PyTaxDEConfig/`, in there,
 next to whatever else belongs to the tooling rather than to a year. Nothing else is needed: no test
 file of your own, no copy of your numbers here.
+
+The YAML files themselves may live in `PyTaxDEConfig/` too, all years side by side, while each year's
+receipts stay in its own folder. A top-level `belege_ordner:` then says where the receipts are,
+relative to the YAML file, and every `belege:` entry keeps its path relative to that folder:
+
+```yaml
+jahr: 2025
+belege_ordner: "../2025 Steuererklärung"
+```
+
+A note in Markdown beside the YAML (`Steuererklärung 2025.md`: what was filed, what lies where) is
+checked by `--verweise`: every link must exist relative to the note, as in any editor that follows it,
+and every path in a code span (`` `2026-05-21 Bescheid\` ``) relative to the receipts' folder, as in
+the YAML. "…" abbreviates a long file name; commands, web addresses and code blocks are left alone.
 
 Before a commit, let the privacy test read your real returns: it then fails on any of their words or
 numbers that made it into this project (an example modelled on your own year, say). It keeps no list

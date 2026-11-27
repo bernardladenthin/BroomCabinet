@@ -100,6 +100,25 @@ class Ablage(unittest.TestCase):
             self.assertTrue((o / "PyTaxDEConfig" / "Steuererklärungen.json").exists())
             self.assertFalse((o / "Steuererklärungen.json").exists())
             self.assertEqual(gesamt.finde_gesamt(o / "2025 Steuererklärung" / "x.yaml"), o.resolve())
+            self.assertEqual(gesamt.finde_gesamt(o / "PyTaxDEConfig" / "x.yaml"), o.resolve())
+
+    def test_receipts_relative_to_belege_ordner(self):
+        import tempfile
+        from pathlib import Path
+
+        from taxde.rechner import belege_basis
+        with tempfile.TemporaryDirectory() as t:
+            o = Path(t)
+            (o / "PyTaxDEConfig").mkdir()
+            (o / "2025 Steuererklärung").mkdir()
+            (o / "2025 Steuererklärung" / "Bescheid.pdf").write_bytes(b"%PDF")
+            y = o / "PyTaxDEConfig" / "Steuererklärung 2025.yaml"
+            y.write_text('jahr: 2025\nbelege_ordner: "../2025 Steuererklärung"\nbescheid: {belege: [Bescheid.pdf]}\n',
+                         encoding="utf-8")
+            self.assertEqual(belege_basis(y), o / "2025 Steuererklärung")
+            self.assertEqual(belege_pruefen(y), [])
+            y.write_text("jahr: 2025\nbescheid: {belege: [Bescheid.pdf]}\n", encoding="utf-8")
+            self.assertEqual(belege_pruefen(y), [("bescheid", "Bescheid.pdf")])
 
 
 class Studie(unittest.TestCase):
@@ -150,6 +169,46 @@ class Studie(unittest.TestCase):
                              ({"termine": 2, "parken": [3], "parken_je_termin": 3}, "nicht beides")):
             with self.subTest(text), self.assertRaisesRegex(ValueError, text):
                 self.so(2026, 100, **studie)
+
+
+class Verweise(unittest.TestCase):
+    """The note beside a return: links relative to it, code-span paths relative to the receipts' folder."""
+
+    NOTIZ = "\n".join([
+        "Alles in [`Steuererklärung 2025.yaml`](<Steuererklärung 2025.yaml>), [Web](https://example.org),",
+        "[Anker](#oben), ![Bild](<../2025 Steuererklärung/Bescheid.pdf>) und [fehlt](<weg.pdf>).",
+        "| `2026-05-21 Bescheid\\` | Bescheid |",
+        "| `Übertragungsprotokoll_…_2025.pdf` | abgekürzt |",
+        "| `2026-04-03 … ELSTER ….png` | abgekürzt, mit Leerzeichen |",
+        "| `nicht_da.pdf` | fehlt |",
+        "Kein Pfad: `bescheid:`, `--belege`, `python -B x.py --pruefen`, `$a = 1`.",
+        "```powershell",
+        'cd "gibt es nicht\\"',
+        "```",
+        "[ref]: <../2025 Steuererklärung/>",
+    ]) + "\n"
+
+    def test_links_and_paths_against_their_folders(self):
+        import tempfile
+        from pathlib import Path
+
+        from taxde.verweise import verweise, verweise_pruefen
+        self.assertEqual([(a, z) for _, a, z in verweise(self.NOTIZ)], [
+            ("link", "Steuererklärung 2025.yaml"), ("link", "../2025 Steuererklärung/Bescheid.pdf"),
+            ("link", "weg.pdf"), ("pfad", "2026-05-21 Bescheid\\"), ("pfad", "Übertragungsprotokoll_…_2025.pdf"),
+            ("pfad", "2026-04-03 … ELSTER ….png"), ("pfad", "nicht_da.pdf"), ("link", "../2025 Steuererklärung/")])
+        with tempfile.TemporaryDirectory() as t:
+            o = Path(t)
+            jahr, konfig = o / "2025 Steuererklärung", o / "PyTaxDEConfig"
+            (jahr / "2026-05-21 Bescheid").mkdir(parents=True)
+            konfig.mkdir()
+            for f in ("Bescheid.pdf", "Übertragungsprotokoll_ESt_123_2025.pdf", "2026-04-03 16_24_20-ELSTER - ESt.png"):
+                (jahr / f).write_bytes(b"x")
+            (konfig / "Steuererklärung 2025.yaml").write_text(
+                'jahr: 2025\nbelege_ordner: "../2025 Steuererklärung"\n', encoding="utf-8")
+            md = konfig / "Steuererklärung 2025.md"
+            md.write_text(self.NOTIZ, encoding="utf-8")
+            self.assertEqual(verweise_pruefen(md), [(2, "link", "weg.pdf"), (6, "pfad", "nicht_da.pdf")])
 
 
 class Kalender(unittest.TestCase):

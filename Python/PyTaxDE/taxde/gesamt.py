@@ -30,7 +30,7 @@ from pathlib import Path
 
 from .ergebnis import als_dict, als_json, lesen, unterschiede
 from .posten import STUDIE_KATEGORIEN, dec, euro_ab
-from .rechner import Rechner, belege, laden
+from .rechner import Rechner, belege, belege_basis, laden
 
 DATEI = "Steuererklärungen.json"
 KONFIG = "PyTaxDEConfig"            # optional subfolder for the JSON (and the private scripts, lists)
@@ -64,9 +64,12 @@ def datei(ordner) -> Path:
 
 
 def finde_gesamt(yaml):
-    """The folder whose Steuererklärungen.json holds this YAML: its own folder or the one above.
+    """The folder whose Steuererklärungen.json holds this YAML: its own folder or the one above (always
+    the one above for a YAML in PyTaxDEConfig/).
     Without such a file: the folder above if the YAML sits in a year folder, else its own folder."""
     p = Path(yaml).resolve()
+    if p.parent.name == KONFIG:                         # the returns kept in PyTaxDEConfig/ of their folder
+        return p.parent.parent
     for o in (p.parent, p.parent.parent):
         if datei(o).exists():
             return o
@@ -221,7 +224,7 @@ REGELN = ("grundfreibetrag", "arbeitnehmer_pauschbetrag", "entfernung", "homeoff
 
 
 def anzeige(e, daten, yaml: Path, ordner: Path, r) -> dict:
-    basis = yaml.parent
+    basis = belege_basis(yaml, daten)
     abschnitte = []
     for ab in e.abschnitte:
         abschnitte.append({
